@@ -1,0 +1,22 @@
+{
+  "name": "pos-super-new-ui-automation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright + TypeScript UI automation project for the POS frontend",
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test tests/smoke",
+    "test:e2e": "playwright test tests/e2e",
+    "test:headed": "playwright test --headed",
+    "codegen": "playwright codegen http://192.168.0.89:22080/kpos/front2/myhome.html",
+    "allure:generate": "allure generate allure-results --clean -o allure-report",
+    "allure:open": "allure open allure-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.6.0",
+    "allure-commandline": "^2.38.1",
+    "allure-playwright": "^3.6.0",
+    "typescript": "^5.9.3"
+  }
+}
