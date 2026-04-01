@@ -24,6 +24,7 @@ export class LicenseSelectionPage {
     this.enterButton = this.page.getByText('Enter', { exact: true });
     this.titleHeaders = this.page.getByText(/^(POS LICENSE|TYPE|STATUS)$/);
     this.licenseRows = this.page.locator('.selectbx .tablebx > .skOneRow');
+    this.licenseRows = this.page.locator('.selectbx .tablebx > .skOneRow');
   }
 
   @step('页面操作：确认 License 选择区域已经显示')

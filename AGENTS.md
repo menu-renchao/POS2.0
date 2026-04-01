@@ -26,6 +26,9 @@ This repository is a maintainable Playwright + TypeScript UI automation project 
 
 - `pages/` only holds page structure, locators, page-level actions, and page-level reads.
 - `pages/` can do things like: click a button, fill an input, switch a tab, read a table number, return a locator or page data.
+- All stable selectors in `pages/` must be centralized on the page object, either as class-level locator fields or dedicated private locator factory methods.
+- Do not scatter raw `getByRole(...)`, `getByText(...)`, `locator(...)`, or selector strings throughout page action/read methods when those selectors belong to the page structure.
+- If a selector is reused, semantically important, or represents a stable page element such as a button, dialog, input, tab, list, or summary area, define it once and consume it through the centralized page locator API.
 - `pages/` must not contain business selection strategy or cross-step intent such as “select any available table”, “pick the first usable license”, “enter the system with employee context”, or other business-level decisions.
 - `flows/` only holds business intent, multi-step orchestration, and selection strategy.
 - `flows/` can combine multiple page actions, decide which record to pick, decide fallback order, and return business-level results.
@@ -56,6 +59,12 @@ test(
 - Treat "login" as employee context entry or employee switching during operations.
 - Prefer expressing employee context through flows and fixtures.
 - Keep room for optional API-assisted setup or `storageState`, but do not make that the default strategy.
+
+## Navigation Rules
+
+- Do not open POS inner pages by direct URL, hash, or deep link such as `#orderDishes`.
+- Always enter the app from `http://192.168.0.89:22080/kpos/front2/myhome.html`, then navigate through the UI flow to the target page.
+- Apply the same rule to every in-app page, not only the order-dishes page.
 
 ## Test Design
 

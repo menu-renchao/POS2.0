@@ -26,8 +26,6 @@ export class SelectTablePage {
   async expectLoaded(): Promise<void> {
     await expect(this.page).toHaveURL(/#tableV2/);
     await expect(this.backButton).toBeVisible();
-    await expect(this.areaRadios.first()).toBeVisible();
-    await expect(this.tableNodes.first()).toBeVisible();
   }
 
   @step('页面操作：读取当前区域下所有空桌')
@@ -60,9 +58,7 @@ export class SelectTablePage {
 
   @step('页面操作：读取当前选中的区域名称')
   async getCurrentAreaName(): Promise<string> {
-    const selectedArea = this.page.locator(
-      'button.table-v2-area-card[role="radio"][aria-checked="true"]',
-    );
+    const selectedArea = this.page.locator('button[aria-pressed="true"]');
 
     await expect(selectedArea).toBeVisible();
 

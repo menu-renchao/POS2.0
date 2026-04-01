@@ -88,21 +88,25 @@ export class HomePage {
 
   @step((buttonName: string) => `页面操作：在主页中查找 ${buttonName} 功能入口，若未显示则展开更多菜单后查找`)
   private async resolveFunctionButton(buttonName: string): Promise<Locator> {
-    const visibleButton = await this.findVisibleFunctionButton(buttonName);
+    let resolvedButton: Locator | null = null;
 
-    if (visibleButton) {
-      return visibleButton;
+    await expect(async () => {
+      resolvedButton = await this.findVisibleFunctionButton(buttonName);
+
+      if (resolvedButton) {
+        return;
+      }
+
+      await this.openMoreMenu();
+      resolvedButton = await this.findVisibleFunctionButton(buttonName);
+      expect(resolvedButton).toBeTruthy();
+    }).toPass({ timeout: 10_000 });
+
+    if (!resolvedButton) {
+      throw new Error(`Unable to find function button on home page: ${buttonName}`);
     }
 
-    await this.openMoreMenu();
-
-    const expandedButton = await this.findVisibleFunctionButton(buttonName);
-
-    if (expandedButton) {
-      return expandedButton;
-    }
-
-    throw new Error(`Unable to find function button on home page: ${buttonName}`);
+    return resolvedButton;
   }
 
   @step('页面操作：点击更多菜单展开按钮')
