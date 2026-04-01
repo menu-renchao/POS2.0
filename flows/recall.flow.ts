@@ -1,4 +1,7 @@
-import { RecallPage } from '../pages/recall.page';
+import {
+  RecallPage,
+  type RecallOrderDetails,
+} from '../pages/recall.page';
 import {
   type RecallManualSearchTag,
   type RecallOrderStatus,
@@ -79,6 +82,18 @@ export class RecallFlow {
     await recallPage.clearAllSearchConditions();
     return recallPage;
   }
+
+  @step((_: RecallPage, orderNumber: string) => `业务步骤：查看订单 ${orderNumber} 的详情并在读取完成后关闭弹窗`)
+  async viewOrderDetails(recallPage: RecallPage, orderNumber: string): Promise<RecallOrderDetails> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber);
+
+    try {
+      return await recallPage.readOrderDetailsSnapshot();
+    } finally {
+      await recallPage.closeOrderDetailsDialog();
+    }
+  }
 }
 
 export async function searchRecallOrders(
@@ -92,4 +107,12 @@ export async function searchRecallOrders(
 export async function clearRecallSearchConditions(recallPage: RecallPage): Promise<RecallPage> {
   const recallFlow = new RecallFlow();
   return await recallFlow.clearSearchConditions(recallPage);
+}
+
+export async function viewRecallOrderDetails(
+  recallPage: RecallPage,
+  orderNumber: string,
+): Promise<RecallOrderDetails> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.viewOrderDetails(recallPage, orderNumber);
 }

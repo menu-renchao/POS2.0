@@ -8,6 +8,7 @@ import {
   RecallPaymentTypes,
   RecallProductLines,
 } from '../../test-data/recall-search-options';
+import { waitUntil } from '../../utils/wait';
 
 const recallFixtureHtml = String.raw`
 <!DOCTYPE html>
@@ -155,11 +156,29 @@ test.describe('Recall 页面选择器契约', () => {
         await recallPage.fillManualSearchKeyword('1001');
         await recallPage.submitManualSearch();
 
-        await expect.poll(async () => await recallPage.readManualSearchKeyword()).toBe('1001');
+        const submittedKeyword = await waitUntil(
+          async () => await recallPage.readManualSearchKeyword(),
+          (keyword) => keyword === '1001',
+          {
+            timeout: 2_000,
+            interval: 20,
+            message: 'Recall manual search keyword was not submitted in time.',
+          },
+        );
+        expect(submittedKeyword).toBe('1001');
 
         await recallPage.clearAllSearchConditions();
 
-        await expect.poll(async () => await recallPage.readManualSearchKeyword()).toBe('');
+        const clearedKeyword = await waitUntil(
+          async () => await recallPage.readManualSearchKeyword(),
+          (keyword) => keyword === '',
+          {
+            timeout: 2_000,
+            interval: 20,
+            message: 'Recall manual search keyword was not cleared in time.',
+          },
+        );
+        expect(clearedKeyword).toBe('');
         await expect(page.getByTestId('recall2-active-filter-bar').locator('button')).toHaveCount(0);
       });
     },

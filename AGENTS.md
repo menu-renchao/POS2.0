@@ -12,9 +12,11 @@ This repository is a maintainable Playwright + TypeScript UI automation project 
 ## Automation Rules
 
 - Use Playwright Test as the default runner.
+- Prefer `data-testid` locators first for stable elements. Only fall back to other locator strategies such as `getByRole`, `getByLabel`, or `getByText` when no reliable `data-testid` is available.
 - Prefer semantic locators such as `getByRole`, `getByLabel`, and `getByText`.
 - Do not default to brittle CSS chains, nth-child selectors, or XPath.
 - Do not use `waitForTimeout` in tests or helpers.
+- Prefer `utils/wait.ts` `waitUntil()` for condition polling that may retry multiple times. Avoid `expect(...).toPass()` and `expect.poll()` in page objects, flows, helpers, and tests when they would create noisy intermediate failures in reports. Assert only the final settled result.
 - Every method in `pages/` and `flows/` must use Chinese `@step(...)` descriptions for report display.
 - Do not keep page/flow action descriptions only in comments; convert those descriptions into executable report steps.
 - Every `describe` and `test` title must be written in Chinese.

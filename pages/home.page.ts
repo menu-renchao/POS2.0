@@ -8,6 +8,7 @@ import { SelectTablePage } from './select-table.page';
 import { appConfig } from '../test-data/env';
 import { expectPathname } from '../utils/expectations';
 import { step } from '../utils/step';
+import { waitUntil } from '../utils/wait';
 
 export class HomePage {
   private readonly appFrame: ReturnType<Page['frameLocator']>;
@@ -88,22 +89,26 @@ export class HomePage {
 
   @step((buttonName: string) => `页面操作：在主页中查找 ${buttonName} 功能入口，若未显示则展开更多菜单后查找`)
   private async resolveFunctionButton(buttonName: string): Promise<Locator> {
-    let resolvedButton: Locator | null = null;
+    const resolvedButton = await waitUntil(
+      async () => {
+        const visibleButton = await this.findVisibleFunctionButton(buttonName);
 
-    await expect(async () => {
-      resolvedButton = await this.findVisibleFunctionButton(buttonName);
+        if (visibleButton) {
+          return visibleButton;
+        }
 
-      if (resolvedButton) {
-        return;
-      }
-
-      await this.openMoreMenu();
-      resolvedButton = await this.findVisibleFunctionButton(buttonName);
-      expect(resolvedButton).toBeTruthy();
-    }).toPass({ timeout: 10_000 });
+        await this.openMoreMenu();
+        return await this.findVisibleFunctionButton(buttonName);
+      },
+      (resolvedButton): resolvedButton is Locator => Boolean(resolvedButton),
+      {
+        timeout: 10_000,
+        message: `Unable to find function button on home page: ${buttonName}.`,
+      },
+    );
 
     if (!resolvedButton) {
-      throw new Error(`Unable to find function button on home page: ${buttonName}`);
+      throw new Error(`Unable to find function button on home page: ${buttonName}.`);
     }
 
     return resolvedButton;

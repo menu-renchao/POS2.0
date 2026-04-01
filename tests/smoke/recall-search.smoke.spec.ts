@@ -8,6 +8,7 @@ import { openHome } from '../../flows/home.flow';
 import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
 import { test } from '../../fixtures/test.fixture';
 import { RecallManualSearchTags } from '../../test-data/recall-search-options';
+import { waitUntil } from '../../utils/wait';
 
 test.describe('Recall 搜索冒烟', () => {
   test(
@@ -37,7 +38,14 @@ test.describe('Recall 搜索冒烟', () => {
 
       await recallPage.expectLoaded();
 
-      const visibleOrderNumbers = await recallPage.readVisibleOrderNumbers();
+      const visibleOrderNumbers = await waitUntil(
+        async () => await recallPage.readVisibleOrderNumbers(),
+        (orderNumbers) => orderNumbers.length > 0,
+        {
+          timeout: 10_000,
+          message: 'Recall order list did not load any order numbers in time.',
+        },
+      );
       const targetOrderNumber = visibleOrderNumbers[0];
 
       expect(targetOrderNumber).toBeTruthy();
@@ -49,20 +57,51 @@ test.describe('Recall 搜索冒烟', () => {
         },
       });
 
-      await expect
-        .poll(async () => {
-          const orderNumbers = await recallPage.readVisibleOrderNumbers();
-          return orderNumbers.length > 0 && orderNumbers.every((orderNumber) => orderNumber === targetOrderNumber);
-        })
-        .toBe(true);
+      const filteredOrderNumbers = await waitUntil(
+        async () => await recallPage.readVisibleOrderNumbers(),
+        (orderNumbers) =>
+          orderNumbers.length > 0 &&
+          orderNumbers.every((orderNumber) => orderNumber === targetOrderNumber),
+        {
+          timeout: 10_000,
+          message: `Recall order list did not narrow down to ${targetOrderNumber}.`,
+        },
+      );
+
+      expect(filteredOrderNumbers.length).toBeGreaterThan(0);
+      expect(filteredOrderNumbers.every((orderNumber) => orderNumber === targetOrderNumber)).toBe(true);
 
       await clearRecallSearchConditions(recallPage);
 
-      await expect.poll(async () => await recallPage.readManualSearchKeyword()).toBe('');
-      await expect.poll(async () => await recallPage.readActiveFilterTexts()).toEqual([]);
-      await expect
-        .poll(async () => (await recallPage.readVisibleOrderNumbers()).length)
-        .toBeGreaterThan(0);
+      const clearedKeyword = await waitUntil(
+        async () => await recallPage.readManualSearchKeyword(),
+        (keyword) => keyword === '',
+        {
+          timeout: 10_000,
+          message: 'Recall manual search keyword was not cleared in time.',
+        },
+      );
+      expect(clearedKeyword).toBe('');
+
+      const activeFilterTexts = await waitUntil(
+        async () => await recallPage.readActiveFilterTexts(),
+        (filters) => filters.length === 0,
+        {
+          timeout: 10_000,
+          message: 'Recall active filters were not cleared in time.',
+        },
+      );
+      expect(activeFilterTexts).toEqual([]);
+
+      const visibleOrderNumbersAfterClear = await waitUntil(
+        async () => await recallPage.readVisibleOrderNumbers(),
+        (orderNumbers) => orderNumbers.length > 0,
+        {
+          timeout: 10_000,
+          message: 'Recall order list did not recover after clearing filters.',
+        },
+      );
+      expect(visibleOrderNumbersAfterClear.length).toBeGreaterThan(0);
     },
   );
 });

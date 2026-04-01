@@ -8,6 +8,56 @@ import {
   type RecallProductLine,
 } from '../test-data/recall-search-options';
 import { step } from '../utils/step';
+import { waitUntil } from '../utils/wait';
+
+export type RecallCustomerInfo = {
+  name: string;
+  phone: string;
+  address: string | null;
+  note: string | null;
+};
+
+export type RecallMemberInfo = {
+  entries: string[];
+};
+
+export type RecallOrderContext = {
+  orderType: string | null;
+  tableName: string | null;
+  guestCount: string | null;
+  serverName: string | null;
+};
+
+export type RecallOrderPaymentRecord = {
+  method: string;
+  amount: string | null;
+  details: Record<string, string>;
+};
+
+export type RecallOrderItemAddition = {
+  name: string;
+  price?: string;
+};
+
+export type RecallOrderItem = {
+  seat: string | null;
+  sentTime: string | null;
+  quantity: string | null;
+  name: string;
+  price: string | null;
+  additions: RecallOrderItemAddition[];
+};
+
+export type RecallOrderDetails = {
+  orderNumber: string;
+  paymentStatus: string | null;
+  customerInfo: RecallCustomerInfo | null;
+  memberInfo: RecallMemberInfo | null;
+  orderContext: RecallOrderContext;
+  payments: RecallOrderPaymentRecord[];
+  items: RecallOrderItem[];
+  priceSummary: Record<string, string>;
+};
 
 export class RecallPage {
   private readonly newOrderButton: Locator;
@@ -31,6 +81,8 @@ export class RecallPage {
   private readonly searchDialogSubmitButton: Locator;
   private readonly searchDialogKeyboardCloseButton: Locator;
   private readonly activeFilterTags: Locator;
+  private readonly orderListContainer: Locator;
+  private readonly orderDetailsDialog: Locator;
 
   constructor(private readonly page: Page) {
     this.newOrderButton = this.page.getByTestId('recall2-header-new-order');
@@ -60,6 +112,8 @@ export class RecallPage {
     this.searchDialogSubmitButton = this.searchDialog.getByTestId('recall2-search-modal-search-button');
     this.searchDialogKeyboardCloseButton = this.page.getByTestId('pos-keyboard-button-{close}');
     this.activeFilterTags = this.page.getByTestId(/^recall2-filter-tag-(?!label|value).+$/);
+    this.orderListContainer = this.page.getByTestId('recall2-order-list-container');
+    this.orderDetailsDialog = this.page.locator('[role="dialog"][data-testid="pos-ui-modal"]');
   }
 
   @step('页面操作：确认 Recall 页面已经加载完成')
@@ -92,7 +146,7 @@ export class RecallPage {
     await this.selectTopDropdownOption(this.paymentTypesButton, paymentType);
   }
 
-  @step((productLine: string) => `页面操作：按产品类型筛选 ${productLine}`)
+  @step((productLine: string) => `页面操作：按产品线筛选 ${productLine}`)
   async selectProductLine(productLine: RecallProductLine): Promise<void> {
     await this.selectTopDropdownOption(this.productLineButton, productLine);
   }
@@ -115,14 +169,14 @@ export class RecallPage {
     await (await this.resolveVisibleSearchDialogInput()).fill(keyword);
   }
 
-  @step('页面操作：提交手动输入搜索条件')
+  @step('页面操作：提交手动搜索条件')
   async submitManualSearch(): Promise<void> {
     await expect(this.searchDialog).toBeVisible();
     await this.searchDialogSubmitButton.click();
     await expect(this.searchDialog).toBeHidden();
   }
 
-  @step('页面操作：关闭手动输入搜索弹窗')
+  @step('页面操作：关闭手动搜索弹窗')
   async closeManualSearchDialog(): Promise<void> {
     if (await this.searchDialog.isVisible().catch(() => false)) {
       if (await this.searchDialogKeyboardCloseButton.isVisible().catch(() => false)) {
@@ -148,28 +202,439 @@ export class RecallPage {
     }
   }
 
-  @step('页面操作：读取当前可见订单号列表')
+  @step('页面读取：读取当前可见订单号列表')
   async readVisibleOrderNumbers(): Promise<string[]> {
     const orderNumbers = await this.orderNumberBadges.allTextContents();
     return orderNumbers.map((orderNumber) => orderNumber.trim()).filter(Boolean);
   }
 
-  @step('页面操作：读取当前手动搜索关键字')
+  @step('页面读取：读取当前手动搜索关键字')
   async readManualSearchKeyword(): Promise<string> {
     return await this.topSearchInput.inputValue();
   }
 
-  @step('页面操作：读取当前激活的筛选条件')
+  @step('页面读取：读取当前激活的筛选条件')
   async readActiveFilterTexts(): Promise<string[]> {
     const filterTexts = await this.activeFilterTags.allTextContents();
     return filterTexts.map((filterText) => filterText.trim()).filter(Boolean);
   }
 
+  @step((orderNumber: string) => `页面操作：打开订单 ${orderNumber} 的详情弹窗`)
+  async openOrderDetails(orderNumber: string): Promise<void> {
+    const normalizedOrderNumber = this.normalizeOrderNumber(orderNumber);
+
+    await this.closeOrderDetailsDialog();
+    await expect(this.orderListContainer).toBeVisible();
+    await this.orderListContainer.getByText(normalizedOrderNumber, { exact: true }).first().click();
+    await this.waitForOrderDetailsDialogReady();
+  }
+
+  @step('页面读取：读取订单详情中的客户信息')
+  async readOrderCustomerInfo(): Promise<RecallCustomerInfo | null> {
+    return (await this.readOrderDetailsSnapshot()).customerInfo;
+  }
+
+  @step('页面读取：读取订单详情中的会员信息')
+  async readOrderMemberInfo(): Promise<RecallMemberInfo | null> {
+    return (await this.readOrderDetailsSnapshot()).memberInfo;
+  }
+
+  @step('页面读取：读取订单详情中的支付状态')
+  async readOrderPaymentStatus(): Promise<string | null> {
+    return (await this.readOrderDetailsSnapshot()).paymentStatus;
+  }
+
+  @step('页面读取：读取订单详情中的菜品明细')
+  async readOrderItems(): Promise<RecallOrderItem[]> {
+    return (await this.readOrderDetailsSnapshot()).items;
+  }
+
+  @step('页面读取：读取订单详情中的价格汇总')
+  async readOrderPriceSummary(): Promise<Record<string, string>> {
+    return (await this.readOrderDetailsSnapshot()).priceSummary;
+  }
+
+  @step('页面读取：读取订单详情中的订单类型、桌号、人数与服务员信息')
+  async readOrderContext(): Promise<RecallOrderContext> {
+    return (await this.readOrderDetailsSnapshot()).orderContext;
+  }
+
+  @step('页面读取：读取订单详情中的支付记录')
+  async readOrderPayments(): Promise<RecallOrderPaymentRecord[]> {
+    return (await this.readOrderDetailsSnapshot()).payments;
+  }
+
+  @step('页面读取：读取当前详情弹窗中的完整订单信息')
+  async readOrderDetailsSnapshot(): Promise<RecallOrderDetails> {
+    await this.waitForOrderDetailsDialogReady();
+
+    return await this.orderDetailsDialog.evaluate((dialogElement) => {
+      const cleanText = (value: string | null | undefined): string => value?.replace(/\s+/g, ' ').trim() ?? '';
+      const normalizeOptionalText = (value: string | null | undefined): string | null => {
+        const normalized = cleanText(value);
+        return normalized && normalized !== '-' ? normalized : null;
+      };
+      const selectText = (scope: Element, selector: string): string | null =>
+        normalizeOptionalText(scope.querySelector(selector)?.textContent);
+      const readTexts = (scope: Element, selector: string): string[] =>
+        Array.from(scope.querySelectorAll(selector))
+          .map((node) => cleanText(node.textContent))
+          .filter(Boolean);
+      const dedupeElements = <T extends Element>(elements: T[]): T[] => {
+        const uniqueElements: T[] = [];
+
+        for (const element of elements) {
+          if (!uniqueElements.includes(element)) {
+            uniqueElements.push(element);
+          }
+        }
+
+        return uniqueElements;
+      };
+      const getSection = (title: string): Element | null => {
+        const normalizedTitle = title.toUpperCase();
+        const headings = Array.from(dialogElement.querySelectorAll('h1,h2,h3,h4,h5,h6'));
+        const heading = headings.find((node) => cleanText(node.textContent).toUpperCase() === normalizedTitle);
+        return heading?.closest('[class*="_section_"]') ?? heading?.parentElement?.parentElement ?? null;
+      };
+      const uniqueValues = (values: string[]): string[] => {
+        const uniqueTexts: string[] = [];
+
+        for (const value of values) {
+          if (value && !uniqueTexts.includes(value)) {
+            uniqueTexts.push(value);
+          }
+        }
+
+        return uniqueTexts;
+      };
+      const isOrderTypeText = (text: string): boolean =>
+        /^(dine in|delivery|pick up|pickup|take out|to go|togo|bar|drive thru|drive-thru|online delivery|online pickup)$/i.test(
+          text,
+        );
+      const parseTableAndGuestCount = (
+        text: string,
+      ): {
+        tableName: string;
+        guestCount: string;
+      } | null => {
+        const matchedGroups = text.match(/^(\d+)\((\d+)\)$/);
+
+        if (!matchedGroups) {
+          return null;
+        }
+
+        return {
+          tableName: matchedGroups[1],
+          guestCount: matchedGroups[2],
+        };
+      };
+      const isGuestCountText = (text: string): boolean => /^\d+(?:\(\d+\))?$/.test(text);
+      const isTableText = (text: string): boolean =>
+        /\b(table|tbl|tab|booth|room|patio|bar seat)\b/i.test(text);
+      const findSeatHeader = (dishElement: Element): Element | null => {
+        let currentAncestor: Element | null = dishElement.parentElement;
+
+        while (currentAncestor && currentAncestor !== dialogElement) {
+          const seatHeader =
+            currentAncestor.querySelector('[data-test-id^="shared-order-seat-dish-list-seat-header-"]') ??
+            currentAncestor.querySelector('[data-testid^="shared-order-seat-dish-list-seat-header-"]') ??
+            currentAncestor.querySelector('[class*="_seatHeader_"]');
+
+          if (seatHeader) {
+            return seatHeader;
+          }
+
+          currentAncestor = currentAncestor.parentElement;
+        }
+
+        return null;
+      };
+      const readDishName = (
+        dishElement: Element,
+        sentTime: string | null,
+        quantity: string | null,
+        price: string | null,
+      ): string | null => {
+        const explicitName =
+          selectText(dishElement, '[data-testid="dish-item-name"]') ??
+          selectText(dishElement, '[data-test-id="dish-item-name"]') ??
+          selectText(dishElement, '[class*="_dishName_"]');
+
+        if (explicitName) {
+          return explicitName;
+        }
+
+        const directChildren = Array.from(dishElement.children);
+        const mainRow =
+          directChildren.find((childElement) => {
+            const childText = cleanText(childElement.textContent);
+
+            if (!childText || childText === sentTime) {
+              return false;
+            }
+
+            return Boolean((price && childText.includes(price)) || (quantity && childText.includes(quantity)));
+          }) ?? directChildren[0] ?? null;
+
+        if (!mainRow) {
+          return null;
+        }
+
+        const spanTexts = uniqueValues(
+          Array.from(mainRow.querySelectorAll('span'))
+            .map((node) => cleanText(node.textContent))
+            .filter(Boolean),
+        );
+
+        return (
+          spanTexts.find(
+            (text) =>
+              text !== sentTime &&
+              text !== quantity &&
+              text !== price &&
+              !/^\$[\d,.]+$/.test(text) &&
+              !/^\d+$/.test(text),
+          ) ?? null
+        );
+      };
+
+      const orderNumber =
+        selectText(dialogElement, '[class*="_number_"]') ??
+        normalizeOptionalText(dialogElement.textContent?.match(/#\d+/)?.[0]) ??
+        '';
+      const paymentStatus = selectText(dialogElement, '[class*="_statusTag_"]');
+
+      const headerChipTexts = uniqueValues(
+        Array.from(dialogElement.querySelectorAll('[class*="_header_1ej2d_"] button, [class*="_actionButtons_"] button'))
+          .map((button) => cleanText(button.textContent))
+          .filter(Boolean),
+      );
+
+      let orderType: string | null = null;
+      let tableName: string | null = null;
+      let guestCount: string | null = null;
+      let serverName: string | null = null;
+
+      for (const chipText of headerChipTexts) {
+        const parsedTableAndGuestCount = parseTableAndGuestCount(chipText);
+
+        if (parsedTableAndGuestCount) {
+          tableName ??= parsedTableAndGuestCount.tableName;
+          guestCount ??= parsedTableAndGuestCount.guestCount;
+          continue;
+        }
+
+        if (!orderType && isOrderTypeText(chipText)) {
+          orderType = chipText;
+          continue;
+        }
+
+        if (!guestCount && isGuestCountText(chipText)) {
+          guestCount = chipText;
+          continue;
+        }
+
+        if (!tableName && isTableText(chipText)) {
+          tableName = chipText;
+          continue;
+        }
+
+        if (!serverName) {
+          serverName = chipText;
+        }
+      }
+
+      const customerSection = getSection('CUSTOMER INFO');
+      const customerPrimaryTexts = customerSection
+        ? Array.from(customerSection.querySelectorAll('[class*="_customerPrimaryText_"]'))
+            .map((node) => cleanText(node.textContent))
+            .filter(Boolean)
+        : [];
+      const customerAddress = customerSection
+        ? selectText(customerSection, '[class*="_customerAddressText_"]')
+        : null;
+      const customerNote = customerSection ? selectText(customerSection, '[class*="_customerNoteText_"]') : null;
+      const customerName = normalizeOptionalText(customerPrimaryTexts[0]);
+      const customerPhone = normalizeOptionalText(customerPrimaryTexts[1]);
+      const customerInfo =
+        customerName || customerPhone || customerAddress || customerNote
+          ? {
+              name: customerName ?? '',
+              phone: customerPhone ?? '',
+              address: customerAddress,
+              note: customerNote,
+            }
+          : null;
+
+      const memberSection = getSection('MEMBER INFO');
+      const memberEntries = memberSection
+        ? Array.from(memberSection.querySelectorAll('[class*="_memberInfoText_"]'))
+            .map((node) => cleanText(node.textContent))
+            .filter(Boolean)
+        : [];
+      const memberInfo = memberEntries.length > 0 ? { entries: memberEntries } : null;
+
+      const paymentSection = getSection('PAYMENT');
+      const payments = paymentSection
+        ? dedupeElements(
+            Array.from(
+              paymentSection.querySelectorAll('[class*="_methodLabel_"], [class*="_paymentText_"]'),
+            ).map(
+              (methodElement) =>
+                methodElement.closest('[class*="_card_"]') ??
+                methodElement.parentElement?.parentElement ??
+                methodElement.parentElement,
+            ).filter((cardElement): cardElement is Element => Boolean(cardElement)),
+          ).reduce<RecallOrderPaymentRecord[]>((records, cardElement) => {
+              const method =
+                selectText(cardElement, '[class*="_methodLabel_"]') ??
+                selectText(cardElement, '[class*="_paymentText_"]');
+              const amount = selectText(cardElement, '[class*="_amount_"]');
+              const details = Array.from(cardElement.querySelectorAll('[class*="_contentItem_"]')).reduce<Record<string, string>>(
+                (detailMap, detailRow) => {
+                  const label = normalizeOptionalText(
+                    detailRow.querySelector('[class*="_detailLabel_"]')?.textContent?.replace(/:\s*$/, ''),
+                  );
+                  const value = selectText(detailRow, '[class*="_detailAmount_"]');
+
+                  if (label && value) {
+                    detailMap[label] = value;
+                  }
+
+                  return detailMap;
+                },
+                {},
+              );
+
+              if (method) {
+                records.push({ method, amount, details });
+              }
+
+              return records;
+            }, [])
+        : [];
+
+      const items = Array.from(dialogElement.querySelectorAll('[data-testid="pos-ui-dish-item"]')).reduce<RecallOrderItem[]>(
+        (records, dishElement) => {
+          const sentTime =
+            selectText(dishElement, '[class*="_sentText_"]') ??
+            readTexts(dishElement, 'span').find((text) => /^Sent in /i.test(text)) ??
+            null;
+          const quantity =
+            selectText(dishElement, '[class*="_quantity_"]') ??
+            readTexts(dishElement, 'span').find((text) => /^\d+$/.test(text)) ??
+            null;
+          const price =
+            selectText(dishElement, '[class*="_dishPrice_"]') ??
+            readTexts(dishElement, 'span').find((text) => /^\$[\d,.]+$/.test(text)) ??
+            null;
+          const seatHeader = findSeatHeader(dishElement);
+          const seat =
+            (seatHeader ? selectText(seatHeader, '[class*="_seatTitle_"]') : null) ??
+            normalizeOptionalText(seatHeader?.textContent);
+          const name = readDishName(dishElement, sentTime, quantity, price);
+
+          if (!name) {
+            return records;
+          }
+
+          const additions = dedupeElements(
+            Array.from(
+              dishElement.querySelectorAll(
+                '[class*="_extraItem_"], [data-testid^="dish-item-subitem-"], [data-test-id^="dish-item-subitem-"]',
+              ),
+            ),
+          ).reduce<
+            RecallOrderItemAddition[]
+          >((lines, extraElement) => {
+            const rawAdditionText = normalizeOptionalText(extraElement.textContent);
+            const additionPrice =
+              selectText(extraElement, '[class*="_optionPrice_"]') ??
+              rawAdditionText?.match(/\$[\d,.]+$/)?.[0] ??
+              null;
+            const additionName =
+              selectText(extraElement, '[class*="_extraText_"]') ??
+              (rawAdditionText && additionPrice
+                ? normalizeOptionalText(rawAdditionText.replace(new RegExp(`\\s*${additionPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), ''))
+                : rawAdditionText);
+
+            if (additionName) {
+              lines.push(additionPrice ? { name: additionName, price: additionPrice } : { name: additionName });
+            }
+
+            return lines;
+          }, []);
+
+          records.push({
+            seat,
+            sentTime,
+            quantity,
+            name,
+            price,
+            additions,
+          });
+
+          return records;
+        },
+        [],
+      );
+
+      const priceSummaryContainer =
+        dialogElement.querySelector('[data-test-id="shared-order-price-summary-toggle"]') ??
+        dialogElement.querySelector('[data-testid="shared-order-price-summary-toggle"]') ??
+        dialogElement.querySelector('[class*="_container_1jzox_"]') ??
+        dialogElement.querySelector('[class*="_container_"][class*="1jzox"]');
+      const priceSummary = priceSummaryContainer
+        ? Array.from(priceSummaryContainer.children).reduce<Record<string, string>>((summary, rowElement) => {
+            const spanTexts = Array.from(rowElement.querySelectorAll('span'))
+              .map((node) => cleanText(node.textContent))
+              .filter(Boolean);
+            const label =
+              spanTexts[0] ??
+              selectText(rowElement, '[class*="_label_1jzox_"]') ??
+              selectText(rowElement, '[class*="_totalLabel_1jzox_"]');
+            const value =
+              spanTexts.length > 1 ? spanTexts[spanTexts.length - 1] : null;
+
+            if (label && value && label !== value) {
+              summary[label] = value;
+            }
+
+            return summary;
+          }, {})
+        : {};
+
+      return {
+        orderNumber,
+        paymentStatus,
+        customerInfo,
+        memberInfo,
+        orderContext: {
+          orderType,
+          tableName,
+          guestCount,
+          serverName,
+        },
+        payments,
+        items,
+        priceSummary,
+      };
+    });
+  }
+
+  @step('页面操作：关闭当前订单详情弹窗')
+  async closeOrderDetailsDialog(): Promise<void> {
+    if (!(await this.orderDetailsDialog.isVisible().catch(() => false))) {
+      return;
+    }
+
+    await this.page.keyboard.press('Escape');
+    await expect(this.orderDetailsDialog).toBeHidden({ timeout: 5_000 });
+  }
+
   @step((_filterButton: Locator, optionName: string) => `页面操作：从顶部筛选下拉菜单中选择 ${optionName}`)
-  private async selectTopDropdownOption(
-    filterButton: Locator,
-    optionName: string,
-  ): Promise<void> {
+  private async selectTopDropdownOption(filterButton: Locator, optionName: string): Promise<void> {
     await expect(filterButton).toBeVisible();
     await filterButton.click();
     await this.page
@@ -210,6 +675,18 @@ export class RecallPage {
     await expect(this.topSearchInput).toHaveValue('');
   }
 
+  private async waitForOrderDetailsDialogReady(): Promise<void> {
+    await expect(this.orderDetailsDialog).toBeVisible({ timeout: 10_000 });
+    await waitUntil(
+      async () => (await this.orderDetailsDialog.textContent())?.trim() ?? '',
+      (dialogText) => !/^loading\.\.\.$/i.test(dialogText) && !/^loading$/i.test(dialogText),
+      {
+        timeout: 10_000,
+        message: 'Order details dialog did not finish loading in time.',
+      },
+    );
+  }
+
   private async resolveVisibleSearchDialogInput(): Promise<Locator> {
     const inputCandidates = [
       this.searchDialogDefaultInput,
@@ -240,6 +717,11 @@ export class RecallPage {
     }
 
     return null;
+  }
+
+  private normalizeOrderNumber(orderNumber: string): string {
+    const normalizedOrderNumber = orderNumber.trim().replace(/^#/, '');
+    return `#${normalizedOrderNumber}`;
   }
 
   private resolveManualSearchTagTestId(tag: RecallManualSearchTag): string {
