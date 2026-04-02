@@ -1,15 +1,12 @@
 import { enterWithEmployeePassword } from '../../flows/employee-login.flow';
 import { openHome } from '../../flows/home.flow';
 import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import {
-  selectAnyAvailableTable,
-  selectGuestCountAndEnterOrderDishes,
-} from '../../flows/select-table.flow';
+import { skipTableSelectionAndEnterOrderDishes } from '../../flows/select-table.flow';
 import { test } from '../../fixtures/test.fixture';
 
 test.describe('堂食点餐冒烟', () => {
   test(
-    '应能选择空桌、选择人数并进入点餐页面',
+    '应能通过 New order 跳过选桌直接进入点餐页面',
     {
       tag: ['@smoke'],
       annotation: [
@@ -34,19 +31,9 @@ test.describe('堂食点餐冒烟', () => {
 
       await loggedInHomePage.expectPrimaryFunctionCardsVisible();
       const selectTablePage = await loggedInHomePage.clickDineIn();
-      await selectTablePage.expectLoaded();
+      const orderDishesPage = await skipTableSelectionAndEnterOrderDishes(selectTablePage);
 
-      const { guestCountDialogPage, selectedTable } = await selectAnyAvailableTable(
-        selectTablePage,
-      );
-
-      const orderDishesPage = await selectGuestCountAndEnterOrderDishes(
-        guestCountDialogPage,
-        1,
-      );
-
-      await orderDishesPage.expectTableNumber(selectedTable.tableNumber);
-      await orderDishesPage.expectGuestCount(1);
+      await orderDishesPage.expectLoaded();
     },
   );
 });

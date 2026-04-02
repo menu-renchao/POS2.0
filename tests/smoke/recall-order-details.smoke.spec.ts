@@ -32,7 +32,7 @@ test.describe('Recall 订单详情冒烟', () => {
       const recallPage = await loggedInHomePage.clickRecall();
 
       const details = await viewRecallOrderDetails(recallPage, '1');
-     console.log(JSON.stringify(details, null, 2));
+      console.log(JSON.stringify(details, null, 2));
       expect(details.orderNumber).toBe('#1');
       expect(details.paymentStatus).toBeTruthy();
       expect(details.items.length).toBeGreaterThan(0);

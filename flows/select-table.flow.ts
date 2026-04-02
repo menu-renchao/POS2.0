@@ -1,10 +1,13 @@
-import { GuestCountDialogPage } from '../pages/guest-count-dialog.page';
 import { OrderDishesPage } from '../pages/order-dishes.page';
 import { type SelectedTableRecord, SelectTablePage } from '../pages/select-table.page';
 import { step } from '../utils/step';
 
 export type TableSelectionResult = {
-  guestCountDialogPage: GuestCountDialogPage;
+  selectedTable: SelectedTableRecord;
+};
+
+export type TableOrderEntryResult = {
+  orderDishesPage: OrderDishesPage;
   selectedTable: SelectedTableRecord;
 };
 
@@ -15,24 +18,30 @@ export class SelectTableFlow {
   ): Promise<TableSelectionResult> {
     await selectTablePage.expectLoaded();
 
-    const availableTables = await selectTablePage.getAvailableTables();
-    const selectedTable = availableTables[0];
+    const areaNames = await selectTablePage.readAreaNames();
 
-    if (!selectedTable) {
-      throw new Error('No available table found on the current selected area.');
+    for (const areaName of areaNames) {
+      await selectTablePage.selectArea(areaName);
+
+      const availableTables = await selectTablePage.getAvailableTables();
+      const selectedTable = availableTables[0];
+
+      if (!selectedTable) {
+        continue;
+      }
+
+      const tableNumber = await selectTablePage.readTableNumber(selectedTable);
+      await selectTablePage.clickTable(selectedTable);
+
+      return {
+        selectedTable: {
+          areaName,
+          tableNumber,
+        },
+      };
     }
 
-    const areaName = await selectTablePage.getCurrentAreaName();
-    const tableNumber = await selectTablePage.readTableNumber(selectedTable);
-    const guestCountDialogPage = await selectTablePage.clickTable(selectedTable);
-
-    return {
-      guestCountDialogPage,
-      selectedTable: {
-        areaName,
-        tableNumber,
-      },
-    };
+    throw new Error('No available table found across all visible areas on the select-table page.');
   }
 
   @step(
@@ -48,10 +57,9 @@ export class SelectTableFlow {
     await selectTablePage.selectArea(areaName);
 
     const table = await selectTablePage.findTableByNumber(tableNumber);
-    const guestCountDialogPage = await selectTablePage.clickTable(table);
+    await selectTablePage.clickTable(table);
 
     return {
-      guestCountDialogPage,
       selectedTable: {
         areaName,
         tableNumber,
@@ -60,15 +68,40 @@ export class SelectTableFlow {
   }
 
   @step(
-    (_guestCountDialogPage: GuestCountDialogPage, guestCount: number) =>
-      `业务步骤：在人数弹窗中选择 ${guestCount} 位客人并进入点餐页`,
+    (_selectTablePage: SelectTablePage, guestCount: number) =>
+      `业务步骤：选择任意空桌并选择 ${guestCount} 位客人进入点单页`,
   )
-  async selectGuestCountAndEnterOrderDishes(
-    guestCountDialogPage: GuestCountDialogPage,
+  async selectAnyAvailableTableAndEnterOrderDishes(
+    selectTablePage: SelectTablePage,
     guestCount: number,
+  ): Promise<TableOrderEntryResult> {
+    const { selectedTable } = await this.selectAnyAvailableTable(selectTablePage);
+
+    let orderDishesPage: OrderDishesPage;
+
+    try {
+      orderDishesPage = await selectTablePage.enterOrderDishesAfterSelectingTable(guestCount);
+    } catch {
+      await selectTablePage.selectArea(selectedTable.areaName);
+      const selectedTableCard = await selectTablePage.findTableByNumber(selectedTable.tableNumber);
+      await selectTablePage.clickTable(selectedTableCard);
+      orderDishesPage = await selectTablePage.enterOrderDishesAfterSelectingTable(guestCount);
+    }
+
+    await orderDishesPage.expectLoaded();
+
+    return {
+      orderDishesPage,
+      selectedTable,
+    };
+  }
+
+  @step('业务步骤：跳过选桌并通过 New order 直接进入点单页')
+  async skipTableSelectionAndEnterOrderDishes(
+    selectTablePage: SelectTablePage,
   ): Promise<OrderDishesPage> {
-    await guestCountDialogPage.expectVisible();
-    const orderDishesPage = await guestCountDialogPage.selectGuestCount(guestCount);
+    await selectTablePage.expectLoaded();
+    const orderDishesPage = await selectTablePage.clickNewOrder();
     await orderDishesPage.expectLoaded();
     return orderDishesPage;
   }
@@ -94,13 +127,20 @@ export async function selectTableByAreaAndTableNumber(
   );
 }
 
-export async function selectGuestCountAndEnterOrderDishes(
-  guestCountDialogPage: GuestCountDialogPage,
+export async function selectAnyAvailableTableAndEnterOrderDishes(
+  selectTablePage: SelectTablePage,
   guestCount: number,
-): Promise<OrderDishesPage> {
+): Promise<TableOrderEntryResult> {
   const selectTableFlow = new SelectTableFlow();
-  return await selectTableFlow.selectGuestCountAndEnterOrderDishes(
-    guestCountDialogPage,
+  return await selectTableFlow.selectAnyAvailableTableAndEnterOrderDishes(
+    selectTablePage,
     guestCount,
   );
+}
+
+export async function skipTableSelectionAndEnterOrderDishes(
+  selectTablePage: SelectTablePage,
+): Promise<OrderDishesPage> {
+  const selectTableFlow = new SelectTableFlow();
+  return await selectTableFlow.skipTableSelectionAndEnterOrderDishes(selectTablePage);
 }

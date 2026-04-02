@@ -2,12 +2,8 @@ import { enterWithEmployeePassword } from '../../flows/employee-login.flow';
 import { openHome } from '../../flows/home.flow';
 import { addComboDish, addRegularDish } from '../../flows/order-dishes.flow';
 import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import {
-  selectAnyAvailableTable,
-  selectGuestCountAndEnterOrderDishes,
-} from '../../flows/select-table.flow';
+import { selectAnyAvailableTableAndEnterOrderDishes } from '../../flows/select-table.flow';
 import { test } from '../../fixtures/test.fixture';
-import { RecallPage } from 'pages/recall.page';
 
 test.describe('点餐冒烟测试', () => {
   test(
@@ -32,12 +28,8 @@ test.describe('点餐冒烟测试', () => {
       const selectTablePage = await loggedInHomePage.clickDineIn();
       await selectTablePage.expectLoaded();
 
-      const { guestCountDialogPage, selectedTable } = await selectAnyAvailableTable(
+      const { orderDishesPage, selectedTable } = await selectAnyAvailableTableAndEnterOrderDishes(
         selectTablePage,
-      );
-
-      const orderDishesPage = await selectGuestCountAndEnterOrderDishes(
-        guestCountDialogPage,
         1,
       );
 
@@ -57,7 +49,6 @@ test.describe('点餐冒烟测试', () => {
         3,
       );
       await orderDishesPage.saveOrder();
-      const recallPage = homePage.clickRecall();  
     },
   );
 });

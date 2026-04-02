@@ -318,14 +318,14 @@ export class RecallPage {
         tableName: string;
         guestCount: string;
       } | null => {
-        const matchedGroups = text.match(/^(\d+)\((\d+)\)$/);
+        const matchedGroups = text.match(/^(.+?)\s*\((\d+)\)$/);
 
         if (!matchedGroups) {
           return null;
         }
 
         return {
-          tableName: matchedGroups[1],
+          tableName: matchedGroups[1].trim(),
           guestCount: matchedGroups[2],
         };
       };

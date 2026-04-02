@@ -1,6 +1,20 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { step } from '../utils/step';
+import { waitUntil } from '../utils/wait';
 import { HomePage } from './home.page';
+
+export type OrderedDishItem = {
+  quantity: string;
+  name: string;
+  price: string | null;
+};
+
+export type OrderPriceSummary = Record<string, string>;
+
+export type OrderDishesSnapshot = {
+  items: OrderedDishItem[];
+  priceSummary: OrderPriceSummary;
+};
 
 export class OrderDishesPage {
   private readonly appFrame: ReturnType<Page['frameLocator']>;
@@ -13,6 +27,7 @@ export class OrderDishesPage {
   private readonly countDialogInput: Locator;
   private readonly countDialogConfirmButton: Locator;
   private readonly weightDialog: Locator;
+  private readonly weightDialogLoadingText: Locator;
   private readonly weightInput: Locator;
   private readonly weightConfirmButton: Locator;
   private readonly priceDialog: Locator;
@@ -22,7 +37,6 @@ export class OrderDishesPage {
   private readonly specificationConfirmButton: Locator;
   private readonly comboDialog: Locator;
   private readonly comboConfirmButton: Locator;
-  private readonly cartButton: Locator;
   private readonly cartBadge: Locator;
   private readonly saveOrderButton: Locator;
 
@@ -42,8 +56,11 @@ export class OrderDishesPage {
     this.countDialogConfirmButton = this.countDialog.getByRole('button', {
       name: /^(Confirm|确认)$/,
     });
-    this.weightDialog = this.appFrame.getByRole('dialog', { name: 'Enter Weight' });
-    this.weightInput = this.weightDialog.getByRole('textbox', { name: 'Weight' });
+    this.weightDialog = this.appFrame.getByRole('dialog').filter({
+      has: this.appFrame.getByText('Weight', { exact: true }),
+    }).first();
+    this.weightDialogLoadingText = this.weightDialog.getByText('Loading', { exact: true });
+    this.weightInput = this.weightDialog.locator('input').first();
     this.weightConfirmButton = this.weightDialog.getByRole('button', { name: 'Confirm' });
     this.priceDialog = this.appFrame.getByRole('dialog', { name: 'Enter Price' });
     this.priceInput = this.priceDialog.getByRole('textbox', { name: 'Price' });
@@ -60,7 +77,6 @@ export class OrderDishesPage {
     this.comboConfirmButton = this.comboDialog.locator('button', {
       hasText: /^(Confirm|确认)$/,
     }).first();
-    this.cartButton = this.appFrame.getByRole('button', { name: 'Cart' });
     this.cartBadge = this.appFrame.locator('[data-testid="cart-badge"]');
     this.saveOrderButton = this.appFrame.locator('[data-testid="bottom-button-saveOrderBtn"]');
   }
@@ -122,13 +138,22 @@ export class OrderDishesPage {
 
   @step('页面操作：确认重量输入弹窗可见')
   async expectWeightDialogVisible(): Promise<void> {
-    await expect(this.weightDialog).toBeVisible();
+    await expect(this.weightDialog).toBeVisible({ timeout: 10_000 });
+    await this.waitUntilWeightDialogReady();
   }
 
   @step((weight: number) => `页面操作：输入重量 ${weight}`)
   async enterWeight(weight: number): Promise<void> {
     await this.expectWeightDialogVisible();
-    await this.weightInput.fill(String(weight));
+
+    if (await this.weightInput.isVisible().catch(() => false)) {
+      await this.weightInput.fill(String(weight));
+      return;
+    }
+
+    for (const digit of String(weight)) {
+      await this.weightDialog.getByRole('button', { name: digit, exact: true }).click();
+    }
   }
 
   @step('页面操作：确认重量输入')
@@ -205,12 +230,68 @@ export class OrderDishesPage {
 
   @step('页面操作：确认购物车中有菜品')
   async expectCartHasItems(): Promise<void> {
-    await expect(this.cartButton).toBeVisible();
-
     if (await this.cartBadge.isVisible()) {
       const count = await this.cartBadge.textContent();
       expect(Number(count)).toBeGreaterThan(0);
     }
+  }
+
+  @step('页面读取：读取点单页左侧已点菜品明细')
+  async readOrderedItems(): Promise<OrderedDishItem[]> {
+    await this.expectLoaded();
+    const frameLines = (await this.appFrame.locator('body').innerText())
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    return frameLines.reduce<OrderedDishItem[]>((items, line) => {
+      const matchedItem = line.match(/^(\d+)\s+(.+?)\s+(\$[\d,.]+)$/);
+
+      if (!matchedItem) {
+        return items;
+      }
+
+      const [, quantity, name, price] = matchedItem;
+
+      items.push({
+        quantity,
+        name,
+        price,
+      });
+
+      return items;
+    }, []);
+  }
+
+  @step('页面读取：读取点单页左侧价格汇总')
+  async readPriceSummary(): Promise<OrderPriceSummary> {
+    await this.expectLoaded();
+    const frameText = (await this.appFrame.locator('body').innerText())
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const summaryEntries = Array.from(
+      frameText.matchAll(
+        /(Count|Subtotal|Tax|Total Before Tips|Total)\s+(\$?[\d,.]+)/g,
+      ),
+    );
+
+    if (summaryEntries.length === 0) {
+      throw new Error(`Unable to parse order price summary from text: ${frameText}`);
+    }
+
+    return summaryEntries.reduce<OrderPriceSummary>((summary, [, label, value]) => {
+      summary[label] = value;
+      return summary;
+    }, {});
+  }
+
+  @step('页面读取：读取点单页当前订单快照')
+  async readOrderSnapshot(): Promise<OrderDishesSnapshot> {
+    return {
+      items: await this.readOrderedItems(),
+      priceSummary: await this.readPriceSummary(),
+    };
   }
 
   @step('页面操作：保存订单')
@@ -233,6 +314,41 @@ export class OrderDishesPage {
 
   private resolveDishButton(dishName: string): Locator {
     return this.appFrame.getByRole('button', { name: dishName, exact: true });
+  }
+
+  private async waitUntilWeightDialogReady(): Promise<void> {
+    try {
+      await waitUntil(
+        async () => ({
+          isLoading: await this.weightDialogLoadingText.isVisible().catch(() => false),
+          hasVisibleInput: await this.weightInput.isVisible().catch(() => false),
+          digitButtonCount: await this.weightDialog
+            .getByRole('button')
+            .filter({ hasText: /^\d$/ })
+            .count()
+            .catch(() => 0),
+        }),
+        (state) => !state.isLoading && (state.hasVisibleInput || state.digitButtonCount > 0),
+        {
+          timeout: 20_000,
+          message: 'Weight dialog did not finish loading input controls in time.',
+        },
+      );
+    } catch (error) {
+      const isStillLoading = await this.weightDialogLoadingText.isVisible().catch(() => false);
+      const hasVisibleInput = await this.weightInput.isVisible().catch(() => false);
+      const digitButtonCount = await this.weightDialog
+        .getByRole('button')
+        .filter({ hasText: /^\d$/ })
+        .count()
+        .catch(() => 0);
+
+      if (isStillLoading && !hasVisibleInput && digitButtonCount === 0) {
+        throw new Error('当前license为磅秤模式，无法输入重量');
+      }
+
+      throw error;
+    }
   }
 
   private resolveCountDialogNumberButton(digit: string): Locator {

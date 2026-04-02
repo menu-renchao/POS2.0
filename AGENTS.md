@@ -31,6 +31,7 @@ This repository is a maintainable Playwright + TypeScript UI automation project 
 - All stable selectors in `pages/` must be centralized on the page object, either as class-level locator fields or dedicated private locator factory methods.
 - Do not scatter raw `getByRole(...)`, `getByText(...)`, `locator(...)`, or selector strings throughout page action/read methods when those selectors belong to the page structure.
 - If a selector is reused, semantically important, or represents a stable page element such as a button, dialog, input, tab, list, or summary area, define it once and consume it through the centralized page locator API.
+- Do not create a separate page object for a strongly coupled transient dialog or popup that only exists as one immediate step of its parent page flow, such as a guest-count dialog opened from table selection. Keep that dialog on the owning page object unless it can be entered, reused, and reasoned about independently.
 - `pages/` must not contain business selection strategy or cross-step intent such as “select any available table”, “pick the first usable license”, “enter the system with employee context”, or other business-level decisions.
 - `flows/` only holds business intent, multi-step orchestration, and selection strategy.
 - `flows/` can combine multiple page actions, decide which record to pick, decide fallback order, and return business-level results.
