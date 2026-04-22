@@ -9,18 +9,48 @@ import {
 } from '../../flows/recall.flow';
 import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
 import { selectAnyAvailableTableAndEnterOrderDishes } from '../../flows/select-table.flow';
+import { SplitOrderFlow } from '../../flows/split-order.flow';
 import { test } from '../../fixtures/test.fixture';
-import { type OrderPriceSummary } from '../../pages/order-dishes.page';
-import { type RecallOrderDetails, type RecallOrderItem } from '../../pages/recall.page';
+import { EmployeeLoginPage } from '../../pages/employee-login.page';
+import { HomePage } from '../../pages/home.page';
+import { OrderDishesPage, type OrderPriceSummary } from '../../pages/order-dishes.page';
+import { RecallPage, type RecallOrderDetails, type RecallOrderItem } from '../../pages/recall.page';
+import { type SplitOrderSuborderSnapshot } from '../../pages/split-order.page';
 import {
   RecallManualSearchTags,
   RecallPaymentStatuses,
 } from '../../test-data/recall-search-options';
+import { waitUntil } from '../../utils/wait';
 
 type ComparableDishItem = {
   quantity: string;
   name: string;
 };
+
+function countSplitDishRows(
+  snapshot: {
+    suborders: Array<{
+      dishes: Array<{ name: string }>;
+      orderNumber: string;
+    }>;
+  },
+  orderNumber: string,
+  dishName: string,
+): number {
+  return (
+    snapshot.suborders
+      .find((suborder) => suborder.orderNumber === orderNumber)
+      ?.dishes.filter((dish) => dish.name === dishName).length ?? 0
+  );
+}
+
+function normalizeCurrencyValue(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return value.startsWith('$') ? value : `$${value}`;
+}
 
 const expectedGuestCount = 3;
 const comparablePriceSummaryKeys = ['Count', 'Subtotal', 'Tax', 'Total Before Tips'] as const;
@@ -58,12 +88,13 @@ async function assertRecallMatchesOrderSnapshot(
   recallDetails: RecallOrderDetails,
   orderPriceSummary: OrderPriceSummary,
   expectedTableNumber: string,
+  expectedComparableDishItems: ComparableDishItem[] = expectedDishItems,
 ): Promise<void> {
   await test.step('校验 Recall 菜品明细与点单页一致', async () => {
     expect(
       normalizeDishItems(recallDetails.items),
       'Recall 菜品明细应与点单页菜品明细一致',
-    ).toEqual(normalizeExpectedDishItems(expectedDishItems));
+    ).toEqual(normalizeExpectedDishItems(expectedComparableDishItems));
   });
 
   await test.step('校验 Recall 价格信息与点单页一致', async () => {
@@ -93,6 +124,90 @@ async function assertRecallMatchesOrderSnapshot(
       'Recall 支付状态应保持未支付',
     ).toBe(RecallPaymentStatuses.unpaid);
   });
+}
+
+async function assertRecallMatchesSplitSuborder(
+  recallDetails: RecallOrderDetails,
+  expectedSuborder: SplitOrderSuborderSnapshot,
+  expectedTableNumber: string,
+): Promise<void> {
+  await test.step('校验 Recall 菜品明细包含目标子单的关键菜品', async () => {
+    const recallDishNames = [...new Set(recallDetails.items.map((item) => item.name))].sort((leftItem, rightItem) =>
+      leftItem.localeCompare(rightItem),
+    );
+    const expectedDishNames = [...new Set(expectedSuborder.dishes.map((dish) => dish.name))].sort((leftItem, rightItem) =>
+      leftItem.localeCompare(rightItem),
+    );
+
+    expect(recallDishNames, 'Recall 菜品名称集合应与目标子单一致').toEqual(expectedDishNames);
+    expect(
+      recallDetails.items.filter((item) => item.name === 'test').length,
+      'Recall 中的 x-3 子单至少应包含 2 行 test，表示移动结果已保留',
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  await test.step('校验 Recall 订单上下文与目标子单一致', async () => {
+    expect(recallDetails.orderContext.orderType ?? '').toMatch(/dine[\s-]*in/i);
+    expect(recallDetails.orderContext.tableName).toBe(expectedTableNumber);
+
+    if (expectedSuborder.seats.length > 0) {
+      expect(recallDetails.orderContext.guestCount).toBe(String(expectedSuborder.seats.length));
+    }
+  });
+
+  await test.step('校验 Recall 价格摘要与目标子单一致', async () => {
+    const expectedTotalBeforeTips = normalizeCurrencyValue(expectedSuborder.total);
+    if (expectedTotalBeforeTips) {
+      expect(recallDetails.priceSummary['Total Before Tips']).toBe(expectedTotalBeforeTips);
+    }
+  });
+}
+
+async function enterRecallAfterSplitSave(
+  pageAfterSplitSave: HomePage | OrderDishesPage | RecallPage,
+  employeeLoginPage: EmployeeLoginPage,
+): Promise<RecallPage> {
+  if (pageAfterSplitSave instanceof RecallPage) {
+    return pageAfterSplitSave;
+  }
+
+  const recallReadyHomePage =
+    pageAfterSplitSave instanceof OrderDishesPage
+      ? await pageAfterSplitSave.saveOrder()
+      : pageAfterSplitSave;
+
+  const requiresEmployeeRelogin = await waitUntil(
+    async () => await employeeLoginPage.isVisible(),
+    (isVisible) => isVisible,
+    {
+      timeout: 3_000,
+      message: 'Employee passcode dialog did not appear after split save in time.',
+    },
+  ).catch(() => false);
+
+  const loggedInHomePage = requiresEmployeeRelogin
+    ? await enterWithEmployeePassword(employeeLoginPage, recallReadyHomePage, '11')
+    : recallReadyHomePage;
+
+  const recallPage = await loggedInHomePage.clickRecall();
+  const recallLoaded = await recallPage.expectLoaded().then(() => true).catch(() => false);
+
+  if (recallLoaded) {
+    return recallPage;
+  }
+
+  if (await employeeLoginPage.isVisible().catch(() => false)) {
+    const reloggedInHomePage = await enterWithEmployeePassword(
+      employeeLoginPage,
+      loggedInHomePage,
+      '11',
+    );
+    const retriedRecallPage = await reloggedInHomePage.clickRecall();
+    await retriedRecallPage.expectLoaded();
+    return retriedRecallPage;
+  }
+
+  throw new Error('Unable to enter Recall after split save.');
 }
 
 test.describe('堂食点单后 Recall 校验', () => {
@@ -180,6 +295,142 @@ test.describe('堂食点单后 Recall 校验', () => {
         await assertRecallMatchesOrderSnapshot(
           recallDetails,
           orderSnapshot.currentOrderPriceSummary,
+          dineInOrderContext.selectedTable.tableNumber,
+        );
+      });
+    },
+  );
+
+  test(
+    '应能在堂食点单后将订单平分三份并移动 x-1 的 test 到 x-3 后保存分单并在 Recall 查看订单',
+    {
+      tag: ['@smoke'],
+      annotation: [
+        {
+          type: 'issue',
+          description: 'https://devtickets.atlassian.net/browse/12345',
+        },
+      ],
+    },
+    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+      const splitOrderFlow = new SplitOrderFlow();
+
+      await test.step('从首页进入系统并完成堂食点单前置操作', async () => {
+        await openHome(homePage);
+
+        if (await licenseSelectionPage.isVisible(10_000)) {
+          await enterWithAvailableLicense(licenseSelectionPage, homePage);
+        }
+      });
+
+      const dineInOrderContext = await test.step('使用员工口令进入系统并选择任意空桌的 3 人堂食点单页', async () => {
+        const readyHomePage = await enterWithEmployeePassword(
+          employeeLoginPage,
+          homePage,
+          '11',
+        );
+
+        await readyHomePage.expectPrimaryFunctionCardsVisible();
+        const selectTablePage = await readyHomePage.clickDineIn();
+        const { orderDishesPage, selectedTable } = await selectAnyAvailableTableAndEnterOrderDishes(
+          selectTablePage,
+          expectedGuestCount,
+        );
+
+        await orderDishesPage.expectTableNumber(selectedTable.tableNumber);
+        await orderDishesPage.expectGuestCount(expectedGuestCount);
+
+        return {
+          orderDishesPage,
+          selectedTable,
+        };
+      });
+
+      await test.step('完成点单', async () => {
+        await addRegularDish(dineInOrderContext.orderDishesPage, 'test', 2);
+        await addRegularDish(dineInOrderContext.orderDishesPage, 'common item2', 1);
+      });
+
+      const splitResult = await test.step('将当前订单平分三份并把 x-1 的 test 移动到 x-3', async () => {
+        const splitOrderPage = await dineInOrderContext.orderDishesPage.openSplitOrder();
+
+        await splitOrderFlow.splitOrderEvenly(splitOrderPage, 3);
+
+        const evenlySplitSnapshot = await splitOrderPage.readSnapshot();
+        expect(evenlySplitSnapshot.suborders).toHaveLength(3);
+
+        const sourceOrderNumber = evenlySplitSnapshot.suborders[0]?.orderNumber;
+        const targetOrderNumber = evenlySplitSnapshot.suborders[2]?.orderNumber;
+
+        expect(sourceOrderNumber, '平分三份后应存在 x-1 子单').toBeTruthy();
+        expect(targetOrderNumber, '平分三份后应存在 x-3 子单').toBeTruthy();
+
+        const sourceTestCountBeforeMove = countSplitDishRows(
+          evenlySplitSnapshot,
+          sourceOrderNumber as string,
+          'test',
+        );
+        const targetTestCountBeforeMove = countSplitDishRows(
+          evenlySplitSnapshot,
+          targetOrderNumber as string,
+          'test',
+        );
+
+        await splitOrderFlow.moveDishes(
+          splitOrderPage,
+          sourceOrderNumber as string,
+          ['test'],
+          targetOrderNumber as string,
+        );
+
+        const movedSnapshot = await splitOrderPage.readSnapshot();
+        const targetSuborderSnapshot = movedSnapshot.suborders.find(
+          (suborder) => suborder.orderNumber === targetOrderNumber,
+        );
+        expect(
+          countSplitDishRows(movedSnapshot, sourceOrderNumber as string, 'test'),
+          '移动后 x-1 子单中的 test 数量应减少 1',
+        ).toBe(sourceTestCountBeforeMove - 1);
+        expect(
+          countSplitDishRows(movedSnapshot, targetOrderNumber as string, 'test'),
+          '移动后 x-3 子单中的 test 数量应增加 1',
+        ).toBe(targetTestCountBeforeMove + 1);
+        expect(targetSuborderSnapshot, '移动后应仍能读取 x-3 子单快照').toBeTruthy();
+
+        return {
+          pageAfterSplitSave: await splitOrderFlow.submitAndReturnPage(splitOrderPage),
+          recallOrderNumber: String(sourceOrderNumber).replace(/-\d+$/, ''),
+          targetOrderNumber: targetOrderNumber as string,
+          targetSuborderSnapshot: targetSuborderSnapshot as SplitOrderSuborderSnapshot,
+        };
+      });
+
+      const recallDetails = await test.step('按订单号进入 Recall 查看刚保存的分单订单', async () => {
+        const recallPage = await enterRecallAfterSplitSave(
+          splitResult.pageAfterSplitSave,
+          employeeLoginPage,
+        );
+
+        await searchRecallOrders(recallPage, {
+          paymentStatus: RecallPaymentStatuses.unpaid,
+          manualSearch: {
+            tag: RecallManualSearchTags.orderNumber,
+            keyword: splitResult.recallOrderNumber,
+          },
+        });
+
+        return await viewRecallOrderDetails(
+          recallPage,
+          splitResult.recallOrderNumber,
+          splitResult.targetOrderNumber,
+        );
+      });
+
+      await test.step('校验分单保存后 Recall 仍可读取 x-3 子单详情', async () => {
+        expect(recallDetails.orderNumber).toBe(`#${splitResult.targetOrderNumber}`);
+        await assertRecallMatchesSplitSuborder(
+          recallDetails,
+          splitResult.targetSuborderSnapshot,
           dineInOrderContext.selectedTable.tableNumber,
         );
       });

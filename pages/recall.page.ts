@@ -82,6 +82,7 @@ export class RecallPage {
   private readonly searchDialogKeyboardCloseButton: Locator;
   private readonly activeFilterTags: Locator;
   private readonly orderListContainer: Locator;
+  private readonly orderDetailsDialogs: Locator;
   private readonly orderDetailsDialog: Locator;
 
   constructor(private readonly page: Page) {
@@ -113,7 +114,8 @@ export class RecallPage {
     this.searchDialogKeyboardCloseButton = this.page.getByTestId('pos-keyboard-button-{close}');
     this.activeFilterTags = this.page.getByTestId(/^recall2-filter-tag-(?!label|value).+$/);
     this.orderListContainer = this.page.getByTestId('recall2-order-list-container');
-    this.orderDetailsDialog = this.page.locator('[role="dialog"][data-testid="pos-ui-modal"]');
+    this.orderDetailsDialogs = this.page.locator('[role="dialog"][data-testid="pos-ui-modal"]');
+    this.orderDetailsDialog = this.page.locator('[role="dialog"][data-testid="pos-ui-modal"]:visible').last();
   }
 
   @step('页面操作：确认 Recall 页面已经加载完成')
@@ -219,14 +221,19 @@ export class RecallPage {
     return filterTexts.map((filterText) => filterText.trim()).filter(Boolean);
   }
 
-  @step((orderNumber: string) => `页面操作：打开订单 ${orderNumber} 的详情弹窗`)
-  async openOrderDetails(orderNumber: string): Promise<void> {
+  @step((orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `页面操作：打开订单 ${orderNumber} 的详情弹窗并进入子单 ${targetOrderNumber}`
+      : `页面操作：打开订单 ${orderNumber} 的详情弹窗`,
+  )
+  async openOrderDetails(orderNumber: string, targetOrderNumber?: string): Promise<void> {
     const normalizedOrderNumber = this.normalizeOrderNumber(orderNumber);
 
     await this.closeOrderDetailsDialog();
     await expect(this.orderListContainer).toBeVisible();
     await this.orderListContainer.getByText(normalizedOrderNumber, { exact: true }).first().click();
     await this.waitForOrderDetailsDialogReady();
+    await this.selectSplitTargetOrderIfNeeded(normalizedOrderNumber, targetOrderNumber);
   }
 
   @step('页面读取：读取订单详情中的客户信息')
@@ -625,12 +632,13 @@ export class RecallPage {
 
   @step('页面操作：关闭当前订单详情弹窗')
   async closeOrderDetailsDialog(): Promise<void> {
-    if (!(await this.orderDetailsDialog.isVisible().catch(() => false))) {
-      return;
-    }
+    let visibleDialogCount = await this.readVisibleOrderDialogCount();
 
-    await this.page.keyboard.press('Escape');
-    await expect(this.orderDetailsDialog).toBeHidden({ timeout: 5_000 });
+    while (visibleDialogCount > 0) {
+      await this.page.keyboard.press('Escape');
+      await this.waitForVisibleOrderDialogCount(visibleDialogCount - 1);
+      visibleDialogCount = await this.readVisibleOrderDialogCount();
+    }
   }
 
   @step((_filterButton: Locator, optionName: string) => `页面操作：从顶部筛选下拉菜单中选择 ${optionName}`)
@@ -687,6 +695,61 @@ export class RecallPage {
     );
   }
 
+  private async selectSplitTargetOrderIfNeeded(
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<void> {
+    const splitOrderNumberText = targetOrderNumber
+      ? this.normalizeOrderNumber(targetOrderNumber)
+      : null;
+    const splitOrderTargetLabel = splitOrderNumberText
+      ? this.orderDetailsDialog.getByText(splitOrderNumberText, { exact: true }).first()
+      : this.orderDetailsDialog
+          .getByText(new RegExp(`^${this.escapeRegExp(orderNumber)}-\\d+$`))
+          .first();
+
+    if (!(await splitOrderTargetLabel.isVisible().catch(() => false))) {
+      return;
+    }
+
+    const visibleDialogCount = await this.readVisibleOrderDialogCount();
+    await splitOrderTargetLabel.evaluate((targetLabelElement) => {
+      const clickableElement =
+        targetLabelElement.closest<HTMLElement>('button, [role="button"]') ??
+        (targetLabelElement as HTMLElement);
+      clickableElement.click();
+    });
+    await this.waitForVisibleOrderDialogCount(visibleDialogCount + 1);
+    await this.waitForOrderDetailsDialogReady();
+  }
+
+  private async readVisibleOrderDialogCount(): Promise<number> {
+    return await this.orderDetailsDialogs.evaluateAll((dialogElements) =>
+      dialogElements.filter((dialogElement) => {
+        const htmlElement = dialogElement as HTMLElement;
+        const computedStyle = window.getComputedStyle(htmlElement);
+
+        return (
+          !htmlElement.hidden &&
+          htmlElement.getAttribute('aria-hidden') !== 'true' &&
+          computedStyle.display !== 'none' &&
+          computedStyle.visibility !== 'hidden'
+        );
+      }).length,
+    );
+  }
+
+  private async waitForVisibleOrderDialogCount(expectedCount: number): Promise<void> {
+    await waitUntil(
+      async () => await this.readVisibleOrderDialogCount(),
+      (visibleDialogCount) => visibleDialogCount === expectedCount,
+      {
+        timeout: 5_000,
+        message: `Visible Recall order dialog count did not become ${expectedCount} in time.`,
+      },
+    );
+  }
+
   private async resolveVisibleSearchDialogInput(): Promise<Locator> {
     const inputCandidates = [
       this.searchDialogDefaultInput,
@@ -722,6 +785,10 @@ export class RecallPage {
   private normalizeOrderNumber(orderNumber: string): string {
     const normalizedOrderNumber = orderNumber.trim().replace(/^#/, '');
     return `#${normalizedOrderNumber}`;
+  }
+
+  private escapeRegExp(input: string): string {
+    return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private resolveManualSearchTagTestId(tag: RecallManualSearchTag): string {

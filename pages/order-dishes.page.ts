@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 import { HomePage } from './home.page';
+import { SplitOrderPage } from './split-order.page';
 
 export type OrderedDishItem = {
   quantity: string;
@@ -89,6 +90,7 @@ export class OrderDishesPage {
   private readonly cartBadge: Locator;
   private readonly saveOrderButton: Locator;
   private readonly moreActionButton: Locator;
+  private readonly splitButton: Locator;
   private readonly chargeButton: Locator;
   private readonly chargeDialog: Locator;
   private readonly customChargeDialog: Locator;
@@ -152,6 +154,9 @@ export class OrderDishesPage {
     this.saveOrderButton = this.appFrame.locator('[data-testid="bottom-button-saveOrderBtn"]');
     this.moreActionButton = this.appFrame.getByRole('button', {
       name: /^(More|更多)$/,
+    }).first();
+    this.splitButton = this.appFrame.getByRole('button', {
+      name: /^Split$/,
     }).first();
     this.chargeButton = this.appFrame.getByRole('button', {
       name: CHARGE_BUTTON_NAMES,
@@ -647,6 +652,19 @@ export class OrderDishesPage {
     return new HomePage(this.page);
   }
 
+  @step('页面操作：点击 Split 并打开分单面板')
+  async openSplitOrder(): Promise<SplitOrderPage> {
+    await this.expectLoaded();
+    await (await this.resolveSplitButton()).evaluate((buttonElement) => {
+      (buttonElement as HTMLElement).click();
+    });
+
+    const splitOrderPage = new SplitOrderPage(this.page);
+    await splitOrderPage.expectLoaded();
+
+    return splitOrderPage;
+  }
+
   private createEmptyChargeState(scope: ChargeScope = 'whole'): ChargeState {
     return {
       itemCharges: {},
@@ -926,6 +944,14 @@ export class OrderDishesPage {
     throw new Error('Unable to find the charge button on the order page.');
   }
 
+  private async resolveSplitButton(): Promise<Locator> {
+    if (await this.splitButton.isVisible().catch(() => false)) {
+      return this.splitButton;
+    }
+
+    throw new Error('Unable to find visible Split button on the order page.');
+  }
+
   private async resolveChargeOptionLocator(optionName: string): Promise<Locator> {
     return await this.resolveVisibleLocator(
       [
@@ -1135,4 +1161,3 @@ export class OrderDishesPage {
     return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }
-

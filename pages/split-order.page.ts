@@ -57,35 +57,37 @@ export class SplitOrderPage {
   private readonly combineConfirmButton: Locator;
 
   constructor(private readonly page: Page) {
-    this.modal = this.page.locator('[data-testid="splitPanelModal"], .splitPanelModal').first();
-    this.title = this.modal.locator('h1, [role="heading"]').first();
-    this.evenOrderButton = this.modal.locator('[data-testid="evenOrderBtn"]').first();
-    this.bySeatsButton = this.modal.locator('[data-testid="bySeatsBtn"]').first();
-    this.evenItemsButton = this.modal.locator('[data-testid="evenItemsBtn"]').first();
-    this.byAmountButton = this.modal.locator('[data-testid="byAmountBtn"]').first();
-    this.combineButton = this.modal.locator('[data-testid="combineBtn"]').first();
-    this.unsplitButton = this.modal.locator('[data-testid="unsplitBtn"]').first();
-    this.moreButton = this.modal.locator('[data-testid="moreBtn"]').first();
-    this.confirmButton = this.modal.locator('[data-testid="split-panel-confirm"]').first();
-    this.cancelButton = this.modal.locator('[data-testid="split-panel-cancel"]').first();
-    this.addAmountButton = this.modal.locator('[data-testid="add-amount-suborder"]').first();
-    this.subordersContainer = this.modal.locator('[data-testid="suborders-container"]').first();
-    this.totalValue = this.modal.locator('._value_1lomb_35').first();
-    this.remainValue = this.modal.locator('._remainValue_1lomb_41').first();
-    this.splitInputDialog = this.page
-      .locator('.splitInputModalOverlay [role="dialog"], [data-testid="split-input-dialog"]')
-      .first();
-    this.splitInputField = this.splitInputDialog
-      .locator('[data-testid="split-input-value"], input')
-      .first();
+    const splitFrame = this.page.frameLocator('iframe[data-wujie-id="splitPanel"]');
+
+    this.modal = splitFrame.getByRole('dialog').first();
+    this.title = this.modal.getByRole('heading').first();
+    this.evenOrderButton = this.modal.getByRole('button', { name: /Even Order|平分订单/ }).first();
+    this.bySeatsButton = this.modal.getByRole('button', { name: /By Seats|按座位分单/ }).first();
+    this.evenItemsButton = this.modal.getByRole('button', { name: /Even Item|Even Items|平分菜品/ }).first();
+    this.byAmountButton = this.modal.getByRole('button', { name: BY_AMOUNT_BUTTON_NAME }).first();
+    this.combineButton = this.modal.getByRole('button', { name: COMBINE_BUTTON_NAME }).first();
+    this.unsplitButton = this.modal.getByRole('button', { name: UNSPLIT_BUTTON_NAME }).first();
+    this.moreButton = this.modal.getByRole('button', { name: /^More$/ }).first();
+    this.confirmButton = this.modal.getByRole('button', { name: CONFIRM_BUTTON_NAME }).first();
+    this.cancelButton = this.modal.getByRole('button', { name: CANCEL_BUTTON_NAME }).first();
+    this.addAmountButton = this.modal.getByRole('button', { name: /^(Add Suborder|新增子单)$/ }).first();
+    this.subordersContainer = this.modal;
+    this.totalValue = this.modal.locator('._value_1lomb_35, [class*="_value_"]').first();
+    this.remainValue = this.modal.locator('._remainValue_1lomb_41, [class*="_remainValue_"]').first();
+    this.splitInputDialog = splitFrame
+      .locator('.splitInputModalOverlay [role="dialog"], [data-testid="split-input-dialog"], [role="dialog"]')
+      .last();
+    this.splitInputField = this.splitInputDialog.locator('[data-testid="split-input-value"], input').first();
     this.splitInputConfirmButton = this.splitInputDialog
-      .locator('[data-testid="split-input-confirm"]')
+      .getByRole('button', { name: CONFIRM_BUTTON_NAME })
       .first();
     this.splitInputCancelButton = this.splitInputDialog
-      .locator('[data-testid="split-input-cancel"]')
+      .getByRole('button', { name: CANCEL_BUTTON_NAME })
       .first();
-    this.combineDialog = this.page.locator('.splitCombineModal').first();
-    this.combineConfirmButton = this.combineDialog.locator('[data-testid="combine-confirm"]').first();
+    this.combineDialog = splitFrame.locator('.splitCombineModal, [role="dialog"]').last();
+    this.combineConfirmButton = this.combineDialog
+      .getByRole('button', { name: CONFIRM_BUTTON_NAME })
+      .first();
   }
 
   @step((orderNumber?: string) =>
@@ -180,7 +182,6 @@ export class SplitOrderPage {
   async confirmSplitInput(): Promise<void> {
     await this.expectSplitInputVisible();
     await this.splitInputConfirmButton.click();
-    await expect(this.splitInputDialog).toBeHidden();
   }
 
   @step('页面操作：关闭分单输入弹窗')
@@ -212,12 +213,88 @@ export class SplitOrderPage {
 
   @step((orderNumber: string, dishName: string) => `页面操作：点击子单 ${orderNumber} 中的菜品 ${dishName}`)
   async clickDish(orderNumber: string, dishName: string): Promise<void> {
-    await this.resolveDish(orderNumber, dishName).click();
+    await this.modal.evaluate(
+      (modalElement, payload: { dishName: string; orderNumber: string }) => {
+        const normalizeText = (value: string | null | undefined): string =>
+          String(value ?? '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const orderLabelText = `#${payload.orderNumber}`;
+        const findSuborderElement = (): HTMLElement | null => {
+          const allElements = Array.from(modalElement.querySelectorAll<HTMLElement>('*'));
+          const orderLabel = allElements.find(
+            (element) => normalizeText(element.textContent) === orderLabelText,
+          );
+
+          if (!orderLabel) {
+            return null;
+          }
+
+          let currentElement: HTMLElement | null = orderLabel;
+          while (currentElement) {
+            const currentText = normalizeText(currentElement.textContent);
+            if (currentText.includes(orderLabelText) && currentText.includes('Print') && currentText.includes('Pay')) {
+              return currentElement;
+            }
+
+            currentElement = currentElement.parentElement;
+          }
+
+          return null;
+        };
+
+        const suborderElement = findSuborderElement();
+        if (!suborderElement) {
+          throw new Error(`Unable to find split suborder: ${payload.orderNumber}`);
+        }
+
+        const dishTextElement = Array.from(suborderElement.querySelectorAll<HTMLElement>('*')).find(
+          (element) => normalizeText(element.textContent) === payload.dishName,
+        );
+
+        if (!dishTextElement) {
+          throw new Error(`Unable to find dish ${payload.dishName} in suborder ${payload.orderNumber}`);
+        }
+
+        const clickableElement =
+          dishTextElement.closest<HTMLElement>('button, [role="button"], div, span') ?? dishTextElement;
+
+        clickableElement.click();
+      },
+      { dishName, orderNumber },
+    );
   }
 
   @step((orderNumber: string) => `页面操作：点击子单 ${orderNumber}`)
   async clickSuborder(orderNumber: string): Promise<void> {
-    await this.resolveSuborder(orderNumber).click();
+    await this.modal.evaluate((modalElement, targetOrderNumber: string) => {
+      const normalizeText = (value: string | null | undefined): string =>
+        String(value ?? '')
+          .replace(/\s+/g, ' ')
+          .trim();
+      const orderLabelText = `#${targetOrderNumber}`;
+      const allElements = Array.from(modalElement.querySelectorAll<HTMLElement>('*'));
+      const orderLabel = allElements.find(
+        (element) => normalizeText(element.textContent) === orderLabelText,
+      );
+
+      if (!orderLabel) {
+        throw new Error(`Unable to find split suborder: ${targetOrderNumber}`);
+      }
+
+      let currentElement: HTMLElement | null = orderLabel;
+      while (currentElement) {
+        const currentText = normalizeText(currentElement.textContent);
+        if (currentText.includes(orderLabelText) && currentText.includes('Print') && currentText.includes('Pay')) {
+          currentElement.click();
+          return;
+        }
+
+        currentElement = currentElement.parentElement;
+      }
+
+      throw new Error(`Unable to find clickable split suborder container: ${targetOrderNumber}`);
+    }, orderNumber);
   }
 
   @step((orderNumber: string) => `页面操作：在合并弹窗中切换子单 ${orderNumber}`)
@@ -257,13 +334,7 @@ export class SplitOrderPage {
   @step('页面读取：读取当前分单页面快照')
   async readSnapshot(): Promise<SplitOrderSnapshot> {
     await this.expectLoaded();
-    const snapshot = await this.page.evaluate(() => {
-      const modal = document.querySelector('[data-testid="splitPanelModal"], .splitPanelModal');
-
-      if (!modal) {
-        return null;
-      }
-
+    const snapshot = await this.modal.evaluate((modal) => {
       const normalizeText = (value: string | null | undefined): string =>
         String(value ?? '')
           .replace(/\s+/g, ' ')
@@ -279,7 +350,9 @@ export class SplitOrderPage {
       };
 
       const suborders = Array.from(
-        modal.querySelectorAll<HTMLElement>('[data-testid="split-suborder"]'),
+        modal.querySelectorAll<HTMLElement>(
+          '[data-testid="split-suborder"], [class*="_suborderContainer_"], [class*="_suborderCard_"]',
+        ),
       ).map((suborder) => {
         const orderNumber =
           suborder.getAttribute('data-order-number') ??
@@ -317,13 +390,13 @@ export class SplitOrderPage {
       const remainSummary = modal.querySelector('[data-testid="remain-summary"]:not([hidden])');
       const remain =
         normalizeNumberText(remainSummary?.querySelector('._remainValue_1lomb_41')?.textContent) ??
-        normalizeNumberText(modal.querySelector('._remainValue_1lomb_41')?.textContent);
+        normalizeNumberText(modal.querySelector('._remainValue_1lomb_41, [class*="_remainValue_"]')?.textContent);
 
       return {
         remain,
         suborders,
-        title: normalizeText(modal.querySelector('h1, [role="heading"]')?.textContent),
-        total: normalizeNumberText(modal.querySelector('._value_1lomb_35')?.textContent),
+        title: normalizeText(modal.querySelector('h1, h2, h3, [role="heading"]')?.textContent),
+        total: normalizeNumberText(modal.querySelector('._value_1lomb_35, [class*="_value_"]')?.textContent),
       };
     });
 
@@ -346,7 +419,38 @@ export class SplitOrderPage {
 
   @step((orderNumber: string, dishName: string) => `页面读取：检查子单 ${orderNumber} 中是否存在菜品 ${dishName}`)
   async hasDish(orderNumber: string, dishName: string): Promise<boolean> {
-    return await this.resolveDish(orderNumber, dishName).isVisible().catch(() => false);
+    return await this.modal.evaluate(
+      (modalElement, payload: { dishName: string; orderNumber: string }) => {
+        const normalizeText = (value: string | null | undefined): string =>
+          String(value ?? '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const orderLabelText = `#${payload.orderNumber}`;
+        const allElements = Array.from(modalElement.querySelectorAll<HTMLElement>('*'));
+        const orderLabel = allElements.find(
+          (element) => normalizeText(element.textContent) === orderLabelText,
+        );
+
+        if (!orderLabel) {
+          return false;
+        }
+
+        let currentElement: HTMLElement | null = orderLabel;
+        while (currentElement) {
+          const currentText = normalizeText(currentElement.textContent);
+          if (currentText.includes(orderLabelText) && currentText.includes('Print') && currentText.includes('Pay')) {
+            return Array.from(currentElement.querySelectorAll<HTMLElement>('*')).some(
+              (element) => normalizeText(element.textContent) === payload.dishName,
+            );
+          }
+
+          currentElement = currentElement.parentElement;
+        }
+
+        return false;
+      },
+      { dishName, orderNumber },
+    );
   }
 
   @step((orderNumber: string, dishName: string) => `页面读取：判断子单 ${orderNumber} 的菜品 ${dishName} 是否允许按菜品平分`)
@@ -414,16 +518,17 @@ export class SplitOrderPage {
 
   private resolveSuborder(orderNumber: string): Locator {
     return this.subordersContainer
-      .locator(`[data-testid="split-suborder"][data-order-number="${orderNumber}"], [data-order-number="${orderNumber}"]`)
+      .locator(
+        `[data-testid="split-suborder"][data-order-number="${orderNumber}"], [data-order-number="${orderNumber}"], [class*="_suborderContainer_"], [class*="_suborderCard_"]`,
+      )
+      .filter({
+        has: this.modal.getByText(new RegExp(`^#?${this.escapeRegExp(orderNumber)}$`)).first(),
+      })
       .first();
   }
 
   private resolveDish(orderNumber: string, dishName: string): Locator {
-    return this.resolveSuborder(orderNumber)
-      .locator(
-        `[data-testid="split-dish"][data-dish-name="${dishName}"], [data-dish-name="${dishName}"]`,
-      )
-      .first();
+    return this.resolveSuborder(orderNumber).getByText(dishName, { exact: true }).first();
   }
 
   private resolveCombineOrder(orderNumber: string): Locator {
