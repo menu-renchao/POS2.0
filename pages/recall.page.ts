@@ -38,6 +38,7 @@ export type RecallOrderPaymentRecord = {
 export type RecallOrderItemAddition = {
   name: string;
   price?: string;
+  subAdditions?: RecallOrderItemAddition[];
 };
 
 export type RecallOrderItem = {
@@ -766,32 +767,78 @@ export class RecallPage {
             return records;
           }
 
-          const additions = dedupeElements(
-            Array.from(
-              dishElement.querySelectorAll(
-                '[class*="_extraItem_"], [data-testid^="dish-item-subitem-"], [data-test-id^="dish-item-subitem-"]',
-              ),
-            ),
-          ).reduce<
-            RecallOrderItemAddition[]
-          >((lines, extraElement) => {
-            const rawAdditionText = normalizeOptionalText(extraElement.textContent);
+          const additionSelectors = [
+            '[class*="_extraItem_"]',
+            '[data-testid^="dish-item-subitem-"]',
+            '[data-test-id^="dish-item-subitem-"]',
+            '[class*="_optionItemContainer_"]',
+          ].join(', ');
+          const additionElements = dedupeElements(Array.from(dishElement.querySelectorAll(additionSelectors)));
+          const additionElementSet = new Set(additionElements);
+          const childMap = new Map<Element, Element[]>();
+          const topLevelAdditionElements: Element[] = [];
+
+          const parseAdditionElement = (
+            additionElement: Element,
+          ): RecallOrderItemAddition | null => {
+            const rawAdditionText = normalizeOptionalText(additionElement.textContent);
             const additionPrice =
-              selectText(extraElement, '[class*="_optionPrice_"]') ??
+              selectText(additionElement, '[class*="_optionPrice_"]') ??
               rawAdditionText?.match(/\$[\d,.]+$/)?.[0] ??
               null;
             const additionName =
-              selectText(extraElement, '[class*="_extraText_"]') ??
+              selectText(additionElement, '[class*="_extraText_"]') ??
+              selectText(additionElement, '[class*="_optionName_"]') ??
               (rawAdditionText && additionPrice
-                ? normalizeOptionalText(rawAdditionText.replace(new RegExp(`\\s*${additionPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), ''))
+                ? normalizeOptionalText(
+                    rawAdditionText.replace(
+                      new RegExp(`\\s*${additionPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+                      '',
+                    ),
+                  )
                 : rawAdditionText);
 
-            if (additionName) {
-              lines.push(additionPrice ? { name: additionName, price: additionPrice } : { name: additionName });
+            if (!additionName) {
+              return null;
             }
 
-            return lines;
-          }, []);
+            const subAdditions = (childMap.get(additionElement) ?? [])
+              .map((childElement) => parseAdditionElement(childElement))
+              .filter((addition): addition is RecallOrderItemAddition => addition !== null);
+
+            return {
+              ...(additionPrice ? { price: additionPrice } : {}),
+              ...(subAdditions.length > 0 ? { subAdditions } : {}),
+              name: additionName,
+            };
+          };
+
+          for (const additionElement of additionElements) {
+            let parentAdditionElement: Element | null = null;
+            let currentParent = additionElement.parentElement;
+
+            while (currentParent && currentParent !== dishElement) {
+              if (additionElementSet.has(currentParent)) {
+                parentAdditionElement = currentParent;
+                break;
+              }
+
+              currentParent = currentParent.parentElement;
+            }
+
+            if (parentAdditionElement) {
+              const children = childMap.get(parentAdditionElement) ?? [];
+              children.push(additionElement);
+              childMap.set(parentAdditionElement, children);
+              continue;
+            }
+
+            topLevelAdditionElements.push(additionElement);
+          }
+
+          const additions = topLevelAdditionElements
+            .map((additionElement) => parseAdditionElement(additionElement))
+            .filter((addition): addition is RecallOrderItemAddition => addition !== null);
 
           records.push({
             seat,

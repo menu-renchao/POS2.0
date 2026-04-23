@@ -2,11 +2,7 @@ import { expect } from '@playwright/test';
 import { enterEmployeeContext } from '../../flows/employee-login.flow';
 import { openHome } from '../../flows/home.flow';
 import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import {
-  addDishToCart,
-  addRegularDish,
-  increaseOrderedDishQuantityByOne,
-} from '../../flows/order-dishes.flow';
+import { addRegularDish, increaseOrderedDishQuantityByOne } from '../../flows/order-dishes.flow';
 import {
   editFirstVisibleRecallOrder,
   openRecallFromHome,
@@ -32,6 +28,8 @@ const automationMenu = {
   category: '全类型类',
   group: '自动化菜单组',
 };
+
+const categoryOptionDishName = 'test';
 
 type AppEntryPages = {
   employeeLoginPage: EmployeeLoginPage;
@@ -77,6 +75,37 @@ async function saveOrderAndOpenLatestRecallDetails(
 
   const recallPage = await openRecallFromHome(savedHomePage);
   return await viewFirstVisibleRecallOrderDetails(recallPage);
+}
+
+async function assertCategoryOptionOrderRoundTrip(
+  orderDishesPage: OrderDishesPage,
+  dishName: string,
+  option: string,
+  suboption?: string,
+): Promise<void> {
+  await orderDishesPage.clickDish(dishName);
+  await orderDishesPage.selectCategoryOption(option, suboption);
+
+  const orderedItems = await orderDishesPage.readOrderedItems();
+  const orderedItem = orderedItems.find((item) => item.name === dishName);
+
+  expect(orderedItem, `点单页应包含菜品 ${dishName}`).toBeTruthy();
+  expect(orderedItem?.price, `点单页应展示菜品 ${dishName} 的价格`).toBeTruthy();
+  expect(
+    orderedItem?.additions.map((addition) => addition.name.trim()) ?? [],
+    `点单页应回显 ${dishName} 的 option`,
+  ).toEqual(suboption ? [option, suboption] : [option]);
+
+  const orderDetails = await saveOrderAndOpenLatestRecallDetails(orderDishesPage);
+  const recallItem = orderDetails.items.find((item) => item.name === dishName);
+
+  expect(orderDetails.items, 'Recall 最新订单应只包含本次保存的菜品').toHaveLength(1);
+  expect(recallItem, `Recall 中应包含菜品 ${dishName}`).toBeTruthy();
+  expect(recallItem?.price).toBe(orderedItem?.price);
+  expect(
+    recallItem?.additions.map((addition) => addition.name.trim()) ?? [],
+    `Recall 中应回显 ${dishName} 的 option`,
+  ).toEqual(suboption ? [option, suboption] : [option]);
 }
 
 async function expectLatestRecallDishMatches(
@@ -407,4 +436,41 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       });
     },
   );
+
+  test.describe('option 选择回显', () => {
+    test(
+      '应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显',
+      {
+        annotation: [
+          {
+            type: 'issue',
+            description: 'https://devtickets.atlassian.net/browse/POS-15643',
+          },
+          {
+            type: 'issue',
+            description: 'https://devtickets.atlassian.net/browse/POS-15758',
+          },
+          {
+            type: 'issue',
+            description: 'https://devtickets.atlassian.net/browse/POS-15759',
+          },
+        ],
+      },
+      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+        });
+
+        await test.step('从 To Go 进入点单页，选择分类 option1 和二级 option sub1 并校验回显', async () => {
+          const orderDishesPage = await startToGoOrder(readyHomePage);
+          await assertCategoryOptionOrderRoundTrip(
+            orderDishesPage,
+            categoryOptionDishName,
+            'option1',
+            'sub1',
+          );
+        });
+      },
+    );
+  });
 });

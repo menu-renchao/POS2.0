@@ -190,6 +190,74 @@ const modifierFrameHtml = String.raw`
 </html>
 `;
 
+const categoryOptionFrameHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <button type="button">Back</button>
+    <button type="button">Send</button>
+    <button type="button">Pay</button>
+
+    <main>
+      <button type="button" data-testid="ordered-dish-category-option">1 Fried Rice $5.89</button>
+    </main>
+
+    <div class="_dock_hspw6_1">
+      <div class="_topBar_hspw6_10">
+        <div class="_topBarAction_hspw6_17">
+          <button type="button" class="_collapseBtn_hspw6_21" data-testid="item-option-panel-collapse-button">
+            <span>Collapse</span>
+          </button>
+        </div>
+      </div>
+      <div class="_grid_hspw6_73 _compactPadding_hspw6_86">
+        <button type="button" class="_card_gu1xb_1" aria-pressed="false">
+          <span class="_name_gu1xb_37">aaa</span>
+        </button>
+      </div>
+      <div>
+        <div class="_subGrid_hspw6_99" hidden>
+          <button type="button" class="_card_gu1xb_1" aria-pressed="false">
+            <span class="_name_gu1xb_37">sub1</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const state = {
+          selectedDishName: null,
+          selectedOption: null,
+          selectedSubOption: null,
+        };
+
+        window.__orderDishesState = state;
+
+        const dishButton = document.querySelector('[data-testid="ordered-dish-category-option"]');
+        const optionPanel = document.querySelector('._dock_hspw6_1');
+        const optionButton = optionPanel.querySelector('._grid_hspw6_73 ._card_gu1xb_1');
+        const subGrid = optionPanel.querySelector('._subGrid_hspw6_99');
+        const subOptionButton = subGrid.querySelector('._card_gu1xb_1');
+
+        dishButton.addEventListener('click', () => {
+          state.selectedDishName = 'Fried Rice';
+        });
+
+        optionButton.addEventListener('click', () => {
+          state.selectedOption = optionButton.textContent.trim();
+          subGrid.hidden = false;
+        });
+
+        subOptionButton.addEventListener('click', () => {
+          state.selectedSubOption = subOptionButton.textContent.trim();
+        });
+      })();
+    </script>
+  </body>
+</html>
+`;
+
 async function prepareOrderDishesFrame(page: import('@playwright/test').Page): Promise<void> {
   await page.setContent('<iframe data-wujie-id="orderDishes"></iframe>');
   await page.locator('iframe[data-wujie-id="orderDishes"]').evaluate((iframe, content) => {
@@ -341,4 +409,82 @@ test.describe('已点菜品调味契约', () => {
       });
     },
   );
+
+  test('应能选择分类 option 且不强制选择二级 option', async ({ page }) => {
+    const orderDishesPage = new OrderDishesPage(page);
+
+    await test.step('准备分类 option 面板', async () => {
+      await prepareOrderDishesFrame(page);
+      await page.locator('iframe[data-wujie-id="orderDishes"]').evaluate((iframe, content) => {
+        iframe.setAttribute('srcdoc', content as string);
+      }, categoryOptionFrameHtml);
+      await page.evaluate(() => {
+        window.location.hash = 'orderDishes';
+      });
+    });
+
+    await test.step('先选中菜品再选择分类 option', async () => {
+      await page
+        .frameLocator('iframe[data-wujie-id="orderDishes"]')
+        .getByTestId('ordered-dish-category-option')
+        .click();
+      await orderDishesPage.selectCategoryOption('aaa');
+    });
+
+    const state = await page
+      .frameLocator('iframe[data-wujie-id="orderDishes"]')
+      .locator('body')
+      .evaluate(() => {
+        return (window as typeof window & {
+          __orderDishesState: {
+            selectedDishName: string | null;
+            selectedOption: string | null;
+            selectedSubOption: string | null;
+          };
+        }).__orderDishesState;
+      });
+
+    expect(state.selectedDishName).toBe('Fried Rice');
+    expect(state.selectedOption).toBe('aaa');
+    expect(state.selectedSubOption).toBeNull();
+  });
+
+  test('应能选择分类 option 后再选择二级 option', async ({ page }) => {
+    const orderDishesPage = new OrderDishesPage(page);
+
+    await test.step('准备分类 option 面板', async () => {
+      await prepareOrderDishesFrame(page);
+      await page.locator('iframe[data-wujie-id="orderDishes"]').evaluate((iframe, content) => {
+        iframe.setAttribute('srcdoc', content as string);
+      }, categoryOptionFrameHtml);
+      await page.evaluate(() => {
+        window.location.hash = 'orderDishes';
+      });
+    });
+
+    await test.step('先选中菜品再选择分类 option 与二级 option', async () => {
+      await page
+        .frameLocator('iframe[data-wujie-id="orderDishes"]')
+        .getByTestId('ordered-dish-category-option')
+        .click();
+      await orderDishesPage.selectCategoryOption('aaa', 'sub1');
+    });
+
+    const state = await page
+      .frameLocator('iframe[data-wujie-id="orderDishes"]')
+      .locator('body')
+      .evaluate(() => {
+        return (window as typeof window & {
+          __orderDishesState: {
+            selectedDishName: string | null;
+            selectedOption: string | null;
+            selectedSubOption: string | null;
+          };
+        }).__orderDishesState;
+      });
+
+    expect(state.selectedDishName).toBe('Fried Rice');
+    expect(state.selectedOption).toBe('aaa');
+    expect(state.selectedSubOption).toBe('sub1');
+  });
 });

@@ -15,6 +15,7 @@ export type OrderedDishItem = {
 export type OrderedDishItemAddition = {
   name: string;
   price?: string;
+  subAdditions?: OrderedDishItemAddition[];
 };
 
 export type OrderPriceSummary = {
@@ -113,6 +114,9 @@ export class OrderDishesPage {
   private readonly priceConfirmButton: Locator;
   private readonly specificationDialog: Locator;
   private readonly specificationConfirmButton: Locator;
+  private readonly categoryOptionPanel: Locator;
+  private readonly categoryOptionGrid: Locator;
+  private readonly categoryOptionSubGrid: Locator;
   private readonly comboDialog: Locator;
   private readonly comboConfirmButton: Locator;
   private readonly cartBadge: Locator;
@@ -201,6 +205,11 @@ export class OrderDishesPage {
     this.specificationConfirmButton = this.specificationDialog.getByRole('button', {
       name: 'Confirm',
     });
+    this.categoryOptionPanel = this.appFrame
+      .locator('[data-testid="item-option-panel-collapse-button"]')
+      .locator('xpath=ancestor::div[contains(@class,"_dock_")][1]');
+    this.categoryOptionGrid = this.categoryOptionPanel.locator('[class*="_grid_"]').first();
+    this.categoryOptionSubGrid = this.categoryOptionPanel.locator('[class*="_subGrid_"]').first();
     this.comboDialog = this.appFrame.locator('aside[class*="_panel_"]').filter({
       has: this.appFrame.getByRole('button', { name: 'Cancel', exact: true }),
     }).first();
@@ -499,10 +508,35 @@ export class OrderDishesPage {
     return await this.specificationDialog.isVisible();
   }
 
+  @step('页面操作：确认分类 option 面板可见')
+  async expectCategoryOptionPanelVisible(): Promise<void> {
+    await expect(this.categoryOptionPanel).toBeVisible();
+  }
+
+  @step('页面操作：检查分类 option 面板是否可见')
+  async isCategoryOptionPanelVisible(): Promise<boolean> {
+    return await this.categoryOptionPanel.isVisible().catch(() => false);
+  }
+
   @step((spec: string) => `页面操作：选择规格 ${spec}`)
   async selectSpecification(spec: string): Promise<void> {
     await this.expectSpecificationDialogVisible();
     await this.resolveSpecificationButton(spec).click();
+  }
+
+  @step((option: string, suboption?: string) =>
+    suboption
+      ? `页面操作：选择分类 option ${option} 和二级 option ${suboption}`
+      : `页面操作：选择分类 option ${option}`,
+  )
+  async selectCategoryOption(option: string, suboption?: string): Promise<void> {
+    await this.expectCategoryOptionPanelVisible();
+    await (await this.resolveCategoryOptionButton(option)).click();
+
+    if (suboption) {
+      await expect(this.categoryOptionSubGrid).toBeVisible({ timeout: 10_000 });
+      await (await this.resolveCategorySubOptionButton(suboption)).click();
+    }
   }
 
   @step('页面操作：确认规格选择')
@@ -819,6 +853,11 @@ export class OrderDishesPage {
         price: string | null;
         quantity: string;
       };
+      type OrderedDishItemAdditionFromDom = {
+        name: string;
+        price?: string;
+        subAdditions?: OrderedDishItemAdditionFromDom[];
+      };
 
       const cleanText = (value: string | null | undefined): string =>
         value?.replace(/\s+/g, ' ').trim() ?? '';
@@ -844,6 +883,12 @@ export class OrderDishesPage {
           return true;
         });
       };
+      const additionSelectors = [
+        '[data-testid^="dish-item-subitem-"]',
+        '[data-test-id^="dish-item-subitem-"]',
+        '[class*="_extraItem_"]',
+        '[class*="_optionItemContainer_"]',
+      ].join(', ');
       const readDishName = (
         dishElement: Element,
         quantity: string | null,
@@ -865,6 +910,42 @@ export class OrderDishesPage {
                 !/^\d+(?:\.\d+)?$/.test(text),
             ) ?? null
         );
+      };
+      const isAdditionElement = (element: Element): boolean => element.matches(additionSelectors);
+      const parseAdditionElement = (
+        additionElement: Element,
+        childMap: Map<Element, Element[]>,
+      ): OrderedDishItemAdditionFromDom | null => {
+        const rawAdditionText = normalizeOptionalText(additionElement.textContent);
+        const additionPrice =
+          selectText(additionElement, '[class*="_optionPrice_"]') ??
+          rawAdditionText?.match(/\$[\d,.]+$/)?.[0] ??
+          null;
+        const additionName =
+          selectText(additionElement, '[class*="_extraText_"]') ??
+          selectText(additionElement, '[class*="_optionName_"]') ??
+          (rawAdditionText && additionPrice
+            ? normalizeOptionalText(
+                rawAdditionText.replace(
+                  new RegExp(`\\s*${additionPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+                  '',
+                ),
+              )
+            : rawAdditionText);
+
+        if (!additionName) {
+          return null;
+        }
+
+        const subAdditions = (childMap.get(additionElement) ?? [])
+          .map((childElement) => parseAdditionElement(childElement, childMap))
+          .filter((addition): addition is OrderedDishItemAdditionFromDom => addition !== null);
+
+        return {
+          ...(additionPrice ? { price: additionPrice } : {}),
+          ...(subAdditions.length > 0 ? { subAdditions } : {}),
+          name: additionName,
+        };
       };
 
       return dedupeElements(
@@ -888,41 +969,39 @@ export class OrderDishesPage {
           return items;
         }
 
-        const additions = dedupeElements(
-          Array.from(
-            dishElement.querySelectorAll(
-              [
-                '[data-testid^="dish-item-subitem-"]',
-                '[data-test-id^="dish-item-subitem-"]',
-                '[class*="_extraItem_"]',
-                '[class*="_optionItemContainer_"]',
-              ].join(', '),
-            ),
-          ),
-        ).reduce<Array<{ name: string; price?: string }>>((lines, optionElement) => {
-          const rawOptionText = normalizeOptionalText(optionElement.textContent);
-          const optionPrice =
-            selectText(optionElement, '[class*="_optionPrice_"]') ??
-            rawOptionText?.match(/\$[\d,.]+$/)?.[0] ??
-            null;
-          const optionName =
-            selectText(optionElement, '[class*="_optionName_"]') ??
-            selectText(optionElement, '[class*="_extraText_"]') ??
-            (rawOptionText && optionPrice
-              ? normalizeOptionalText(
-                  rawOptionText.replace(
-                    new RegExp(`\\s*${optionPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
-                    '',
-                  ),
-                )
-              : rawOptionText);
+        const additionElements = dedupeElements(Array.from(dishElement.querySelectorAll(additionSelectors)));
+        const additionElementSet = new Set(additionElements);
+        const childMap = new Map<Element, Element[]>();
+        const topLevelAdditionElements: Element[] = [];
 
-          if (optionName) {
-            lines.push(optionPrice ? { name: optionName, price: optionPrice } : { name: optionName });
+        for (const additionElement of additionElements) {
+          let parentAdditionElement: Element | null = null;
+          let currentParent = additionElement.parentElement;
+
+          while (currentParent && currentParent !== dishElement) {
+            if (additionElementSet.has(currentParent)) {
+              parentAdditionElement = currentParent;
+              break;
+            }
+
+            currentParent = currentParent.parentElement;
           }
 
-          return lines;
-        }, []);
+          if (parentAdditionElement) {
+            const children = childMap.get(parentAdditionElement) ?? [];
+            children.push(additionElement);
+            childMap.set(parentAdditionElement, children);
+            continue;
+          }
+
+          topLevelAdditionElements.push(additionElement);
+        }
+
+        const additions = topLevelAdditionElements
+          .map((additionElement) => parseAdditionElement(additionElement, childMap))
+          .filter(
+            (addition): addition is OrderedDishItemAdditionFromDom => addition !== null,
+          );
 
         items.push({
           additions,
@@ -1745,6 +1824,43 @@ export class OrderDishesPage {
 
   private resolveSpecificationButton(spec: string): Locator {
     return this.specificationDialog.getByRole('button', { name: spec, exact: true });
+  }
+
+  private async resolveCategoryOptionButton(option: string): Promise<Locator> {
+    const escapedOption = this.escapeRegExp(option);
+    const optionPattern = new RegExp(`^\\s*${escapedOption}\\s*(?:\\$[\\d,.]+)?\\s*$`);
+
+    return await this.resolveVisibleLocator(
+      [
+        this.categoryOptionGrid.getByRole('button', { name: optionPattern }).first(),
+        this.categoryOptionGrid
+          .locator('[data-testid^="category-option-"], [data-test-id^="category-option-"]')
+          .filter({ hasText: optionPattern })
+          .first(),
+        this.categoryOptionGrid.locator('[class*="_card_"]').filter({ hasText: optionPattern }).first(),
+      ],
+      `Unable to find category option button: ${option}.`,
+    );
+  }
+
+  private async resolveCategorySubOptionButton(option: string): Promise<Locator> {
+    const escapedOption = this.escapeRegExp(option);
+    const optionPattern = new RegExp(`^\\s*${escapedOption}\\s*(?:\\$[\\d,.]+)?\\s*$`);
+
+    return await this.resolveVisibleLocator(
+      [
+        this.categoryOptionSubGrid.getByRole('button', { name: optionPattern }).first(),
+        this.categoryOptionSubGrid
+          .locator('[data-testid^="category-sub-option-"], [data-test-id^="category-sub-option-"]')
+          .filter({ hasText: optionPattern })
+          .first(),
+        this.categoryOptionSubGrid
+          .locator('[class*="_card_"]')
+          .filter({ hasText: optionPattern })
+          .first(),
+      ],
+      `Unable to find category sub option button: ${option}.`,
+    );
   }
 
   private async activateComboSection(sectionName: string): Promise<void> {

@@ -147,6 +147,11 @@ export class OrderDishesFlow {
     await orderDishesPage.clickDish(dishName);
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
 
+    if (await orderDishesPage.isCategoryOptionPanelVisible()) {
+      await orderDishesPage.selectCategoryOption(specifications[0], specifications[1]);
+      return;
+    }
+
     if (await orderDishesPage.isSpecificationDialogVisible()) {
       for (const spec of specifications) {
         await orderDishesPage.selectSpecification(spec);
