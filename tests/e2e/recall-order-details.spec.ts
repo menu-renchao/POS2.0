@@ -407,6 +407,96 @@ const changedSelectorOrderDetailFixtureHtml = String.raw`
 </html>
 `;
 
+const orderDetailWithOptionsFixtureHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <button type="button" data-testid="recall2-header-new-order">New Order</button>
+    <button type="button" data-testid="recall2-header-paging">Paging</button>
+    <button type="button" data-testid="recall2-filter-dropdown-paymentStatus">Payment Status</button>
+    <button type="button" data-testid="recall2-filter-dropdown-orderStatus">Order Status</button>
+    <button type="button" data-testid="recall2-filter-dropdown-orderType">Order Type</button>
+    <button type="button" data-testid="recall2-filter-dropdown-paymentType">Payment Type</button>
+    <button type="button" data-testid="recall2-filter-dropdown-productLine">Product Line</button>
+    <button type="button" data-testid="recall2-search-trigger">Search</button>
+    <button type="button" data-testid="icon-button-More Filters">More Filters</button>
+    <input data-testid="recall2-search-input" value="" />
+
+    <div data-testid="recall2-order-list-container">
+      <button type="button" data-testid="recall2-order-card-4">#4</button>
+    </div>
+
+    <div role="dialog" aria-modal="true" data-testid="pos-ui-modal" hidden>
+      <div class="_header_1ej2d_479">
+        <div class="_orderNumber_1bmdj_459"><span class="_number_1bmdj_480">#4</span></div>
+        <div class="_status_1bmdj_494"><span class="_statusTag_1bmdj_500">Unpaid</span></div>
+        <div class="_actionButtons_gham7_478">
+          <button type="button">To Go</button>
+          <button type="button">Boss</button>
+        </div>
+      </div>
+
+      <div data-testid="pos-ui-dish-item" class="_dishItem_yksc5_196">
+        <div class="_dishMainRow_yksc5_239">
+          <div class="_dishInfo_yksc5_203">
+            <section class="_prefix_yksc5_280"><span class="_quantity_yksc5_234">1</span></section>
+            <div class="_dishTitleBlock_yksc5_339"><span class="_dishName_yksc5_331">test</span></div>
+          </div>
+          <span class="_dishPrice_yksc5_355">$7.89</span>
+        </div>
+        <div class="_comboExtras_yksc5_205">
+          <div class="_optionsContainer_yksc5_376">
+            <div class="_optionItemContainer_yksc5_383" data-testid="dish-item-subitem-option-67273">
+              <div class="_optionItem_yksc5_383">
+                <div class="_optionNameContainer_yksc5_541">
+                  <span class="_optionName_yksc5_422">Pork Sauce</span>
+                </div>
+              </div>
+            </div>
+            <div class="_optionItemContainer_yksc5_383" data-testid="dish-item-subitem-option-67274">
+              <div class="_optionItem_yksc5_383">
+                <div class="_optionNameContainer_yksc5_541">
+                  <span class="_optionName_yksc5_422"> Sweet Sour Sauce</span>
+                </div>
+              </div>
+            </div>
+            <div class="_optionItemContainer_yksc5_383" data-testid="dish-item-subitem-option-67275">
+              <div class="_optionItem_yksc5_383">
+                <div class="_optionNameContainer_yksc5_541">
+                  <span class="_optionName_yksc5_422"> Garlic Sauce</span>
+                </div>
+                <span class="_optionPrice_yksc5_423">$2.00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-test-id="shared-order-price-summary-toggle" class="_container_new_437">
+        <div><span>Count</span><span>1</span></div>
+        <div><span>Subtotal</span><span>$7.89</span></div>
+        <div><span>Total</span><span>$7.89</span></div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const orderCard = document.querySelector('[data-testid="recall2-order-list-container"] button');
+        const dialog = document.querySelector('[data-testid="pos-ui-modal"]');
+        orderCard?.addEventListener('click', () => {
+          dialog.hidden = false;
+        });
+        window.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            dialog.hidden = true;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
+`;
+
 test.describe('Recall 订单详情读取', () => {
   test(
     '应能读取指定订单的详情并在完成后主动关闭详情弹窗',
@@ -587,6 +677,39 @@ test.describe('Recall 订单详情读取', () => {
         },
       });
 
+      await expect(page.getByRole('dialog')).toBeHidden();
+    },
+  );
+
+  test(
+    '应能读取 Recall 菜品下的调味名称和价格',
+    {},
+    async ({ page }) => {
+      const recallPage = new RecallPage(page);
+
+      await test.step('准备带调味子项的 Recall 订单详情', async () => {
+        await page.setContent(orderDetailWithOptionsFixtureHtml);
+        await page.evaluate(() => {
+          window.location.hash = '#recall';
+        });
+      });
+
+      const details = await viewRecallOrderDetails(recallPage, '4');
+
+      expect(details.items).toEqual([
+        {
+          additions: [
+            { name: 'Pork Sauce' },
+            { name: 'Sweet Sour Sauce' },
+            { name: 'Garlic Sauce', price: '$2.00' },
+          ],
+          name: 'test',
+          price: '$7.89',
+          quantity: '1',
+          seat: null,
+          sentTime: null,
+        },
+      ]);
       await expect(page.getByRole('dialog')).toBeHidden();
     },
   );

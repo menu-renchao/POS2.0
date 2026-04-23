@@ -6,9 +6,15 @@ import type { RecallPage } from './recall.page';
 import { SplitOrderPage } from './split-order.page';
 
 export type OrderedDishItem = {
+  additions: OrderedDishItemAddition[];
   quantity: string;
   name: string;
   price: string | null;
+};
+
+export type OrderedDishItemAddition = {
+  name: string;
+  price?: string;
 };
 
 export type OrderPriceSummary = {
@@ -28,6 +34,16 @@ export type OrderDishesSnapshot = {
 export type ChargeScope = 'whole' | 'item';
 
 export type ChargeCustomType = 'percentage' | 'fixed';
+
+export type ModifierPriceSelection =
+  | {
+      kind: 'preset';
+      value: string;
+    }
+  | {
+      kind: 'custom';
+      value: number | string;
+    };
 
 export type WholeOrderChargeInfo = {
   amountText: string | null;
@@ -83,6 +99,8 @@ export class OrderDishesPage {
   private readonly selectedDishAddButton: Locator;
   private readonly countButton: Locator;
   private readonly firstAvailableDishButton: Locator;
+  private readonly menuGroupCards: Locator;
+  private readonly menuCategoryCards: Locator;
   private readonly countDialog: Locator;
   private readonly countDialogInput: Locator;
   private readonly countDialogConfirmButton: Locator;
@@ -104,6 +122,12 @@ export class OrderDishesPage {
   private readonly saveOrderButton: Locator;
   private readonly moreActionButton: Locator;
   private readonly splitButton: Locator;
+  private readonly modifyButton: Locator;
+  private readonly modifyPanel: Locator;
+  private readonly modifyBackButton: Locator;
+  private readonly customModifierNameInput: Locator;
+  private readonly customModifierPriceInput: Locator;
+  private readonly customModifierAddButton: Locator;
   private readonly chargeButton: Locator;
   private readonly chargeDialog: Locator;
   private readonly customChargeDialog: Locator;
@@ -149,6 +173,12 @@ export class OrderDishesPage {
     this.firstAvailableDishButton = this.appFrame.locator(
       'button:not([name*="Back"]):not([name*="Cart"]):not([name*="Send"]):not([name*="Pay"])',
     ).first();
+    this.menuGroupCards = this.appFrame.locator(
+      '[data-testid^="menu-group-card-"], [data-test-id^="menu-group-card-"]',
+    );
+    this.menuCategoryCards = this.appFrame.locator(
+      '[data-testid^="menu-category-card-"], [data-test-id^="menu-category-card-"]',
+    );
     this.countDialog = this.appFrame.locator(
       '[data-testid="dish-count-modal"], [data-testid="option-count-modal"]',
     );
@@ -193,6 +223,33 @@ export class OrderDishesPage {
     this.splitButton = this.appFrame.getByRole('button', {
       name: /^Split$/,
     }).first();
+    this.modifyButton = this.appFrame
+      .locator(
+        '[data-testid="action-rail-button-modify"], [data-test-id="action-rail-button-modify"], [data-testid="modify-button"], [data-test-id="modify-button"]',
+      )
+      .or(this.appFrame.getByRole('button', { name: /^(Modify|修改)$/ }))
+      .first();
+    this.modifyPanel = this.appFrame
+      .locator(
+        '[data-testid="modify-panel"], [data-test-id="modify-panel"], [class*="_panel_"]',
+      )
+      .filter({
+        has: this.appFrame.getByText(/^(Modify|修改)$/),
+      })
+      .first();
+    this.modifyBackButton = this.modifyPanel
+      .locator('[aria-label="onLeftIcon"], [aria-label="Back"], [aria-label="返回"]')
+      .first();
+    this.customModifierNameInput = this.modifyPanel
+      .getByPlaceholder(/^(Enter custom modifier|输入自定义调味)$/)
+      .first();
+    this.customModifierPriceInput = this.modifyPanel
+      .getByPlaceholder(/^(0\.00)$/)
+      .first();
+    this.customModifierAddButton = this.modifyPanel
+      .locator('[class*="_bodyFirstRow_"]')
+      .getByRole('button', { name: /^(Add|添加)$/ })
+      .first();
     this.chargeButton = this.appFrame.getByRole('button', {
       name: CHARGE_BUTTON_NAMES,
     }).first();
@@ -257,6 +314,24 @@ export class OrderDishesPage {
     await this.resolveDishButton(dishName).click();
   }
 
+  @step((groupName: string) => `页面操作：切换菜单组 ${groupName}`)
+  async switchMenuGroup(groupName: string): Promise<void> {
+    await this.expectLoaded();
+    await (await this.resolveMenuGroupCard(groupName)).click();
+  }
+
+  @step((categoryName: string) => `页面操作：切换菜单类别 ${categoryName}`)
+  async switchMenuCategory(categoryName: string): Promise<void> {
+    await this.expectLoaded();
+    await (await this.resolveMenuCategoryCard(categoryName)).click();
+  }
+
+  @step((groupName: string, categoryName: string) => `页面操作：切换菜单组 ${groupName} 和类别 ${categoryName}`)
+  async switchMenu(groupName: string, categoryName: string): Promise<void> {
+    await this.switchMenuGroup(groupName);
+    await this.switchMenuCategory(categoryName);
+  }
+
   @step((quantity: number) => `页面操作：通过 Count 按钮将待点菜数量修改为 ${quantity}`)
   async changeDishCount(quantity: number): Promise<void> {
     await this.expectLoaded();
@@ -305,6 +380,70 @@ export class OrderDishesPage {
   async increaseOrderedDishQuantityByOne(dishName: string): Promise<void> {
     await this.selectOrderedDish(dishName);
     await this.clickSelectedDishAdd();
+  }
+
+  @step((dishName: string) => `页面操作：选中已点菜品 ${dishName} 并打开 Modify 面板`)
+  async openModifyForOrderedDish(dishName: string): Promise<void> {
+    await this.selectOrderedDish(dishName);
+    await (await this.resolveModifyButton()).click();
+    await this.expectModifyPanelVisible();
+  }
+
+  @step('页面操作：确认 Modify 面板可见')
+  async expectModifyPanelVisible(): Promise<void> {
+    await expect(this.modifyPanel).toBeVisible();
+  }
+
+  @step('页面操作：点击 Modify 面板返回按钮关闭调味页面')
+  async closeModifyPanel(): Promise<void> {
+    if (!(await this.modifyPanel.isVisible().catch(() => false))) {
+      return;
+    }
+
+    await this.modifyBackButton.click();
+    await expect(this.modifyPanel).toBeHidden();
+  }
+
+  @step((action: string) => `页面操作：选择调味动作 ${action}`)
+  async selectModifyAction(action: string): Promise<void> {
+    await this.expectModifyPanelVisible();
+    await (await this.resolveModifySectionButton('Actions', action)).click();
+  }
+
+  @step((category: string) => `页面操作：选择调味分类 ${category}`)
+  async selectModifyCategory(category: string): Promise<void> {
+    await this.expectModifyPanelVisible();
+    await (await this.resolveModifySectionButton('Category', category)).click();
+  }
+
+  @step((option: string) => `页面操作：选择系统预置调味 ${option}`)
+  async selectModifyOption(option: string): Promise<void> {
+    await this.expectModifyPanelVisible();
+    await (await this.resolveModifyOptionButton(option)).click();
+  }
+
+  @step((price: ModifierPriceSelection) => `页面操作：选择调味价格 ${price.kind === 'preset' ? price.value : `自定义 ${price.value}`}`)
+  async selectModifyPrice(price: ModifierPriceSelection): Promise<void> {
+    await this.expectModifyPanelVisible();
+
+    if (price.kind === 'preset') {
+      await (await this.resolveModifySectionButton('Price', price.value)).click();
+      return;
+    }
+
+    await (await this.resolveModifySectionButton('Price', 'Custom')).click();
+    const customPriceInput = await this.resolveModifyCustomPriceInput();
+    await customPriceInput.fill(this.formatModifierPriceInput(price.value));
+    await customPriceInput.press('Enter').catch(() => {});
+    await customPriceInput.blur().catch(() => {});
+  }
+
+  @step((name: string, price: number | string = 0) => `页面操作：添加自定义调味 ${name}，价格 ${price}`)
+  async addCustomModifier(name: string, price: number | string = 0): Promise<void> {
+    await this.expectModifyPanelVisible();
+    await this.customModifierNameInput.fill(name);
+    await this.customModifierPriceInput.fill(this.formatModifierPriceInput(price));
+    await this.customModifierAddButton.click();
   }
 
   @step('页面操作：确认重量输入弹窗可见')
@@ -646,13 +785,160 @@ export class OrderDishesPage {
   @step('页面读取：读取点单页左侧已点菜品明细')
   async readOrderedItems(): Promise<OrderedDishItem[]> {
     await this.expectLoaded();
+
+    const structuredItems = await this.readStructuredOrderedItems();
+
+    if (structuredItems.length > 0) {
+      return structuredItems;
+    }
+
+    const buttonTexts = await this.appFrame.locator('button, [role="button"]').evaluateAll((buttonLikeElements) =>
+      buttonLikeElements
+        .map((buttonLikeElement) => (buttonLikeElement as HTMLElement).innerText.replace(/\s+/g, ' ').trim())
+        .filter(Boolean),
+    );
+    const itemsFromButtons = this.parseOrderedItemsFromTexts(buttonTexts);
+
+    if (itemsFromButtons.length > 0) {
+      return itemsFromButtons;
+    }
+
     const frameLines = (await this.appFrame.locator('body').innerText())
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean);
 
-    return frameLines.reduce<OrderedDishItem[]>((items, line) => {
-      const matchedItem = line.match(/^(\d+)\s+(.+?)\s+(\$[\d,.]+)$/);
+    return this.parseOrderedItemsFromTexts(frameLines);
+  }
+
+  private async readStructuredOrderedItems(): Promise<OrderedDishItem[]> {
+    return await this.appFrame.locator('body').evaluate(() => {
+      type OrderedDishItemFromDom = {
+        additions: Array<{ name: string; price?: string }>;
+        name: string;
+        price: string | null;
+        quantity: string;
+      };
+
+      const cleanText = (value: string | null | undefined): string =>
+        value?.replace(/\s+/g, ' ').trim() ?? '';
+      const normalizeOptionalText = (value: string | null | undefined): string | null => {
+        const normalizedText = cleanText(value);
+        return normalizedText.length > 0 ? normalizedText : null;
+      };
+      const selectText = (root: Element, selector: string): string | null =>
+        normalizeOptionalText(root.querySelector(selector)?.textContent);
+      const readTexts = (root: Element, selector: string): string[] =>
+        Array.from(root.querySelectorAll(selector))
+          .map((element) => cleanText(element.textContent))
+          .filter(Boolean);
+      const dedupeElements = <T extends Element>(elements: T[]): T[] => {
+        const seenElements = new Set<T>();
+
+        return elements.filter((element) => {
+          if (seenElements.has(element)) {
+            return false;
+          }
+
+          seenElements.add(element);
+          return true;
+        });
+      };
+      const readDishName = (
+        dishElement: Element,
+        quantity: string | null,
+        price: string | null,
+      ): string | null => {
+        const explicitDishName = selectText(dishElement, '[class*="_dishName_"]');
+
+        if (explicitDishName) {
+          return explicitDishName;
+        }
+
+        return (
+          readTexts(dishElement, 'span, div')
+            .find(
+              (text) =>
+                text !== quantity &&
+                text !== price &&
+                !/^\$[\d,.]+$/.test(text) &&
+                !/^\d+(?:\.\d+)?$/.test(text),
+            ) ?? null
+        );
+      };
+
+      return dedupeElements(
+        Array.from(
+          document.querySelectorAll(
+            '[data-testid="pos-ui-dish-item"], [data-test-id="pos-ui-dish-item"], [class*="_dishItem_"]',
+          ),
+        ),
+      ).reduce<OrderedDishItemFromDom[]>((items, dishElement) => {
+        const quantity =
+          selectText(dishElement, '[class*="_quantity_"]') ??
+          readTexts(dishElement, 'span').find((text) => /^\d+(?:\.\d+)?$/.test(text)) ??
+          null;
+        const price =
+          selectText(dishElement, '[class*="_dishPrice_"]') ??
+          readTexts(dishElement, 'span').find((text) => /^\$[\d,.]+$/.test(text)) ??
+          null;
+        const name = readDishName(dishElement, quantity, price);
+
+        if (!quantity || !name) {
+          return items;
+        }
+
+        const additions = dedupeElements(
+          Array.from(
+            dishElement.querySelectorAll(
+              [
+                '[data-testid^="dish-item-subitem-"]',
+                '[data-test-id^="dish-item-subitem-"]',
+                '[class*="_extraItem_"]',
+                '[class*="_optionItemContainer_"]',
+              ].join(', '),
+            ),
+          ),
+        ).reduce<Array<{ name: string; price?: string }>>((lines, optionElement) => {
+          const rawOptionText = normalizeOptionalText(optionElement.textContent);
+          const optionPrice =
+            selectText(optionElement, '[class*="_optionPrice_"]') ??
+            rawOptionText?.match(/\$[\d,.]+$/)?.[0] ??
+            null;
+          const optionName =
+            selectText(optionElement, '[class*="_optionName_"]') ??
+            selectText(optionElement, '[class*="_extraText_"]') ??
+            (rawOptionText && optionPrice
+              ? normalizeOptionalText(
+                  rawOptionText.replace(
+                    new RegExp(`\\s*${optionPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+                    '',
+                  ),
+                )
+              : rawOptionText);
+
+          if (optionName) {
+            lines.push(optionPrice ? { name: optionName, price: optionPrice } : { name: optionName });
+          }
+
+          return lines;
+        }, []);
+
+        items.push({
+          additions,
+          name,
+          price,
+          quantity,
+        });
+
+        return items;
+      }, []);
+    });
+  }
+
+  private parseOrderedItemsFromTexts(texts: string[]): OrderedDishItem[] {
+    return texts.reduce<OrderedDishItem[]>((items, text) => {
+      const matchedItem = text.match(/^(\d+(?:\.\d+)?)\s+(.+?)\s+(?:\d+(?:\.\d+)?\s+sent\s+)?(\$[\d,.]+)$/i);
 
       if (!matchedItem) {
         return items;
@@ -661,6 +947,7 @@ export class OrderDishesPage {
       const [, quantity, name, price] = matchedItem;
 
       items.push({
+        additions: [],
         quantity,
         name,
         price,
@@ -1132,6 +1419,26 @@ export class OrderDishesPage {
     throw new Error('Unable to find the charge button on the order page.');
   }
 
+  private async resolveModifyButton(): Promise<Locator> {
+    const candidates = [this.modifyButton];
+
+    const directModifyButton = await this.findVisibleLocator(candidates);
+    if (directModifyButton) {
+      return directModifyButton;
+    }
+
+    if (await this.moreActionButton.isVisible().catch(() => false)) {
+      await this.moreActionButton.click();
+      const modifyButtonAfterMore = await this.findVisibleLocator(candidates);
+
+      if (modifyButtonAfterMore) {
+        return modifyButtonAfterMore;
+      }
+    }
+
+    throw new Error('Unable to find the Modify button for the selected ordered dish.');
+  }
+
   private async resolveSplitButton(): Promise<Locator> {
     if (await this.splitButton.isVisible().catch(() => false)) {
       return this.splitButton;
@@ -1257,6 +1564,91 @@ export class OrderDishesPage {
     return null;
   }
 
+  private resolveModifySection(sectionName: string): Locator {
+    const escapedSectionName = this.escapeRegExp(sectionName);
+
+    return this.modifyPanel
+      .locator('[class*="_section_"], [class*="_optionsSection_"]')
+      .filter({
+        hasText: new RegExp(`(^|\\s)${escapedSectionName}(\\s|$)`),
+      })
+      .first();
+  }
+
+  private async resolveModifySectionButton(
+    sectionName: string,
+    buttonName: string,
+  ): Promise<Locator> {
+    const section = this.resolveModifySection(sectionName);
+    const escapedButtonName = this.escapeRegExp(buttonName);
+
+    return await this.resolveVisibleLocator(
+      [
+        section.getByRole('button', { name: buttonName, exact: true }).first(),
+        section
+          .locator('button')
+          .filter({
+            hasText: new RegExp(`^\\s*${escapedButtonName}\\s*$`),
+          })
+          .first(),
+      ],
+      `Unable to find Modify ${sectionName} button: ${buttonName}.`,
+    );
+  }
+
+  private async resolveModifyOptionButton(optionName: string): Promise<Locator> {
+    const optionSection = this.resolveModifySection('Option');
+    const escapedOptionName = this.escapeRegExp(optionName);
+    const optionNamePattern = new RegExp(`^\\s*${escapedOptionName}\\s*(?:\\$[\\d,.]+)?\\s*$`);
+
+    return await this.resolveVisibleLocator(
+      [
+        optionSection.getByRole('button', { name: optionNamePattern }).first(),
+        optionSection
+          .locator('[data-testid^="modifier-option-"], [data-test-id^="modifier-option-"]')
+          .filter({ hasText: optionNamePattern })
+          .first(),
+        optionSection
+          .locator('[class*="_optionCard_"]')
+          .filter({ hasText: optionNamePattern })
+          .first(),
+      ],
+      `Unable to find Modify option button: ${optionName}.`,
+    );
+  }
+
+  private async resolveModifyCustomPriceInput(): Promise<Locator> {
+    const priceSection = this.resolveModifySection('Price');
+
+    return await this.resolveVisibleLocator(
+      [
+        priceSection
+          .locator(
+            '[data-testid="modifier-custom-price-input"], [data-test-id="modifier-custom-price-input"]',
+          )
+          .first(),
+        priceSection.locator('input').first(),
+        this.appFrame
+          .locator(
+            '[data-testid="modifier-custom-price-input"], [data-test-id="modifier-custom-price-input"]',
+          )
+          .first(),
+      ],
+      'Unable to find Modify custom price input after selecting Custom price.',
+    );
+  }
+
+  private formatModifierPriceInput(price: number | string): string {
+    const rawText = String(price).trim().replace(/^\$/, '');
+    const numericValue = Number(rawText);
+
+    if (Number.isFinite(numericValue)) {
+      return numericValue.toFixed(2);
+    }
+
+    return rawText;
+  }
+
   private resolveTableNumberButton(tableNumber: string): Locator {
     return this.appFrame.getByRole('button', {
       name: new RegExp(`TableIcon\\s*${this.escapeRegExp(tableNumber)}`),
@@ -1271,6 +1663,34 @@ export class OrderDishesPage {
 
   private resolveDishButton(dishName: string): Locator {
     return this.appFrame.getByRole('button', { name: dishName, exact: true });
+  }
+
+  private async resolveMenuGroupCard(groupName: string): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.menuGroupCards
+          .filter({
+            hasText: new RegExp(this.escapeRegExp(groupName)),
+          })
+          .first(),
+        this.appFrame.getByRole('button', { name: groupName, exact: true }).first(),
+      ],
+      `Unable to find menu group: ${groupName}.`,
+    );
+  }
+
+  private async resolveMenuCategoryCard(categoryName: string): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.menuCategoryCards
+          .filter({
+            hasText: new RegExp(this.escapeRegExp(categoryName)),
+          })
+          .first(),
+        this.appFrame.getByRole('button', { name: categoryName, exact: true }).first(),
+      ],
+      `Unable to find menu category: ${categoryName}.`,
+    );
   }
 
   private resolveOrderedDishButton(dishName: string): Locator {

@@ -9,6 +9,8 @@ const orderDishesFrameHtml = String.raw`
     <button type="button">Back</button>
     <button type="button">Send</button>
     <button type="button">Pay</button>
+    <button type="button" data-testid="menu-group-card-auto">自动化菜单组</button>
+    <button type="button" data-testid="menu-category-card-all">全类型类</button>
     <button type="button">普通套餐</button>
 
     <aside class="_panel_1hxxi_20" hidden>
@@ -42,7 +44,7 @@ const orderDishesFrameHtml = String.raw`
 
         window.__orderDishesState = state;
 
-        const comboDishButton = document.querySelector('button:nth-of-type(4)');
+        const comboDishButton = document.querySelector('button:nth-of-type(6)');
         const comboDialog = document.querySelector('aside');
         const confirmButton = comboDialog.querySelector('button:nth-of-type(2)');
         const shells = Array.from(comboDialog.querySelectorAll('div[data-dish-name]'));
@@ -109,6 +111,8 @@ const tabbedComboFrameHtml = String.raw`
     <button type="button">Back</button>
     <button type="button">Send</button>
     <button type="button">Pay</button>
+    <button type="button" data-testid="menu-group-card-auto">自动化菜单组</button>
+    <button type="button" data-testid="menu-category-card-all">全类型类</button>
     <button type="button">普通套餐</button>
 
     <aside class="_panel_1hxxi_20" hidden>
@@ -138,7 +142,7 @@ const tabbedComboFrameHtml = String.raw`
 
         window.__orderDishesState = state;
 
-        const comboDishButton = document.querySelector('button:nth-of-type(4)');
+        const comboDishButton = document.querySelector('button:nth-of-type(6)');
         const comboDialog = document.querySelector('aside');
         const confirmButton = comboDialog.querySelector('button:nth-of-type(2)');
         const sectionButtons = Array.from(comboDialog.querySelectorAll('._tabs_1hxxi_72 button'));
@@ -214,6 +218,11 @@ const tabbedComboFrameHtml = String.raw`
 `;
 
 test.describe('点餐套餐数量契约', () => {
+  const menuSelection = {
+    category: '全类型类',
+    group: '自动化菜单组',
+  };
+
   test(
     '应能在同一套餐分组下按数量重复选择子菜',
     {},
@@ -235,6 +244,7 @@ test.describe('点餐套餐数量契约', () => {
         await flow.addComboDish(
           orderDishesPage,
           '普通套餐',
+          menuSelection,
           {
             common: {
               普通菜1: 1,
@@ -289,6 +299,7 @@ test.describe('点餐套餐数量契约', () => {
         await flow.addComboDish(
           orderDishesPage,
           '普通套餐',
+          menuSelection,
           {
             common: {
               普通菜1: 1,

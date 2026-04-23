@@ -1,6 +1,7 @@
 import {
   type ChargeCustomType,
   type ChargeScope,
+  type ModifierPriceSelection,
   OrderDishesPage,
 } from '../pages/order-dishes.page';
 import { type HomePage } from '../pages/home.page';
@@ -10,7 +11,12 @@ export type ComboSectionSelection = string | Record<string, number>;
 
 export type ComboSelections = Record<string, ComboSectionSelection>;
 
-export interface DishOrderParams {
+export type MenuSelection = {
+  category: string;
+  group: string;
+};
+
+export interface DishOrderParams extends MenuSelection {
   comboSelections?: ComboSelections;
   dishName: string;
   price?: number;
@@ -33,21 +39,47 @@ export type CustomChargeParams = {
   value: number;
 };
 
+export type PresetModifierOption = {
+  action: string;
+  category: string;
+  option: string;
+  price?: ModifierPriceSelection;
+};
+
+export type PresetModifierOptionsParams = {
+  closeAfter?: boolean;
+  dishName: string;
+  options: PresetModifierOption[];
+};
+
+export type CustomModifierParams = {
+  closeAfter?: boolean;
+  dishName: string;
+  name: string;
+  price?: number | string;
+};
+
 export class OrderDishesFlow {
   @step('业务步骤：添加普通菜品到购物车')
   async addRegularDish(
     orderDishesPage: OrderDishesPage,
     dishName: string,
+    menuSelection: MenuSelection,
     quantity: number = 1,
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
+    await this.switchMenu(orderDishesPage, menuSelection);
     await orderDishesPage.clickDish(dishName);
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
   }
 
   @step('业务步骤：添加第一道可用菜品到购物车')
-  async addFirstAvailableDish(orderDishesPage: OrderDishesPage): Promise<void> {
+  async addFirstAvailableDish(
+    orderDishesPage: OrderDishesPage,
+    menuSelection: MenuSelection,
+  ): Promise<void> {
     await orderDishesPage.expectLoaded();
+    await this.switchMenu(orderDishesPage, menuSelection);
     await orderDishesPage.clickFirstAvailableDish();
   }
 
@@ -55,10 +87,12 @@ export class OrderDishesFlow {
   async addWeightedDish(
     orderDishesPage: OrderDishesPage,
     dishName: string,
+    menuSelection: MenuSelection,
     weight: number,
     quantity: number = 1,
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
+    await this.switchMenu(orderDishesPage, menuSelection);
     await orderDishesPage.clickDish(dishName);
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
     await orderDishesPage.enterWeight(weight);
@@ -69,10 +103,12 @@ export class OrderDishesFlow {
   async addComboDish(
     orderDishesPage: OrderDishesPage,
     dishName: string,
+    menuSelection: MenuSelection,
     selections: ComboSelections,
     quantity: number = 1,
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
+    await this.switchMenu(orderDishesPage, menuSelection);
     await orderDishesPage.clickDish(dishName);
 
     for (const [sectionName, sectionSelection] of Object.entries(selections)) {
@@ -102,10 +138,12 @@ export class OrderDishesFlow {
   async addSpecDish(
     orderDishesPage: OrderDishesPage,
     dishName: string,
+    menuSelection: MenuSelection,
     specifications: string[],
     quantity: number = 1,
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
+    await this.switchMenu(orderDishesPage, menuSelection);
     await orderDishesPage.clickDish(dishName);
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
 
@@ -122,10 +160,12 @@ export class OrderDishesFlow {
   async addOpenPriceDish(
     orderDishesPage: OrderDishesPage,
     dishName: string,
+    menuSelection: MenuSelection,
     price: number,
     quantity: number = 1,
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
+    await this.switchMenu(orderDishesPage, menuSelection);
     await orderDishesPage.clickDish(dishName);
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
     await orderDishesPage.enterPrice(price);
@@ -137,29 +177,30 @@ export class OrderDishesFlow {
     orderDishesPage: OrderDishesPage,
     params: DishOrderParams,
   ): Promise<void> {
-    const { dishName, quantity = 1, weight, price, specifications, comboSelections } = params;
+    const { category, dishName, group, quantity = 1, weight, price, specifications, comboSelections } = params;
+    const menuSelection = { category, group };
 
     if (weight !== undefined) {
-      await this.addWeightedDish(orderDishesPage, dishName, weight, quantity);
+      await this.addWeightedDish(orderDishesPage, dishName, menuSelection, weight, quantity);
       return;
     }
 
     if (price !== undefined) {
-      await this.addOpenPriceDish(orderDishesPage, dishName, price, quantity);
+      await this.addOpenPriceDish(orderDishesPage, dishName, menuSelection, price, quantity);
       return;
     }
 
     if (specifications && specifications.length > 0) {
-      await this.addSpecDish(orderDishesPage, dishName, specifications, quantity);
+      await this.addSpecDish(orderDishesPage, dishName, menuSelection, specifications, quantity);
       return;
     }
 
     if (comboSelections && Object.keys(comboSelections).length > 0) {
-      await this.addComboDish(orderDishesPage, dishName, comboSelections, quantity);
+      await this.addComboDish(orderDishesPage, dishName, menuSelection, comboSelections, quantity);
       return;
     }
 
-    await this.addRegularDish(orderDishesPage, dishName, quantity);
+    await this.addRegularDish(orderDishesPage, dishName, menuSelection, quantity);
   }
 
   @step('业务步骤：将当前堂食订单送厨')
@@ -175,6 +216,44 @@ export class OrderDishesFlow {
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
     await orderDishesPage.increaseOrderedDishQuantityByOne(dishName);
+  }
+
+  @step(
+    (_orderDishesPage: OrderDishesPage, params: PresetModifierOptionsParams) =>
+      `业务步骤：为已点菜品 ${params.dishName} 连续选择系统预置调味`,
+  )
+  async selectPresetModifierOptions(
+    orderDishesPage: OrderDishesPage,
+    params: PresetModifierOptionsParams,
+  ): Promise<void> {
+    if (params.options.length === 0) {
+      throw new Error('Preset modifier flow requires at least one option.');
+    }
+
+    await this.runModifyPanelFlow(orderDishesPage, params.dishName, params.closeAfter, async () => {
+      for (const option of params.options) {
+        await orderDishesPage.selectModifyAction(option.action);
+        await orderDishesPage.selectModifyCategory(option.category);
+        await orderDishesPage.selectModifyOption(option.option);
+
+        if (option.price) {
+          await orderDishesPage.selectModifyPrice(option.price);
+        }
+      }
+    });
+  }
+
+  @step(
+    (_orderDishesPage: OrderDishesPage, params: CustomModifierParams) =>
+      `业务步骤：为已点菜品 ${params.dishName} 添加自定义调味 ${params.name}`,
+  )
+  async addCustomModifier(
+    orderDishesPage: OrderDishesPage,
+    params: CustomModifierParams,
+  ): Promise<void> {
+    await this.runModifyPanelFlow(orderDishesPage, params.dishName, params.closeAfter, async () => {
+      await orderDishesPage.addCustomModifier(params.name, params.price ?? 0);
+    });
   }
 
   @step((optionName: string) => `业务步骤：按预置加收项 ${optionName} 快捷整单加收`)
@@ -256,6 +335,17 @@ export class OrderDishesFlow {
   }
 
   @step(
+    (_orderDishesPage: OrderDishesPage, menuSelection: MenuSelection) =>
+      `业务步骤：切换菜单组 ${menuSelection.group} 和类别 ${menuSelection.category}`,
+  )
+  private async switchMenu(
+    orderDishesPage: OrderDishesPage,
+    menuSelection: MenuSelection,
+  ): Promise<void> {
+    await orderDishesPage.switchMenu(menuSelection.group, menuSelection.category);
+  }
+
+  @step(
     (_orderDishesPage: OrderDishesPage, dishNames?: string[]) =>
       `业务步骤：选择加收目标菜品 ${dishNames?.join('、') ?? ''}`,
   )
@@ -269,6 +359,26 @@ export class OrderDishesFlow {
 
     for (const dishName of dishNames) {
       await orderDishesPage.toggleChargeDish(dishName);
+    }
+  }
+
+  private async runModifyPanelFlow(
+    orderDishesPage: OrderDishesPage,
+    dishName: string,
+    closeAfter: boolean | undefined,
+    work: () => Promise<void>,
+  ): Promise<void> {
+    await orderDishesPage.openModifyForOrderedDish(dishName);
+
+    try {
+      await work();
+
+      if (closeAfter ?? true) {
+        await orderDishesPage.closeModifyPanel();
+      }
+    } catch (error) {
+      await orderDishesPage.closeModifyPanel();
+      throw error;
     }
   }
 
@@ -292,55 +402,63 @@ export class OrderDishesFlow {
 export async function addRegularDish(
   orderDishesPage: OrderDishesPage,
   dishName: string,
+  menuSelection: MenuSelection,
   quantity: number = 1,
 ): Promise<void> {
   const flow = new OrderDishesFlow();
-  await flow.addRegularDish(orderDishesPage, dishName, quantity);
+  await flow.addRegularDish(orderDishesPage, dishName, menuSelection, quantity);
 }
 
-export async function addFirstAvailableDish(orderDishesPage: OrderDishesPage): Promise<void> {
+export async function addFirstAvailableDish(
+  orderDishesPage: OrderDishesPage,
+  menuSelection: MenuSelection,
+): Promise<void> {
   const flow = new OrderDishesFlow();
-  await flow.addFirstAvailableDish(orderDishesPage);
+  await flow.addFirstAvailableDish(orderDishesPage, menuSelection);
 }
 
 export async function addWeightedDish(
   orderDishesPage: OrderDishesPage,
   dishName: string,
+  menuSelection: MenuSelection,
   weight: number,
   quantity: number = 1,
 ): Promise<void> {
   const flow = new OrderDishesFlow();
-  await flow.addWeightedDish(orderDishesPage, dishName, weight, quantity);
+  await flow.addWeightedDish(orderDishesPage, dishName, menuSelection, weight, quantity);
 }
 
 export async function addComboDish(
   orderDishesPage: OrderDishesPage,
   dishName: string,
+  menuSelection: MenuSelection,
   selections: ComboSelections,
   quantity: number = 1,
 ): Promise<void> {
   const flow = new OrderDishesFlow();
-  await flow.addComboDish(orderDishesPage, dishName, selections, quantity);
+  await flow.addComboDish(orderDishesPage, dishName, menuSelection, selections, quantity);
 }
 
 export async function addSpecDish(
   orderDishesPage: OrderDishesPage,
   dishName: string,
+  menuSelection: MenuSelection,
   specifications: string[],
   quantity: number = 1,
 ): Promise<void> {
   const flow = new OrderDishesFlow();
-  await flow.addSpecDish(orderDishesPage, dishName, specifications, quantity);
+  await flow.addSpecDish(orderDishesPage, dishName, menuSelection, specifications, quantity);
 }
 
 export async function addOpenPriceDish(
   orderDishesPage: OrderDishesPage,
   dishName: string,
+  menuSelection: MenuSelection,
   price: number,
   quantity: number = 1,
 ): Promise<void> {
   const flow = new OrderDishesFlow();
-  await flow.addOpenPriceDish(orderDishesPage, dishName, price, quantity);
+  await flow.addOpenPriceDish(orderDishesPage, dishName, menuSelection, price, quantity);
 }
 
 export async function addDishToCart(
@@ -362,6 +480,22 @@ export async function increaseOrderedDishQuantityByOne(
 ): Promise<void> {
   const flow = new OrderDishesFlow();
   await flow.increaseOrderedDishQuantityByOne(orderDishesPage, dishName);
+}
+
+export async function selectPresetModifierOptions(
+  orderDishesPage: OrderDishesPage,
+  params: PresetModifierOptionsParams,
+): Promise<void> {
+  const flow = new OrderDishesFlow();
+  await flow.selectPresetModifierOptions(orderDishesPage, params);
+}
+
+export async function addCustomModifier(
+  orderDishesPage: OrderDishesPage,
+  params: CustomModifierParams,
+): Promise<void> {
+  const flow = new OrderDishesFlow();
+  await flow.addCustomModifier(orderDishesPage, params);
 }
 
 export async function quickChargeByName(

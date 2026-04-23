@@ -54,6 +54,10 @@ function parseCurrencyValue(value: string | null): number | null {
 }
 
 const expectedGuestCount = 3;
+const automationMenu = {
+  category: '全类型类',
+  group: '自动化菜单组',
+};
 const comparablePriceSummaryKeys = ['Count', 'Subtotal', 'Tax', 'Total Before Tips'] as const;
 const expectedDishItems: ComparableDishItem[] = [
   { quantity: '2', name: 'test' },
@@ -250,8 +254,8 @@ test.describe('堂食点单后 Recall 校验', () => {
       });
 
       const orderSnapshot = await test.step('执行堂食点单并保存订单', async () => {
-        await addWeightedDish(dineInOrderContext.orderDishesPage, '称重菜', 14);
-        await addRegularDish(dineInOrderContext.orderDishesPage, 'test', 2);
+        await addWeightedDish(dineInOrderContext.orderDishesPage, '称重菜', automationMenu, 14);
+        await addRegularDish(dineInOrderContext.orderDishesPage, 'test', automationMenu, 2);
 
         const currentOrderPriceSummary = await dineInOrderContext.orderDishesPage.readPriceSummary();
 
@@ -330,8 +334,8 @@ test.describe('堂食点单后 Recall 校验', () => {
       });
 
       await test.step('完成点单', async () => {
-        await addRegularDish(dineInOrderContext.orderDishesPage, 'test', 2);
-        await addRegularDish(dineInOrderContext.orderDishesPage, 'common item2', 1);
+        await addRegularDish(dineInOrderContext.orderDishesPage, 'test', automationMenu, 2);
+        await addRegularDish(dineInOrderContext.orderDishesPage, 'common item2', automationMenu, 1);
       });
 
       const splitResult = await test.step('将当前订单平分三份并把 x-1 的 test 移动到 x-3', async () => {

@@ -5,6 +5,11 @@ import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
 import { selectAnyAvailableTableAndEnterOrderDishes } from '../../flows/select-table.flow';
 import { test } from '../../fixtures/test.fixture';
 
+const automationMenu = {
+  category: '全类型类',
+  group: '自动化菜单组',
+};
+
 test.describe('点餐冒烟测试', () => {
   test.setTimeout(60_000);
 
@@ -38,10 +43,11 @@ test.describe('点餐冒烟测试', () => {
       await orderDishesPage.expectTableNumber(selectedTable.tableNumber);
       await orderDishesPage.expectGuestCount(1);
 
-      await addRegularDish(orderDishesPage, 'test', 3);
+      await addRegularDish(orderDishesPage, 'test', automationMenu, 3);
       await addComboDish(
         orderDishesPage,
         '普通套餐',
+        automationMenu,
         {
           common: {
             普通菜1: 1,
