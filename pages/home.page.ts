@@ -91,9 +91,7 @@ export class HomePage {
   @step((buttonName: string) => `页面操作：点击主页中的 ${buttonName} 功能入口`)
   private async clickFunctionButton(buttonName: string): Promise<void> {
     const button = await this.resolveFunctionButton(buttonName);
-    await button.evaluate((buttonElement) => {
-      (buttonElement as HTMLElement).click();
-    });
+    await button.click({ timeout: 10_000 });
   }
 
   @step((buttonName: string) => `页面操作：在主页中查找 ${buttonName} 功能入口，若未显示则展开更多菜单后查找`)

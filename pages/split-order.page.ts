@@ -68,15 +68,18 @@ export class SplitOrderPage {
     this.combineButton = this.modal.getByRole('button', { name: COMBINE_BUTTON_NAME }).first();
     this.unsplitButton = this.modal.getByRole('button', { name: UNSPLIT_BUTTON_NAME }).first();
     this.moreButton = this.modal.getByRole('button', { name: /^More$/ }).first();
-    this.confirmButton = this.modal.getByRole('button', { name: CONFIRM_BUTTON_NAME }).first();
+    this.confirmButton = this.modal
+      .locator('[data-testid="splitPanelModal-confirm-button"], [data-testid="split-panel-confirm"]')
+      .or(this.modal.getByRole('button', { name: CONFIRM_BUTTON_NAME }).first())
+      .first();
     this.cancelButton = this.modal.getByRole('button', { name: CANCEL_BUTTON_NAME }).first();
     this.addAmountButton = this.modal.getByRole('button', { name: /^(Add Suborder|新增子单)$/ }).first();
     this.subordersContainer = this.modal;
     this.totalValue = this.modal.locator('._value_1lomb_35, [class*="_value_"]').first();
     this.remainValue = this.modal.locator('._remainValue_1lomb_41, [class*="_remainValue_"]').first();
     this.splitInputDialog = splitFrame
-      .locator('.splitInputModalOverlay [role="dialog"], [data-testid="split-input-dialog"], [role="dialog"]')
-      .last();
+      .locator('.splitInputModalOverlay [role="dialog"], [data-testid="split-input-dialog"]')
+      .first();
     this.splitInputField = this.splitInputDialog.locator('[data-testid="split-input-value"], input').first();
     this.splitInputConfirmButton = this.splitInputDialog
       .getByRole('button', { name: CONFIRM_BUTTON_NAME })
@@ -419,47 +422,22 @@ export class SplitOrderPage {
 
   @step((orderNumber: string, dishName: string) => `页面读取：检查子单 ${orderNumber} 中是否存在菜品 ${dishName}`)
   async hasDish(orderNumber: string, dishName: string): Promise<boolean> {
-    return await this.modal.evaluate(
-      (modalElement, payload: { dishName: string; orderNumber: string }) => {
-        const normalizeText = (value: string | null | undefined): string =>
-          String(value ?? '')
-            .replace(/\s+/g, ' ')
-            .trim();
-        const orderLabelText = `#${payload.orderNumber}`;
-        const allElements = Array.from(modalElement.querySelectorAll<HTMLElement>('*'));
-        const orderLabel = allElements.find(
-          (element) => normalizeText(element.textContent) === orderLabelText,
-        );
-
-        if (!orderLabel) {
-          return false;
-        }
-
-        let currentElement: HTMLElement | null = orderLabel;
-        while (currentElement) {
-          const currentText = normalizeText(currentElement.textContent);
-          if (currentText.includes(orderLabelText) && currentText.includes('Print') && currentText.includes('Pay')) {
-            return Array.from(currentElement.querySelectorAll<HTMLElement>('*')).some(
-              (element) => normalizeText(element.textContent) === payload.dishName,
-            );
-          }
-
-          currentElement = currentElement.parentElement;
-        }
-
-        return false;
-      },
-      { dishName, orderNumber },
+    const snapshot = await this.readSnapshot();
+    return (
+      snapshot.suborders
+        .find((suborder) => suborder.orderNumber === orderNumber)
+        ?.dishes.some((dish) => dish.name === dishName) ?? false
     );
   }
 
   @step((orderNumber: string, dishName: string) => `页面读取：判断子单 ${orderNumber} 的菜品 ${dishName} 是否允许按菜品平分`)
   async isDishEligibleForEvenSplit(orderNumber: string, dishName: string): Promise<boolean> {
-    const dishRow = this.resolveDish(orderNumber, dishName);
-    const proportionText =
-      (await dishRow.getAttribute('data-proportion').catch(() => null)) ??
-      (await dishRow.locator('[class*="_proportion_"]').first().textContent().catch(() => null));
-    const normalizedProportion = this.normalizeOptionalText(proportionText);
+    const snapshot = await this.readSnapshot();
+    const suborder = snapshot.suborders.find(
+      (currentSuborder) => currentSuborder.orderNumber === orderNumber,
+    );
+    const dish = suborder?.dishes.find((currentDish) => currentDish.name === dishName);
+    const normalizedProportion = this.normalizeOptionalText(dish?.proportion);
 
     return !normalizedProportion || !/^1\/\d+$/.test(normalizedProportion);
   }
@@ -517,18 +495,26 @@ export class SplitOrderPage {
   }
 
   private resolveSuborder(orderNumber: string): Locator {
+    const escapedOrderNumber = this.escapeCssAttribute(orderNumber);
+
     return this.subordersContainer
       .locator(
-        `[data-testid="split-suborder"][data-order-number="${orderNumber}"], [data-order-number="${orderNumber}"], [class*="_suborderContainer_"], [class*="_suborderCard_"]`,
+        [
+          `[data-testid="split-suborder"][data-order-number="${escapedOrderNumber}"]`,
+          `[class*="_suborderContainer_"][data-order-number="${escapedOrderNumber}"]`,
+          `[class*="_suborderCard_"][data-order-number="${escapedOrderNumber}"]`,
+        ].join(', '),
       )
-      .filter({
-        has: this.modal.getByText(new RegExp(`^#?${this.escapeRegExp(orderNumber)}$`)).first(),
-      })
       .first();
   }
 
   private resolveDish(orderNumber: string, dishName: string): Locator {
-    return this.resolveSuborder(orderNumber).getByText(dishName, { exact: true }).first();
+    return this.resolveSuborder(orderNumber)
+      .locator('[data-testid="split-dish"], [class*="_dishItem_"], [data-dish-name]')
+      .filter({
+        hasText: new RegExp(this.escapeRegExp(dishName)),
+      })
+      .first();
   }
 
   private resolveCombineOrder(orderNumber: string): Locator {
@@ -601,5 +587,9 @@ export class SplitOrderPage {
 
   private escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private escapeCssAttribute(value: string): string {
+    return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   }
 }

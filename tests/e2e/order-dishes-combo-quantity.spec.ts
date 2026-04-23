@@ -102,6 +102,117 @@ const orderDishesFrameHtml = String.raw`
 </html>
 `;
 
+const tabbedComboFrameHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <button type="button">Back</button>
+    <button type="button">Send</button>
+    <button type="button">Pay</button>
+    <button type="button">普通套餐</button>
+
+    <aside class="_panel_1hxxi_20" hidden>
+      <div class="_header_1hxxi_41">
+        <button type="button">Cancel</button>
+        <button type="button" disabled>Confirm</button>
+      </div>
+      <div class="_tabs_1hxxi_72">
+        <button type="button">common</button>
+        <button type="button">SelectionjMcma</button>
+      </div>
+      <div class="_itemGrid_1hxxi_171">
+        <div class="_cardShell_vnilk_1" data-dish-name="普通菜1" data-price="$30"></div>
+        <div class="_cardShell_vnilk_1" data-dish-name="普通菜2" data-price="$5.89"></div>
+      </div>
+    </aside>
+
+    <script>
+      (() => {
+        const state = {
+          activeSection: 'common',
+          confirmClicks: 0,
+          comboSelections: {
+            common: {},
+          },
+        };
+
+        window.__orderDishesState = state;
+
+        const comboDishButton = document.querySelector('button:nth-of-type(4)');
+        const comboDialog = document.querySelector('aside');
+        const confirmButton = comboDialog.querySelector('button:nth-of-type(2)');
+        const sectionButtons = Array.from(comboDialog.querySelectorAll('._tabs_1hxxi_72 button'));
+        const shells = Array.from(comboDialog.querySelectorAll('div[data-dish-name]'));
+
+        const updateConfirmState = () => {
+          confirmButton.disabled = Object.keys(state.comboSelections.common).length === 0;
+        };
+
+        const renderCard = (shell) => {
+          const dishName = shell.dataset.dishName;
+          const price = shell.dataset.price;
+          const quantity = state.comboSelections.common[dishName] || 0;
+
+          if (quantity === 0) {
+            shell.innerHTML = [
+              '<button type="button" class="_card_vnilk_1 _item_vnilk_36">',
+              '  <div class="_itemLayout_vnilk_58">',
+              '    <span class="_itemTitle_vnilk_36">' + dishName + '</span>',
+              '    <span>' + price + '</span>',
+              '  </div>',
+              '</button>',
+            ].join('');
+
+            shell.querySelector('button').addEventListener('click', () => {
+              state.comboSelections.common[dishName] = 1;
+              renderCard(shell);
+              updateConfirmState();
+            });
+            return;
+          }
+
+          shell.innerHTML = [
+            '<div class="_card_vnilk_1 _item_vnilk_36 _selected_vnilk_142">',
+            '  <div class="_itemLayout_vnilk_58">',
+            '    <span class="_itemTitle_vnilk_36">' + dishName + '</span>',
+            '    <span>' + price + '</span>',
+            '  </div>',
+            '  <div class="_counter_vnilk_163">',
+            '    <button type="button" class="_counterBtn_vnilk_194 _counterBtnMinus_vnilk_205">-</button>',
+            '    <span class="_counterBadge_vnilk_163">' + quantity + '</span>',
+            '    <button type="button" class="_counterBtn_vnilk_194 _counterBtnPlus_vnilk_205">+</button>',
+            '  </div>',
+            '</div>',
+          ].join('');
+
+          shell.querySelector('button[class*="_counterBtnPlus_"]').addEventListener('click', () => {
+            state.comboSelections.common[dishName] += 1;
+            renderCard(shell);
+          });
+        };
+
+        shells.forEach(renderCard);
+
+        sectionButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            state.activeSection = button.textContent.trim();
+          });
+        });
+
+        comboDishButton.addEventListener('click', () => {
+          comboDialog.hidden = false;
+        });
+
+        confirmButton.addEventListener('click', () => {
+          state.confirmClicks += 1;
+          comboDialog.hidden = true;
+        });
+      })();
+    </script>
+  </body>
+</html>
+`;
+
 test.describe('点餐套餐数量契约', () => {
   test(
     '应能在同一套餐分组下按数量重复选择子菜',
@@ -146,6 +257,62 @@ test.describe('点餐套餐数量契约', () => {
           }).__orderDishesState;
         });
 
+        expect(state.confirmClicks).toBe(1);
+        expect(state.comboSelections).toEqual({
+          common: {
+            普通菜1: 1,
+            普通菜2: 2,
+          },
+        });
+      });
+    },
+  );
+
+  test(
+    '应能在新版分组按钮套餐面板下选择带数量的子菜',
+    {},
+    async ({ page }) => {
+      const flow = new OrderDishesFlow();
+      const orderDishesPage = new OrderDishesPage(page);
+
+      await test.step('准备新版分组按钮套餐面板', async () => {
+        await page.setContent('<iframe data-wujie-id="orderDishes"></iframe>');
+        await page.locator('iframe[data-wujie-id="orderDishes"]').evaluate((iframe, content) => {
+          iframe.setAttribute('srcdoc', content as string);
+        }, tabbedComboFrameHtml);
+        await page.evaluate(() => {
+          window.location.hash = 'orderDishes';
+        });
+      });
+
+      await test.step('通过 flow 选择新版套餐子菜数量', async () => {
+        await flow.addComboDish(
+          orderDishesPage,
+          '普通套餐',
+          {
+            common: {
+              普通菜1: 1,
+              普通菜2: 2,
+            },
+          },
+        );
+      });
+
+      await test.step('验证新版面板记录了分组和子菜数量', async () => {
+        const frame = page.frameLocator('iframe[data-wujie-id="orderDishes"]');
+        const state = await frame.locator('body').evaluate(() => {
+          return (window as typeof window & {
+            __orderDishesState: {
+              activeSection: string;
+              confirmClicks: number;
+              comboSelections: {
+                common: Record<string, number>;
+              };
+            };
+          }).__orderDishesState;
+        });
+
+        expect(state.activeSection).toBe('common');
         expect(state.confirmClicks).toBe(1);
         expect(state.comboSelections).toEqual({
           common: {

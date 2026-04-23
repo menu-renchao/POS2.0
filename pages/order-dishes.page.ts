@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 import { HomePage } from './home.page';
+import type { RecallPage } from './recall.page';
 import { SplitOrderPage } from './split-order.page';
 
 export type OrderedDishItem = {
@@ -10,7 +11,14 @@ export type OrderedDishItem = {
   price: string | null;
 };
 
-export type OrderPriceSummary = Record<string, string>;
+export type OrderPriceSummary = {
+  Count: number;
+  Subtotal: number;
+  Tax: number;
+  'Total Before Tips': number;
+  'Total(Cash)': number;
+  'Total(Card)': number;
+};
 
 export type OrderDishesSnapshot = {
   items: OrderedDishItem[];
@@ -69,8 +77,10 @@ const CUSTOM_TAXED_LABELS = /^(Taxed|含税)$/;
 export class OrderDishesPage {
   private readonly appFrame: ReturnType<Page['frameLocator']>;
   private readonly backButton: Locator;
+  private readonly headerRecallButton: Locator;
   private readonly sendButton: Locator;
   private readonly payButton: Locator;
+  private readonly selectedDishAddButton: Locator;
   private readonly countButton: Locator;
   private readonly firstAvailableDishButton: Locator;
   private readonly countDialog: Locator;
@@ -88,6 +98,9 @@ export class OrderDishesPage {
   private readonly comboDialog: Locator;
   private readonly comboConfirmButton: Locator;
   private readonly cartBadge: Locator;
+  private readonly priceSummaryToggle: Locator;
+  private readonly priceSummaryDetailsContainer: Locator;
+  private readonly priceSummaryTotalContainer: Locator;
   private readonly saveOrderButton: Locator;
   private readonly moreActionButton: Locator;
   private readonly splitButton: Locator;
@@ -116,8 +129,22 @@ export class OrderDishesPage {
   constructor(private readonly page: Page) {
     this.appFrame = this.page.frameLocator('iframe[data-wujie-id="orderDishes"]');
     this.backButton = this.appFrame.getByRole('button', { name: 'Back' });
-    this.sendButton = this.appFrame.getByRole('button', { name: 'Send' });
+    this.headerRecallButton = this.appFrame.getByRole('button', { name: /Recall/ }).first();
+    this.sendButton = this.appFrame
+      .locator(
+        '[data-testid="bottom-button-sendOrderBtn"], [data-test-id="bottom-button-sendOrderBtn"]',
+      )
+      .or(this.appFrame.getByRole('button', { name: 'Send' }))
+      .first();
     this.payButton = this.appFrame.getByRole('button', { name: 'Pay' });
+    this.selectedDishAddButton = this.appFrame
+      .locator('[data-testid="action-rail-button-add1"], [data-test-id="action-rail-button-add1"]')
+      .or(
+        this.appFrame
+          .locator('aside, [role="complementary"]')
+          .getByRole('button', { name: /^(Add|加)$/ }),
+      )
+      .first();
     this.countButton = this.appFrame.getByRole('button', { name: /^(Count|数量)$/ });
     this.firstAvailableDishButton = this.appFrame.locator(
       'button:not([name*="Back"]):not([name*="Cart"]):not([name*="Send"]):not([name*="Pay"])',
@@ -151,6 +178,14 @@ export class OrderDishesPage {
       hasText: /^(Confirm|确认)$/,
     }).first();
     this.cartBadge = this.appFrame.locator('[data-testid="cart-badge"]');
+    this.priceSummaryToggle = this.appFrame
+      .locator(
+        '[data-test-id="shared-order-price-summary-toggle"], [data-testid="shared-order-price-summary-toggle"]',
+      )
+      .or(this.appFrame.getByRole('button', { name: /Total\(Cash\).*Total\(Card\)/ }))
+      .first();
+    this.priceSummaryDetailsContainer = this.priceSummaryToggle.locator('xpath=following-sibling::*[1]');
+    this.priceSummaryTotalContainer = this.priceSummaryToggle.locator('xpath=following-sibling::*[2]');
     this.saveOrderButton = this.appFrame.locator('[data-testid="bottom-button-saveOrderBtn"]');
     this.moreActionButton = this.appFrame.getByRole('button', {
       name: /^(More|更多)$/,
@@ -253,6 +288,25 @@ export class OrderDishesPage {
     await this.firstAvailableDishButton.click();
   }
 
+  @step((dishName: string) => `页面操作：选中已下单菜品 ${dishName}`)
+  async selectOrderedDish(dishName: string): Promise<void> {
+    await this.expectLoaded();
+    await this.resolveOrderedDishButton(dishName).click();
+  }
+
+  @step('页面操作：点击已选菜品的加 1 按钮')
+  async clickSelectedDishAdd(): Promise<void> {
+    await this.expectLoaded();
+    await expect(this.selectedDishAddButton).toBeVisible({ timeout: 10_000 });
+    await this.selectedDishAddButton.click();
+  }
+
+  @step((dishName: string) => `页面操作：选中已下单菜品 ${dishName} 并点击加 1`)
+  async increaseOrderedDishQuantityByOne(dishName: string): Promise<void> {
+    await this.selectOrderedDish(dishName);
+    await this.clickSelectedDishAdd();
+  }
+
   @step('页面操作：确认重量输入弹窗可见')
   async expectWeightDialogVisible(): Promise<void> {
     await expect(this.weightDialog).toBeVisible({ timeout: 10_000 });
@@ -333,10 +387,11 @@ export class OrderDishesPage {
       return;
     }
 
-    await this.resolveComboSectionItemButton(sectionName, dishName).click();
+    await this.activateComboSection(sectionName);
+    await (await this.resolveComboSectionItemButton(sectionName, dishName)).click();
 
     for (let currentQuantity = 1; currentQuantity < quantity; currentQuantity += 1) {
-      await this.resolveComboSectionItemPlusButton(sectionName, dishName).click();
+      await (await this.resolveComboSectionItemPlusButton(sectionName, dishName)).click();
     }
   }
 
@@ -618,24 +673,132 @@ export class OrderDishesPage {
   @step('页面读取：读取点单页左侧价格汇总')
   async readPriceSummary(): Promise<OrderPriceSummary> {
     await this.expectLoaded();
-    const frameText = (await this.appFrame.locator('body').innerText())
-      .replace(/\s+/g, ' ')
-      .trim();
+    await this.expandPriceSummary();
+    const summary: Partial<OrderPriceSummary> = {};
 
-    const summaryEntries = Array.from(
-      frameText.matchAll(
-        /(Count|Subtotal|Tax|Total Before Tips|Total)\s+(\$?[\d,.]+)/g,
-      ),
-    );
+    summary.Count = await this.readPriceSummaryRowNumber('Count');
+    summary.Subtotal = await this.readPriceSummaryRowNumber('Subtotal');
+    summary.Tax = await this.readPriceSummaryRowNumber('Tax');
+    summary['Total Before Tips'] = await this.readPriceSummaryRowNumber('Total Before Tips');
+    summary['Total(Cash)'] = await this.readPriceSummaryMoneyNumber('Total(Cash)');
+    summary['Total(Card)'] = await this.readPriceSummaryMoneyNumber('Total(Card)');
 
-    if (summaryEntries.length === 0) {
-      throw new Error(`Unable to parse order price summary from text: ${frameText}`);
+    return summary as OrderPriceSummary;
+  }
+
+  @step('页面操作：展开点单页价格汇总')
+  async expandPriceSummary(): Promise<void> {
+    await this.expectLoaded();
+
+    if (await this.isPriceSummaryExpanded()) {
+      return;
     }
 
-    return summaryEntries.reduce<OrderPriceSummary>((summary, [, label, value]) => {
-      summary[label] = value;
-      return summary;
-    }, {});
+    await this.priceSummaryToggle.click({ timeout: 5_000 });
+    await waitUntil(
+      async () => await this.isPriceSummaryExpanded(),
+      (summaryExpanded) => summaryExpanded,
+      {
+        timeout: 5_000,
+        probeTimeout: 1_000,
+        message: '点单页价格汇总未在展开后变为展开状态。',
+      },
+    );
+  }
+
+  private async isPriceSummaryExpanded(): Promise<boolean> {
+    const expanded = await this.priceSummaryToggle.getAttribute('aria-expanded').catch(() => null);
+
+    if (expanded === 'true') {
+      return true;
+    }
+
+    if (expanded === 'false') {
+      return false;
+    }
+
+    return await this.priceSummaryDetailsContainer.isVisible().catch(() => false);
+  }
+
+  private async readPriceSummaryRowNumber(label: string): Promise<number> {
+    const labelLocator = this.appFrame.getByText(label, { exact: true }).first();
+    await expect(labelLocator).toBeVisible();
+    const value = await labelLocator.evaluate((labelElement) => {
+      const nextElement = labelElement.nextElementSibling;
+
+      return nextElement?.textContent ?? '';
+    });
+    const normalizedValue = value.replace(/\s+/g, ' ').trim();
+
+    if (!normalizedValue) {
+      throw new Error(`Unable to read ${label} from order price summary.`);
+    }
+
+    const parsedValue = Number(normalizedValue.replace(/[$,]/g, ''));
+
+    if (Number.isNaN(parsedValue)) {
+      throw new Error(`Unable to parse ${label} from order price summary: ${normalizedValue}`);
+    }
+
+    return parsedValue;
+  }
+
+  private async readPriceSummaryMoneyNumber(label: string): Promise<number> {
+    const labelLocator = this.appFrame.getByText(label, { exact: true }).first();
+    await expect(labelLocator).toBeVisible();
+    const value = await labelLocator.evaluate((labelElement) => {
+      let currentElement = labelElement.nextElementSibling;
+      const isPriceSummaryLabel = (value: string): boolean =>
+        /^(Count|Subtotal|Tax|Total Before Tips|Total(?:\((?:Cash|Card)\))?)$/i.test(value);
+
+      while (currentElement) {
+        const currentText = currentElement.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+        const moneyMatches = currentText.match(/\$[\d,.]+/g);
+
+        if (isPriceSummaryLabel(currentText)) {
+          return '';
+        }
+
+        if (moneyMatches && moneyMatches.length > 1) {
+          return moneyMatches.at(-1) ?? '';
+        }
+
+        if (moneyMatches?.length === 1 && !/^Save/i.test(currentText)) {
+          return moneyMatches[0];
+        }
+
+        currentElement = currentElement.nextElementSibling;
+      }
+
+      return '';
+    });
+    const normalizedValue = value.replace(/\s+/g, ' ').trim();
+    const moneyMatches = normalizedValue.match(/\$[\d,.]+/g);
+    const moneyValue = moneyMatches?.at(-1) ?? '';
+
+    if (!moneyValue) {
+      throw new Error(`Unable to read ${label} from order price summary.`);
+    }
+
+    const parsedValue = Number(moneyValue.replace(/[$,]/g, ''));
+
+    if (Number.isNaN(parsedValue)) {
+      throw new Error(`Unable to parse ${label} from order price summary: ${moneyValue}`);
+    }
+
+    return parsedValue;
+  }
+
+  @step('页面读取：读取点单页税额')
+  async readTaxAmount(): Promise<number> {
+    const priceSummary = await this.readPriceSummary();
+    const taxAmount = priceSummary.Tax;
+
+    if (taxAmount === undefined || taxAmount === null) {
+      throw new Error('Unable to read Tax from order price summary.');
+    }
+
+    return taxAmount;
   }
 
   @step('页面读取：读取点单页当前订单快照')
@@ -650,6 +813,31 @@ export class OrderDishesPage {
   async saveOrder(): Promise<HomePage> {
     await this.saveOrderButton.click();
     return new HomePage(this.page);
+  }
+
+  @step('页面操作：点击 Send 送厨订单')
+  async sendOrder(): Promise<HomePage> {
+    await this.expectLoaded();
+    await this.sendButton.click();
+    return new HomePage(this.page);
+  }
+
+  @step('页面操作：点击 Save 保存订单但不假设页面跳转')
+  async clickSaveOrder(): Promise<void> {
+    await this.expectLoaded();
+    await this.saveOrderButton.click();
+  }
+
+  @step('页面操作：从点单页顶部点击 Recall 入口')
+  async clickRecall(): Promise<RecallPage> {
+    await this.expectLoaded();
+    await this.headerRecallButton.click();
+
+    const { RecallPage } = await import('./recall.page.js');
+    const recallPage = new RecallPage(this.page);
+    await recallPage.expectLoaded();
+
+    return recallPage;
   }
 
   @step('页面操作：点击 Split 并打开分单面板')
@@ -1085,6 +1273,17 @@ export class OrderDishesPage {
     return this.appFrame.getByRole('button', { name: dishName, exact: true });
   }
 
+  private resolveOrderedDishButton(dishName: string): Locator {
+    const escapedDishName = this.escapeRegExp(dishName);
+    return this.appFrame
+      .getByRole('button', {
+        name: new RegExp(
+          `(?:^|\\s)\\d+\\s+${escapedDishName}(?:\\s+\\d+\\s+sent)?\\s+\\$[\\d,.]+`,
+        ),
+      })
+      .first();
+  }
+
   private async waitUntilWeightDialogReady(): Promise<void> {
     try {
       await waitUntil(
@@ -1128,7 +1327,19 @@ export class OrderDishesPage {
     return this.specificationDialog.getByRole('button', { name: spec, exact: true });
   }
 
-  private resolveComboSection(sectionName: string): Locator {
+  private async activateComboSection(sectionName: string): Promise<void> {
+    const sectionButton = this.comboDialog
+      .getByRole('button', {
+        name: new RegExp(`^${this.escapeRegExp(sectionName)}$`),
+      })
+      .first();
+
+    if (await sectionButton.isVisible().catch(() => false)) {
+      await sectionButton.click();
+    }
+  }
+
+  private resolveLegacyComboSection(sectionName: string): Locator {
     return this.comboDialog
       .locator('div[class*="_sectionName_"]')
       .filter({
@@ -1139,22 +1350,44 @@ export class OrderDishesPage {
   }
 
   private resolveComboSectionItemCardShell(sectionName: string, dishName: string): Locator {
-    return this.resolveComboSection(sectionName)
+    const itemTitle = this.comboDialog.locator('span[class*="_itemTitle_"]', {
+      hasText: new RegExp(`^${this.escapeRegExp(dishName)}$`),
+    });
+
+    return this.resolveLegacyComboSection(sectionName)
       .locator('span[class*="_itemTitle_"]', {
         hasText: new RegExp(`^${this.escapeRegExp(dishName)}$`),
       })
-      .locator('xpath=ancestor::div[contains(@class,"_cardShell_")][1]');
-  }
-
-  private resolveComboSectionItemButton(sectionName: string, dishName: string): Locator {
-    return this.resolveComboSectionItemCardShell(sectionName, dishName)
-      .locator('xpath=.//button[not(contains(@class, "_counterBtn_"))][1]');
-  }
-
-  private resolveComboSectionItemPlusButton(sectionName: string, dishName: string): Locator {
-    return this.resolveComboSectionItemCardShell(sectionName, dishName)
-      .locator('button[class*="_counterBtnPlus_"]')
+      .locator('xpath=ancestor::div[contains(@class,"_cardShell_")][1]')
+      .or(itemTitle.locator('xpath=ancestor::div[contains(@class,"_cardShell_")][1]'))
       .first();
+  }
+
+  private async resolveComboSectionItemButton(
+    sectionName: string,
+    dishName: string,
+  ): Promise<Locator> {
+    const cardShell = this.resolveComboSectionItemCardShell(sectionName, dishName);
+
+    return await this.resolveVisibleLocator(
+      [cardShell.getByRole('button').first()],
+      `Unable to find combo item button: ${sectionName} / ${dishName}.`,
+    );
+  }
+
+  private async resolveComboSectionItemPlusButton(
+    sectionName: string,
+    dishName: string,
+  ): Promise<Locator> {
+    const cardShell = this.resolveComboSectionItemCardShell(sectionName, dishName);
+
+    return await this.resolveVisibleLocator(
+      [
+        cardShell.locator('button[class*="_counterBtnPlus_"]').first(),
+        cardShell.getByRole('button', { name: '+', exact: true }).first(),
+      ],
+      `Unable to find combo item plus button: ${sectionName} / ${dishName}.`,
+    );
   }
 
   private escapeRegExp(input: string): string {

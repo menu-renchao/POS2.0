@@ -481,11 +481,11 @@ test.describe('Recall 订单详情读取', () => {
           },
         ],
         priceSummary: {
-          Count: '3',
-          Subtotal: '$175.89',
-          Tax: '$10.55',
-          'Total Before Tips': '$186.44',
-          Total: '$188.44',
+          Count: 3,
+          Subtotal: 175.89,
+          Tax: 10.55,
+          'Total Before Tips': 186.44,
+          Total: 188.44,
         },
       });
 
@@ -522,7 +522,7 @@ test.describe('Recall 订单详情读取', () => {
         payments: [],
         items: [],
         priceSummary: {
-          Total: '$0.00',
+          Total: 0,
         },
       });
 
@@ -581,9 +581,9 @@ test.describe('Recall 订单详情读取', () => {
           },
         ],
         priceSummary: {
-          Count: '2',
-          Subtotal: '$18.00',
-          Total: '$19.00',
+          Count: 2,
+          Subtotal: 18,
+          Total: 19,
         },
       });
 

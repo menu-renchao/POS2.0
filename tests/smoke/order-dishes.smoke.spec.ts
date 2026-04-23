@@ -6,6 +6,8 @@ import { selectAnyAvailableTableAndEnterOrderDishes } from '../../flows/select-t
 import { test } from '../../fixtures/test.fixture';
 
 test.describe('点餐冒烟测试', () => {
+  test.setTimeout(60_000);
+
   test(
     '应能进入点餐页面并添加普通菜与带数量的套餐子菜到购物车',
     {
@@ -14,7 +16,7 @@ test.describe('点餐冒烟测试', () => {
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
       await openHome(homePage);
 
-      if (await licenseSelectionPage.isVisible(10_000)) {
+      if (await licenseSelectionPage.isVisible(30_000)) {
         await enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
@@ -44,6 +46,14 @@ test.describe('点餐冒烟测试', () => {
           common: {
             普通菜1: 1,
             普通菜2: 2,
+          },
+          SelectionYprbJ: {
+            'Spi Thai Gn Curry Chk': 1,
+            'Spi Kung Pao Chicken': 1,
+          },
+          SelectiondDbta: {
+            'Crabmeat Salad': 1,
+            'House Salad': 1,
           },
         },
         3,

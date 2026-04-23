@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { SplitOrderFlow } from '../../flows/split-order.flow';
 import { SplitOrderPage } from '../../pages/split-order.page';
 
@@ -52,7 +52,7 @@ const splitOrderFixtureHtml = String.raw`
 
       <footer>
         <button type="button" data-testid="split-panel-cancel">Cancel</button>
-        <button type="button" data-testid="split-panel-confirm">Confirm</button>
+        <button type="button" data-testid="splitPanelModal-confirm-button">Confirm</button>
       </footer>
     </div>
 
@@ -141,7 +141,7 @@ const splitOrderFixtureHtml = String.raw`
         const inputValue = document.querySelector('[data-testid="split-input-value"]');
         const combineModal = document.querySelector('.splitCombineModal');
         const combineOrderList = document.querySelector('[data-testid="combine-order-list"]');
-        const panelConfirmButton = document.querySelector('[data-testid="split-panel-confirm"]');
+        const panelConfirmButton = document.querySelector('[data-testid="splitPanelModal-confirm-button"]');
 
         let currentInputAction = '';
 
@@ -517,12 +517,14 @@ const splitOrderFixtureHtml = String.raw`
         });
 
         panelConfirmButton.addEventListener('click', () => {
+          state.submitClickedAt = performance.now();
+
           if (state.submitTarget === 'recall') {
-            window.location.hash = '#recall';
+            window.parent.location.hash = '#recall';
             return;
           }
 
-          window.location.hash = '';
+          window.parent.location.hash = '';
         });
 
         render();
@@ -532,6 +534,17 @@ const splitOrderFixtureHtml = String.raw`
 </html>
 `;
 
+async function loadSplitOrderFixture(page: Page): Promise<void> {
+  await page.setContent('<iframe data-wujie-id="splitPanel"></iframe>');
+  await page.locator('iframe[data-wujie-id="splitPanel"]').evaluate((iframe, content) => {
+    iframe.setAttribute('srcdoc', content as string);
+  }, splitOrderFixtureHtml);
+}
+
+function splitPanelFrame(page: Page): ReturnType<Page['frameLocator']> {
+  return page.frameLocator('iframe[data-wujie-id="splitPanel"]');
+}
+
 test.describe('分单页面能力契约', () => {
   test(
     '应能完成分单页面读取、按菜品平分、移动菜品、合并与取消分单',
@@ -540,7 +553,7 @@ test.describe('分单页面能力契约', () => {
       const splitOrderPage = new SplitOrderPage(page);
 
       await test.step('准备分单页面契约骨架', async () => {
-        await page.setContent(splitOrderFixtureHtml);
+        await loadSplitOrderFixture(page);
       });
 
       await test.step('校验初始页面与可平分菜品状态', async () => {
@@ -587,7 +600,7 @@ test.describe('分单页面能力契约', () => {
       const splitOrderFlow = new SplitOrderFlow();
 
       await test.step('准备分单页面契约骨架', async () => {
-        await page.setContent(splitOrderFixtureHtml);
+        await loadSplitOrderFixture(page);
       });
 
       await test.step('执行平分订单', async () => {
@@ -629,19 +642,36 @@ test.describe('分单页面能力契约', () => {
       const splitOrderFlow = new SplitOrderFlow();
 
       await test.step('准备分单页面契约骨架并提交回 Recall', async () => {
-        await page.setContent(splitOrderFixtureHtml);
-        await page.evaluate(() => {
-          window.__splitOrderState.submitTarget = 'recall';
+        await loadSplitOrderFixture(page);
+        await splitPanelFrame(page).locator('body').evaluate(() => {
+          const state = (window as typeof window & {
+            __splitOrderState: { submitStartedAt?: number; submitTarget: string };
+          }).__splitOrderState;
+
+          state.submitStartedAt = performance.now();
+          state.submitTarget = 'recall';
         });
 
         const recallPage = await splitOrderFlow.submitAndReturnPage(splitOrderPage);
+        const submitDelay = await splitPanelFrame(page).locator('body').evaluate(() => {
+          const state = (window as typeof window & {
+            __splitOrderState: { submitClickedAt: number; submitStartedAt: number };
+          }).__splitOrderState;
+
+          return state.submitClickedAt - state.submitStartedAt;
+        });
+        expect(submitDelay).toBeGreaterThanOrEqual(450);
         expect(recallPage.constructor.name).toBe('RecallPage');
       });
 
       await test.step('重新准备页面并提交回主页', async () => {
-        await page.setContent(splitOrderFixtureHtml);
-        await page.evaluate(() => {
-          window.__splitOrderState.submitTarget = 'home';
+        await loadSplitOrderFixture(page);
+        await splitPanelFrame(page).locator('body').evaluate(() => {
+          const state = (window as typeof window & {
+            __splitOrderState: { submitTarget: string };
+          }).__splitOrderState;
+
+          state.submitTarget = 'home';
         });
 
         const homePage = await splitOrderFlow.submitAndReturnPage(splitOrderPage);

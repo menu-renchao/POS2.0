@@ -15,23 +15,18 @@ export class SelectTablePage {
   private readonly newOrderButton: Locator;
   private readonly areaButtons: Locator;
   private readonly tableButtons: Locator;
-  private readonly availableTableButtons: Locator;
   private readonly guestCountDialog: Locator;
   private readonly orderDishesFrame: Locator;
   private readonly loadingTablesStatus: Locator;
 
   constructor(private readonly page: Page) {
-    this.backButton = this.page.getByRole('button', { name: 'Back' });
+    this.backButton = this.page
+      .getByRole('button', { name: 'Back' })
+      .or(this.page.getByRole('img', { name: 'Back' }))
+      .first();
     this.newOrderButton = this.page.getByRole('button', { name: /New order/i });
     this.areaButtons = this.page.locator('button[aria-pressed]');
-    this.tableButtons = this.page.getByRole('button', {
-      name: /(Seat2Icon|Reopen1Icon)/,
-    });
-    this.availableTableButtons = this.page.getByRole('button', {
-      name: /Seat2Icon/,
-    }).filter({
-      hasNotText: 'Boss',
-    });
+    this.tableButtons = this.page.getByRole('button');
     this.guestCountDialog = this.page.getByRole('dialog').filter({
       hasText: 'Please choose the guest number of this order.',
     }).first();
@@ -53,13 +48,13 @@ export class SelectTablePage {
     await this.expectLoaded();
     await this.waitUntilTableDataLoaded();
 
-    const availableTableCount = await this.availableTableButtons.count();
+    const availableTableCount = await this.tableButtons.count();
     const availableTables: Locator[] = [];
 
     for (let index = 0; index < availableTableCount; index += 1) {
-      const tableButton = this.availableTableButtons.nth(index);
+      const tableButton = this.tableButtons.nth(index);
 
-      if (await tableButton.isVisible().catch(() => false)) {
+      if (await this.isAvailableTableButton(tableButton)) {
         availableTables.push(tableButton);
       }
     }
@@ -110,13 +105,20 @@ export class SelectTablePage {
     await this.waitUntilTableDataLoaded();
 
     const escapedTableNumber = tableNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const table = this.tableButtons.filter({
+    const matchedTables = this.tableButtons.filter({
       hasText: new RegExp(`(^|\\s)${escapedTableNumber}(\\s|$)`),
     });
+    const matchedTableCount = await matchedTables.count();
 
-    await expect(table.first()).toBeVisible();
+    for (let index = 0; index < matchedTableCount; index += 1) {
+      const table = matchedTables.nth(index);
 
-    return table.first();
+      if (await this.isTableButton(table)) {
+        return table;
+      }
+    }
+
+    throw new Error(`Unable to find visible table card by number: ${tableNumber}`);
   }
 
   @step('页面操作：等待选桌页面桌台数据加载完成')
@@ -243,5 +245,41 @@ export class SelectTablePage {
         }),
       )
       .first();
+  }
+
+  private async isAvailableTableButton(table: Locator): Promise<boolean> {
+    if (!(await this.isTableButton(table))) {
+      return false;
+    }
+
+    const tableText = await this.readTableButtonText(table);
+
+    return tableText.length > 0 && !tableText.includes('Boss');
+  }
+
+  private async isTableButton(table: Locator): Promise<boolean> {
+    if (!(await table.isVisible().catch(() => false))) {
+      return false;
+    }
+
+    const box = await table.boundingBox().catch(() => null);
+
+    if (!box || box.y < 200 || box.width < 50 || box.height < 40) {
+      return false;
+    }
+
+    const tableText = await this.readTableButtonText(table);
+
+    return /^\S+$/.test(tableText);
+  }
+
+  private async readTableButtonText(table: Locator): Promise<string> {
+    return (
+      await table
+        .evaluate((tableElement) => (tableElement as HTMLElement).innerText)
+        .catch(async () => (await table.textContent()) ?? '')
+    )
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 }

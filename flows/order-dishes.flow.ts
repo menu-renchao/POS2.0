@@ -3,6 +3,7 @@ import {
   type ChargeScope,
   OrderDishesPage,
 } from '../pages/order-dishes.page';
+import { type HomePage } from '../pages/home.page';
 import { step } from '../utils/step';
 
 export type ComboSectionSelection = string | Record<string, number>;
@@ -159,6 +160,21 @@ export class OrderDishesFlow {
     }
 
     await this.addRegularDish(orderDishesPage, dishName, quantity);
+  }
+
+  @step('业务步骤：将当前堂食订单送厨')
+  async sendOrderToKitchen(orderDishesPage: OrderDishesPage): Promise<HomePage> {
+    await orderDishesPage.expectLoaded();
+    return await orderDishesPage.sendOrder();
+  }
+
+  @step((_: OrderDishesPage, dishName: string) => `业务步骤：编辑已下单菜品 ${dishName} 并加 1`)
+  async increaseOrderedDishQuantityByOne(
+    orderDishesPage: OrderDishesPage,
+    dishName: string,
+  ): Promise<void> {
+    await orderDishesPage.expectLoaded();
+    await orderDishesPage.increaseOrderedDishQuantityByOne(dishName);
   }
 
   @step((optionName: string) => `业务步骤：按预置加收项 ${optionName} 快捷整单加收`)
@@ -333,6 +349,19 @@ export async function addDishToCart(
 ): Promise<void> {
   const flow = new OrderDishesFlow();
   await flow.addDishToCart(orderDishesPage, params);
+}
+
+export async function sendOrderToKitchen(orderDishesPage: OrderDishesPage): Promise<HomePage> {
+  const flow = new OrderDishesFlow();
+  return await flow.sendOrderToKitchen(orderDishesPage);
+}
+
+export async function increaseOrderedDishQuantityByOne(
+  orderDishesPage: OrderDishesPage,
+  dishName: string,
+): Promise<void> {
+  const flow = new OrderDishesFlow();
+  await flow.increaseOrderedDishQuantityByOne(orderDishesPage, dishName);
 }
 
 export async function quickChargeByName(

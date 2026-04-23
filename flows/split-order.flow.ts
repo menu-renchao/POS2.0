@@ -3,6 +3,9 @@ import { OrderDishesPage } from '../pages/order-dishes.page';
 import { RecallPage } from '../pages/recall.page';
 import { type SplitOrderReturnPage, SplitOrderPage } from '../pages/split-order.page';
 import { step } from '../utils/step';
+import { waitUntil } from '../utils/wait';
+
+const SPLIT_ORDER_SUBMIT_STABILIZATION_MS = 1500;
 
 export class SplitOrderFlow {
   @step((_splitOrderPage: SplitOrderPage, count: number) => `业务步骤：将当前订单平分为 ${count} 份`)

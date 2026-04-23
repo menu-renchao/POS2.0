@@ -1,8 +1,8 @@
 import { expect } from '@playwright/test';
-import { enterWithEmployeePassword } from '../../flows/employee-login.flow';
+import { enterEmployeeContext } from '../../flows/employee-login.flow';
 import { openHome } from '../../flows/home.flow';
 import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import { viewRecallOrderDetails } from '../../flows/recall.flow';
+import { openRecallFromHome, viewRecallOrderDetails } from '../../flows/recall.flow';
 import { test } from '../../fixtures/test.fixture';
 
 test.describe('Recall 订单详情冒烟', () => {
@@ -24,12 +24,8 @@ test.describe('Recall 订单详情冒烟', () => {
         await enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
-      const loggedInHomePage = await enterWithEmployeePassword(
-        employeeLoginPage,
-        homePage,
-        '11',
-      );
-      const recallPage = await loggedInHomePage.clickRecall();
+      const loggedInHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
+      const recallPage = await openRecallFromHome(loggedInHomePage);
 
       const details = await viewRecallOrderDetails(recallPage, '1');
       console.log(JSON.stringify(details, null, 2));

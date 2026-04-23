@@ -29,9 +29,9 @@ export class LicenseSelectionPage {
 
   @step('页面操作：确认 License 选择区域已经显示')
   async expectVisible(): Promise<void> {
-    await expect(this.licenseInput).toBeVisible();
-    await expect(this.titleHeaders).toHaveCount(3);
-    await expect(this.licenseRows.first()).toBeVisible();
+    await this.licenseInput.waitFor({ state: 'visible', timeout: 30_000 });
+    await expect(this.titleHeaders).toHaveCount(3, { timeout: 30_000 });
+    await expect(this.licenseRows.first()).toBeVisible({ timeout: 30_000 });
   }
 
   @step((timeoutMs = 0) => `页面操作：判断 License 选择区域在 ${timeoutMs} 毫秒内是否可见`)
@@ -62,6 +62,7 @@ export class LicenseSelectionPage {
   @step('页面操作：点击 Enter 按钮提交当前选中的 License')
   async clickEnter(): Promise<void> {
     await this.enterButton.click();
+    await expect(this.licenseInput).toBeHidden();
   }
 
   @step(

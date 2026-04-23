@@ -73,7 +73,9 @@ test(
 
 - Smoke tests should validate stable availability signals only.
 - E2E tests should express business intent instead of click-by-click scripts.
+- When a request does not explicitly require table selection, order-entry tests should use the default no-table path; Recall checks should validate the first visible order record directly.
 - Add stronger semantic locators or test ids before introducing fragile selectors.
+- Price-related page reads should return numeric values from the page object layer. Do not re-parse currency strings in test cases when the page object can already provide numbers.
 
 ## Project Structure
 

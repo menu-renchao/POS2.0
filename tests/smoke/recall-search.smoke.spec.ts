@@ -1,9 +1,10 @@
 import { expect } from '@playwright/test';
+import { enterEmployeeContext } from '../../flows/employee-login.flow';
 import {
   clearRecallSearchConditions,
+  openRecallFromHome,
   searchRecallOrders,
 } from '../../flows/recall.flow';
-import { enterWithEmployeePassword } from '../../flows/employee-login.flow';
 import { openHome } from '../../flows/home.flow';
 import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
 import { test } from '../../fixtures/test.fixture';
@@ -29,14 +30,8 @@ test.describe('Recall 搜索冒烟', () => {
         await enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
-      const loggedInHomePage = await enterWithEmployeePassword(
-        employeeLoginPage,
-        homePage,
-        '11',
-      );
-      const recallPage = await loggedInHomePage.clickRecall();
-
-      await recallPage.expectLoaded();
+      const loggedInHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
+      const recallPage = await openRecallFromHome(loggedInHomePage);
 
       const visibleOrderNumbers = await waitUntil(
         async () => await recallPage.readVisibleOrderNumbers(),

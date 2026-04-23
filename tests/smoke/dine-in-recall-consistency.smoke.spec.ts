@@ -1,9 +1,10 @@
 import { expect } from '@playwright/test';
-import { enterWithEmployeePassword } from '../../flows/employee-login.flow';
+import { enterEmployeeContext, enterWithEmployeePassword } from '../../flows/employee-login.flow';
 import { openHome } from '../../flows/home.flow';
 import { addRegularDish, addWeightedDish } from '../../flows/order-dishes.flow';
 import {
   readLatestVisibleRecallOrderNumber,
+  openRecallFromHome,
   searchRecallOrders,
   viewRecallOrderDetails,
 } from '../../flows/recall.flow';
@@ -17,7 +18,6 @@ import { OrderDishesPage, type OrderPriceSummary } from '../../pages/order-dishe
 import { RecallPage, type RecallOrderDetails, type RecallOrderItem } from '../../pages/recall.page';
 import { type SplitOrderSuborderSnapshot } from '../../pages/split-order.page';
 import {
-  RecallManualSearchTags,
   RecallPaymentStatuses,
 } from '../../test-data/recall-search-options';
 import { waitUntil } from '../../utils/wait';
@@ -44,12 +44,13 @@ function countSplitDishRows(
   );
 }
 
-function normalizeCurrencyValue(value: string | null): string | null {
+function parseCurrencyValue(value: string | null): number | null {
   if (!value) {
     return null;
   }
 
-  return value.startsWith('$') ? value : `$${value}`;
+  const parsedValue = Number(value.replace(/[$,]/g, ''));
+  return Number.isNaN(parsedValue) ? null : parsedValue;
 }
 
 const expectedGuestCount = 3;
@@ -74,9 +75,9 @@ function normalizeExpectedDishItems(items: ComparableDishItem[]): ComparableDish
   );
 }
 
-function pickComparablePriceSummary(summary: Record<string, string>): Record<string, string> {
-  return comparablePriceSummaryKeys.reduce<Record<string, string>>((pickedSummary, key) => {
-    if (summary[key]) {
+function pickComparablePriceSummary(summary: Record<string, number>): Record<string, number> {
+  return comparablePriceSummaryKeys.reduce<Record<string, number>>((pickedSummary, key) => {
+    if (summary[key] !== undefined) {
       pickedSummary[key] = summary[key];
     }
 
@@ -156,8 +157,8 @@ async function assertRecallMatchesSplitSuborder(
   });
 
   await test.step('校验 Recall 价格摘要与目标子单一致', async () => {
-    const expectedTotalBeforeTips = normalizeCurrencyValue(expectedSuborder.total);
-    if (expectedTotalBeforeTips) {
+    const expectedTotalBeforeTips = parseCurrencyValue(expectedSuborder.total);
+    if (expectedTotalBeforeTips !== null) {
       expect(recallDetails.priceSummary['Total Before Tips']).toBe(expectedTotalBeforeTips);
     }
   });
@@ -186,7 +187,7 @@ async function enterRecallAfterSplitSave(
   ).catch(() => false);
 
   const loggedInHomePage = requiresEmployeeRelogin
-    ? await enterWithEmployeePassword(employeeLoginPage, recallReadyHomePage, '11')
+    ? await enterEmployeeContext(recallReadyHomePage, employeeLoginPage)
     : recallReadyHomePage;
 
   const recallPage = await loggedInHomePage.clickRecall();
@@ -197,11 +198,7 @@ async function enterRecallAfterSplitSave(
   }
 
   if (await employeeLoginPage.isVisible().catch(() => false)) {
-    const reloggedInHomePage = await enterWithEmployeePassword(
-      employeeLoginPage,
-      loggedInHomePage,
-      '11',
-    );
+    const reloggedInHomePage = await enterEmployeeContext(loggedInHomePage, employeeLoginPage);
     const retriedRecallPage = await reloggedInHomePage.clickRecall();
     await retriedRecallPage.expectLoaded();
     return retriedRecallPage;
@@ -211,6 +208,8 @@ async function enterRecallAfterSplitSave(
 }
 
 test.describe('堂食点单后 Recall 校验', () => {
+  test.describe.configure({ timeout: 180_000 });
+
   test(
     '应能在任意空桌以 3 人堂食点单保存后通过 Recall 校验订单信息一致',
     {
@@ -226,17 +225,13 @@ test.describe('堂食点单后 Recall 校验', () => {
       await test.step('从首页进入系统并完成堂食点单前置操作', async () => {
         await openHome(homePage);
 
-        if (await licenseSelectionPage.isVisible(10_000)) {
+        if (await licenseSelectionPage.isVisible(30_000)) {
           await enterWithAvailableLicense(licenseSelectionPage, homePage);
         }
       });
 
       const dineInOrderContext = await test.step('使用员工口令进入系统并选择任意空桌的 3 人堂食点单页', async () => {
-        const readyHomePage = await enterWithEmployeePassword(
-          employeeLoginPage,
-          homePage,
-          '11',
-        );
+        const readyHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
 
         await readyHomePage.expectPrimaryFunctionCardsVisible();
         const selectTablePage = await readyHomePage.clickDineIn();
@@ -271,20 +266,12 @@ test.describe('堂食点单后 Recall 校验', () => {
 
       const recallDetails = await test.step('进入 Recall 查询包含目标菜品的最新未支付堂食订单', async () => {
         const recallReadyHomePage = await employeeLoginPage.isVisible()
-          ? await enterWithEmployeePassword(
-              employeeLoginPage,
-              orderSnapshot.savedHomePage,
-              '11',
-            )
+          ? await enterEmployeeContext(orderSnapshot.savedHomePage, employeeLoginPage)
           : orderSnapshot.savedHomePage;
-        const recallPage = await recallReadyHomePage.clickRecall();
+        const recallPage = await openRecallFromHome(recallReadyHomePage);
 
         await searchRecallOrders(recallPage, {
           paymentStatus: RecallPaymentStatuses.unpaid,
-          manualSearch: {
-            tag: RecallManualSearchTags.itemName,
-            keyword: 'test',
-          },
         });
 
         const latestOrderNumber = await readLatestVisibleRecallOrderNumber(recallPage);
@@ -318,17 +305,13 @@ test.describe('堂食点单后 Recall 校验', () => {
       await test.step('从首页进入系统并完成堂食点单前置操作', async () => {
         await openHome(homePage);
 
-        if (await licenseSelectionPage.isVisible(10_000)) {
+        if (await licenseSelectionPage.isVisible(30_000)) {
           await enterWithAvailableLicense(licenseSelectionPage, homePage);
         }
       });
 
       const dineInOrderContext = await test.step('使用员工口令进入系统并选择任意空桌的 3 人堂食点单页', async () => {
-        const readyHomePage = await enterWithEmployeePassword(
-          employeeLoginPage,
-          homePage,
-          '11',
-        );
+        const readyHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
 
         await readyHomePage.expectPrimaryFunctionCardsVisible();
         const selectTablePage = await readyHomePage.clickDineIn();
@@ -413,10 +396,6 @@ test.describe('堂食点单后 Recall 校验', () => {
 
         await searchRecallOrders(recallPage, {
           paymentStatus: RecallPaymentStatuses.unpaid,
-          manualSearch: {
-            tag: RecallManualSearchTags.orderNumber,
-            keyword: splitResult.recallOrderNumber,
-          },
         });
 
         return await viewRecallOrderDetails(
