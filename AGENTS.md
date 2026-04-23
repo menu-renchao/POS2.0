@@ -22,7 +22,7 @@ This repository is a maintainable Playwright + TypeScript UI automation project 
 - Every `describe` and `test` title must be written in Chinese.
 - Test-case-level report steps must also use Chinese.
 - Test-case-level metadata should use Playwright native `test(title, details, body)` style.
-- Jira links should be declared in the `details.annotation` field, not via a custom wrapper helper.
+- Jira links should be declared in the `details.annotation` field. Keep searchable issue keys such as `POS-30543` in the spec file; shared helpers may only build the full Jira URL or annotation object from that key.
 
 ## Page And Flow Boundaries
 
@@ -76,6 +76,11 @@ test(
 - When a request does not explicitly require table selection, order-entry tests should use the default no-table path; Recall checks should validate the first visible order record directly.
 - Add stronger semantic locators or test ids before introducing fragile selectors.
 - Price-related page reads should return numeric values from the page object layer. Do not re-parse currency strings in test cases when the page object can already provide numbers.
+- Data-driven test inputs should be separated from spec files when they represent reusable domain data, business samples, or case matrices.
+- Prefer TypeScript files under `test-data/` for test data so literals keep type checking, `as const` narrowing, factories, and IDE refactoring support.
+- Keep stable POS domain samples such as menu groups, dishes, options, customers, quantities, and expected deltas in `test-data/`; keep only scenario orchestration and assertions in spec files.
+- Use small factory functions in `test-data/` for dynamic values such as unique customer names. Do not inline `Date.now()` or other dynamic sample generation in spec bodies.
+- Keep traceability metadata such as Jira issue keys in spec files so global search lands on the owning test. Use `test-data/` case arrays only for pure input/expected-value matrices that do not need direct issue-key searchability.
 
 ## Project Structure
 

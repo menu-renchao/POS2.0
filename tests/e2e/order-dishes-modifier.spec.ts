@@ -212,13 +212,13 @@ const categoryOptionFrameHtml = String.raw`
       </div>
       <div class="_grid_hspw6_73 _compactPadding_hspw6_86">
         <button type="button" class="_card_gu1xb_1" aria-pressed="false">
-          <span class="_name_gu1xb_37">aaa</span>
+          <span class="_name_gu1xb_37">free option</span>
         </button>
       </div>
       <div>
         <div class="_subGrid_hspw6_99" hidden>
           <button type="button" class="_card_gu1xb_1" aria-pressed="false">
-            <span class="_name_gu1xb_37">sub1</span>
+            <span class="_name_gu1xb_37">free suboption</span>
           </button>
         </div>
       </div>
@@ -428,7 +428,7 @@ test.describe('已点菜品调味契约', () => {
         .frameLocator('iframe[data-wujie-id="orderDishes"]')
         .getByTestId('ordered-dish-category-option')
         .click();
-      await orderDishesPage.selectCategoryOption('aaa');
+      await orderDishesPage.selectCategoryOption('free option');
     });
 
     const state = await page
@@ -445,7 +445,7 @@ test.describe('已点菜品调味契约', () => {
       });
 
     expect(state.selectedDishName).toBe('Fried Rice');
-    expect(state.selectedOption).toBe('aaa');
+    expect(state.selectedOption).toBe('free option');
     expect(state.selectedSubOption).toBeNull();
   });
 
@@ -467,7 +467,7 @@ test.describe('已点菜品调味契约', () => {
         .frameLocator('iframe[data-wujie-id="orderDishes"]')
         .getByTestId('ordered-dish-category-option')
         .click();
-      await orderDishesPage.selectCategoryOption('aaa', 'sub1');
+      await orderDishesPage.selectCategoryOption('free option', 'free suboption');
     });
 
     const state = await page
@@ -484,7 +484,7 @@ test.describe('已点菜品调味契约', () => {
       });
 
     expect(state.selectedDishName).toBe('Fried Rice');
-    expect(state.selectedOption).toBe('aaa');
-    expect(state.selectedSubOption).toBe('sub1');
+    expect(state.selectedOption).toBe('free option');
+    expect(state.selectedSubOption).toBe('free suboption');
   });
 });

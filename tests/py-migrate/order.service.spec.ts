@@ -2,7 +2,11 @@ import { expect } from '@playwright/test';
 import { enterEmployeeContext } from '../../flows/employee-login.flow';
 import { openHome } from '../../flows/home.flow';
 import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import { addRegularDish, increaseOrderedDishQuantityByOne } from '../../flows/order-dishes.flow';
+import {
+  addDishToCart,
+  addRegularDish,
+  increaseOrderedDishQuantityByOne,
+} from '../../flows/order-dishes.flow';
 import {
   editFirstVisibleRecallOrder,
   openRecallFromHome,
@@ -21,21 +25,37 @@ import { HomePage } from '../../pages/home.page';
 import { LicenseSelectionPage } from '../../pages/license-selection.page';
 import { OrderDishesPage } from '../../pages/order-dishes.page';
 import { RecallPage } from '../../pages/recall.page';
-
-const firstDishName = '普通菜1';
-const secondDishName = 'test';
-const automationMenu = {
-  category: '全类型类',
-  group: '自动化菜单组',
-};
-
-const categoryOptionDishName = 'test';
+import {
+  buildOrderServicePickupCustomer,
+  orderServiceCategoryOptions,
+  orderServiceCustomers,
+  orderServiceDishes,
+  orderServiceEditRecallTaxCase,
+  orderServiceMultiDishQuantityCase,
+  orderServiceSplitEvenlyCase,
+} from '../../test-data/order-service';
+import { jiraIssueAnnotation, jiraIssueAnnotations } from '../../utils/jira';
 
 type AppEntryPages = {
   employeeLoginPage: EmployeeLoginPage;
   homePage: HomePage;
   licenseSelectionPage: LicenseSelectionPage;
 };
+
+const recallDishRoundTripCases = [
+  {
+    title: '应能 To Go 点普通菜后在 Recall 校验菜品名称和价格',
+    issue: 'POS-15602',
+    dish: orderServiceDishes.regular,
+    stepTitle: '从 To Go 进入点单页，添加普通菜并保存后在 Recall 校验',
+  },
+  {
+    title: '应能 To Go 点另一个分类菜品后在 Recall 校验菜品名称和价格',
+    issue: 'POS-15641',
+    dish: orderServiceDishes.test,
+    stepTitle: '从 To Go 进入点单页，添加 test 菜品并保存后在 Recall 校验',
+  },
+] as const;
 
 function readCurrencyAmount(value: string | undefined): number {
   if (!value) {
@@ -132,12 +152,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
     '应能堂食保存后在 Recall 编辑菜品数量并校验税额实时更新',
     {
       tag: ['@smoke'],
-      annotation: [
-        {
-          type: 'issue',
-          description: 'https://devtickets.atlassian.net/browse/POS-30543',
-        },
-      ],
+      annotation: [jiraIssueAnnotation('POS-30543')],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
       const readyHomePage = await test.step('从首页进入系统并完成授权与员工口令前置条件', async () => {
@@ -148,8 +163,16 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         const selectTablePage = await readyHomePage.clickDineIn();
         const orderDishesPage = await skipTableSelectionAndEnterOrderDishes(selectTablePage);
 
-        await addRegularDish(orderDishesPage, firstDishName, automationMenu, 1);
-        await addRegularDish(orderDishesPage, secondDishName, automationMenu, 1);
+        await addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
+        await addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.test.name,
+          orderServiceDishes.test.menu,
+        );
 
         const savedHomePage = await orderDishesPage.saveOrder();
         await savedHomePage.expectPrimaryFunctionCardsVisible();
@@ -164,10 +187,12 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         const orderDetails = await viewFirstVisibleRecallOrderDetails(recallPage);
         const subtotalBeforeEdit = orderDetails.priceSummary.Subtotal;
         const taxBeforeEdit = orderDetails.priceSummary.Tax;
-        const testItem = orderDetails.items.find((item) => item.name === secondDishName);
+        const testItem = orderDetails.items.find(
+          (item) => item.name === orderServiceDishes.test.name,
+        );
 
         expect(orderDetails.items.map((item) => item.name), 'Recall 应包含送厨菜品').toEqual(
-          expect.arrayContaining([firstDishName, secondDishName]),
+          expect.arrayContaining([orderServiceDishes.regular.name, orderServiceDishes.test.name]),
         );
         expect(subtotalBeforeEdit, '编辑前 Recall 应能读取 Subtotal').toBeTruthy();
         expect(taxBeforeEdit, '编辑前 Recall 应能读取税额').toBeTruthy();
@@ -181,26 +206,35 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         };
       });
 
-      const editResult = await test.step('从 Recall 编辑订单并将 test 加 1 后保存', async () => {
-        const recallPage: RecallPage = recallBeforeEdit.recallPage;
-        const editingOrderDishesPage = await editFirstVisibleRecallOrder(recallPage);
+      const editResult = await test.step(
+        `从 Recall 编辑订单并将 ${orderServiceDishes.test.name} 加 1 后保存`,
+        async () => {
+          const recallPage: RecallPage = recallBeforeEdit.recallPage;
+          const editingOrderDishesPage = await editFirstVisibleRecallOrder(recallPage);
 
-        await increaseOrderedDishQuantityByOne(editingOrderDishesPage, secondDishName);
-        const priceSummaryAfterQuantityChange = await editingOrderDishesPage.readPriceSummary();
-        const subtotalAfterQuantityChange = priceSummaryAfterQuantityChange.Subtotal;
-        const subtotalDelta = subtotalAfterQuantityChange - recallBeforeEdit.subtotalBeforeEdit;
-        const testItemPrice = readCurrencyAmount(recallBeforeEdit.testItemPrice);
+          await increaseOrderedDishQuantityByOne(
+            editingOrderDishesPage,
+            orderServiceDishes.test.name,
+          );
+          const priceSummaryAfterQuantityChange = await editingOrderDishesPage.readPriceSummary();
+          const subtotalAfterQuantityChange = priceSummaryAfterQuantityChange.Subtotal;
+          const subtotalDelta = subtotalAfterQuantityChange - recallBeforeEdit.subtotalBeforeEdit;
+          const testItemPrice = readCurrencyAmount(recallBeforeEdit.testItemPrice);
 
-        expect(subtotalDelta, '点单页加 1 后 Subtotal 应增加 test 单价').toBeCloseTo(testItemPrice, 2);
+          expect(
+            subtotalDelta,
+            `点单页加 1 后 Subtotal 应增加 ${orderServiceDishes.test.name} 单价`,
+          ).toBeCloseTo(testItemPrice, 2);
 
-        const savedHomePage = await editingOrderDishesPage.saveOrder();
-        await savedHomePage.expectPrimaryFunctionCardsVisible();
+          const savedHomePage = await editingOrderDishesPage.saveOrder();
+          await savedHomePage.expectPrimaryFunctionCardsVisible();
 
-        return {
-          savedHomePage,
-          subtotalAfterQuantityChange,
-        };
-      });
+          return {
+            savedHomePage,
+            subtotalAfterQuantityChange,
+          };
+        },
+      );
 
       await test.step('再次进入 Recall 校验保存后的税额已更新', async () => {
         const readyHomePage = await enterEmployeeContext(
@@ -215,7 +249,10 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         const afterTaxRate = taxAfterEdit / subtotalAfterEdit;
         const beforeTaxRate = recallBeforeEdit.taxBeforeEdit / recallBeforeEdit.subtotalBeforeEdit;
 
-        expect(orderDetailsAfterEdit.items.find((item) => item.name === secondDishName)?.quantity).toBe('2');
+        expect(
+          orderDetailsAfterEdit.items.find((item) => item.name === orderServiceDishes.test.name)
+            ?.quantity,
+        ).toBe(orderServiceEditRecallTaxCase.editedTestDishQuantity);
         expect(subtotalAfterEdit, 'Recall 保存后应保留更新后的 Subtotal').toBeTruthy();
         expect(taxAfterEdit, 'Recall 保存后应保留更新后的税额').toBeTruthy();
         expect(afterTaxRate, 'Recall 保存后的 tax/subtotal 比例应与修改前近似一致').toBeCloseTo(
@@ -229,95 +266,77 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
     },
   );
 
-  test(
-    '应能 To Go 点普通菜后在 Recall 校验菜品名称和价格',
-    {
-      annotation: [
-        {
-          type: 'issue',
-          description: 'https://devtickets.atlassian.net/browse/POS-15602',
-        },
-      ],
-    },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
-      });
+  for (const testCase of recallDishRoundTripCases) {
+    test(
+      testCase.title,
+      {
+        annotation: [jiraIssueAnnotation(testCase.issue)],
+      },
+      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+        });
 
-      await test.step('从 To Go 进入点单页，添加普通菜并保存后在 Recall 校验', async () => {
-        const orderDishesPage = await startToGoOrder(readyHomePage);
+        await test.step(testCase.stepTitle, async () => {
+          const orderDishesPage = await startToGoOrder(readyHomePage);
 
-        await addRegularDish(orderDishesPage, firstDishName, automationMenu);
-        await expectLatestRecallDishMatches(orderDishesPage, firstDishName);
-      });
-    },
-  );
-
-  test(
-    '应能 To Go 点另一个分类菜品后在 Recall 校验菜品名称和价格',
-    {
-      annotation: [
-        {
-          type: 'issue',
-          description: 'https://devtickets.atlassian.net/browse/POS-15641',
-        },
-      ],
-    },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
-      });
-
-      await test.step('从 To Go 进入点单页，添加 test 菜品并保存后在 Recall 校验', async () => {
-        const orderDishesPage = await startToGoOrder(readyHomePage);
-
-        await addRegularDish(orderDishesPage, secondDishName, automationMenu);
-        await expectLatestRecallDishMatches(orderDishesPage, secondDishName);
-      });
-    },
-  );
+          await addRegularDish(orderDishesPage, testCase.dish.name, testCase.dish.menu);
+          await expectLatestRecallDishMatches(orderDishesPage, testCase.dish.name);
+        });
+      },
+    );
+  }
 
   test(
     '应能点单时累计整数菜品数量并在 Recall 保持数量',
     {
-      annotation: [
-        {
-          type: 'issue',
-          description: 'https://devtickets.atlassian.net/browse/POS-32905',
-        },
-      ],
+      annotation: [jiraIssueAnnotation('POS-32905')],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
       const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
         return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
       });
 
-      const orderDishesPage = await test.step('从 To Go 点两个菜并将第一个菜数量调整为 3', async () => {
-        const page = await startToGoOrder(readyHomePage);
+      const orderDishesPage = await test.step(
+        `从 To Go 点两个菜并将第一个菜数量调整为 ${orderServiceMultiDishQuantityCase.multiDishFirstQuantity}`,
+        async () => {
+          const page = await startToGoOrder(readyHomePage);
 
-        await addDishToCart(page, {
-          ...automationMenu,
-          dishName: firstDishName,
-          quantity: 3,
-        });
-        await addRegularDish(page, secondDishName, automationMenu);
+          await addDishToCart(page, {
+            ...orderServiceDishes.regular.menu,
+            dishName: orderServiceDishes.regular.name,
+            quantity: orderServiceMultiDishQuantityCase.multiDishFirstQuantity,
+          });
+          await addRegularDish(page, orderServiceDishes.test.name, orderServiceDishes.test.menu);
 
-        return page;
-      });
+          return page;
+        },
+      );
 
-      await test.step('校验点单页 Count 为整数 4', async () => {
-        const priceSummary = await orderDishesPage.readPriceSummary();
+      await test.step(
+        `校验点单页 Count 为整数 ${orderServiceMultiDishQuantityCase.multiDishTotalCount}`,
+        async () => {
+          const priceSummary = await orderDishesPage.readPriceSummary();
 
-        expect(priceSummary.Count).toBe(4);
-      });
+          expect(priceSummary.Count).toBe(orderServiceMultiDishQuantityCase.multiDishTotalCount);
+        },
+      );
 
       await test.step('保存订单后在 Recall 校验两个菜的数量保持一致', async () => {
         const orderDetails = await saveOrderAndOpenLatestRecallDetails(orderDishesPage);
-        const firstDish = orderDetails.items.find((item) => item.name === firstDishName);
-        const secondDish = orderDetails.items.find((item) => item.name === secondDishName);
+        const firstDish = orderDetails.items.find(
+          (item) => item.name === orderServiceDishes.regular.name,
+        );
+        const secondDish = orderDetails.items.find(
+          (item) => item.name === orderServiceDishes.test.name,
+        );
 
-        expect(firstDish?.quantity).toBe('3');
-        expect(secondDish?.quantity).toBe('1');
+        expect(firstDish?.quantity).toBe(
+          orderServiceMultiDishQuantityCase.multiDishFirstRecallQuantity,
+        );
+        expect(secondDish?.quantity).toBe(
+          orderServiceMultiDishQuantityCase.multiDishSecondRecallQuantity,
+        );
       });
     },
   );
@@ -325,12 +344,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
   test(
     '应能创建 Delivery 订单并在 Recall 详情展示客户信息',
     {
-      annotation: [
-        {
-          type: 'issue',
-          description: 'https://devtickets.atlassian.net/browse/POS-30575',
-        },
-      ],
+      annotation: [jiraIssueAnnotation('POS-30575')],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
       const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
@@ -338,25 +352,28 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       });
 
       const orderDishesPage = await test.step('填写 Delivery 客户信息并进入点单页', async () => {
-        return await startDeliveryOrder(readyHomePage, {
-          address: 'menusifu-test',
-          customerName: 'pos-test',
-          note: '我的备注',
-          phoneNumber: '01234567890',
-          street: '55',
-          zipCode: '10016',
-        });
+        return await startDeliveryOrder(readyHomePage, orderServiceCustomers.delivery);
       });
 
       await test.step('添加菜品、保存订单并在 Recall 校验客户信息', async () => {
-        await addRegularDish(orderDishesPage, firstDishName, automationMenu);
+        await addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
 
         const orderDetails = await saveOrderAndOpenLatestRecallDetails(orderDishesPage);
 
-        expect(orderDetails.customerInfo?.name).toContain('pos-test');
-        expect(orderDetails.customerInfo?.address).toContain('menusifu-test');
-        expect(orderDetails.customerInfo?.note).toContain('我的备注');
-        expect(orderDetails.customerInfo?.phone.replace(/\D/g, '')).toContain('01234567890');
+        expect(orderDetails.customerInfo?.name).toContain(
+          orderServiceCustomers.delivery.customerName,
+        );
+        expect(orderDetails.customerInfo?.address).toContain(
+          orderServiceCustomers.delivery.address,
+        );
+        expect(orderDetails.customerInfo?.note).toContain(orderServiceCustomers.delivery.note);
+        expect(orderDetails.customerInfo?.phone.replace(/\D/g, '')).toContain(
+          orderServiceCustomers.delivery.phoneNumber,
+        );
       });
     },
   );
@@ -365,32 +382,28 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
     '应能创建带姓名的 Pick Up 订单并在 Recall 详情展示客户姓名',
     {
       tag: ['@smoke'],
-      annotation: [
-        {
-          type: 'issue',
-          description: 'https://devtickets.atlassian.net/browse/POS-31409',
-        },
-      ],
+      annotation: [jiraIssueAnnotation('POS-31409')],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
       const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
         return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
       });
-      const customerName = `pos-${Date.now()}`;
+      const customer = buildOrderServicePickupCustomer();
 
       const orderDishesPage = await test.step('填写 Pick Up 姓名并进入点单页', async () => {
-        return await startPickUpOrder(readyHomePage, {
-          customerName,
-          phoneNumber: '01234567890',
-        });
+        return await startPickUpOrder(readyHomePage, customer);
       });
 
       await test.step('添加菜品、保存订单并在 Recall 校验客户姓名', async () => {
-        await addRegularDish(orderDishesPage, firstDishName, automationMenu);
+        await addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
 
         const orderDetails = await saveOrderAndOpenLatestRecallDetails(orderDishesPage);
 
-        expect(orderDetails.customerInfo?.name).toContain(customerName);
+        expect(orderDetails.customerInfo?.name).toContain(customer.customerName);
       });
     },
   );
@@ -398,79 +411,129 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
   test(
     '应能在点单页将订单平分为两份并校验子单金额',
     {
-      annotation: [
-        {
-          type: 'issue',
-          description: 'https://devtickets.atlassian.net/browse/POS-16303',
-        },
-      ],
+      annotation: [jiraIssueAnnotation('POS-16303')],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
       const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
         return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
       });
 
-      await test.step('添加 To Go 菜品并打开分单面板执行平分', async () => {
-        const orderDishesPage = await startToGoOrder(readyHomePage);
-        const splitOrderFlow = new SplitOrderFlow();
+      await test.step(
+        `添加 To Go 菜品并打开分单面板执行平分为 ${orderServiceSplitEvenlyCase.splitSuborderCount} 份`,
+        async () => {
+          const orderDishesPage = await startToGoOrder(readyHomePage);
+          const splitOrderFlow = new SplitOrderFlow();
 
-        await addRegularDish(orderDishesPage, firstDishName, automationMenu);
+          await addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
 
-        const splitOrderPage = await orderDishesPage.openSplitOrder();
-        const beforeSplitSnapshot = await splitOrderPage.readSnapshot();
-        const totalBeforeSplit = Number(beforeSplitSnapshot.total);
+          const splitOrderPage = await orderDishesPage.openSplitOrder();
+          const beforeSplitSnapshot = await splitOrderPage.readSnapshot();
+          const totalBeforeSplit = Number(beforeSplitSnapshot.total);
 
-        expect(totalBeforeSplit, '分单前应能读取订单总额').toBeGreaterThan(0);
+          expect(totalBeforeSplit, '分单前应能读取订单总额').toBeGreaterThan(0);
 
-        await splitOrderFlow.splitOrderEvenly(splitOrderPage, 2);
+          await splitOrderFlow.splitOrderEvenly(
+            splitOrderPage,
+            orderServiceSplitEvenlyCase.splitSuborderCount,
+          );
 
-        const afterSplitSnapshot = await splitOrderPage.readSnapshot();
+          const afterSplitSnapshot = await splitOrderPage.readSnapshot();
 
-        expect(afterSplitSnapshot.suborders).toHaveLength(2);
+          expect(afterSplitSnapshot.suborders).toHaveLength(
+            orderServiceSplitEvenlyCase.splitSuborderCount,
+          );
 
-        for (const suborder of afterSplitSnapshot.suborders) {
-          expect(Number(suborder.total)).toBeCloseTo(totalBeforeSplit / 2, 2);
-        }
+          for (const suborder of afterSplitSnapshot.suborders) {
+            expect(Number(suborder.total)).toBeCloseTo(
+              totalBeforeSplit / orderServiceSplitEvenlyCase.splitSuborderCount,
+              2,
+            );
+          }
 
-        await splitOrderFlow.submitAndReturnPage(splitOrderPage);
-      });
+          await splitOrderFlow.submitAndReturnPage(splitOrderPage);
+        },
+      );
+
     },
   );
 
   test.describe('option 选择回显', () => {
     test(
-      '应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显',
+      '应能在分类菜品上选择有价格 option 并正确计算总额',
       {
-        annotation: [
-          {
-            type: 'issue',
-            description: 'https://devtickets.atlassian.net/browse/POS-15643',
-          },
-          {
-            type: 'issue',
-            description: 'https://devtickets.atlassian.net/browse/POS-15758',
-          },
-          {
-            type: 'issue',
-            description: 'https://devtickets.atlassian.net/browse/POS-15759',
-          },
-        ],
+        annotation: [jiraIssueAnnotation('POS-24394')],
       },
       async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
         const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
           return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
         });
 
-        await test.step('从 To Go 进入点单页，选择分类 option1 和二级 option sub1 并校验回显', async () => {
+        await test.step('从 To Go 进入点单页，选择有价格 option 并校验总额变化', async () => {
           const orderDishesPage = await startToGoOrder(readyHomePage);
-          await assertCategoryOptionOrderRoundTrip(
-            orderDishesPage,
-            categoryOptionDishName,
-            'option1',
-            'sub1',
+          await orderDishesPage.clickDish(orderServiceDishes.categoryOption.name);
+
+          const subtotalBeforeOption = (await orderDishesPage.readPriceSummary()).Subtotal;
+          await orderDishesPage.selectCategoryOption(orderServiceCategoryOptions.priced.name);
+
+          const subtotalAfterOption = (await orderDishesPage.readPriceSummary()).Subtotal;
+          const orderedItems = await orderDishesPage.readOrderedItems();
+          const orderedItem = orderedItems.find(
+            (item) => item.name === orderServiceDishes.categoryOption.name,
           );
+
+          expect(
+            subtotalAfterOption,
+            '选择有价格 option 后 Subtotal 应增加',
+          ).toBeGreaterThan(subtotalBeforeOption);
+          expect(
+            subtotalAfterOption - subtotalBeforeOption,
+            '有价格 option 的金额增量应符合测试数据配置',
+          ).toBeCloseTo(orderServiceCategoryOptions.priced.expectedSubtotalDelta, 2);
+          expect(orderedItem?.additions.map((addition) => addition.name.trim()) ?? []).toEqual([
+            orderServiceCategoryOptions.priced.name,
+          ]);
+
+          const orderDetails = await saveOrderAndOpenLatestRecallDetails(orderDishesPage);
+          const recallDish = orderDetails.items.find(
+            (item) => item.name === orderServiceDishes.categoryOption.name,
+          );
+
+          expect(orderDetails.priceSummary.Subtotal).toBe(subtotalAfterOption);
+          expect(recallDish?.additions.map((addition) => addition.name.trim()) ?? []).toEqual([
+            orderServiceCategoryOptions.priced.name,
+          ]);
         });
       },
     );
+
+    test(
+      '应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显',
+      {
+        annotation: jiraIssueAnnotations(['POS-15643', 'POS-15758', 'POS-15759']),
+      },
+      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+        });
+
+        await test.step(
+          `从 To Go 进入点单页，选择 ${orderServiceCategoryOptions.freeNested.name} 和 ${orderServiceCategoryOptions.freeNested.suboptionName} 并校验回显`,
+          async () => {
+            const orderDishesPage = await startToGoOrder(readyHomePage);
+            await assertCategoryOptionOrderRoundTrip(
+              orderDishesPage,
+              orderServiceDishes.categoryOption.name,
+              orderServiceCategoryOptions.freeNested.name,
+              orderServiceCategoryOptions.freeNested.suboptionName,
+            );
+          },
+        );
+      },
+    );
+
   });
 });

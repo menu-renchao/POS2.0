@@ -1660,6 +1660,31 @@ export class OrderDishesPage {
   ): Promise<Locator> {
     const section = this.resolveModifySection(sectionName);
     const escapedButtonName = this.escapeRegExp(buttonName);
+    const fallbackSectionLocators: Locator[] = [];
+
+    if (sectionName === 'Actions') {
+      fallbackSectionLocators.push(
+        this.modifyPanel.locator('[class*="_actionsGrid_"], [class*="_actionGrid_"]'),
+      );
+    }
+
+    if (sectionName === 'Category') {
+      fallbackSectionLocators.push(
+        this.modifyPanel.locator('[class*="_categoryGrid_"], [class*="_categoryOptions_"]'),
+      );
+    }
+
+    if (sectionName === 'Option') {
+      fallbackSectionLocators.push(
+        this.modifyPanel.locator('[class*="_optionsGrid_"], [class*="_optionGrid_"]'),
+      );
+    }
+
+    if (sectionName === 'Price') {
+      fallbackSectionLocators.push(
+        this.modifyPanel.locator('[class*="_priceGrid_"], [class*="_priceSection_"]'),
+      );
+    }
 
     return await this.resolveVisibleLocator(
       [
@@ -1670,6 +1695,17 @@ export class OrderDishesPage {
             hasText: new RegExp(`^\\s*${escapedButtonName}\\s*$`),
           })
           .first(),
+        ...fallbackSectionLocators.map((locator) =>
+          locator
+            .getByRole('button', { name: buttonName, exact: true })
+            .first(),
+        ),
+        ...fallbackSectionLocators.map((locator) =>
+          locator
+            .locator('button')
+            .filter({ hasText: new RegExp(`^\\s*${escapedButtonName}\\s*$`) })
+            .first(),
+        ),
       ],
       `Unable to find Modify ${sectionName} button: ${buttonName}.`,
     );

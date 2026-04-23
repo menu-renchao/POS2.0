@@ -107,7 +107,7 @@ const orderDishesWithNestedOptionsFrameHtml = String.raw`
                   <div class="_optionItemContainer_yksc5_383" data-testid="dish-item-subitem-option-undefined">
                     <div class="_optionItem_yksc5_383">
                       <div class="_optionNameContainer_yksc5_541">
-                        <span class="_optionName_yksc5_422">sub1</span>
+                        <span class="_optionName_yksc5_422">free suboption</span>
                       </div>
                     </div>
                   </div>
@@ -196,7 +196,7 @@ test.describe('点单页已点菜品读取契约', () => {
           additions: [
             {
               name: 'Pork Sauce',
-              subAdditions: [{ name: 'sub1' }],
+              subAdditions: [{ name: 'free suboption' }],
             },
             { name: 'Garlic Sauce', price: '$3.00' },
           ],

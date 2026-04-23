@@ -545,7 +545,7 @@ const nestedOptionOrderDetailFixtureHtml = String.raw`
                   <div class="_optionItemContainer_99zrf_383" data-testid="dish-item-subitem-option-67274">
                     <div class="_optionItem_99zrf_383">
                       <div class="_optionNameContainer_99zrf_541">
-                        <span class="_optionName_99zrf_422">sub1</span>
+                        <span class="_optionName_99zrf_422">free suboption</span>
                       </div>
                     </div>
                   </div>
@@ -826,7 +826,7 @@ test.describe('Recall 订单详情读取', () => {
           additions: [
             {
               name: 'Pork Sauce',
-              subAdditions: [{ name: 'sub1' }],
+              subAdditions: [{ name: 'free suboption' }],
             },
             { name: 'Garlic Sauce', price: '$2.00' },
           ],
