@@ -10,6 +10,7 @@ import {
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 import { OrderDishesPage } from './order-dishes.page';
+import { PaymentPage } from './payment.page';
 
 export type RecallCustomerInfo = {
   name: string;
@@ -88,6 +89,7 @@ export class RecallPage {
   private readonly visibleOrderDetailsDialogs: Locator;
   private readonly orderDetailsDialog: Locator;
   private readonly orderDetailsEditButton: Locator;
+  private readonly orderDetailsPayButton: Locator;
   private readonly orderDetailsPriceSummaryToggle: Locator;
   private readonly orderDetailsPriceSummaryDetailsContainer: Locator;
 
@@ -152,6 +154,17 @@ export class RecallPage {
         ].join(', '),
       )
       .or(this.orderDetailsDialog.getByRole('button', { name: /^(Edit|编辑)$/ }))
+      .first();
+    this.orderDetailsPayButton = this.orderDetailsDialog
+      .locator(
+        [
+          '[data-test-id="shared-order-detail-side-action-pay"]',
+          '[data-testid="shared-order-detail-side-action-pay"]',
+          '[data-test-id="recall2-order-detail-pay"]',
+          '[data-testid="recall2-order-detail-pay"]',
+        ].join(', '),
+      )
+      .or(this.orderDetailsDialog.getByRole('button', { name: /^(Pay|支付)$/ }))
       .first();
     this.orderDetailsPriceSummaryToggle = this.orderDetailsDialog
       .locator(
@@ -341,6 +354,18 @@ export class RecallPage {
     await orderDishesPage.expectLoaded();
 
     return orderDishesPage;
+  }
+
+  @step('页面操作：从 Recall 订单详情点击 Pay 并进入支付页面')
+  async openPayment(): Promise<PaymentPage> {
+    await this.waitForOrderDetailsDialogReady();
+    await expect(this.orderDetailsPayButton).toBeVisible({ timeout: 10_000 });
+    await this.orderDetailsPayButton.click();
+
+    const paymentPage = new PaymentPage(this.page);
+    await paymentPage.expectLoaded();
+
+    return paymentPage;
   }
 
   @step('页面操作：展开 Recall 订单详情价格汇总')

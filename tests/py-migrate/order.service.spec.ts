@@ -7,9 +7,12 @@ import {
   addRegularDish,
   increaseOrderedDishQuantityByOne,
 } from '../../flows/order-dishes.flow';
+import { PaymentFlow } from '../../flows/payment.flow';
 import {
   editFirstVisibleRecallOrder,
   openRecallFromHome,
+  readLatestVisibleRecallOrderNumber,
+  searchRecallOrders,
   viewFirstVisibleRecallOrderDetails,
 } from '../../flows/recall.flow';
 import { skipTableSelectionAndEnterOrderDishes } from '../../flows/select-table.flow';
@@ -34,6 +37,7 @@ import {
   orderServiceMultiDishQuantityCase,
   orderServiceSplitEvenlyCase,
 } from '../../test-data/order-service';
+import { RecallManualSearchTags, RecallPaymentStatuses } from '../../test-data/recall-search-options';
 import { jiraIssueAnnotation, jiraIssueAnnotations } from '../../utils/jira';
 
 type AppEntryPages = {
@@ -95,6 +99,14 @@ async function saveOrderAndOpenLatestRecallDetails(
 
   const recallPage = await openRecallFromHome(savedHomePage);
   return await viewFirstVisibleRecallOrderDetails(recallPage);
+}
+
+async function saveOrderAndOpenRecallPage(
+  orderDishesPage: OrderDishesPage,
+): Promise<RecallPage> {
+  const savedHomePage = await orderDishesPage.saveOrder();
+  await savedHomePage.expectPrimaryFunctionCardsVisible();
+  return await openRecallFromHome(savedHomePage);
 }
 
 async function assertCategoryOptionOrderRoundTrip(
@@ -460,6 +472,98 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
 
     },
   );
+
+  test.describe('支付回归', () => {
+    test(
+      '应能在 Recall 为最新 To Go 订单完成现金支付后看到 Paid 状态',
+      {},
+      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+        });
+
+        const paymentFlow = new PaymentFlow();
+        const recallPage = await test.step('创建 To Go 订单并保存后进入 Recall', async () => {
+          const orderDishesPage = await startToGoOrder(readyHomePage);
+          await addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.test.name,
+            orderServiceDishes.test.menu,
+          );
+
+          return await saveOrderAndOpenRecallPage(orderDishesPage);
+        });
+
+        const latestOrderNumber = await test.step('读取最新订单号并从 Recall 详情进入支付页', async () => {
+          const orderNumber = await readLatestVisibleRecallOrderNumber(recallPage);
+          await recallPage.openOrderDetails(orderNumber);
+          const paymentPage = await recallPage.openPayment();
+          await paymentFlow.payByCash(paymentPage, { printReceipt: false });
+          return orderNumber;
+        });
+
+        await test.step('按订单号搜索并校验支付后状态为 Paid', async () => {
+          await recallPage.expectLoaded();
+          await searchRecallOrders(recallPage, {
+            paymentStatus: RecallPaymentStatuses.paid,
+            manualSearch: {
+              tag: RecallManualSearchTags.orderNumber,
+              keyword: latestOrderNumber.replace(/^#/, ''),
+            },
+          });
+
+          const orderDetails = await viewFirstVisibleRecallOrderDetails(recallPage);
+          expect(orderDetails.orderNumber).toBe(latestOrderNumber);
+          expect(orderDetails.paymentStatus).toBe(RecallPaymentStatuses.paid);
+        });
+      },
+    );
+
+    test(
+      '应能在 Recall 为最新 To Go 订单完成信用卡支付后看到 Paid 状态',
+      {},
+      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+        });
+
+        const paymentFlow = new PaymentFlow();
+        const recallPage = await test.step('创建 To Go 订单并保存后进入 Recall', async () => {
+          const orderDishesPage = await startToGoOrder(readyHomePage);
+          await addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.test.name,
+            orderServiceDishes.test.menu,
+          );
+
+          return await saveOrderAndOpenRecallPage(orderDishesPage);
+        });
+
+        const latestOrderNumber = await test.step('读取最新订单号并从 Recall 详情进入信用卡支付页', async () => {
+          const orderNumber = await readLatestVisibleRecallOrderNumber(recallPage);
+          await recallPage.openOrderDetails(orderNumber);
+          const paymentPage = await recallPage.openPayment();
+          await paymentFlow.payByCreditCard(paymentPage, { printReceipt: false });
+          return orderNumber;
+        });
+
+        await test.step('按订单号搜索并校验支付后状态为 Paid', async () => {
+          await recallPage.expectLoaded();
+          await searchRecallOrders(recallPage, {
+            paymentStatus: RecallPaymentStatuses.paid,
+            manualSearch: {
+              tag: RecallManualSearchTags.orderNumber,
+              keyword: latestOrderNumber.replace(/^#/, ''),
+            },
+          });
+
+          const orderDetails = await viewFirstVisibleRecallOrderDetails(recallPage);
+          expect(orderDetails.orderNumber).toBe(latestOrderNumber);
+          expect(orderDetails.paymentStatus).toBe(RecallPaymentStatuses.paid);
+        });
+      },
+    );
+  });
 
   test.describe('option 选择回显', () => {
     test(

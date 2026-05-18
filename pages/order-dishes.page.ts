@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 import { HomePage } from './home.page';
+import { PaymentPage } from './payment.page';
 import type { RecallPage } from './recall.page';
 import { SplitOrderPage } from './split-order.page';
 
@@ -156,7 +157,7 @@ export class OrderDishesPage {
 
   constructor(private readonly page: Page) {
     this.appFrame = this.page.frameLocator('iframe[data-wujie-id="orderDishes"]');
-    this.backButton = this.appFrame.getByRole('button', { name: 'Back' });
+    this.backButton = this.appFrame.locator( '[data-testid="icon-button-Back"]');
     this.headerRecallButton = this.appFrame.getByRole('button', { name: /Recall/ }).first();
     this.sendButton = this.appFrame
       .locator(
@@ -1204,6 +1205,17 @@ export class OrderDishesPage {
     await recallPage.expectLoaded();
 
     return recallPage;
+  }
+
+  @step('页面操作：从点单页点击 Pay 并进入支付页面')
+  async openPayment(): Promise<PaymentPage> {
+    await this.expectLoaded();
+    await this.payButton.click();
+
+    const paymentPage = new PaymentPage(this.page);
+    await paymentPage.expectLoaded();
+
+    return paymentPage;
   }
 
   @step('页面操作：点击 Split 并打开分单面板')
