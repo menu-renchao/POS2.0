@@ -44,14 +44,16 @@ This repository is a maintainable Playwright + TypeScript UI automation project 
 
 ## POM Readability
 
-- Keep page objects small and focused. When a page file starts carrying multiple independent areas or workflows, split it by page region or capability instead of continuing to grow one class.
-- Avoid long locator fallback chains. Prefer one real DOM contract per element; if mutually exclusive render scopes exist, encapsulate the scope difference once rather than repeating `.or(...)` guesses per method.
+- Keep page objects small and focused. When a page file starts carrying multiple independent areas or workflows, split it by page region or capability instead of continuing to grow one class. See `docs/page-object-guidelines.md`.
+- Avoid long locator fallback chains. Prefer one real DOM contract per element; if mutually exclusive render scopes exist, encapsulate the scope difference once in `pages/shared/locator-scope.ts` rather than repeating `.or(...)` guesses per method.
 - Use method names with stable semantics: `click` for raw actions, `open`/`enter` for navigation, `fill`/`select` for state changes, `read` for data reads, and `expect` for assertions.
 - Do not hide business strategy, retry policy, or recovery logic inside lightweight-sounding page methods. If the method contains selection policy or multi-step fallback, move that intent to `flows/` or split it into explicit page steps.
-- Prefer typed page APIs over raw strings when the allowed values are finite and stable, such as home entries, filter types, or operation modes.
+- Prefer typed page APIs over raw strings when the allowed values are finite and stable, such as home entries (`HomeEntry` in `pages/shared/page-method-contracts.ts`), filter types, or operation modes.
 - Make postconditions explicit. A caller should be able to tell from the method name and return type whether the action only clicks, leaves the user on the same page, or guarantees arrival at the next page.
+- Same-page actions return `Promise<void>`; cross-page actions return the destination page object after minimal load checks. Do not default to `return this` for same-page actions.
 - Avoid duplicate flow entrypoints that expose the same behavior through both class methods and one-to-one wrapper functions unless there is a clear reporting or fixture need.
 - Keep snapshot/read APIs narrow. Use small read methods for focused data, and let aggregate snapshot methods compose those reads instead of embedding all parsing logic in one large method.
+- Hotspot page facades (`order-dishes.page.ts`, `recall.page.ts`) should stay thin delegators; implementation belongs in `pages/order-dishes/` or `pages/recall/` section files.
 
 ## Recommended Test Metadata Style
 

@@ -10,17 +10,19 @@ import { appConfig } from '../test-data/env';
 import { expectPathname } from '../utils/expectations';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
+import { createHomeScope, type FrameOrHostScope } from './shared/locator-scope';
+import { HOME_ENTRY_TEST_IDS, type HomeEntry } from './shared/page-method-contracts';
 
 export class HomePage {
-  private readonly appFrame: ReturnType<Page['frameLocator']>;
+  private readonly scope: FrameOrHostScope;
   private readonly openDrawerButton: Locator;
   private readonly refreshButton: Locator;
   private readonly refreshLoadingText: Locator;
 
   constructor(private readonly page: Page) {
-    this.appFrame = this.page.frameLocator('#newLoginContainer iframe');
-    this.openDrawerButton = this.appFrame.getByRole('button', { name: 'Open drawer' });
-    this.refreshButton = this.appFrame.getByTestId('icon-button-refresh');
+    this.scope = createHomeScope(page);
+    this.openDrawerButton = this.scope.appFrame.getByRole('button', { name: 'Open drawer' });
+    this.refreshButton = this.scope.appFrame.getByTestId('icon-button-refresh');
     this.refreshLoadingText = this.page.locator('#floatmsgbx');
   }
 
@@ -70,25 +72,46 @@ export class HomePage {
   }
 
   @step('页面操作：点击 Dine In 入口并进入选桌页')
-  async clickDineIn(): Promise<SelectTablePage> {
+  async enterDineIn(): Promise<SelectTablePage> {
     await this.clickFunctionButton('Dine In');
-    return new SelectTablePage(this.page);
+    const selectTablePage = new SelectTablePage(this.page);
+    await selectTablePage.expectLoaded();
+    return selectTablePage;
+  }
+
+  /** @deprecated 请使用 {@link enterDineIn} */
+  async clickDineIn(): Promise<SelectTablePage> {
+    return this.enterDineIn();
   }
 
   @step('页面操作：点击 Delivery 入口并进入 Delivery 页面')
-  async clickDelivery(): Promise<DeliveryPage> {
+  async enterDelivery(): Promise<DeliveryPage> {
     await this.clickFunctionButton('Delivery');
-    return new DeliveryPage(this.page);
+    const deliveryPage = new DeliveryPage(this.page);
+    await deliveryPage.expectVisible();
+    return deliveryPage;
+  }
+
+  /** @deprecated 请使用 {@link enterDelivery} */
+  async clickDelivery(): Promise<DeliveryPage> {
+    return this.enterDelivery();
   }
 
   @step('页面操作：点击 Pick Up 入口并进入 Pick Up 页面')
-  async clickPickUp(): Promise<PickUpPage> {
+  async enterPickUp(): Promise<PickUpPage> {
     await this.clickFunctionButton('Pick Up');
-    return new PickUpPage(this.page);
+    const pickUpPage = new PickUpPage(this.page);
+    await pickUpPage.expectVisible();
+    return pickUpPage;
+  }
+
+  /** @deprecated 请使用 {@link enterPickUp} */
+  async clickPickUp(): Promise<PickUpPage> {
+    return this.enterPickUp();
   }
 
   @step('页面操作：点击 To Go 入口并进入点单页')
-  async clickToGo(): Promise<OrderDishesPage> {
+  async enterToGo(): Promise<OrderDishesPage> {
     await waitUntil(
       async () => {
         const currentUrl = this.page.url();
@@ -113,35 +136,59 @@ export class HomePage {
       },
     );
 
-    return new OrderDishesPage(this.page);
+    const orderDishesPage = new OrderDishesPage(this.page);
+    await orderDishesPage.expectLoaded();
+    return orderDishesPage;
+  }
+
+  /** @deprecated 请使用 {@link enterToGo} */
+  async clickToGo(): Promise<OrderDishesPage> {
+    return this.enterToGo();
   }
 
   @step('页面操作：点击 Report 入口并进入 Report 页面')
-  async clickReport(): Promise<ReportPage> {
+  async enterReport(): Promise<ReportPage> {
     await this.clickFunctionButton('Report');
     return new ReportPage(this.page);
   }
 
+  /** @deprecated 请使用 {@link enterReport} */
+  async clickReport(): Promise<ReportPage> {
+    return this.enterReport();
+  }
+
   @step('页面操作：点击 Admin 入口并进入 Admin 页面')
-  async clickAdmin(): Promise<AdminPage> {
+  async enterAdmin(): Promise<AdminPage> {
     await this.clickFunctionButton('Admin');
     return new AdminPage(this.page);
   }
 
-  @step('页面操作：点击 Recall 入口并进入 Recall 页面')
-  async clickRecall(): Promise<RecallPage> {
-    await this.clickFunctionButton('Recall');
-    return new RecallPage(this.page);
+  /** @deprecated 请使用 {@link enterAdmin} */
+  async clickAdmin(): Promise<AdminPage> {
+    return this.enterAdmin();
   }
 
-  @step((buttonName: string) => `页面操作：点击主页中的 ${buttonName} 功能入口`)
-  private async clickFunctionButton(buttonName: string): Promise<void> {
+  @step('页面操作：点击 Recall 入口并进入 Recall 页面')
+  async enterRecall(): Promise<RecallPage> {
+    await this.clickFunctionButton('Recall');
+    const recallPage = new RecallPage(this.page);
+    await recallPage.expectLoaded();
+    return recallPage;
+  }
+
+  /** @deprecated 请使用 {@link enterRecall} */
+  async clickRecall(): Promise<RecallPage> {
+    return this.enterRecall();
+  }
+
+  @step((buttonName: HomeEntry) => `页面操作：点击主页中的 ${buttonName} 功能入口`)
+  private async clickFunctionButton(buttonName: HomeEntry): Promise<void> {
     const button = await this.resolveFunctionButton(buttonName);
     await button.click({ timeout: 10_000 });
   }
 
-  @step((buttonName: string) => `页面操作：在主页中查找 ${buttonName} 功能入口，若未显示则展开更多菜单后查找`)
-  private async resolveFunctionButton(buttonName: string, timeout = 10_000): Promise<Locator> {
+  @step((buttonName: HomeEntry) => `页面操作：在主页中查找 ${buttonName} 功能入口，若未显示则展开更多菜单后查找`)
+  private async resolveFunctionButton(buttonName: HomeEntry, timeout = 10_000): Promise<Locator> {
     const resolvedButton = await waitUntil(
       async () => {
         const visibleButton = await this.findVisibleFunctionButton(buttonName);
@@ -200,8 +247,8 @@ export class HomePage {
     }
   }
 
-  @step((buttonName: string) => `页面操作：查找当前已显示的 ${buttonName} 功能入口`)
-  private async findVisibleFunctionButton(buttonName: string): Promise<Locator | null> {
+  @step((buttonName: HomeEntry) => `页面操作：查找当前已显示的 ${buttonName} 功能入口`)
+  private async findVisibleFunctionButton(buttonName: HomeEntry): Promise<Locator | null> {
     const buttons = this.resolveFunctionButtonLocator(buttonName);
     const count = await buttons.count();
 
@@ -216,37 +263,7 @@ export class HomePage {
     return null;
   }
 
-  private resolveFunctionButtonLocator(buttonName: string): Locator {
-    const mappedTestId = this.resolveFunctionButtonTestId(buttonName);
-
-    if (mappedTestId) {
-      return this.appFrame.getByTestId(mappedTestId);
-    }
-
-    return this.appFrame.getByRole('button', {
-      name: buttonName,
-      exact: true,
-    });
-  }
-
-  private resolveFunctionButtonTestId(buttonName: string): string | null {
-    switch (buttonName) {
-      case 'Dine In':
-        return 'pos-ui-function-card-dine_in';
-      case 'Delivery':
-        return 'pos-ui-function-card-delivery';
-      case 'Pick Up':
-        return 'pos-ui-function-card-pickup';
-      case 'Report':
-        return 'pos-ui-function-card-report';
-      case 'Admin':
-        return 'pos-ui-function-card-admin';
-      case 'Recall':
-        return 'pos-ui-function-card-recall';
-      case 'To Go':
-        return 'pos-ui-function-card-togo';
-      default:
-        return null;
-    }
+  private resolveFunctionButtonLocator(buttonName: HomeEntry): Locator {
+    return this.scope.appFrame.getByTestId(HOME_ENTRY_TEST_IDS[buttonName]);
   }
 }

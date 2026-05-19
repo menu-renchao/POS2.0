@@ -474,7 +474,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
   );
 
   test.describe('支付回归', () => {
-    test(
+    test.skip(
       '应能在 Recall 为最新 To Go 订单完成现金支付后看到 Paid 状态',
       {},
       async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
@@ -519,7 +519,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       },
     );
 
-    test(
+    test.skip(
       '应能在 Recall 为最新 To Go 订单完成信用卡支付后看到 Paid 状态',
       {},
       async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {

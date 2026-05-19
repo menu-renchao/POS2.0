@@ -33,10 +33,7 @@ export type RecallSearchParams = {
 export class RecallFlow {
   @step('业务步骤：从首页进入 Recall 页面')
   async openRecallFromHome(homePage: HomePage): Promise<RecallPage> {
-    const recallPage = await homePage.clickRecall();
-    await recallPage.expectLoaded();
-
-    return recallPage;
+    return await homePage.enterRecall();
   }
 
   @step('业务步骤：按综合条件搜索 Recall 订单')

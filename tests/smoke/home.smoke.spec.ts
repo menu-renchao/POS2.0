@@ -15,6 +15,7 @@ test.describe('首页冒烟', () => {
     },
     async ({ homePage }) => {
       await openHome(homePage);
+      await homePage.expectEmployeeReady();
     },
   );
 });

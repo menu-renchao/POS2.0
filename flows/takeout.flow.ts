@@ -22,9 +22,7 @@ export type DeliveryOrderParams = {
 export class TakeoutFlow {
   @step('业务步骤：从主页点击 To Go 并进入点单页')
   async startToGoOrder(homePage: HomePage): Promise<OrderDishesPage> {
-    const orderDishesPage = await homePage.clickToGo();
-    await orderDishesPage.expectLoaded();
-    return orderDishesPage;
+    return await homePage.enterToGo();
   }
 
   @step('业务步骤：从主页进入 Pick Up 信息页并完成开始下单')
@@ -32,8 +30,7 @@ export class TakeoutFlow {
     homePage: HomePage,
     params: PickUpOrderParams = {},
   ): Promise<OrderDishesPage> {
-    const pickUpPage = await homePage.clickPickUp();
-    await pickUpPage.expectVisible();
+    const pickUpPage = await homePage.enterPickUp();
     await this.fillPickUpInformation(pickUpPage, params);
 
     const orderDishesPage = await pickUpPage.clickStartOrder();
@@ -46,8 +43,7 @@ export class TakeoutFlow {
     homePage: HomePage,
     params: DeliveryOrderParams,
   ): Promise<OrderDishesPage> {
-    const deliveryPage = await homePage.clickDelivery();
-    await deliveryPage.expectVisible();
+    const deliveryPage = await homePage.enterDelivery();
     await this.fillDeliveryInformation(deliveryPage, params);
 
     const orderDishesPage = await deliveryPage.clickStartOrder();
