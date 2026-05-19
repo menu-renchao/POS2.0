@@ -42,6 +42,17 @@ This repository is a maintainable Playwright + TypeScript UI automation project 
 - `flows/` must not redefine page locators or duplicate low-level page interaction details that belong in `pages/`.
 - Do not mix `page` and `flow` responsibilities in the same method. If a method contains business policy or selection logic, move it to `flows/`. If a method only describes a single page action or read, keep it in `pages/`.
 
+## POM Readability
+
+- Keep page objects small and focused. When a page file starts carrying multiple independent areas or workflows, split it by page region or capability instead of continuing to grow one class.
+- Avoid long locator fallback chains. Prefer one real DOM contract per element; if mutually exclusive render scopes exist, encapsulate the scope difference once rather than repeating `.or(...)` guesses per method.
+- Use method names with stable semantics: `click` for raw actions, `open`/`enter` for navigation, `fill`/`select` for state changes, `read` for data reads, and `expect` for assertions.
+- Do not hide business strategy, retry policy, or recovery logic inside lightweight-sounding page methods. If the method contains selection policy or multi-step fallback, move that intent to `flows/` or split it into explicit page steps.
+- Prefer typed page APIs over raw strings when the allowed values are finite and stable, such as home entries, filter types, or operation modes.
+- Make postconditions explicit. A caller should be able to tell from the method name and return type whether the action only clicks, leaves the user on the same page, or guarantees arrival at the next page.
+- Avoid duplicate flow entrypoints that expose the same behavior through both class methods and one-to-one wrapper functions unless there is a clear reporting or fixture need.
+- Keep snapshot/read APIs narrow. Use small read methods for focused data, and let aggregate snapshot methods compose those reads instead of embedding all parsing logic in one large method.
+
 ## Recommended Test Metadata Style
 
 ```ts

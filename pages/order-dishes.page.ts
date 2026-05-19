@@ -1343,117 +1343,110 @@ export class OrderDishesPage {
     return await readScope
       .getByRole('button', { name: /^\d+(?:\.\d+)?\s+.+\s+\$[\d,.]+/i })
       .evaluateAll((buttonElements) => {
-      type OrderedDishItemFromDom = {
-        additions: Array<{ name: string; price?: string }>;
-        name: string;
-        price: string | null;
-        quantity: string;
-      };
+        const cleanText = (value: string | null | undefined): string =>
+          value?.replace(/\s+/g, ' ').trim() ?? '';
 
-      const cleanText = (value: string | null | undefined): string =>
-        value?.replace(/\s+/g, ' ').trim() ?? '';
+        return buttonElements
+          .map<OrderedDishItem | null>((buttonElement) => {
+            const text = cleanText(buttonElement.textContent);
+            const headerMatch = text.match(/^(\d+(?:\.\d+)?)\s+(.+?)\s+(\$[\d,.]+)/i);
 
-      return buttonElements
-        .map((buttonElement) => {
-          const text = cleanText(buttonElement.textContent);
-          const headerMatch = text.match(/^(\d+(?:\.\d+)?)\s+(.+?)\s+(\$[\d,.]+)/i);
+            if (!headerMatch) {
+              return null;
+            }
 
-          if (!headerMatch) {
-            return null;
-          }
-
-          const [, quantity, name, price] = headerMatch;
-          const domAdditionNodes = Array.from(
-            buttonElement.querySelectorAll(
-              [
-                '[data-testid^="dish-item-subitem-"]',
-                '[data-test-id^="dish-item-subitem-"]',
-                '[class*="_optionItemContainer_"]',
-                '[class*="_extraItem_"]',
-              ].join(', '),
-            ),
-          )
-            .map((additionElement) =>
-              cleanText(additionElement.textContent).replace(/DishLevelIcon/gi, '').trim(),
-            )
-            .filter(Boolean);
-          const leafAdditions = Array.from(buttonElement.querySelectorAll('span, div'))
-            .filter((element) => element.children.length === 0)
-            .map((element) => cleanText(element.textContent))
-            .filter(
-              (label) =>
-                label &&
-                label !== quantity &&
-                label !== name &&
-                label !== price &&
-                !/^DishLevelIcon$/i.test(label) &&
-                !/^\d+(?:\.\d+)?$/.test(label),
-            );
-          const rowBasedAdditions = Array.from(buttonElement.children)
-            .slice(1)
-            .flatMap((rowElement) =>
-              Array.from(rowElement.children).map((additionRow) =>
-                cleanText(additionRow.textContent).replace(/DishLevelIcon/gi, '').trim(),
+            const [, quantity, name, price] = headerMatch;
+            const domAdditionNodes = Array.from(
+              buttonElement.querySelectorAll(
+                [
+                  '[data-testid^="dish-item-subitem-"]',
+                  '[data-test-id^="dish-item-subitem-"]',
+                  '[class*="_optionItemContainer_"]',
+                  '[class*="_extraItem_"]',
+                ].join(', '),
               ),
             )
-            .filter(Boolean);
-          const iconBasedAdditions = Array.from(
-            buttonElement.querySelectorAll('img[alt="DishLevelIcon"], img[alt*="DishLevel"]'),
-          )
-            .map((iconElement) => {
-              const labelElement = Array.from(iconElement.parentElement?.children ?? []).find(
-                (childElement) => childElement !== iconElement,
+              .map((additionElement) =>
+                cleanText(additionElement.textContent).replace(/DishLevelIcon/gi, '').trim(),
+              )
+              .filter(Boolean);
+            const leafAdditions = Array.from(buttonElement.querySelectorAll('span, div'))
+              .filter((element) => element.children.length === 0)
+              .map((element) => cleanText(element.textContent))
+              .filter(
+                (label) =>
+                  label &&
+                  label !== quantity &&
+                  label !== name &&
+                  label !== price &&
+                  !/^DishLevelIcon$/i.test(label) &&
+                  !/^\d+(?:\.\d+)?$/.test(label),
               );
+            const rowBasedAdditions = Array.from(buttonElement.children)
+              .slice(1)
+              .flatMap((rowElement) =>
+                Array.from(rowElement.children).map((additionRow) =>
+                  cleanText(additionRow.textContent).replace(/DishLevelIcon/gi, '').trim(),
+                ),
+              )
+              .filter(Boolean);
+            const iconBasedAdditions = Array.from(
+              buttonElement.querySelectorAll('img[alt="DishLevelIcon"], img[alt*="DishLevel"]'),
+            )
+              .map((iconElement) => {
+                const labelElement = Array.from(iconElement.parentElement?.children ?? []).find(
+                  (childElement) => childElement !== iconElement,
+                );
 
-              return cleanText(labelElement?.textContent ?? iconElement.parentElement?.textContent)
-                .replace(/DishLevelIcon/gi, '')
-                .trim();
-            })
-            .filter(Boolean);
-          const remainder = text.slice(headerMatch[0].length).trim();
-          const textBasedAdditions = remainder
-            .split(/DishLevelIcon/i)
-            .map((part) => cleanText(part))
-            .filter(Boolean);
-          const additionTexts =
-            domAdditionNodes.length > 0
-              ? domAdditionNodes
-              : leafAdditions.length > 0
-                ? leafAdditions
-                : rowBasedAdditions.length > 0
-                  ? rowBasedAdditions
-                  : iconBasedAdditions.length > 0
-                    ? iconBasedAdditions
-                    : textBasedAdditions;
-          const normalizedAdditionTexts =
-            additionTexts.length === 1
-              ? additionTexts[0].split(/\s+(?=(?:free|category)\s+(?:option|suboption))/i)
-              : additionTexts;
-          const additions = normalizedAdditionTexts
-            .map((part) => cleanText(part))
-            .filter(Boolean)
-            .map((part) => {
-              const priceMatch = part.match(/\$[\d,.]+$/);
-              const additionName = priceMatch
-                ? cleanText(part.replace(priceMatch[0], ''))
-                : part;
+                return cleanText(labelElement?.textContent ?? iconElement.parentElement?.textContent)
+                  .replace(/DishLevelIcon/gi, '')
+                  .trim();
+              })
+              .filter(Boolean);
+            const remainder = text.slice(headerMatch[0].length).trim();
+            const textBasedAdditions = remainder
+              .split(/DishLevelIcon/i)
+              .map((part) => cleanText(part))
+              .filter(Boolean);
+            const additionTexts =
+              domAdditionNodes.length > 0
+                ? domAdditionNodes
+                : leafAdditions.length > 0
+                  ? leafAdditions
+                  : rowBasedAdditions.length > 0
+                    ? rowBasedAdditions
+                    : iconBasedAdditions.length > 0
+                      ? iconBasedAdditions
+                      : textBasedAdditions;
+            const normalizedAdditionTexts =
+              additionTexts.length === 1
+                ? additionTexts[0].split(/\s+(?=(?:free|category)\s+(?:option|suboption))/i)
+                : additionTexts;
+            const additions = normalizedAdditionTexts
+              .map((part) => cleanText(part))
+              .filter(Boolean)
+              .map((part) => {
+                const priceMatch = part.match(/\$[\d,.]+$/);
+                const additionName = priceMatch
+                  ? cleanText(part.replace(priceMatch[0], ''))
+                  : part;
 
-              return {
-                name: additionName,
-                ...(priceMatch ? { price: priceMatch[0] } : {}),
-              };
-            })
-            .filter((addition) => addition.name.length > 0);
+                return {
+                  name: additionName,
+                  ...(priceMatch ? { price: priceMatch[0] } : {}),
+                };
+              })
+              .filter((addition) => addition.name.length > 0);
 
-          return {
-            additions,
-            name,
-            price,
-            quantity,
-          } satisfies OrderedDishItemFromDom;
-        })
-        .filter((item): item is OrderedDishItemFromDom => item !== null);
-    });
+            return {
+              additions,
+              name,
+              price,
+              quantity,
+            } satisfies OrderedDishItem;
+          })
+          .filter((item): item is OrderedDishItem => item !== null);
+      });
   }
 
   private parseOrderedItemsFromTexts(texts: string[]): OrderedDishItem[] {
