@@ -6,7 +6,7 @@ const orderDishesChargeFrameHtml = String.raw`
 <!DOCTYPE html>
 <html lang="en">
   <body>
-    <button type="button">Back</button>
+    <button type="button" data-testid="icon-button-Back">Back</button>
     <button type="button">Send</button>
     <button type="button">Pay</button>
     <button type="button">Charge</button>

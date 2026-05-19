@@ -11,7 +11,6 @@ export type SelectedTableRecord = {
 type TableEntryState = 'guestCountDialog' | 'orderDishes';
 
 export class SelectTablePage {
-  private readonly backButton: Locator;
   private readonly newOrderButton: Locator;
   private readonly areaButtons: Locator;
   private readonly tableButtons: Locator;
@@ -20,10 +19,6 @@ export class SelectTablePage {
   private readonly loadingTablesStatus: Locator;
 
   constructor(private readonly page: Page) {
-    this.backButton = this.page
-      .getByRole('button', { name: 'Back' })
-      .or(this.page.getByRole('img', { name: 'Back' }))
-      .first();
     this.newOrderButton = this.page.getByRole('button', { name: /New order/i });
     this.areaButtons = this.page.locator('button[aria-pressed]');
     this.tableButtons = this.page.getByRole('button');
@@ -39,8 +34,8 @@ export class SelectTablePage {
   @step('页面操作：确认选桌页面已经加载完成')
   async expectLoaded(): Promise<void> {
     await expect(this.page).toHaveURL(/#tableV2/);
-    await expect(this.backButton).toBeVisible();
     await expect(this.newOrderButton).toBeVisible();
+    await expect(this.areaButtons.first()).toBeVisible();
   }
 
   @step('页面读取：读取当前区域下所有空桌')

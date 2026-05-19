@@ -78,9 +78,16 @@ export class SplitOrderPage {
     this.totalValue = this.modal.locator('._value_1lomb_35, [class*="_value_"]').first();
     this.remainValue = this.modal.locator('._remainValue_1lomb_41, [class*="_remainValue_"]').first();
     this.splitInputDialog = splitFrame
-      .locator('.splitInputModalOverlay [role="dialog"], [data-testid="split-input-dialog"]')
+      .getByRole('dialog')
+      .filter({
+        has: splitFrame.getByRole('heading', { name: /Even order|平分订单|Split Input/i }),
+      })
+      .or(splitFrame.locator('.splitInputModalOverlay [role="dialog"], [data-testid="split-input-dialog"]'))
       .first();
-    this.splitInputField = this.splitInputDialog.locator('[data-testid="split-input-value"], input').first();
+    this.splitInputField = this.splitInputDialog
+      .locator('[data-testid="split-input-value"]')
+      .or(this.splitInputDialog.getByRole('textbox'))
+      .first();
     this.splitInputConfirmButton = this.splitInputDialog
       .getByRole('button', { name: CONFIRM_BUTTON_NAME })
       .first();
@@ -455,7 +462,19 @@ export class SplitOrderPage {
 
   private async fillSplitInputValue(value: number): Promise<void> {
     await this.expectSplitInputVisible();
-    await this.splitInputField.fill(String(value));
+
+    const filledByInput = await this.splitInputField
+      .fill(String(value))
+      .then(() => true)
+      .catch(() => false);
+
+    if (filledByInput) {
+      return;
+    }
+
+    for (const digit of String(value)) {
+      await this.splitInputDialog.getByRole('button', { name: digit, exact: true }).click();
+    }
   }
 
   private async openMoreActionsIfNeeded(): Promise<void> {

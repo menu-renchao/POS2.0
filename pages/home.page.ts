@@ -14,10 +14,14 @@ import { waitUntil } from '../utils/wait';
 export class HomePage {
   private readonly appFrame: ReturnType<Page['frameLocator']>;
   private readonly openDrawerButton: Locator;
+  private readonly refreshButton: Locator;
+  private readonly refreshLoadingText: Locator;
 
   constructor(private readonly page: Page) {
     this.appFrame = this.page.frameLocator('#newLoginContainer iframe');
     this.openDrawerButton = this.appFrame.getByRole('button', { name: 'Open drawer' });
+    this.refreshButton = this.appFrame.getByTestId('icon-button-refresh');
+    this.refreshLoadingText = this.page.locator('#floatmsgbx');
   }
 
   @step('页面操作：打开 POS 首页')
@@ -34,6 +38,25 @@ export class HomePage {
   @step('页面操作：确认员工已经进入 POS 主页状态')
   async expectEmployeeReady(): Promise<void> {
     await expect(this.resolveFunctionButton('Dine In')).resolves.toBeDefined();
+  }
+
+  @step('页面操作：点击主页刷新按钮并等待刷新完成')
+  async clickRefresh(): Promise<void> {
+    await waitUntil(
+      async () => ({
+        isVisible: await this.refreshButton.isVisible().catch(() => false),
+        isEnabled: await this.refreshButton.isEnabled().catch(() => false),
+      }),
+      (state) => state.isVisible && state.isEnabled,
+      {
+        timeout: 15_000,
+        message: 'Home page refresh button is not ready.',
+      },
+    );
+
+    await this.refreshButton.click({ timeout: 10_000 });
+    await this.waitUntilRefreshCompleted();
+    await this.expectEmployeeReady();
   }
 
   @step('页面操作：确认主页的核心功能入口已经可用')
@@ -66,7 +89,18 @@ export class HomePage {
 
   @step('页面操作：点击 To Go 入口并进入点单页')
   async clickToGo(): Promise<OrderDishesPage> {
-    await this.clickFunctionButton('To Go');
+    const toGoButton = await this.resolveFunctionButton('To Go');
+    await toGoButton.click({ timeout: 10_000 });
+
+    await waitUntil(
+      async () => this.page.url(),
+      (url) => /#orderDishes/.test(url),
+      {
+        timeout: 30_000,
+        message: 'Home page did not navigate to order dishes after clicking To Go.',
+      },
+    );
+
     return new OrderDishesPage(this.page);
   }
 
@@ -119,6 +153,32 @@ export class HomePage {
     }
 
     return resolvedButton;
+  }
+
+  @step('页面操作：等待主页刷新完成')
+  private async waitUntilRefreshCompleted(): Promise<void> {
+    await waitUntil(
+      async () => await this.refreshLoadingText.isVisible().catch(() => false),
+      (isLoading) => isLoading,
+      {
+        timeout: 5_000,
+        message: 'Home page refresh did not start.',
+      },
+    ).catch(() => undefined);
+
+    await waitUntil(
+      async () => ({
+        isLoading: await this.refreshLoadingText.isVisible().catch(() => false),
+        isRefreshEnabled: await this.refreshButton.isEnabled().catch(() => false),
+      }),
+      (state) => !state.isLoading && state.isRefreshEnabled,
+      {
+        timeout: 30_000,
+        message: 'Home page did not finish refreshing in time.',
+      },
+    );
+
+    await expect(this.refreshLoadingText).toBeHidden({ timeout: 30_000 });
   }
 
   @step('页面操作：点击更多菜单展开按钮')

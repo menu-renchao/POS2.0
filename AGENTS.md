@@ -14,6 +14,8 @@ This repository is a maintainable Playwright + TypeScript UI automation project 
 - Use Playwright Test as the default runner.
 - Prefer `data-testid` locators first for stable elements. Only fall back to other locator strategies such as `getByRole`, `getByLabel`, or `getByText` when no reliable `data-testid` is available.
 - Prefer semantic locators such as `getByRole`, `getByLabel`, and `getByText`.
+- Page object selectors must match the actual DOM contract of the target page. Use the one selector that the page really exposes; do not broaden scope with `.or()` chains, alias attribute lists, multilingual regexes, or parent-page fallbacks just to make a locator pass.
+- Do not enumerate or traverse candidate selectors to guess the target element. If the page lacks a stable selector, add or request a `data-testid` instead of stacking fallback locators.
 - Do not default to brittle CSS chains, nth-child selectors, or XPath.
 - Do not use `waitForTimeout` in tests or helpers.
 - Prefer `utils/wait.ts` `waitUntil()` for condition polling that may retry multiple times. Avoid `expect(...).toPass()` and `expect.poll()` in page objects, flows, helpers, and tests when they would create noisy intermediate failures in reports. Assert only the final settled result.
@@ -29,6 +31,7 @@ This repository is a maintainable Playwright + TypeScript UI automation project 
 - `pages/` only holds page structure, locators, page-level actions, and page-level reads.
 - `pages/` can do things like: click a button, fill an input, switch a tab, read a table number, return a locator or page data.
 - All stable selectors in `pages/` must be centralized on the page object, either as class-level locator fields or dedicated private locator factory methods.
+- Centralized locators should be defined once with the page's real selector. Do not re-resolve the same element through `resolveVisibleLocator()`-style candidate lists unless the page genuinely renders equivalent controls in mutually exclusive regions.
 - Do not scatter raw `getByRole(...)`, `getByText(...)`, `locator(...)`, or selector strings throughout page action/read methods when those selectors belong to the page structure.
 - If a selector is reused, semantically important, or represents a stable page element such as a button, dialog, input, tab, list, or summary area, define it once and consume it through the centralized page locator API.
 - Do not create a separate page object for a strongly coupled transient dialog or popup that only exists as one immediate step of its parent page flow, such as a guest-count dialog opened from table selection. Keep that dialog on the owning page object unless it can be entered, reused, and reasoned about independently.

@@ -1,7 +1,8 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Frame, type Locator, type Page } from '@playwright/test';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 import { HomePage } from './home.page';
+import { InventoryPage } from './inventory.page';
 import { PaymentPage } from './payment.page';
 import type { RecallPage } from './recall.page';
 import { SplitOrderPage } from './split-order.page';
@@ -91,6 +92,7 @@ const CONFIRM_BUTTON_NAMES = /^(Confirm|确认)$/;
 const CUSTOM_PERCENTAGE_BUTTON_NAMES = /^(Percentage|%)$/;
 const CUSTOM_FIXED_BUTTON_NAMES = /^(Fixed Amount|\$)$/;
 const CUSTOM_TAXED_LABELS = /^(Taxed|含税)$/;
+const ORDER_DISHES_IFRAME_SELECTOR = 'iframe[data-wujie-id="orderDishes"]';
 
 export class OrderDishesPage {
   private readonly appFrame: ReturnType<Page['frameLocator']>;
@@ -125,6 +127,12 @@ export class OrderDishesPage {
   private readonly priceSummaryDetailsContainer: Locator;
   private readonly priceSummaryTotalContainer: Locator;
   private readonly saveOrderButton: Locator;
+  private readonly headerMoreButton: Locator;
+  private readonly inventoryMenuItem: Locator;
+  private readonly reduceButton: Locator;
+  private readonly exitButton: Locator;
+  private readonly exitConfirmButton: Locator;
+  private readonly inventoryAlertItems: Locator;
   private readonly moreActionButton: Locator;
   private readonly splitButton: Locator;
   private readonly modifyButton: Locator;
@@ -143,6 +151,7 @@ export class OrderDishesPage {
   private readonly customChargeConfirmButton: Locator;
   private readonly customChargeCancelButton: Locator;
   private readonly customChargeValueInput: Locator;
+  private orderDishesContentFrame: Frame | null = null;
   private persistedChargeState: ChargeState = this.createEmptyChargeState();
   private draftChargeState: ChargeState | null = null;
   private customChargeDraft: {
@@ -157,15 +166,32 @@ export class OrderDishesPage {
 
   constructor(private readonly page: Page) {
     this.appFrame = this.page.frameLocator('iframe[data-wujie-id="orderDishes"]');
-    this.backButton = this.appFrame.locator( '[data-testid="icon-button-Back"]');
-    this.headerRecallButton = this.appFrame.getByRole('button', { name: /Recall/ }).first();
+    this.backButton = this.appFrame
+      .getByTestId('icon-button-Back')
+      .or(this.appFrame.getByRole('button', { name: /^Back$/ }))
+      .or(this.page.getByTestId('icon-button-Back'))
+      .or(this.page.getByRole('button', { name: /^Back$/ }))
+      .first();
+    this.headerRecallButton = this.appFrame
+      .getByRole('button', { name: /Recall/ })
+      .or(this.page.getByRole('button', { name: /Recall/ }))
+      .first();
     this.sendButton = this.appFrame
       .locator(
         '[data-testid="bottom-button-sendOrderBtn"], [data-test-id="bottom-button-sendOrderBtn"]',
       )
       .or(this.appFrame.getByRole('button', { name: 'Send' }))
+      .or(
+        this.page.locator(
+          '[data-testid="bottom-button-sendOrderBtn"], [data-test-id="bottom-button-sendOrderBtn"]',
+        ),
+      )
+      .or(this.page.getByRole('button', { name: 'Send' }))
       .first();
-    this.payButton = this.appFrame.getByRole('button', { name: 'Pay' });
+    this.payButton = this.appFrame
+      .getByRole('button', { name: 'Pay' })
+      .or(this.page.getByRole('button', { name: 'Pay' }))
+      .first();
     this.selectedDishAddButton = this.appFrame
       .locator('[data-testid="action-rail-button-add1"], [data-test-id="action-rail-button-add1"]')
       .or(
@@ -173,20 +199,41 @@ export class OrderDishesPage {
           .locator('aside, [role="complementary"]')
           .getByRole('button', { name: /^(Add|加)$/ }),
       )
+      .or(
+        this.page.locator(
+          '[data-testid="action-rail-button-add1"], [data-test-id="action-rail-button-add1"]',
+        ),
+      )
+      .or(
+        this.page
+          .locator('aside, [role="complementary"]')
+          .getByRole('button', { name: /^(Add|加)$/ }),
+      )
       .first();
-    this.countButton = this.appFrame.getByRole('button', { name: /^(Count|数量)$/ });
+    this.countButton = this.appFrame
+      .getByRole('button', { name: /^(Count|数量)$/ })
+      .or(this.page.getByRole('button', { name: /^(Count|数量)$/ }))
+      .first();
     this.firstAvailableDishButton = this.appFrame.locator(
       'button:not([name*="Back"]):not([name*="Cart"]):not([name*="Send"]):not([name*="Pay"])',
     ).first();
     this.menuGroupCards = this.appFrame.locator(
       '[data-testid^="menu-group-card-"], [data-test-id^="menu-group-card-"]',
+    ).or(
+      this.page.locator('[data-testid^="menu-group-card-"], [data-test-id^="menu-group-card-"]'),
     );
     this.menuCategoryCards = this.appFrame.locator(
       '[data-testid^="menu-category-card-"], [data-test-id^="menu-category-card-"]',
+    ).or(
+      this.page.locator(
+        '[data-testid^="menu-category-card-"], [data-test-id^="menu-category-card-"]',
+      ),
     );
-    this.countDialog = this.appFrame.locator(
-      '[data-testid="dish-count-modal"], [data-testid="option-count-modal"]',
-    );
+    this.countDialog = this.appFrame
+      .locator('[data-testid="dish-count-modal"], [data-testid="option-count-modal"]')
+      .or(
+        this.page.locator('[data-testid="dish-count-modal"], [data-testid="option-count-modal"]'),
+      );
     this.countDialogInput = this.countDialog.locator('input').first();
     this.countDialogConfirmButton = this.countDialog.getByRole('button', {
       name: /^(Confirm|确认)$/,
@@ -206,27 +253,68 @@ export class OrderDishesPage {
     this.specificationConfirmButton = this.specificationDialog.getByRole('button', {
       name: 'Confirm',
     });
-    this.categoryOptionPanel = this.appFrame
-      .locator('[data-testid="item-option-panel-collapse-button"]')
-      .locator('xpath=ancestor::div[contains(@class,"_dock_")][1]');
-    this.categoryOptionGrid = this.categoryOptionPanel.locator('[class*="_grid_"]').first();
-    this.categoryOptionSubGrid = this.categoryOptionPanel.locator('[class*="_subGrid_"]').first();
+    this.categoryOptionPanel = this.page
+      .locator('[data-testid="item-option-panel"], [class*="_dock_"]')
+      .filter({ has: this.page.getByRole('button', { name: /^Collapse/i }) })
+      .first();
+    this.categoryOptionGrid = this.categoryOptionPanel
+      .locator('[class*="_grid_"]')
+      .first()
+      .or(this.categoryOptionPanel);
+    this.categoryOptionSubGrid = this.page.locator('[class*="_subGrid_"]').first();
     this.comboDialog = this.appFrame.locator('aside[class*="_panel_"]').filter({
       has: this.appFrame.getByRole('button', { name: 'Cancel', exact: true }),
     }).first();
     this.comboConfirmButton = this.comboDialog.locator('button', {
       hasText: /^(Confirm|确认)$/,
     }).first();
-    this.cartBadge = this.appFrame.locator('[data-testid="cart-badge"]');
+    this.cartBadge = this.appFrame
+      .locator('[data-testid="cart-badge"]')
+      .or(this.page.locator('[data-testid="cart-badge"]'));
     this.priceSummaryToggle = this.appFrame
       .locator(
         '[data-test-id="shared-order-price-summary-toggle"], [data-testid="shared-order-price-summary-toggle"]',
       )
       .or(this.appFrame.getByRole('button', { name: /Total\(Cash\).*Total\(Card\)/ }))
+      .or(
+        this.page.locator(
+          '[data-test-id="shared-order-price-summary-toggle"], [data-testid="shared-order-price-summary-toggle"]',
+        ),
+      )
+      .or(this.page.getByRole('button', { name: /Total\(Cash\).*Total\(Card\)/ }))
+      .or(this.appFrame.getByRole('button', { name: /Total\s*\$[\d,.]+/ }))
+      .or(this.page.getByRole('button', { name: /Total\s*\$[\d,.]+/ }))
       .first();
     this.priceSummaryDetailsContainer = this.priceSummaryToggle.locator('xpath=following-sibling::*[1]');
     this.priceSummaryTotalContainer = this.priceSummaryToggle.locator('xpath=following-sibling::*[2]');
-    this.saveOrderButton = this.appFrame.locator('[data-testid="bottom-button-saveOrderBtn"]');
+    this.saveOrderButton = this.appFrame
+      .locator('[data-testid="bottom-button-saveOrderBtn"], [data-test-id="bottom-button-saveOrderBtn"]')
+      .or(
+        this.page.locator(
+          '[data-testid="bottom-button-saveOrderBtn"], [data-test-id="bottom-button-saveOrderBtn"]',
+        ),
+      )
+      .or(this.appFrame.getByRole('button', { name: /^(Save|保存)$/ }))
+      .or(this.page.getByRole('button', { name: /^(Save|保存)$/ }))
+      .first();
+    this.headerMoreButton = this.page
+      .getByTestId('icon-button-more')
+      .or(this.appFrame.getByTestId('icon-button-more'));
+    this.inventoryMenuItem = this.page
+      .getByTestId('dropdown-item-inventory')
+      .or(this.page.getByRole('menuitem', { name: 'Inventory' }));
+    this.reduceButton = this.appFrame
+      .getByRole('button', { name: /^Reduce$/ })
+      .or(this.page.getByRole('button', { name: /^Reduce$/ }))
+      .or(this.resolveScopedLocator('#reduce1icon'));
+    this.exitButton = this.appFrame
+      .getByRole('button', { name: /^Back$/ })
+      .or(this.page.getByRole('button', { name: /^Back$/ }))
+      .or(this.resolveScopedLocator('#odBack'));
+    this.exitConfirmButton = this.resolveScopedLocator('#exit-edit-submit');
+    this.inventoryAlertItems = this.page
+      .getByText('Insufficient stock, please modify the order.', { exact: true })
+      .locator('xpath=..');
     this.moreActionButton = this.appFrame.getByRole('button', {
       name: /^(More|更多)$/,
     }).first();
@@ -302,10 +390,10 @@ export class OrderDishesPage {
 
   @step('页面操作：确认点餐页已加载')
   async expectLoaded(): Promise<void> {
-    await expect(this.page).toHaveURL(/#orderDishes/);
-    await expect(this.backButton).toBeVisible();
-    await expect(this.sendButton).toBeVisible();
-    await expect(this.payButton).toBeVisible();
+    await expect(this.page).toHaveURL(/#orderDishes/, { timeout: 15_000 });
+    await expect(await this.resolveBackButton()).toBeVisible();
+    await expect(await this.resolveSendButton()).toBeVisible();
+    await expect(await this.resolvePayButton()).toBeVisible();
   }
 
   @step((tableNumber: string) => `页面操作：确认点餐页顶部桌号为 ${tableNumber}`)
@@ -321,7 +409,47 @@ export class OrderDishesPage {
   @step((dishName: string) => `页面操作：点击菜品 ${dishName}`)
   async clickDish(dishName: string): Promise<void> {
     await this.expectLoaded();
-    await this.resolveDishButton(dishName).click();
+
+    try {
+      await (await this.resolveDishButton(dishName)).click();
+      return;
+    } catch (error) {
+      await this.searchAndClickDish(dishName).catch(() => {
+        throw error;
+      });
+    }
+  }
+
+  @step((dishName: string) => `页面操作：通过 Search menu 搜索并点击菜品 ${dishName}`)
+  async searchAndClickDish(dishName: string): Promise<void> {
+    const searchMenuButton = await this.resolveVisibleLocator(
+      [
+        this.page.getByRole('button', { name: 'Search menu' }).first(),
+        this.appFrame.getByRole('button', { name: 'Search menu' }).first(),
+      ],
+      'Unable to find Search menu button on order dishes page.',
+    );
+    await searchMenuButton.click();
+
+    const searchInput = await this.resolveVisibleLocator(
+      [
+        this.resolveScopedLocator('#searchiptedit'),
+        this.resolveScopedLocator('#schipt'),
+        this.page.getByRole('textbox').last(),
+      ],
+      'Unable to find Search menu input on order dishes page.',
+    );
+    await searchInput.fill(dishName);
+
+    const searchResult = await this.resolveVisibleLocator(
+      [
+        this.resolveScopedLocator('#itemdsply').getByText(dishName, { exact: true }).first(),
+        this.page.getByRole('button', { name: dishName, exact: true }).first(),
+        this.appFrame.getByRole('button', { name: dishName, exact: true }).first(),
+      ],
+      `Unable to find Search menu result for dish: ${dishName}.`,
+    );
+    await searchResult.click();
   }
 
   @step((groupName: string) => `页面操作：切换菜单组 ${groupName}`)
@@ -345,12 +473,23 @@ export class OrderDishesPage {
   @step((quantity: number) => `页面操作：通过 Count 按钮将待点菜数量修改为 ${quantity}`)
   async changeDishCount(quantity: number): Promise<void> {
     await this.expectLoaded();
-    await this.countButton.click();
-    await expect(this.countDialog).toBeVisible();
+    await (await this.resolveCountButton()).click();
 
-    if (await this.countDialogInput.isVisible().catch(() => false)) {
-      await this.countDialogInput.fill(String(quantity)).catch(async () => {
-        await this.countDialogInput.evaluate((inputElement, nextValue) => {
+    const countDialog = await this.resolveCountDialog();
+    await expect(countDialog).toBeVisible();
+    const countDialogInput = countDialog.locator('input').first();
+    const countDialogConfirmButton = countDialog
+      .getByTestId('dish-count-modal-numeric-input-confirm-button')
+      .or(
+        countDialog.getByRole('button', {
+          name: /^(Confirm|确认)$/,
+        }),
+      )
+      .first();
+
+    if (await countDialogInput.isVisible().catch(() => false)) {
+      await countDialogInput.fill(String(quantity)).catch(async () => {
+        await countDialogInput.evaluate((inputElement, nextValue) => {
           const input = inputElement as HTMLInputElement;
           input.value = String(nextValue);
           input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -359,12 +498,19 @@ export class OrderDishesPage {
       });
     } else {
       for (const digit of String(quantity)) {
-        await this.resolveCountDialogNumberButton(digit).click();
+        const numericKey = countDialog.getByTestId(`dish-count-modal-numeric-input-number-${digit}`);
+
+        if (await numericKey.isVisible().catch(() => false)) {
+          await numericKey.click();
+          continue;
+        }
+
+        await countDialog.getByRole('button', { name: digit, exact: true }).click();
       }
     }
 
-    await this.countDialogConfirmButton.click();
-    await expect(this.countDialog).toBeHidden();
+    await countDialogConfirmButton.click();
+    await expect(countDialog).toBeHidden();
   }
 
   @step('页面操作：点击第一个可用菜品')
@@ -376,14 +522,15 @@ export class OrderDishesPage {
   @step((dishName: string) => `页面操作：选中已下单菜品 ${dishName}`)
   async selectOrderedDish(dishName: string): Promise<void> {
     await this.expectLoaded();
-    await this.resolveOrderedDishButton(dishName).click();
+    await (await this.resolveOrderedDishButton(dishName)).click();
   }
 
   @step('页面操作：点击已选菜品的加 1 按钮')
   async clickSelectedDishAdd(): Promise<void> {
     await this.expectLoaded();
-    await expect(this.selectedDishAddButton).toBeVisible({ timeout: 10_000 });
-    await this.selectedDishAddButton.click();
+    const selectedDishAddButton = await this.resolveSelectedDishAddButton();
+    await expect(selectedDishAddButton).toBeVisible({ timeout: 10_000 });
+    await selectedDishAddButton.click();
   }
 
   @step((dishName: string) => `页面操作：选中已下单菜品 ${dishName} 并点击加 1`)
@@ -511,12 +658,49 @@ export class OrderDishesPage {
 
   @step('页面操作：确认分类 option 面板可见')
   async expectCategoryOptionPanelVisible(): Promise<void> {
-    await expect(this.categoryOptionPanel).toBeVisible();
+    await waitUntil(
+      async () => await this.isCategoryOptionPanelVisible(),
+      (visible) => visible,
+      {
+        timeout: 10_000,
+        message: '分类 option 面板未在超时内可见。',
+      },
+    );
+  }
+
+  @step((suboption: string) => `页面操作：检查分类二级 option ${suboption} 是否可见`)
+  private async isCategorySubOptionVisible(suboption: string): Promise<boolean> {
+    const escapedSuboption = this.escapeRegExp(suboption);
+    const suboptionPattern = new RegExp(`^\\s*${escapedSuboption}\\s*(?:\\$[\\d,.]+)?\\s*$`);
+
+    return await this.page
+      .getByRole('button', { name: suboptionPattern })
+      .isVisible()
+      .catch(() => false);
   }
 
   @step('页面操作：检查分类 option 面板是否可见')
   async isCategoryOptionPanelVisible(): Promise<boolean> {
-    return await this.categoryOptionPanel.isVisible().catch(() => false);
+    const panelCandidates = [
+      this.categoryOptionPanel,
+      this.page
+        .locator('[data-testid="item-option-panel-collapse-button"]')
+        .locator('xpath=ancestor::div[contains(@class,"_dock_")][1]'),
+      this.appFrame
+        .locator('[data-testid="item-option-panel-collapse-button"]')
+        .locator('xpath=ancestor::motion[contains(@class,"_dock_")][1]'),
+    ];
+
+    for (const panel of panelCandidates) {
+      if (await panel.isVisible().catch(() => false)) {
+        return true;
+      }
+    }
+
+    return await this.page
+      .getByRole('button', { name: /^Collapse/i })
+      .isVisible()
+      .catch(() => false);
   }
 
   @step((spec: string) => `页面操作：选择规格 ${spec}`)
@@ -535,7 +719,14 @@ export class OrderDishesPage {
     await (await this.resolveCategoryOptionButton(option)).click();
 
     if (suboption) {
-      await expect(this.categoryOptionSubGrid).toBeVisible({ timeout: 10_000 });
+      await waitUntil(
+        async () => await this.isCategorySubOptionVisible(suboption),
+        (visible) => visible,
+        {
+          timeout: 10_000,
+          message: `分类二级 option ${suboption} 未在超时内可见。`,
+        },
+      );
       await (await this.resolveCategorySubOptionButton(suboption)).click();
     }
   }
@@ -821,33 +1012,157 @@ export class OrderDishesPage {
   async readOrderedItems(): Promise<OrderedDishItem[]> {
     await this.expectLoaded();
 
-    const structuredItems = await this.readStructuredOrderedItems();
-
-    if (structuredItems.length > 0) {
-      return structuredItems;
-    }
-
-    const buttonTexts = await this.appFrame.locator('button, [role="button"]').evaluateAll((buttonLikeElements) =>
-      buttonLikeElements
-        .map((buttonLikeElement) => (buttonLikeElement as HTMLElement).innerText.replace(/\s+/g, ' ').trim())
-        .filter(Boolean),
+    const items = await waitUntil(
+      async () => await this.readOrderedItemsSnapshot(),
+      (snapshotItems) => snapshotItems.length > 0,
+      {
+        timeout: 15_000,
+        probeTimeout: 5_000,
+        message: '点餐页购物车菜品未在超时内就绪。',
+      },
     );
-    const itemsFromButtons = this.parseOrderedItemsFromTexts(buttonTexts);
 
-    if (itemsFromButtons.length > 0) {
-      return itemsFromButtons;
-    }
-
-    const frameLines = (await this.appFrame.locator('body').innerText())
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    return this.parseOrderedItemsFromTexts(frameLines);
+    return items.map((item) => ({
+      ...item,
+      additions: this.normalizeOrderedItemAdditions(item.additions),
+    }));
   }
 
-  private async readStructuredOrderedItems(): Promise<OrderedDishItem[]> {
-    return await this.appFrame.locator('body').evaluate(() => {
+  private normalizeOrderedItemAdditions(
+    additions: OrderedDishItemAddition[],
+  ): OrderedDishItemAddition[] {
+    return additions.flatMap((addition) => {
+      const cleanedName = addition.name.replace(/DishLevelIcon/gi, ' ').replace(/\s+/g, ' ').trim();
+      const splitNames = cleanedName
+        .split(/\s+(?=(?:free|category)\s+(?:option|suboption))/i)
+        .map((name) => name.trim())
+        .filter(Boolean);
+
+      if (splitNames.length <= 1) {
+        return [{ ...addition, name: cleanedName }];
+      }
+
+      return splitNames.map((name) => ({
+        ...addition,
+        name,
+        ...(name === cleanedName ? {} : { price: addition.price }),
+      }));
+    });
+  }
+
+  private async readOrderedItemsSnapshot(): Promise<OrderedDishItem[]> {
+    for (const readScope of await this.resolveOrderedItemReadScopes()) {
+      const cartButtonItems = await this.readCartButtonOrderedItems(readScope);
+
+      if (cartButtonItems.length > 0) {
+        return cartButtonItems;
+      }
+
+      const structuredItems = await this.readStructuredOrderedItemsInScope(readScope);
+
+      if (structuredItems.length > 0) {
+        return structuredItems;
+      }
+
+      const cartItemTexts = (
+        await readScope
+          .getByRole('button', { name: /^\d+(?:\.\d+)?\s+.+\s+\$[\d,.]+/i })
+          .allInnerTexts()
+      ).map((text) => text.replace(/\s+/g, ' ').trim());
+      const itemsFromCartButtons = this.parseOrderedItemsFromTexts(cartItemTexts);
+
+      if (itemsFromCartButtons.length > 0) {
+        return itemsFromCartButtons;
+      }
+
+      const frameLines = (await readScope.innerText())
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const itemsFromLines = this.parseOrderedItemsFromTexts(frameLines);
+
+      if (itemsFromLines.length > 0) {
+        return itemsFromLines;
+      }
+    }
+
+    return [];
+  }
+
+  private async resolveOrderedItemReadScopes(): Promise<Locator[]> {
+    const readScopes: Locator[] = [
+      this.page.locator('#orderDishesContainer'),
+      this.page.locator(ORDER_DISHES_IFRAME_SELECTOR).contentFrame().locator('body'),
+    ];
+
+    const contentFrame = await this.tryResolveOrderDishesContentFrame();
+    if (contentFrame) {
+      readScopes.push(contentFrame.locator('body'));
+    }
+
+    return readScopes;
+  }
+
+  private async tryResolveOrderDishesContentFrame(): Promise<Frame | null> {
+    if (this.orderDishesContentFrame) {
+      const frameStillReady = await this.frameHasOrderDishesContent(this.orderDishesContentFrame).catch(
+        () => false,
+      );
+
+      if (frameStillReady) {
+        return this.orderDishesContentFrame;
+      }
+
+      this.orderDishesContentFrame = null;
+    }
+
+    const iframeLocator = this.page.locator(ORDER_DISHES_IFRAME_SELECTOR);
+
+    if ((await iframeLocator.count().catch(() => 0)) === 0) {
+      return null;
+    }
+
+    const iframeHandle = await iframeLocator.first().elementHandle().catch(() => null);
+    const contentFrame = iframeHandle ? await iframeHandle.contentFrame() : null;
+
+    if (!contentFrame || !(await this.frameHasOrderDishesContent(contentFrame).catch(() => false))) {
+      return null;
+    }
+
+    this.orderDishesContentFrame = contentFrame;
+    return contentFrame;
+  }
+
+  private async frameHasOrderDishesContent(frame: Frame): Promise<boolean> {
+    return await frame.locator('body').evaluate((bodyElement) => {
+      const hasStructuredDishItem = Boolean(
+        bodyElement.querySelector(
+          '[data-testid="pos-ui-dish-item"], [data-test-id="pos-ui-dish-item"], [class*="_dishItem_"]',
+        ),
+      );
+      const hasOrderActionButton = Boolean(
+        bodyElement.querySelector(
+          '[data-testid="bottom-button-sendOrderBtn"], [data-test-id="bottom-button-sendOrderBtn"], [data-testid="bottom-button-saveOrderBtn"], [data-test-id="bottom-button-saveOrderBtn"]',
+        ),
+      );
+      const hasCartDishButton = Array.from(
+        bodyElement.querySelectorAll('button,[role="button"]'),
+      ).some((buttonElement) =>
+        /^\d+(?:\.\d+)?\s+.+\s+\$[\d,.]+$/i.test(
+          buttonElement.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+        ),
+      );
+
+      return hasStructuredDishItem || hasOrderActionButton || hasCartDishButton;
+    }).catch(() => false);
+  }
+
+  private async readStructuredOrderedItemsInScope(readScope: Locator): Promise<OrderedDishItem[]> {
+    return await readScope.evaluate((scopeElement) => {
+      const rootElement =
+        scopeElement instanceof HTMLBodyElement ? scopeElement : scopeElement.closest('body') ?? scopeElement;
+
+      return (() => {
       type OrderedDishItemFromDom = {
         additions: Array<{ name: string; price?: string }>;
         name: string;
@@ -951,7 +1266,7 @@ export class OrderDishesPage {
 
       return dedupeElements(
         Array.from(
-          document.querySelectorAll(
+          rootElement.querySelectorAll(
             '[data-testid="pos-ui-dish-item"], [data-test-id="pos-ui-dish-item"], [class*="_dishItem_"]',
           ),
         ),
@@ -1013,21 +1328,154 @@ export class OrderDishesPage {
 
         return items;
       }, []);
+      })();
+    });
+  }
+
+  private async readCartButtonOrderedItems(readScope: Locator): Promise<OrderedDishItem[]> {
+    return await readScope
+      .getByRole('button', { name: /^\d+(?:\.\d+)?\s+.+\s+\$[\d,.]+/i })
+      .evaluateAll((buttonElements) => {
+      type OrderedDishItemFromDom = {
+        additions: Array<{ name: string; price?: string }>;
+        name: string;
+        price: string | null;
+        quantity: string;
+      };
+
+      const cleanText = (value: string | null | undefined): string =>
+        value?.replace(/\s+/g, ' ').trim() ?? '';
+
+      return buttonElements
+        .map((buttonElement) => {
+          const text = cleanText(buttonElement.textContent);
+          const headerMatch = text.match(/^(\d+(?:\.\d+)?)\s+(.+?)\s+(\$[\d,.]+)/i);
+
+          if (!headerMatch) {
+            return null;
+          }
+
+          const [, quantity, name, price] = headerMatch;
+          const domAdditionNodes = Array.from(
+            buttonElement.querySelectorAll(
+              [
+                '[data-testid^="dish-item-subitem-"]',
+                '[data-test-id^="dish-item-subitem-"]',
+                '[class*="_optionItemContainer_"]',
+                '[class*="_extraItem_"]',
+              ].join(', '),
+            ),
+          )
+            .map((additionElement) =>
+              cleanText(additionElement.textContent).replace(/DishLevelIcon/gi, '').trim(),
+            )
+            .filter(Boolean);
+          const leafAdditions = Array.from(buttonElement.querySelectorAll('span, div'))
+            .filter((element) => element.children.length === 0)
+            .map((element) => cleanText(element.textContent))
+            .filter(
+              (label) =>
+                label &&
+                label !== quantity &&
+                label !== name &&
+                label !== price &&
+                !/^DishLevelIcon$/i.test(label) &&
+                !/^\d+(?:\.\d+)?$/.test(label),
+            );
+          const rowBasedAdditions = Array.from(buttonElement.children)
+            .slice(1)
+            .flatMap((rowElement) =>
+              Array.from(rowElement.children).map((additionRow) =>
+                cleanText(additionRow.textContent).replace(/DishLevelIcon/gi, '').trim(),
+              ),
+            )
+            .filter(Boolean);
+          const iconBasedAdditions = Array.from(
+            buttonElement.querySelectorAll('img[alt="DishLevelIcon"], img[alt*="DishLevel"]'),
+          )
+            .map((iconElement) => {
+              const labelElement = Array.from(iconElement.parentElement?.children ?? []).find(
+                (childElement) => childElement !== iconElement,
+              );
+
+              return cleanText(labelElement?.textContent ?? iconElement.parentElement?.textContent)
+                .replace(/DishLevelIcon/gi, '')
+                .trim();
+            })
+            .filter(Boolean);
+          const remainder = text.slice(headerMatch[0].length).trim();
+          const textBasedAdditions = remainder
+            .split(/DishLevelIcon/i)
+            .map((part) => cleanText(part))
+            .filter(Boolean);
+          const additionTexts =
+            domAdditionNodes.length > 0
+              ? domAdditionNodes
+              : leafAdditions.length > 0
+                ? leafAdditions
+                : rowBasedAdditions.length > 0
+                  ? rowBasedAdditions
+                  : iconBasedAdditions.length > 0
+                    ? iconBasedAdditions
+                    : textBasedAdditions;
+          const normalizedAdditionTexts =
+            additionTexts.length === 1
+              ? additionTexts[0].split(/\s+(?=(?:free|category)\s+(?:option|suboption))/i)
+              : additionTexts;
+          const additions = normalizedAdditionTexts
+            .map((part) => cleanText(part))
+            .filter(Boolean)
+            .map((part) => {
+              const priceMatch = part.match(/\$[\d,.]+$/);
+              const additionName = priceMatch
+                ? cleanText(part.replace(priceMatch[0], ''))
+                : part;
+
+              return {
+                name: additionName,
+                ...(priceMatch ? { price: priceMatch[0] } : {}),
+              };
+            })
+            .filter((addition) => addition.name.length > 0);
+
+          return {
+            additions,
+            name,
+            price,
+            quantity,
+          } satisfies OrderedDishItemFromDom;
+        })
+        .filter((item): item is OrderedDishItemFromDom => item !== null);
     });
   }
 
   private parseOrderedItemsFromTexts(texts: string[]): OrderedDishItem[] {
     return texts.reduce<OrderedDishItem[]>((items, text) => {
-      const matchedItem = text.match(/^(\d+(?:\.\d+)?)\s+(.+?)\s+(?:\d+(?:\.\d+)?\s+sent\s+)?(\$[\d,.]+)$/i);
+      const matchedItem = text.match(/^(\d+(?:\.\d+)?)\s+(.+?)\s+(\$[\d,.]+)/i);
 
       if (!matchedItem) {
         return items;
       }
 
       const [, quantity, name, price] = matchedItem;
+      const remainder = text.slice(matchedItem[0].length).trim();
+      const additions = remainder
+        .split(/DishLevelIcon/i)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => {
+          const priceMatch = part.match(/\$[\d,.]+$/);
+          const additionName = priceMatch ? part.replace(priceMatch[0], '').trim() : part;
+
+          return {
+            name: additionName,
+            ...(priceMatch ? { price: priceMatch[0] } : {}),
+          };
+        })
+        .filter((addition) => addition.name.length > 0);
 
       items.push({
-        additions: [],
+        additions,
         quantity,
         name,
         price,
@@ -1041,6 +1489,12 @@ export class OrderDishesPage {
   async readPriceSummary(): Promise<OrderPriceSummary> {
     await this.expectLoaded();
     await this.expandPriceSummary();
+    const inlinePriceSummary = await this.tryReadInlinePriceSummary();
+
+    if (inlinePriceSummary) {
+      return inlinePriceSummary;
+    }
+
     const summary: Partial<OrderPriceSummary> = {};
 
     summary.Count = await this.readPriceSummaryRowNumber('Count');
@@ -1053,6 +1507,62 @@ export class OrderDishesPage {
     return summary as OrderPriceSummary;
   }
 
+  private async tryReadInlinePriceSummary(): Promise<OrderPriceSummary | null> {
+    const priceSummaryToggle = await this.resolvePriceSummaryToggle().catch(() => null);
+
+    if (!priceSummaryToggle) {
+      return null;
+    }
+
+    const normalizedText = (await priceSummaryToggle.innerText().catch(() => ''))
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!normalizedText.includes('Count') || !normalizedText.includes('Subtotal')) {
+      return null;
+    }
+
+    const readNumber = (pattern: RegExp): number | null => {
+      const matchedValue = normalizedText.match(pattern)?.[1];
+
+      if (!matchedValue) {
+        return null;
+      }
+
+      const parsedValue = Number(matchedValue.replace(/[$,]/g, ''));
+      return Number.isNaN(parsedValue) ? null : parsedValue;
+    };
+
+    const count = readNumber(/\bCount\s+([\d,.]+)/);
+    const subtotal = readNumber(/\bSubtotal\s+\$?([\d,.]+)/);
+    const tax = readNumber(/\bTax\s+\$?([\d,.]+)/);
+    const totalBeforeTips = readNumber(/\bTotal Before Tips\s+\$?([\d,.]+)/);
+    const totalMatch = [...normalizedText.matchAll(/\bTotal\s+\$?([\d,.]+)/g)];
+    const totalValue =
+      totalMatch.length > 0
+        ? Number(totalMatch[totalMatch.length - 1]?.[1]?.replace(/[$,]/g, ''))
+        : Number.NaN;
+
+    if (
+      count === null ||
+      subtotal === null ||
+      tax === null ||
+      totalBeforeTips === null ||
+      Number.isNaN(totalValue)
+    ) {
+      return null;
+    }
+
+    return {
+      Count: count,
+      Subtotal: subtotal,
+      Tax: tax,
+      'Total Before Tips': totalBeforeTips,
+      'Total(Cash)': totalValue,
+      'Total(Card)': totalValue,
+    };
+  }
+
   @step('页面操作：展开点单页价格汇总')
   async expandPriceSummary(): Promise<void> {
     await this.expectLoaded();
@@ -1061,7 +1571,7 @@ export class OrderDishesPage {
       return;
     }
 
-    await this.priceSummaryToggle.click({ timeout: 5_000 });
+    await (await this.resolvePriceSummaryToggle()).click({ timeout: 5_000 });
     await waitUntil(
       async () => await this.isPriceSummaryExpanded(),
       (summaryExpanded) => summaryExpanded,
@@ -1074,7 +1584,8 @@ export class OrderDishesPage {
   }
 
   private async isPriceSummaryExpanded(): Promise<boolean> {
-    const expanded = await this.priceSummaryToggle.getAttribute('aria-expanded').catch(() => null);
+    const priceSummaryToggle = await this.resolvePriceSummaryToggle();
+    const expanded = await priceSummaryToggle.getAttribute('aria-expanded').catch(() => null);
 
     if (expanded === 'true') {
       return true;
@@ -1084,11 +1595,20 @@ export class OrderDishesPage {
       return false;
     }
 
-    return await this.priceSummaryDetailsContainer.isVisible().catch(() => false);
+    return await priceSummaryToggle
+      .locator('xpath=following-sibling::*[1]')
+      .isVisible()
+      .catch(() => false);
   }
 
   private async readPriceSummaryRowNumber(label: string): Promise<number> {
-    const labelLocator = this.appFrame.getByText(label, { exact: true }).first();
+    const labelLocator = await this.resolveVisibleLocator(
+      [
+        this.appFrame.getByText(label, { exact: true }).first(),
+        this.page.getByText(label, { exact: true }).first(),
+      ],
+      `Unable to find ${label} from order price summary.`,
+    );
     await expect(labelLocator).toBeVisible();
     const value = await labelLocator.evaluate((labelElement) => {
       const nextElement = labelElement.nextElementSibling;
@@ -1111,7 +1631,13 @@ export class OrderDishesPage {
   }
 
   private async readPriceSummaryMoneyNumber(label: string): Promise<number> {
-    const labelLocator = this.appFrame.getByText(label, { exact: true }).first();
+    const labelLocator = await this.resolveVisibleLocator(
+      [
+        this.appFrame.getByText(label, { exact: true }).first(),
+        this.page.getByText(label, { exact: true }).first(),
+      ],
+      `Unable to find ${label} from order price summary.`,
+    );
     await expect(labelLocator).toBeVisible();
     const value = await labelLocator.evaluate((labelElement) => {
       let currentElement = labelElement.nextElementSibling;
@@ -1178,27 +1704,120 @@ export class OrderDishesPage {
 
   @step('页面操作：保存订单')
   async saveOrder(): Promise<HomePage> {
-    await this.saveOrderButton.click();
+    await (await this.resolveSaveOrderButton()).click();
+    await this.dismissPostSaveDialogsIfNeeded();
     return new HomePage(this.page);
   }
 
   @step('页面操作：点击 Send 送厨订单')
   async sendOrder(): Promise<HomePage> {
     await this.expectLoaded();
-    await this.sendButton.click();
+    await (await this.resolveSendButton()).click();
     return new HomePage(this.page);
   }
 
   @step('页面操作：点击 Save 保存订单但不假设页面跳转')
   async clickSaveOrder(): Promise<void> {
     await this.expectLoaded();
-    await this.saveOrderButton.click();
+    await (await this.resolveSaveOrderButton()).click();
+    await this.dismissPostSaveDialogsIfNeeded();
+  }
+
+  @step('页面读取：读取库存不足提示文案')
+  async readInventoryAlertText(): Promise<string> {
+    const alertBody = this.page
+      .getByText('Insufficient stock, please modify the order.', { exact: true })
+      .locator('xpath=..');
+
+    await expect(alertBody).toBeVisible({ timeout: 10_000 });
+
+    return (await alertBody.innerText()).replace(/\s*\n\s*/g, '\n').trim();
+  }
+
+  @step('页面操作：打开库存管理页')
+  async openInventoryPage(): Promise<InventoryPage> {
+    await this.expectLoaded();
+    await (await this.resolveHeaderMoreButton()).click();
+    await (await this.resolveInventoryMenuItem()).click();
+
+    const inventoryPage = new InventoryPage(this.page);
+    await inventoryPage.expectLoaded();
+    return inventoryPage;
+  }
+
+  @step('页面操作：退出点单页')
+  async exitOrderPage(): Promise<void> {
+    await this.expectLoaded();
+    const exitButton = await this.resolveVisibleLocator(
+      [
+        this.page.getByRole('button', { name: /^Back$/ }).first(),
+        this.appFrame.getByRole('button', { name: /^Back$/ }).first(),
+        this.resolveScopedLocator('#odBack'),
+      ],
+      'Unable to find order-dishes exit button.',
+    );
+    await exitButton.click();
+
+    if (await this.exitConfirmButton.isVisible().catch(() => false)) {
+      await this.exitConfirmButton.click();
+    }
+  }
+
+  @step((dishName: string, times: number) => `页面操作：将已点菜品 ${dishName} 减菜 ${times} 次`)
+  async reduceOrderedDishQuantity(dishName: string, times: number): Promise<void> {
+    await this.selectOrderedDish(dishName);
+
+    const removeButton = await this.resolveVisibleLocator(
+      [
+        this.page.getByTestId('action-rail-button-rmvItem').first(),
+        this.appFrame.getByTestId('action-rail-button-rmvItem').first(),
+        this.appFrame.getByRole('button', { name: /^Reduce$/ }).first(),
+        this.page.getByRole('button', { name: /^Reduce$/ }).first(),
+        this.resolveScopedLocator('#reduce1icon'),
+      ],
+      'Unable to find order-dishes remove item button.',
+    );
+
+    for (let index = 0; index < times; index += 1) {
+      await removeButton.click();
+    }
+  }
+
+  @step((dishName: string, quantity: number) => `页面操作：将已点菜品 ${dishName} 数量修改为 ${quantity}`)
+  async changeOrderedDishQuantity(dishName: string, quantity: number): Promise<void> {
+    await this.selectOrderedDish(dishName);
+    await (await this.resolveCountButton()).click();
+
+    const countDialog = await this.resolveCountDialog();
+    await expect(countDialog).toBeVisible();
+    const countDialogInput = countDialog.locator('input').first();
+    const countDialogConfirmButton = countDialog.getByRole('button', {
+      name: /^(Confirm|确认)$/,
+    });
+
+    if (await countDialogInput.isVisible().catch(() => false)) {
+      await countDialogInput.fill(String(quantity)).catch(async () => {
+        await countDialogInput.evaluate((inputElement, nextValue) => {
+          const input = inputElement as HTMLInputElement;
+          input.value = String(nextValue);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }, String(quantity));
+      });
+    } else {
+      for (const digit of String(quantity)) {
+        await countDialog.getByRole('button', { name: digit, exact: true }).click();
+      }
+    }
+
+    await countDialogConfirmButton.click();
+    await expect(countDialog).toBeHidden();
   }
 
   @step('页面操作：从点单页顶部点击 Recall 入口')
   async clickRecall(): Promise<RecallPage> {
     await this.expectLoaded();
-    await this.headerRecallButton.click();
+    await (await this.resolveHeaderRecallButton()).click();
 
     const { RecallPage } = await import('./recall.page.js');
     const recallPage = new RecallPage(this.page);
@@ -1210,7 +1829,7 @@ export class OrderDishesPage {
   @step('页面操作：从点单页点击 Pay 并进入支付页面')
   async openPayment(): Promise<PaymentPage> {
     await this.expectLoaded();
-    await this.payButton.click();
+    await (await this.resolvePayButton()).click();
 
     const paymentPage = new PaymentPage(this.page);
     await paymentPage.expectLoaded();
@@ -1531,11 +2150,85 @@ export class OrderDishesPage {
   }
 
   private async resolveSplitButton(): Promise<Locator> {
-    if (await this.splitButton.isVisible().catch(() => false)) {
-      return this.splitButton;
+    return await this.resolveVisibleLocator(
+      [
+        this.appFrame.getByRole('button', { name: /^Split$/ }).first(),
+        this.page.getByRole('button', { name: /^Split$/ }).first(),
+        this.appFrame.getByRole('button', { name: /^分单$/ }).first(),
+        this.page.getByRole('button', { name: /^分单$/ }).first(),
+        this.splitButton,
+      ],
+      'Unable to find visible Split button on the order page.',
+    );
+  }
+
+  private async resolveCountButton(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.page.getByTestId('action-rail-button-chgNum').first(),
+        this.appFrame.getByTestId('action-rail-button-chgNum').first(),
+        this.appFrame
+          .locator(
+            '[data-testid="action-rail-button-count"], [data-test-id="action-rail-button-count"]',
+          )
+          .first(),
+        this.page
+          .locator(
+            '[data-testid="action-rail-button-count"], [data-test-id="action-rail-button-count"]',
+          )
+          .first(),
+        this.appFrame.getByRole('button', { name: /^(Count|数量)$/ }).first(),
+        this.page.getByRole('button', { name: /^(Count|数量)$/ }).first(),
+        this.countButton,
+      ],
+      'Unable to find visible Count button on the order page.',
+    );
+  }
+
+  @step('页面操作：关闭保存订单后的提示或删菜原因弹窗')
+  private async dismissPostSaveDialogsIfNeeded(): Promise<void> {
+    const gotItButton = this.page.getByRole('button', { name: /^I Got it$/i });
+
+    if (await gotItButton.isVisible().catch(() => false)) {
+      await gotItButton.click();
     }
 
-    throw new Error('Unable to find visible Split button on the order page.');
+    const voidReasonConfirmButton = this.page.locator(
+      '[data-test-id="order-dishes-save-void-reason-confirm"], [data-testid="order-dishes-save-void-reason-confirm"]',
+    );
+
+    if (!(await voidReasonConfirmButton.isVisible().catch(() => false))) {
+      return;
+    }
+
+    const voidReasonOption = this.page
+      .locator(
+        '[data-test-id="order-dishes-save-void-reason-option-1"], [data-testid="order-dishes-save-void-reason-option-1"]',
+      )
+      .first();
+
+    if (await voidReasonOption.isVisible().catch(() => false)) {
+      await voidReasonOption.click();
+    }
+
+    await voidReasonConfirmButton.click();
+  }
+
+  private async resolveCountDialog(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.page.locator('[data-testid="dish-count-modal"], [data-testid="option-count-modal"]'),
+        this.appFrame.locator('[data-testid="dish-count-modal"], [data-testid="option-count-modal"]'),
+        this.page
+          .getByRole('dialog')
+          .filter({ has: this.page.getByRole('heading', { name: /^(Count|数量)$/ }) }),
+        this.appFrame
+          .getByRole('dialog')
+          .filter({ has: this.appFrame.getByRole('heading', { name: /^(Count|数量)$/ }) }),
+        this.countDialog,
+      ],
+      'Unable to find visible Count dialog on the order page.',
+    );
   }
 
   private async resolveChargeOptionLocator(optionName: string): Promise<Locator> {
@@ -1653,6 +2346,150 @@ export class OrderDishesPage {
     }
 
     return null;
+  }
+
+  private resolveScopedLocator(selector: string): Locator {
+    return this.appFrame.locator(selector).or(this.page.locator(selector)).first();
+  }
+
+  private async resolveHeaderMoreButton(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [this.page.getByTestId('icon-button-more').first(), this.appFrame.getByTestId('icon-button-more').first()],
+      'Unable to find order-dishes header More button.',
+    );
+  }
+
+  private async resolveInventoryMenuItem(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.page.getByTestId('dropdown-item-inventory').first(),
+        this.page.getByRole('menuitem', { name: 'Inventory' }).first(),
+        this.appFrame.getByTestId('dropdown-item-inventory').first(),
+      ],
+      'Unable to find Inventory entry in order-dishes More menu.',
+    );
+  }
+
+  private async resolveBackButton(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.appFrame.getByTestId('icon-button-Back').first(),
+        this.appFrame.getByRole('button', { name: /^Back$/ }).first(),
+        this.page.getByTestId('icon-button-Back').first(),
+        this.page.getByRole('button', { name: /^Back$/ }).first(),
+      ],
+      'Unable to find order-dishes Back button.',
+    );
+  }
+
+  private async resolveHeaderRecallButton(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.appFrame.getByRole('button', { name: /Recall/ }).first(),
+        this.page.getByRole('button', { name: /Recall/ }).first(),
+      ],
+      'Unable to find order-dishes Recall button.',
+    );
+  }
+
+  private async resolveSendButton(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.appFrame
+          .locator(
+            '[data-testid="bottom-button-sendOrderBtn"], [data-test-id="bottom-button-sendOrderBtn"]',
+          )
+          .or(this.appFrame.getByRole('button', { name: 'Send' }))
+          .first(),
+        this.page
+          .locator(
+            '[data-testid="bottom-button-sendOrderBtn"], [data-test-id="bottom-button-sendOrderBtn"]',
+          )
+          .or(this.page.getByRole('button', { name: 'Send' }))
+          .first(),
+      ],
+      'Unable to find order-dishes Send button.',
+    );
+  }
+
+  private async resolvePayButton(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.appFrame.getByRole('button', { name: 'Pay' }).first(),
+        this.page.getByRole('button', { name: 'Pay' }).first(),
+      ],
+      'Unable to find order-dishes Pay button.',
+    );
+  }
+
+  private async resolveSelectedDishAddButton(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.appFrame
+          .locator(
+            '[data-testid="action-rail-button-add1"], [data-test-id="action-rail-button-add1"]',
+          )
+          .or(
+            this.appFrame
+              .locator('aside, [role="complementary"]')
+              .getByRole('button', { name: /^(Add|加)$/ }),
+          )
+          .first(),
+        this.page
+          .locator(
+            '[data-testid="action-rail-button-add1"], [data-test-id="action-rail-button-add1"]',
+          )
+          .or(
+            this.page
+              .locator('aside, [role="complementary"]')
+              .getByRole('button', { name: /^(Add|加)$/ }),
+          )
+          .first(),
+      ],
+      'Unable to find selected-dish add button.',
+    );
+  }
+
+  private async resolveSaveOrderButton(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.appFrame
+          .locator(
+            '[data-testid="bottom-button-saveOrderBtn"], [data-test-id="bottom-button-saveOrderBtn"]',
+          )
+          .or(this.appFrame.getByRole('button', { name: /^(Save|保存)$/ }))
+          .first(),
+        this.page
+          .locator(
+            '[data-testid="bottom-button-saveOrderBtn"], [data-test-id="bottom-button-saveOrderBtn"]',
+          )
+          .or(this.page.getByRole('button', { name: /^(Save|保存)$/ }))
+          .first(),
+      ],
+      'Unable to find order-dishes Save button.',
+    );
+  }
+
+  private async resolvePriceSummaryToggle(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.appFrame
+          .locator(
+            '[data-test-id="shared-order-price-summary-toggle"], [data-testid="shared-order-price-summary-toggle"]',
+          )
+          .or(this.appFrame.getByRole('button', { name: /Total\(Cash\).*Total\(Card\)/ }))
+          .or(this.appFrame.getByRole('button', { name: /Total\s*\$[\d,.]+/ }))
+          .first(),
+        this.page
+          .locator(
+            '[data-test-id="shared-order-price-summary-toggle"], [data-testid="shared-order-price-summary-toggle"]',
+          )
+          .or(this.page.getByRole('button', { name: /Total\(Cash\).*Total\(Card\)/ }))
+          .or(this.page.getByRole('button', { name: /Total\s*\$[\d,.]+/ }))
+          .first(),
+      ],
+      'Unable to find order price summary toggle.',
+    );
   }
 
   private resolveModifySection(sectionName: string): Locator {
@@ -1777,19 +2614,61 @@ export class OrderDishesPage {
   }
 
   private resolveTableNumberButton(tableNumber: string): Locator {
-    return this.appFrame.getByRole('button', {
-      name: new RegExp(`TableIcon\\s*${this.escapeRegExp(tableNumber)}`),
-    });
+    return this.appFrame
+      .getByRole('button', {
+        name: new RegExp(`TableIcon\\s*${this.escapeRegExp(tableNumber)}`),
+      })
+      .or(
+        this.page.getByRole('button', {
+          name: new RegExp(`TableIcon\\s*${this.escapeRegExp(tableNumber)}`),
+        }),
+      )
+      .first();
   }
 
   private resolveGuestCountButton(guestCount: number): Locator {
-    return this.appFrame.getByRole('button', {
-      name: new RegExp(`SeatIcon\\s*${guestCount}`),
-    });
+    return this.appFrame
+      .getByRole('button', {
+        name: new RegExp(`SeatIcon\\s*${guestCount}`),
+      })
+      .or(
+        this.page.getByRole('button', {
+          name: new RegExp(`SeatIcon\\s*${guestCount}`),
+        }),
+      )
+      .first();
   }
 
-  private resolveDishButton(dishName: string): Locator {
-    return this.appFrame.getByRole('button', { name: dishName, exact: true });
+  private async resolveDishButton(dishName: string): Promise<Locator> {
+    const dishCandidates = [
+      this.appFrame.getByRole('button', { name: dishName, exact: true }).first(),
+      this.page.getByRole('button', { name: dishName, exact: true }).first(),
+      this.appFrame
+        .getByRole('button')
+        .filter({ has: this.appFrame.getByText(dishName, { exact: true }) })
+        .first(),
+      this.page
+        .getByRole('button')
+        .filter({ has: this.page.getByText(dishName, { exact: true }) })
+        .first(),
+    ];
+    const dishNextButton = this.resolveScopedLocator('#postfalse');
+
+    for (let attempt = 0; attempt < 15; attempt += 1) {
+      const visibleDishButton = await this.findVisibleLocator(dishCandidates);
+
+      if (visibleDishButton) {
+        return visibleDishButton;
+      }
+
+      if (!(await dishNextButton.isVisible().catch(() => false))) {
+        break;
+      }
+
+      await dishNextButton.click();
+    }
+
+    throw new Error(`Unable to find dish button: ${dishName}.`);
   }
 
   private async resolveMenuGroupCard(groupName: string): Promise<Locator> {
@@ -1801,6 +2680,7 @@ export class OrderDishesPage {
           })
           .first(),
         this.appFrame.getByRole('button', { name: groupName, exact: true }).first(),
+        this.page.getByRole('button', { name: groupName, exact: true }).first(),
       ],
       `Unable to find menu group: ${groupName}.`,
     );
@@ -1815,20 +2695,29 @@ export class OrderDishesPage {
           })
           .first(),
         this.appFrame.getByRole('button', { name: categoryName, exact: true }).first(),
+        this.page.getByRole('button', { name: categoryName, exact: true }).first(),
       ],
       `Unable to find menu category: ${categoryName}.`,
     );
   }
 
-  private resolveOrderedDishButton(dishName: string): Locator {
+  private async resolveOrderedDishButton(dishName: string): Promise<Locator> {
     const escapedDishName = this.escapeRegExp(dishName);
-    return this.appFrame
-      .getByRole('button', {
-        name: new RegExp(
-          `(?:^|\\s)\\d+\\s+${escapedDishName}(?:\\s+\\d+\\s+sent)?\\s+\\$[\\d,.]+`,
-        ),
-      })
-      .first();
+    return await this.resolveVisibleLocator(
+      [
+        this.appFrame.getByRole('button', {
+          name: new RegExp(
+            `(?:^|\\s)\\d+\\s+${escapedDishName}(?:\\s+\\d+\\s+sent)?\\s+\\$[\\d,.]+`,
+          ),
+        }).first(),
+        this.page.getByRole('button', {
+          name: new RegExp(
+            `(?:^|\\s)\\d+\\s+${escapedDishName}(?:\\s+\\d+\\s+sent)?\\s+\\$[\\d,.]+`,
+          ),
+        }).first(),
+      ],
+      `Unable to find ordered dish button: ${dishName}.`,
+    );
   }
 
   private async waitUntilWeightDialogReady(): Promise<void> {
@@ -1880,6 +2769,8 @@ export class OrderDishesPage {
 
     return await this.resolveVisibleLocator(
       [
+        this.page.getByRole('button', { name: optionPattern }).first(),
+        this.appFrame.getByRole('button', { name: optionPattern }).first(),
         this.categoryOptionGrid.getByRole('button', { name: optionPattern }).first(),
         this.categoryOptionGrid
           .locator('[data-testid^="category-option-"], [data-test-id^="category-option-"]')
@@ -1897,6 +2788,8 @@ export class OrderDishesPage {
 
     return await this.resolveVisibleLocator(
       [
+        this.page.getByRole('button', { name: optionPattern }).first(),
+        this.appFrame.getByRole('button', { name: optionPattern }).first(),
         this.categoryOptionSubGrid.getByRole('button', { name: optionPattern }).first(),
         this.categoryOptionSubGrid
           .locator('[data-testid^="category-sub-option-"], [data-test-id^="category-sub-option-"]')
