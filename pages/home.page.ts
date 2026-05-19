@@ -89,14 +89,26 @@ export class HomePage {
 
   @step('页面操作：点击 To Go 入口并进入点单页')
   async clickToGo(): Promise<OrderDishesPage> {
-    const toGoButton = await this.resolveFunctionButton('To Go');
-    await toGoButton.click({ timeout: 10_000 });
-
     await waitUntil(
-      async () => this.page.url(),
+      async () => {
+        const currentUrl = this.page.url();
+
+        if (/#orderDishes/.test(currentUrl)) {
+          return currentUrl;
+        }
+
+        const toGoButton = await this.resolveFunctionButton('To Go', 2_000).catch(() => null);
+
+        if (toGoButton) {
+          await toGoButton.click({ timeout: 3_000 }).catch(() => undefined);
+        }
+
+        return this.page.url();
+      },
       (url) => /#orderDishes/.test(url),
       {
         timeout: 30_000,
+        interval: 250,
         message: 'Home page did not navigate to order dishes after clicking To Go.',
       },
     );
@@ -129,7 +141,7 @@ export class HomePage {
   }
 
   @step((buttonName: string) => `页面操作：在主页中查找 ${buttonName} 功能入口，若未显示则展开更多菜单后查找`)
-  private async resolveFunctionButton(buttonName: string): Promise<Locator> {
+  private async resolveFunctionButton(buttonName: string, timeout = 10_000): Promise<Locator> {
     const resolvedButton = await waitUntil(
       async () => {
         const visibleButton = await this.findVisibleFunctionButton(buttonName);
@@ -143,7 +155,7 @@ export class HomePage {
       },
       (resolvedButton): resolvedButton is Locator => Boolean(resolvedButton),
       {
-        timeout: 10_000,
+        timeout,
         message: `Unable to find function button on home page: ${buttonName}.`,
       },
     );

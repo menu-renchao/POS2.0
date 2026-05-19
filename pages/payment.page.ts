@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { waitForInputSettled } from '../utils/input-stability';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 
@@ -77,6 +78,7 @@ export class PaymentPage {
 
   @step('页面操作：点击支付确认按钮')
   async clickPay(): Promise<void> {
+    await waitForInputSettled();
     await (await this.resolvePayButton()).click();
   }
 

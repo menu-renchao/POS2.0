@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { OrderDishesPage } from './order-dishes.page';
+import { waitForInputSettled } from '../utils/input-stability';
 import { step } from '../utils/step';
 
 export class DeliveryPage {
@@ -72,6 +73,7 @@ export class DeliveryPage {
   @step('页面操作：在 Delivery 页面点击 Start Order 并进入点单页')
   async clickStartOrder(): Promise<OrderDishesPage> {
     await this.closeKeyboardIfVisible();
+    await waitForInputSettled();
     await this.startOrderButton.evaluate((buttonElement) => {
       (buttonElement as HTMLElement).click();
     });

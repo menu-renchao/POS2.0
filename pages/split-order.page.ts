@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { HomePage } from './home.page';
 import { OrderDishesPage } from './order-dishes.page';
 import { RecallPage } from './recall.page';
+import { waitForInputSettled } from '../utils/input-stability';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 
@@ -191,6 +192,7 @@ export class SplitOrderPage {
   @step('页面操作：确认分单输入弹窗')
   async confirmSplitInput(): Promise<void> {
     await this.expectSplitInputVisible();
+    await waitForInputSettled();
     await this.splitInputConfirmButton.click();
   }
 

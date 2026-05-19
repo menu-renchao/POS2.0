@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { waitForInputSettled } from '../utils/input-stability';
 import { step } from '../utils/step';
 
 export class EmployeeLoginPage {
@@ -37,6 +38,7 @@ export class EmployeeLoginPage {
 
   @step('页面操作：提交员工口令')
   async clickConfirm(): Promise<void> {
+    await waitForInputSettled();
     await this.confirmButton.evaluate((button) => {
       (button as HTMLElement).click();
     });

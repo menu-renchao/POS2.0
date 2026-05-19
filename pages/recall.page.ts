@@ -8,6 +8,7 @@ import {
   type RecallProductLine,
 } from '../test-data/recall-search-options';
 import { step } from '../utils/step';
+import { waitForInputSettled } from '../utils/input-stability';
 import { waitUntil } from '../utils/wait';
 import { OrderDishesPage } from './order-dishes.page';
 import { PaymentPage } from './payment.page';
@@ -314,6 +315,7 @@ export class RecallPage {
   @step('页面操作：提交手动搜索条件')
   async submitManualSearch(): Promise<void> {
     await expect(this.searchDialog).toBeVisible();
+    await waitForInputSettled();
     await this.searchDialogSubmitButton.click();
     await expect(this.searchDialog).toBeHidden();
   }
@@ -366,6 +368,30 @@ export class RecallPage {
       const matchedOrderNumbers = document.body.innerText.match(/#\d+/g) ?? [];
       return [...new Set<string>(matchedOrderNumbers)];
     });
+  }
+
+  @step('页面读取：读取当前可见订单中的最新订单号')
+  async readLatestVisibleOrderNumber(): Promise<string> {
+    const visibleOrderNumbers = await waitUntil(
+      async () => await this.readVisibleOrderNumbers(),
+      (orderNumbers) => orderNumbers.length > 0,
+      {
+        timeout: 10_000,
+        message: 'Recall order list did not load any order numbers in time.',
+      },
+    );
+
+    const [latestOrderNumber] = [...visibleOrderNumbers].sort((leftOrderNumber, rightOrderNumber) => {
+      const leftValue = Number(leftOrderNumber.replace(/^#/, ''));
+      const rightValue = Number(rightOrderNumber.replace(/^#/, ''));
+      return rightValue - leftValue;
+    });
+
+    if (!latestOrderNumber) {
+      throw new Error('Unable to determine the latest visible Recall order number.');
+    }
+
+    return latestOrderNumber;
   }
 
   @step('页面读取：读取当前手动搜索关键字')
@@ -438,7 +464,8 @@ export class RecallPage {
   @step('页面操作：打开 Recall 最近一笔订单详情')
   async openRecentOrderDetails(): Promise<void> {
     await this.clearAllSearchConditions();
-    await this.openFirstVisibleOrderDetails();
+    const latestOrderNumber = await this.readLatestVisibleOrderNumber();
+    await this.openOrderDetails(latestOrderNumber);
   }
 
   @step('页面操作：打开 Recall 最近一笔订单并进入编辑点单页')
@@ -1266,14 +1293,7 @@ export class RecallPage {
     await this.waitForOrderDetailsDialogReady();
     await this.openVoidActionFromOrderDetails();
     await this.waitForVoidDialogReady();
-
-    if ((await this.voidRestoreInventoryCheckbox.count().catch(() => 0)) > 0) {
-      const checkboxChecked = await this.voidRestoreInventoryCheckbox.isChecked().catch(() => null);
-
-      if (checkboxChecked !== null && checkboxChecked !== restoreInventory) {
-        await this.voidRestoreInventoryCheckbox.setChecked(restoreInventory, { force: true });
-      }
-    }
+    await this.setVoidRestoreInventoryCheckbox(restoreInventory);
 
     await this.voidNoteInput.fill(reason);
     const keyboardCloseButton = this.page.getByTestId('pos-keyboard-button-{close}');
@@ -1282,6 +1302,7 @@ export class RecallPage {
       await keyboardCloseButton.click();
     }
 
+    await waitForInputSettled();
     await this.voidSubmitButton.click();
     await expect(this.voidSubmitButton).toBeHidden({ timeout: 15_000 }).catch(() => undefined);
     await this.dismissOrderDetailsDialogIfNeeded();
@@ -1368,6 +1389,64 @@ export class RecallPage {
       await this.page.keyboard.press('Escape');
       await expect(this.orderDetailsDialog).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
     }
+  }
+
+  @step((restoreInventory: boolean) => `页面操作：将 Void 弹窗中的恢复库存切换为${restoreInventory ? '勾选' : '不勾选'}`)
+  private async setVoidRestoreInventoryCheckbox(restoreInventory: boolean): Promise<void> {
+    if ((await this.voidRestoreInventoryCheckbox.count().catch(() => 0)) === 0) {
+      return;
+    }
+
+    const checkboxChecked = await this.voidRestoreInventoryCheckbox.isChecked().catch(() => null);
+
+    if (checkboxChecked === null || checkboxChecked === restoreInventory) {
+      return;
+    }
+
+    const visibleToggleTargets = [
+      this.voidDialog.getByRole('button', { name: /Restore inventory/i }).first(),
+      this.voidDialog.getByText(/Restore inventory/i).first(),
+    ];
+
+    for (const toggleTarget of visibleToggleTargets) {
+      if (!(await toggleTarget.isVisible().catch(() => false))) {
+        continue;
+      }
+
+      await toggleTarget.click({ force: true }).catch(() => undefined);
+
+      const toggledState = await this.voidRestoreInventoryCheckbox.isChecked().catch(() => null);
+
+      if (toggledState === restoreInventory) {
+        return;
+      }
+    }
+
+    await this.voidRestoreInventoryCheckbox.evaluate((checkboxElement, nextChecked) => {
+      const checkbox = checkboxElement as HTMLInputElement;
+
+      if (checkbox.checked === nextChecked) {
+        return;
+      }
+
+      const checkedSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'checked',
+      )?.set;
+
+      checkedSetter?.call(checkbox, nextChecked);
+      checkbox.dispatchEvent(new Event('input', { bubbles: true }));
+      checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    }, restoreInventory);
+
+    await waitUntil(
+      async () => await this.voidRestoreInventoryCheckbox.isChecked().catch(() => null),
+      (checked) => checked === restoreInventory,
+      {
+        timeout: 5_000,
+        message: 'Void dialog restore inventory checkbox did not reach the expected state.',
+      },
+    );
   }
 
   @step('页面操作：在 Recall 订单详情中打开 Void 操作')

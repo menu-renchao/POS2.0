@@ -1,4 +1,5 @@
 import { expect, type Frame, type Locator, type Page } from '@playwright/test';
+import { waitForInputSettled } from '../utils/input-stability';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 import { HomePage } from './home.page';
@@ -509,6 +510,7 @@ export class OrderDishesPage {
       }
     }
 
+    await waitForInputSettled();
     await countDialogConfirmButton.click();
     await expect(countDialog).toBeHidden();
   }
@@ -591,6 +593,7 @@ export class OrderDishesPage {
     await (await this.resolveModifySectionButton('Price', 'Custom')).click();
     const customPriceInput = await this.resolveModifyCustomPriceInput();
     await customPriceInput.fill(this.formatModifierPriceInput(price.value));
+    await waitForInputSettled();
     await customPriceInput.press('Enter').catch(() => {});
     await customPriceInput.blur().catch(() => {});
   }
@@ -600,6 +603,7 @@ export class OrderDishesPage {
     await this.expectModifyPanelVisible();
     await this.customModifierNameInput.fill(name);
     await this.customModifierPriceInput.fill(this.formatModifierPriceInput(price));
+    await waitForInputSettled();
     await this.customModifierAddButton.click();
   }
 
@@ -626,6 +630,7 @@ export class OrderDishesPage {
   @step('页面操作：确认重量输入')
   async confirmWeightDialog(): Promise<void> {
     await this.expectWeightDialogVisible();
+    await waitForInputSettled();
     await this.weightConfirmButton.click();
   }
 
@@ -643,6 +648,7 @@ export class OrderDishesPage {
   @step('页面操作：确认价格输入')
   async confirmPriceDialog(): Promise<void> {
     await this.expectPriceDialogVisible();
+    await waitForInputSettled();
     await this.priceConfirmButton.click();
   }
 
@@ -905,6 +911,7 @@ export class OrderDishesPage {
   @step('页面操作：确认自定义加收弹窗')
   async confirmCustomChargeDialog(): Promise<void> {
     await expect(this.customChargeDialog).toBeVisible();
+    await waitForInputSettled();
     await this.customChargeConfirmButton.click();
     await expect(this.customChargeDialog).toBeHidden();
 
@@ -1810,6 +1817,7 @@ export class OrderDishesPage {
       }
     }
 
+    await waitForInputSettled();
     await countDialogConfirmButton.click();
     await expect(countDialog).toBeHidden();
   }

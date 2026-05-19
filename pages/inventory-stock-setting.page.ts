@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { InventoryPage } from './inventory.page';
 import { step } from '../utils/step';
+import { waitForInputSettled } from '../utils/input-stability';
 
 export type InventoryStockStatus = 'In Stock (Unlimited)' | 'Out of Stock' | 'Limited Stock';
 
@@ -56,6 +57,7 @@ export class InventoryStockSettingPage {
       await this.keyboardHideButton.click();
     }
 
+    await waitForInputSettled();
     await this.confirmButton.click({ force: true });
 
     await expect(this.inventoryDialog).toBeHidden({ timeout: 15_000 });

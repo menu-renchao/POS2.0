@@ -254,6 +254,45 @@ test.describe('Recall Void 契约', () => {
   );
 
   test(
+    '应能在恢复库存原生 checkbox 脱离视口时仍切换为不勾选后提交 Void',
+    {},
+    async ({ page }) => {
+      const recallPage = new RecallPage(page);
+
+      await test.step('准备原生 checkbox 脱离视口但可见包装层仍可交互的 Recall Void 页面骨架', async () => {
+        await page.setContent(
+          recallVoidFixtureHtml.replaceAll(
+            'input type="checkbox" aria-label="Restore inventory" checked',
+            'input type="checkbox" aria-label="Restore inventory" checked style="position:absolute;left:-9999px;"',
+          ),
+        );
+        await page.evaluate(() => {
+          window.location.hash = 'recall';
+        });
+      });
+
+      await test.step('提交要求不恢复库存的 Void 操作', async () => {
+        await recallPage.voidRecentVisibleOrder({
+          restoreInventory: false,
+          reason: '脱离视口复选框校验',
+        });
+      });
+
+      await test.step('确认恢复库存被切换为未勾选状态', async () => {
+        expect(
+          await page.evaluate(
+            () => (window as typeof window & { __recallVoidState: unknown }).__recallVoidState,
+          ),
+        ).toMatchObject({
+          restoreInventory: false,
+          submitted: true,
+          reason: '脱离视口复选框校验',
+        });
+      });
+    },
+  );
+
+  test(
     '应能在退出 Recall 后等待页面真正离开 Recall',
     {},
     async ({ page }) => {

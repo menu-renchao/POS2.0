@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { InventoryStockSettingPage } from './inventory-stock-setting.page';
 import { OrderDishesPage } from './order-dishes.page';
+import { waitForInputSettled } from '../utils/input-stability';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 
@@ -85,6 +86,7 @@ export class InventoryPage {
     if (await this.itemNameInput.isVisible().catch(() => false)) {
       await this.itemNameInput.fill('');
       await this.itemNameInput.fill(params.itemName);
+      await waitForInputSettled();
       await this.searchButton.click();
       await expect(this.itemNameLocator(params.itemName)).toBeVisible({ timeout: 15_000 });
       return;

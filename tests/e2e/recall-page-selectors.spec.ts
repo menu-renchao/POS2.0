@@ -183,4 +183,76 @@ test.describe('Recall 页面选择器契约', () => {
       });
     },
   );
+
+  test(
+    '手动搜索提交前应等待输入稳定 200ms',
+    {},
+    async ({ page }) => {
+      const recallPage = new RecallPage(page);
+
+      await test.step('准备搜索关键字需等待 200ms 才会稳定的 Recall 页面骨架', async () => {
+        await page.setContent(`
+          <!DOCTYPE html>
+          <html lang="en">
+            <body>
+              <button type="button" data-testid="recall2-header-new-order"></button>
+              <button type="button" data-testid="recall2-header-paging"></button>
+              <input data-testid="recall2-search-input" value="" />
+              <button type="button" data-testid="recall2-search-trigger"></button>
+
+              <div role="dialog" aria-modal="true" data-testid="recall2-search-modal">
+                <button type="button" data-testid="recall2-search-type-option-orderNo"></button>
+                <input data-testid="recall2-search-modal-input-default" value="" />
+                <button type="button" data-testid="recall2-search-modal-search-button">Search</button>
+              </div>
+
+              <script>
+                (() => {
+                  const state = {
+                    committedKeyword: '',
+                    pendingKeyword: '',
+                  };
+
+                  window.__recallDelayedSearchState = state;
+
+                  const topSearchInput = document.querySelector('[data-testid="recall2-search-input"]');
+                  const modalInput = document.querySelector('[data-testid="recall2-search-modal-input-default"]');
+                  const submitSearchButton = document.querySelector('[data-testid="recall2-search-modal-search-button"]');
+                  const searchModal = document.querySelector('[data-testid="recall2-search-modal"]');
+                  let commitTimer = null;
+
+                  modalInput.addEventListener('input', () => {
+                    state.pendingKeyword = modalInput.value;
+
+                    if (commitTimer) {
+                      window.clearTimeout(commitTimer);
+                    }
+
+                    commitTimer = window.setTimeout(() => {
+                      state.committedKeyword = state.pendingKeyword;
+                    }, 200);
+                  });
+
+                  submitSearchButton.addEventListener('click', () => {
+                    topSearchInput.value = state.committedKeyword;
+                    searchModal.hidden = true;
+                  });
+                })();
+              </script>
+            </body>
+          </html>
+        `);
+      });
+
+      await test.step('输入关键字并通过页面对象提交手动搜索', async () => {
+        await recallPage.selectManualSearchTag(RecallManualSearchTags.orderNumber);
+        await recallPage.fillManualSearchKeyword('1001');
+        await recallPage.submitManualSearch();
+      });
+
+      await test.step('确认提交到顶部搜索框的是稳定关键字', async () => {
+        await expect(page.getByTestId('recall2-search-input')).toHaveValue('1001');
+      });
+    },
+  );
 });
