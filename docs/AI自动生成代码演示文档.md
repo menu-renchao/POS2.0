@@ -37,7 +37,7 @@
 - 开发语言：TypeScript
 - 报告体系：Allure + 中文步骤
 - 浏览器：Chrome
-- 主要入口：`http://192.168.0.89:22080/kpos/front2/myhome.html`
+- 主要入口：`http://192.168.0.72:22080/kpos/front2/myhome.html`
 
 常用命令：
 
@@ -691,7 +691,7 @@ npm run allure:open
 业务目标：验证员工进入 POS 后，可以从首页点击 Dine In，并通过 New order 进入点餐页面。
 
 入口与前置条件：
-1. 必须从 http://192.168.0.89:22080/kpos/front2/myhome.html 进入。
+1. 必须从 http://192.168.0.72:22080/kpos/front2/myhome.html 进入。
 2. 如果出现授权选择页面，请选择可用授权并进入系统。
 3. 员工口令使用 11。
 4. 不允许直接打开点餐页或拼接 hash。
