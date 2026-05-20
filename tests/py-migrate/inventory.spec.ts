@@ -67,7 +67,7 @@ async function recallRecentOrderFromHome(homePage: HomePage, orderDishesPage: Or
 }
 
 test.describe('库存管理', () => {
-  test.describe.configure({ timeout: 300_000 });
+  test.describe.configure({ timeout: 120_000 });
 
   test(
     '未送厨点菜、加菜、减菜应正确更新库存',

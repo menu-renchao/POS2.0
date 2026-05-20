@@ -8,8 +8,11 @@ import { recallScopedTestId } from './recall-reads.section';
 export class RecallVoidDialog {
   private readonly voidOrderButton: Locator;
   private readonly voidAllMoreButton: Locator;
+  private readonly legacyVoidAllMoreButton: Locator;
+  private readonly namedVoidAllMoreButton: Locator;
   private readonly voidDialog: Locator;
   private readonly voidRestoreInventoryCheckbox: Locator;
+  private readonly labeledVoidRestoreInventoryCheckbox: Locator;
   private readonly voidNoteInput: Locator;
   private readonly voidSubmitButton: Locator;
 
@@ -19,6 +22,8 @@ export class RecallVoidDialog {
   ) {
     this.voidOrderButton = recallScopedTestId(this.page, 'recall2-order-detail-void');
     this.voidAllMoreButton = recallScopedTestId(this.page, 'recall2-order-detail-void-all');
+    this.legacyVoidAllMoreButton = this.page.locator('#pvoidod');
+    this.namedVoidAllMoreButton = this.page.getByRole('button', { name: /^Void All$/i });
     this.voidDialog = this.page
       .locator('[role="dialog"]:visible')
       .filter({ has: this.page.getByText('Void Reason', { exact: true }) })
@@ -27,6 +32,9 @@ export class RecallVoidDialog {
       this.voidDialog,
       'shared-void-dialog-restore-inventory-checkbox',
     );
+    this.labeledVoidRestoreInventoryCheckbox = this.voidDialog.getByRole('checkbox', {
+      name: /Restore inventory/i,
+    });
     this.voidNoteInput = this.voidDialog.getByRole('textbox', { name: /^Note$/i });
     this.voidSubmitButton = this.voidDialog.getByRole('button', { name: /^Void$/i });
   }
@@ -67,11 +75,13 @@ export class RecallVoidDialog {
 
   @step((restoreInventory: boolean) => `页面操作：将 Void 弹窗中的恢复库存切换为${restoreInventory ? '勾选' : '不勾选'}`)
   private async setVoidRestoreInventoryCheckbox(restoreInventory: boolean): Promise<void> {
-    if ((await this.voidRestoreInventoryCheckbox.count().catch(() => 0)) === 0) {
+    const restoreInventoryCheckbox = await this.resolveRestoreInventoryCheckbox();
+
+    if (!restoreInventoryCheckbox) {
       return;
     }
 
-    const checkboxChecked = await this.voidRestoreInventoryCheckbox.isChecked().catch(() => null);
+    const checkboxChecked = await restoreInventoryCheckbox.isChecked().catch(() => null);
 
     if (checkboxChecked === null || checkboxChecked === restoreInventory) {
       return;
@@ -89,14 +99,14 @@ export class RecallVoidDialog {
 
       await toggleTarget.click({ force: true }).catch(() => undefined);
 
-      const toggledState = await this.voidRestoreInventoryCheckbox.isChecked().catch(() => null);
+      const toggledState = await restoreInventoryCheckbox.isChecked().catch(() => null);
 
       if (toggledState === restoreInventory) {
         return;
       }
     }
 
-    await this.voidRestoreInventoryCheckbox.evaluate((checkboxElement, nextChecked) => {
+    await restoreInventoryCheckbox.evaluate((checkboxElement, nextChecked) => {
       const checkbox = checkboxElement as HTMLInputElement;
 
       if (checkbox.checked === nextChecked) {
@@ -114,7 +124,7 @@ export class RecallVoidDialog {
     }, restoreInventory);
 
     await waitUntil(
-      async () => await this.voidRestoreInventoryCheckbox.isChecked().catch(() => null),
+      async () => await restoreInventoryCheckbox.isChecked().catch(() => null),
       (checked) => checked === restoreInventory,
       {
         timeout: 5_000,
@@ -137,7 +147,17 @@ export class RecallVoidDialog {
       return;
     }
 
-    await this.orderDetails.orderDetailsMoreButton.click();
+    if (await this.legacyVoidAllMoreButton.isVisible().catch(() => false)) {
+      await this.legacyVoidAllMoreButton.click();
+      return;
+    }
+
+    if (await this.namedVoidAllMoreButton.isVisible().catch(() => false)) {
+      await this.namedVoidAllMoreButton.click();
+      return;
+    }
+
+    await this.orderDetails.clickOrderDetailsMoreButton();
 
     const visibleAction = await waitUntil(
       async () => {
@@ -146,6 +166,14 @@ export class RecallVoidDialog {
         }
 
         if (await this.voidAllMoreButton.isVisible().catch(() => false)) {
+          return 'void-all';
+        }
+
+        if (await this.legacyVoidAllMoreButton.isVisible().catch(() => false)) {
+          return 'void-all';
+        }
+
+        if (await this.namedVoidAllMoreButton.isVisible().catch(() => false)) {
           return 'void-all';
         }
 
@@ -165,7 +193,17 @@ export class RecallVoidDialog {
     }
 
     if (visibleAction === 'void-all') {
-      await this.voidAllMoreButton.click();
+      if (await this.voidAllMoreButton.isVisible().catch(() => false)) {
+        await this.voidAllMoreButton.click();
+        return;
+      }
+
+      if (await this.legacyVoidAllMoreButton.isVisible().catch(() => false)) {
+        await this.legacyVoidAllMoreButton.click();
+        return;
+      }
+
+      await this.namedVoidAllMoreButton.click();
       return;
     }
 
@@ -186,5 +224,20 @@ export class RecallVoidDialog {
         message: 'Recall Void 弹窗未完成展示。',
       },
     );
+  }
+
+  private async resolveRestoreInventoryCheckbox(): Promise<Locator | null> {
+    const checkboxCandidates = [
+      this.voidRestoreInventoryCheckbox,
+      this.labeledVoidRestoreInventoryCheckbox,
+    ];
+
+    for (const checkboxCandidate of checkboxCandidates) {
+      if ((await checkboxCandidate.count().catch(() => 0)) > 0) {
+        return checkboxCandidate;
+      }
+    }
+
+    return null;
   }
 }

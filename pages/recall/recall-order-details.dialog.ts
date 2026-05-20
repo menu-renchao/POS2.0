@@ -27,6 +27,8 @@ export class RecallOrderDetailsDialog {
   private readonly orderDetailsEditButton: Locator;
   private readonly orderDetailsPayButton: Locator;
   readonly orderDetailsMoreButton: Locator;
+  private readonly legacyOrderDetailsMoreButton: Locator;
+  private readonly namedOrderDetailsMoreButton: Locator;
 
   constructor(
     readonly page: Page,
@@ -53,6 +55,8 @@ export class RecallOrderDetailsDialog {
       this.orderDetailsDialog,
       'recall2-order-detail-more',
     );
+    this.legacyOrderDetailsMoreButton = this.page.locator('#odsmymoreicon');
+    this.namedOrderDetailsMoreButton = this.page.getByRole('button', { name: /^MoreIcon More$/i });
   }
 
   @step((orderNumber: string, targetOrderNumber?: string) =>
@@ -139,6 +143,28 @@ export class RecallOrderDetailsDialog {
     await paymentPage.expectLoaded();
 
     return paymentPage;
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 More 按钮')
+  async clickOrderDetailsMoreButton(): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+
+    const moreButtonCandidates = [
+      this.orderDetailsMoreButton,
+      this.legacyOrderDetailsMoreButton,
+      this.namedOrderDetailsMoreButton,
+    ];
+
+    for (const moreButtonCandidate of moreButtonCandidates) {
+      if (!(await moreButtonCandidate.isVisible().catch(() => false))) {
+        continue;
+      }
+
+      await moreButtonCandidate.click();
+      return;
+    }
+
+    throw new Error('Recall 订单详情未找到 More 按钮。');
   }
 
   @step('页面操作：展开 Recall 订单详情价格汇总')
