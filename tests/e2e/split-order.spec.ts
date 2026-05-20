@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { SplitOrderFlow } from '../../flows/split-order.flow';
+import { SplitOrderFlow, type SplitOrderSuborderIndex } from '../../flows/split-order.flow';
 import { SplitOrderPage } from '../../pages/split-order.page';
 
 const splitOrderFixtureHtml = String.raw`
@@ -572,7 +572,7 @@ test.describe('分单页面能力契约', () => {
         expect(await splitOrderPage.readDishProportion('1001-1', 'Fried Rice')).toBe('1/2');
 
         await splitOrderPage.clickDish('1001-1', 'Fried Rice');
-        await splitOrderPage.clickDish('1001-2', 'Soup');
+        await splitOrderPage.receiveDishOnSuborder('1001-2', 'Soup');
         expect(await splitOrderPage.hasDish('1001-2', 'Fried Rice')).toBe(true);
 
         await splitOrderPage.clickCombine();
@@ -588,6 +588,65 @@ test.describe('分单页面能力契约', () => {
         const resetSnapshot = await splitOrderPage.readSnapshot();
         expect(resetSnapshot.suborders).toHaveLength(3);
         expect(resetSnapshot.suborders[0]?.dishes.some((dish) => dish.name === 'Noodles')).toBe(true);
+      });
+    },
+  );
+
+  test(
+    '应能按子单序号对指定菜品执行平分并在子单间移动菜品',
+    {},
+    async ({ page }) => {
+      const splitOrderPage = new SplitOrderPage(page);
+      const splitOrderFlow = new SplitOrderFlow();
+
+      await test.step('准备分单页面契约骨架', async () => {
+        await loadSplitOrderFixture(page);
+        await splitOrderPage.expectLoaded('1001');
+      });
+
+      await test.step('在子单 1 对 Fried Rice 执行按菜品平分为 2 份', async () => {
+        expect(await splitOrderPage.isDishEligibleForEvenSplit('1001-1', 'Fried Rice')).toBe(true);
+
+        await splitOrderFlow.evenSplitDishOnSuborder(splitOrderPage, {
+          suborderIndex: '1',
+          dishName: 'Fried Rice',
+          splitCount: 2,
+        });
+
+        expect(await splitOrderPage.readDishProportion('1001-1', 'Fried Rice')).toBe('1/2');
+      });
+
+      await test.step('将子单 1 的 Fried Rice 移动到子单 2', async () => {
+        const beforeMove = await splitOrderPage.readSnapshot();
+        const sourceCountBeforeMove = beforeMove.suborders
+          .find((suborder) => suborder.orderNumber === '1001-1')
+          ?.dishes.filter((dish) => dish.name === 'Fried Rice').length;
+        const targetCountBeforeMove = beforeMove.suborders
+          .find((suborder) => suborder.orderNumber === '1001-2')
+          ?.dishes.filter((dish) => dish.name === 'Fried Rice').length;
+
+        await splitOrderFlow.moveDishesBySuborderIndex(splitOrderPage, '1', ['Fried Rice'], '2');
+
+        const afterMove = await splitOrderPage.readSnapshot();
+        const sourceCountAfterMove = afterMove.suborders
+          .find((suborder) => suborder.orderNumber === '1001-1')
+          ?.dishes.filter((dish) => dish.name === 'Fried Rice').length;
+        const targetCountAfterMove = afterMove.suborders
+          .find((suborder) => suborder.orderNumber === '1001-2')
+          ?.dishes.filter((dish) => dish.name === 'Fried Rice').length;
+
+        expect(sourceCountAfterMove).toBe((sourceCountBeforeMove ?? 0) - 1);
+        expect(targetCountAfterMove).toBe((targetCountBeforeMove ?? 0) + 1);
+      });
+
+      await test.step('非法子单序号应抛出明确错误', async () => {
+        await expect(
+          splitOrderFlow.evenSplitDishOnSuborder(splitOrderPage, {
+            suborderIndex: '9' as SplitOrderSuborderIndex,
+            dishName: 'Fried Rice',
+            splitCount: 2,
+          }),
+        ).rejects.toThrow(/子单序号仅支持/);
       });
     },
   );

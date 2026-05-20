@@ -3,9 +3,26 @@ import { OrderDishesPage } from '../pages/order-dishes.page';
 import { RecallPage } from '../pages/recall.page';
 import { type SplitOrderReturnPage, SplitOrderPage } from '../pages/split-order.page';
 import { step } from '../utils/step';
-import { waitUntil } from '../utils/wait';
 
-const SPLIT_ORDER_SUBMIT_STABILIZATION_MS = 1500;
+export const SPLIT_ORDER_SUBORDER_INDICES = ['1', '2', '3'] as const;
+
+export type SplitOrderSuborderIndex = (typeof SPLIT_ORDER_SUBORDER_INDICES)[number];
+
+export type EvenSplitDishOnSuborderParams = {
+  dishName: string;
+  splitCount: number;
+  suborderIndex: SplitOrderSuborderIndex;
+};
+
+function assertSplitOrderSuborderIndex(
+  suborderIndex: string,
+): asserts suborderIndex is SplitOrderSuborderIndex {
+  if (!SPLIT_ORDER_SUBORDER_INDICES.includes(suborderIndex as SplitOrderSuborderIndex)) {
+    throw new Error(
+      `子单序号仅支持 ${SPLIT_ORDER_SUBORDER_INDICES.join('、')}，收到：${suborderIndex}`,
+    );
+  }
+}
 
 export class SplitOrderFlow {
   @step((_splitOrderPage: SplitOrderPage, count: number) => `业务步骤：将当前订单平分为 ${count} 份`)
@@ -61,6 +78,31 @@ export class SplitOrderFlow {
   }
 
   @step(
+    (_splitOrderPage: SplitOrderPage, params: EvenSplitDishOnSuborderParams) =>
+      `业务步骤：在子单 ${params.suborderIndex} 对菜品 ${params.dishName} 执行按菜品平分为 ${params.splitCount} 份`,
+  )
+  async evenSplitDishOnSuborder(
+    splitOrderPage: SplitOrderPage,
+    params: EvenSplitDishOnSuborderParams,
+  ): Promise<void> {
+    assertSplitOrderSuborderIndex(params.suborderIndex);
+
+    const orderNumber = await this.resolveSuborderIndex(splitOrderPage, params.suborderIndex);
+    const eligible = await splitOrderPage.isDishEligibleForEvenSplit(orderNumber, params.dishName);
+
+    if (!eligible) {
+      throw new Error(
+        `子单 ${params.suborderIndex} 的菜品 ${params.dishName} 当前不可按菜品平分，可能已存在比例或子单已支付。`,
+      );
+    }
+
+    await splitOrderPage.toggleDishSelection(orderNumber, params.dishName);
+    await splitOrderPage.clickEvenItems();
+    await splitOrderPage.fillSplitCount(params.splitCount);
+    await splitOrderPage.confirmSplitInput();
+  }
+
+  @step(
     (_splitOrderPage: SplitOrderPage, sourceOrderNumber: string, dishNames: string[], targetOrderNumber: string) =>
       `业务步骤：将子单 ${sourceOrderNumber} 的菜品 ${dishNames.join('、')} 移动到子单 ${targetOrderNumber}`,
   )
@@ -70,10 +112,44 @@ export class SplitOrderFlow {
     dishNames: string[],
     targetOrderNumber: string,
   ): Promise<void> {
+    if (dishNames.length === 0) {
+      return;
+    }
+
+    const snapshot = await splitOrderPage.readSnapshot();
+    const targetSuborder = snapshot.suborders.find(
+      (suborder) => suborder.orderNumber === targetOrderNumber,
+    );
+    const anchorDishName = targetSuborder?.dishes[0]?.name ?? undefined;
+
     for (const dishName of dishNames) {
       await splitOrderPage.clickDish(sourceOrderNumber, dishName);
-      await splitOrderPage.clickSuborder(targetOrderNumber);
+      await splitOrderPage.receiveDishOnSuborder(targetOrderNumber, anchorDishName);
     }
+  }
+
+  @step(
+    (
+      _splitOrderPage: SplitOrderPage,
+      sourceSuborderIndex: SplitOrderSuborderIndex,
+      dishNames: string[],
+      targetSuborderIndex: SplitOrderSuborderIndex,
+    ) =>
+      `业务步骤：将子单 ${sourceSuborderIndex} 的菜品 ${dishNames.join('、')} 移动到子单 ${targetSuborderIndex}`,
+  )
+  async moveDishesBySuborderIndex(
+    splitOrderPage: SplitOrderPage,
+    sourceSuborderIndex: SplitOrderSuborderIndex,
+    dishNames: string[],
+    targetSuborderIndex: SplitOrderSuborderIndex,
+  ): Promise<void> {
+    assertSplitOrderSuborderIndex(sourceSuborderIndex);
+    assertSplitOrderSuborderIndex(targetSuborderIndex);
+
+    const sourceOrderNumber = await this.resolveSuborderIndex(splitOrderPage, sourceSuborderIndex);
+    const targetOrderNumber = await this.resolveSuborderIndex(splitOrderPage, targetSuborderIndex);
+
+    await this.moveDishes(splitOrderPage, sourceOrderNumber, dishNames, targetOrderNumber);
   }
 
   @step((_splitOrderPage: SplitOrderPage, orderNumbers?: string[]) => `业务步骤：合并分单${orderNumbers?.length ? `，目标子单为 ${orderNumbers.join('、')}` : ''}`)
@@ -108,6 +184,25 @@ export class SplitOrderFlow {
     return this.assertReturnPage(page);
   }
 
+  @step(
+    (_splitOrderPage: SplitOrderPage, suborderIndex: SplitOrderSuborderIndex) =>
+      `业务步骤：解析子单序号 ${suborderIndex} 对应的子单单号`,
+  )
+  async resolveSuborderIndex(
+    splitOrderPage: SplitOrderPage,
+    suborderIndex: SplitOrderSuborderIndex,
+  ): Promise<string> {
+    assertSplitOrderSuborderIndex(suborderIndex);
+
+    const orderNumber = await splitOrderPage.readSuborderOrderNumberByIndex(suborderIndex);
+
+    if (!orderNumber) {
+      throw new Error(`未找到子单序号 ${suborderIndex} 对应的分单子单。`);
+    }
+
+    return orderNumber;
+  }
+
   private assertReturnPage(page: SplitOrderReturnPage): HomePage | OrderDishesPage | RecallPage {
     if (page instanceof RecallPage) {
       return page;
@@ -119,4 +214,37 @@ export class SplitOrderFlow {
 
     return page;
   }
+}
+
+export async function evenSplitDishOnSuborder(
+  splitOrderPage: SplitOrderPage,
+  params: EvenSplitDishOnSuborderParams,
+): Promise<void> {
+  const flow = new SplitOrderFlow();
+  await flow.evenSplitDishOnSuborder(splitOrderPage, params);
+}
+
+export async function moveDishes(
+  splitOrderPage: SplitOrderPage,
+  sourceOrderNumber: string,
+  dishNames: string[],
+  targetOrderNumber: string,
+): Promise<void> {
+  const flow = new SplitOrderFlow();
+  await flow.moveDishes(splitOrderPage, sourceOrderNumber, dishNames, targetOrderNumber);
+}
+
+export async function moveDishesBySuborderIndex(
+  splitOrderPage: SplitOrderPage,
+  sourceSuborderIndex: SplitOrderSuborderIndex,
+  dishNames: string[],
+  targetSuborderIndex: SplitOrderSuborderIndex,
+): Promise<void> {
+  const flow = new SplitOrderFlow();
+  await flow.moveDishesBySuborderIndex(
+    splitOrderPage,
+    sourceSuborderIndex,
+    dishNames,
+    targetSuborderIndex,
+  );
 }

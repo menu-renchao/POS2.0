@@ -40,9 +40,11 @@ import {
 } from '../../test-data/order-service';
 import {
   RecallManualSearchTags,
+  RecallPaymentStatuses,
   RecallOrderPaymentSuccessStatus,
 } from '../../test-data/recall-search-options';
 import { jiraIssueAnnotation, jiraIssueAnnotations } from '../../utils/jira';
+import { waitUntil } from '../../utils/wait';
 
 type AppEntryPages = {
   employeeLoginPage: EmployeeLoginPage;
@@ -77,6 +79,14 @@ function readCurrencyAmount(value: string | undefined): number {
   }
 
   return parsed;
+}
+
+function buildLargeTipAmountInCents(totalBeforeTips: number): number {
+  return Math.floor(totalBeforeTips * 100 * 0.5) + 100;
+}
+
+function formatCurrencyFromCents(amountInCents: number): string {
+  return `$${(amountInCents / 100).toFixed(2)}`;
 }
 
 async function enterReadyHome({
@@ -564,6 +574,130 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
           const orderDetails = await viewRecallOrderDetails(recallPage, latestOrderNumber);
           expect(orderDetails.orderNumber).toBe(latestOrderNumber);
           expect(orderDetails.paymentStatus).toBe(RecallOrderPaymentSuccessStatus);
+        });
+      },
+    );
+  });
+
+  test.describe('小费回归', () => {
+    test(
+      '应能在点单页添加超过餐费 50% 的小费并完成确认',
+      {
+        annotation: [jiraIssueAnnotation('POS-33110')],
+      },
+      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+        });
+
+        await test.step('从 To Go 进入点单页，添加菜品并输入超过 50% 的小费', async () => {
+          const orderDishesPage = await startToGoOrder(readyHomePage);
+
+          await addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+
+          const priceSummaryBeforeTip = await orderDishesPage.readPriceSummary();
+          const bigTipAmountInCents = buildLargeTipAmountInCents(
+            priceSummaryBeforeTip['Total Before Tips'],
+          );
+
+          const bigTipConfirmMessage = await orderDishesPage.addTip(bigTipAmountInCents);
+
+          expect(bigTipConfirmMessage).toBe(
+            'The tip is more than 50% of the meal. Confirm to add?',
+          );
+
+          const savedHomePage = await orderDishesPage.saveOrder();
+          const readyHomePageAfterSave = await enterEmployeeContext(
+            savedHomePage,
+            employeeLoginPage,
+          );
+          const recallPage = await openRecallFromHome(readyHomePageAfterSave);
+          const orderDetails = await viewFirstVisibleRecallOrderDetails(recallPage);
+
+          expect(orderDetails.priceSummary.Tips).toBeCloseTo(bigTipAmountInCents / 100, 2);
+        });
+      },
+    );
+
+    test(
+      '应能在信用卡支付后追加超过餐费 50% 的小费并完成确认',
+      {
+        annotation: [jiraIssueAnnotation('POS-33122')],
+      },
+    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      });
+
+      const paymentFlow = new PaymentFlow();
+      const { recallPage, bigTipAmountInCents } = await test.step(
+        '创建 To Go 订单并保存后进入 Recall',
+        async () => {
+          const orderDishesPage = await startToGoOrder(readyHomePage);
+
+          await addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+
+          const priceSummaryBeforeTip = await orderDishesPage.readPriceSummary();
+          const bigTipAmountInCents = buildLargeTipAmountInCents(
+            priceSummaryBeforeTip['Total Before Tips'],
+          );
+
+          const savedHomePage = await orderDishesPage.saveOrder();
+          const readyHomePageAfterSave = await enterEmployeeContext(
+            savedHomePage,
+            employeeLoginPage,
+          );
+          return {
+            recallPage: await openRecallFromHome(readyHomePageAfterSave),
+            bigTipAmountInCents,
+          };
+        },
+      );
+
+      const paidOrderNumber = await test.step('从 Recall 为最新订单完成信用卡支付', async () => {
+          const orderNumber = await readLatestVisibleRecallOrderNumber(recallPage);
+          await recallPage.openOrderDetails(orderNumber);
+          const paymentPage = await recallPage.openPayment();
+          await paymentFlow.payByCreditCard(paymentPage, { printReceipt: false });
+          await recallPage.closeOrderDetailsDialog();
+          return orderNumber;
+        });
+
+        await test.step('重新打开已支付订单并追加超过 50% 的小费', async () => {
+          await recallPage.expectLoaded();
+          await searchRecallOrders(recallPage, {
+            paymentStatus: RecallPaymentStatuses.paid,
+            manualSearch: {
+              tag: RecallManualSearchTags.orderNumber,
+              keyword: paidOrderNumber.replace(/^#/, ''),
+            },
+          });
+          await recallPage.openOrderDetails(paidOrderNumber);
+          const bigTipConfirmMessage = await recallPage.addPaymentCardTip(bigTipAmountInCents);
+
+          expect(bigTipConfirmMessage).toBe(
+            'The tip is more than 50% of the meal. Confirm to add?',
+          );
+          await recallPage.closeOrderDetailsDialog();
+          await recallPage.openOrderDetails(paidOrderNumber);
+          const displayedPriceSummary = await waitUntil(
+            async () => await recallPage.readDisplayedOrderPriceSummary(),
+            (priceSummary) => priceSummary.Tips !== undefined,
+            {
+              timeout: 15_000,
+              probeTimeout: 5_000,
+              message: '已支付订单详情价格汇总中的 Tips 未在预期时间内出现。',
+            },
+          );
+          expect(displayedPriceSummary.Tips).toBeCloseTo(bigTipAmountInCents / 100, 2);
         });
       },
     );

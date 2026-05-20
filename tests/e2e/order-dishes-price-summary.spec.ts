@@ -25,6 +25,7 @@ const orderDishesFrameHtml = String.raw`
       <div class="row"><span>Subtotal</span><span>$41.78</span></div>
       <div class="row"><span>Tax</span><span>$1.25</span></div>
       <div class="row"><span>Total Before Tips</span><span>$43.03</span></div>
+      <div class="row"><span>Tips</span><span>$2.00</span></div>
     </div>
 
     <div class="row">
@@ -46,6 +47,39 @@ const orderDishesFrameHtml = String.raw`
         });
       })();
     </script>
+  </body>
+</html>
+`;
+
+const orderDishesSingleTotalFrameHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <button type="button" data-testid="icon-button-Back">Back</button>
+    <button type="button">Send</button>
+    <button type="button">Pay</button>
+
+    <div
+      role="button"
+      tabindex="0"
+      aria-expanded="true"
+      data-test-id="shared-order-price-summary-toggle"
+    >
+      <span>Toggle price summary</span>
+    </div>
+
+    <div data-testid="price-summary-details">
+      <div class="row"><span>Count</span><span>2</span></div>
+      <div class="row"><span>Subtotal</span><span>$18.00</span></div>
+      <div class="row"><span>Tax</span><span>$1.00</span></div>
+      <div class="row"><span>Total Before Tips</span><span>$19.00</span></div>
+      <div class="row"><span>Tips</span><span>$2.00</span></div>
+    </div>
+
+    <div class="row">
+      <span>Total</span>
+      <span>$21.00</span>
+    </div>
   </body>
 </html>
 `;
@@ -77,6 +111,7 @@ test.describe('点单页价格汇总契约', () => {
           Subtotal: 41.78,
           Tax: 1.25,
           'Total Before Tips': 43.03,
+          Tips: 2,
           'Total(Cash)': 43.03,
           'Total(Card)': 44.76,
         });
@@ -87,6 +122,40 @@ test.describe('点单页价格汇总契约', () => {
           .getAttribute('aria-expanded');
 
         expect(toggleExpanded).toBe('true');
+      });
+    },
+  );
+
+  test(
+    '应兼容后台仅展示 Total 的价格汇总配置',
+    {},
+    async ({ page }) => {
+      const orderDishesPage = new OrderDishesPage(page);
+
+      await test.step('准备仅展示 Total 的点单页价格汇总骨架', async () => {
+        await page.setContent('<iframe data-wujie-id="orderDishes"></iframe>');
+        await page.locator('iframe[data-wujie-id="orderDishes"]').evaluate((iframe, content) => {
+          iframe.setAttribute('srcdoc', content as string);
+        }, orderDishesSingleTotalFrameHtml);
+        await page.evaluate(() => {
+          window.location.hash = 'orderDishes';
+        });
+      });
+
+      const priceSummary = await test.step('读取仅展示 Total 的价格汇总', async () => {
+        return await orderDishesPage.readPriceSummary();
+      });
+
+      await test.step('验证 Total 已回填到 Total(Cash) 和 Total(Card)', async () => {
+        expect(priceSummary).toMatchObject({
+          Count: 2,
+          Subtotal: 18,
+          Tax: 1,
+          'Total Before Tips': 19,
+          Tips: 2,
+          'Total(Cash)': 21,
+          'Total(Card)': 21,
+        });
       });
     },
   );

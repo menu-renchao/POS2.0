@@ -223,6 +223,34 @@ export class SplitOrderPage {
     await this.resolveDish(orderNumber, dishName).click();
   }
 
+  @step(
+    (targetOrderNumber: string, anchorDishName?: string) =>
+      anchorDishName
+        ? `页面操作：在子单 ${targetOrderNumber} 点击菜品 ${anchorDishName} 以接收已选菜品`
+        : `页面操作：在子单 ${targetOrderNumber} 接收已选菜品`,
+  )
+  async receiveDishOnSuborder(targetOrderNumber: string, anchorDishName?: string): Promise<void> {
+    const normalizedTargetOrderNumber = this.normalizeOrderNumber(targetOrderNumber);
+
+    if (anchorDishName) {
+      await this.clickDish(normalizedTargetOrderNumber, anchorDishName);
+      return;
+    }
+
+    const snapshot = await this.readSnapshot();
+    const targetSuborder = snapshot.suborders.find(
+      (suborder) => this.normalizeOrderNumber(suborder.orderNumber) === normalizedTargetOrderNumber,
+    );
+    const fallbackDishName = targetSuborder?.dishes[0]?.name ?? null;
+
+    if (fallbackDishName) {
+      await this.clickDish(normalizedTargetOrderNumber, fallbackDishName);
+      return;
+    }
+
+    await this.clickSuborder(normalizedTargetOrderNumber);
+  }
+
   @step((orderNumber: string, dishName: string) => `页面操作：点击子单 ${orderNumber} 中的菜品 ${dishName}`)
   async clickDish(orderNumber: string, dishName: string): Promise<void> {
     await this.modal.evaluate(
@@ -449,6 +477,30 @@ export class SplitOrderPage {
     const normalizedProportion = this.normalizeOptionalText(dish?.proportion);
 
     return !normalizedProportion || !/^1\/\d+$/.test(normalizedProportion);
+  }
+
+  @step((suborderIndex: string) => `页面读取：根据子单序号 ${suborderIndex} 解析子单单号`)
+  async readSuborderOrderNumberByIndex(suborderIndex: string): Promise<string | null> {
+    const snapshot = await this.readSnapshot();
+    const normalizedIndex = this.normalizeOrderNumber(suborderIndex);
+
+    for (const suborder of snapshot.suborders) {
+      const orderNumber = this.normalizeOrderNumber(suborder.orderNumber);
+
+      if (orderNumber === normalizedIndex) {
+        return orderNumber;
+      }
+
+      if (orderNumber.endsWith(`-${normalizedIndex}`)) {
+        return orderNumber;
+      }
+
+      if (orderNumber.split('-').pop() === normalizedIndex) {
+        return orderNumber;
+      }
+    }
+
+    return null;
   }
 
   @step('页面读取：读取剩余金额')

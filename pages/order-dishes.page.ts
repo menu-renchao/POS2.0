@@ -6,6 +6,7 @@ import { OrderDishesPageContext } from './order-dishes/order-dishes-page-context
 import type { OrderDishesPageHost } from './order-dishes/order-dishes-page-host';
 import { OrderDishesPageNavigation } from './order-dishes/order-dishes-navigation';
 import { OrderDishesReadsSection } from './order-dishes/order-dishes-reads.section';
+import { OrderDishesTipSection } from './order-dishes/order-dishes-tip.section';
 
 export type {
   ChargeCustomType,
@@ -27,6 +28,7 @@ export class OrderDishesPage implements OrderDishesPageHost {
   private readonly modifier: OrderDishesModifierSection;
   private readonly charge: OrderDishesChargeSection;
   private readonly reads: OrderDishesReadsSection;
+  private readonly tips: OrderDishesTipSection;
 
   constructor(page: Page) {
     this.ctx = new OrderDishesPageContext(page);
@@ -37,6 +39,7 @@ export class OrderDishesPage implements OrderDishesPageHost {
     );
     this.charge = new OrderDishesChargeSection(this.ctx, this);
     this.reads = new OrderDishesReadsSection(this.ctx, this);
+    this.tips = new OrderDishesTipSection(this.ctx, this);
   }
 
   expectLoaded(...args: Parameters<OrderDishesPageNavigation['expectLoaded']>): ReturnType<OrderDishesPageNavigation['expectLoaded']> {
@@ -261,6 +264,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
 
   readPriceSummary(...args: Parameters<OrderDishesReadsSection['readPriceSummary']>): ReturnType<OrderDishesReadsSection['readPriceSummary']> {
     return this.reads.readPriceSummary(...args);
+  }
+
+  addTip(...args: Parameters<OrderDishesTipSection['addTip']>): ReturnType<OrderDishesTipSection['addTip']> {
+    return this.tips.addTip(...args);
   }
 
   expandPriceSummary(...args: Parameters<OrderDishesReadsSection['expandPriceSummary']>): ReturnType<OrderDishesReadsSection['expandPriceSummary']> {
