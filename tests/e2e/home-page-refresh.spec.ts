@@ -135,7 +135,110 @@ const homeFrameWithDelayedToGoReadyHtml = String.raw`
 </html>
 `;
 
+const homeFrameWithStableHeaderButtonsOnlyHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <button type="button" data-testid="pos-ui-theme-toggle">Theme</button>
+    <button
+      type="button"
+      data-testid="icon-button-language"
+      data-test-id="shared-language-switcher-dropdown-trigger"
+      aria-label="language"
+    >
+      Language
+    </button>
+    <button type="button" data-testid="icon-button-support" aria-label="support">Support</button>
+    <button type="button" data-testid="icon-button-refresh" aria-label="refresh">Refresh</button>
+    <button type="button" data-testid="icon-button-exit" aria-label="exit">Exit</button>
+  </body>
+</html>
+`;
+
+const homeFrameWithTextOnlyPickUpEntryHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <button type="button" id="pick-up-entry">Pick Up</button>
+
+    <script>
+      (() => {
+        const pickUpEntry = document.querySelector('#pick-up-entry');
+
+        pickUpEntry?.addEventListener('click', () => {
+          document.body.innerHTML = [
+            '<input placeholder="Phone number" />',
+            '<input placeholder="Name" />',
+            '<input placeholder="Note" />',
+            '<button type="button" data-testid="button-default">Start Order</button>',
+          ].join('');
+        });
+      })();
+    </script>
+  </body>
+</html>
+`;
+
 test.describe('主页刷新契约', () => {
+  test(
+    '主页核心可用信号应基于固定头部按钮而非可配置菜单项',
+    {},
+    async ({ page }) => {
+      await test.step('准备仅包含固定头部按钮的主页骨架', async () => {
+        await page.setContent(`
+          <!DOCTYPE html>
+          <html lang="en">
+            <body>
+              <div id="floatmsgbx" hidden>Loading...</div>
+              <div id="newLoginContainer">
+                <iframe></iframe>
+              </div>
+            </body>
+          </html>
+        `);
+        await page.locator('#newLoginContainer iframe').evaluate((iframe, content) => {
+          iframe.setAttribute('srcdoc', content as string);
+        }, homeFrameWithStableHeaderButtonsOnlyHtml);
+      });
+
+      const homePage = new HomePage(page);
+
+      await test.step('当前主页就绪判断不应再依赖 Pick Up、Report、Admin、Recall 等灵活菜单', async () => {
+        await homePage.expectPrimaryFunctionCardsVisible();
+      });
+    },
+  );
+
+  test(
+    '应能通过按钮名称识别没有 data-testid 的 Pick Up 入口',
+    {},
+    async ({ page }) => {
+      await test.step('准备仅通过按钮名称暴露 Pick Up 入口的主页骨架', async () => {
+        await page.setContent(`
+          <!DOCTYPE html>
+          <html lang="en">
+            <body>
+              <div id="floatmsgbx" hidden>Loading...</div>
+              <div id="newLoginContainer">
+                <iframe></iframe>
+              </div>
+            </body>
+          </html>
+        `);
+        await page.locator('#newLoginContainer iframe').evaluate((iframe, content) => {
+          iframe.setAttribute('srcdoc', content as string);
+        }, homeFrameWithTextOnlyPickUpEntryHtml);
+      });
+
+      const homePage = new HomePage(page);
+
+      await test.step('点击 Pick Up 后仍应进入 Pick Up 信息页', async () => {
+        const pickUpPage = await homePage.enterPickUp();
+        await pickUpPage.expectVisible();
+      });
+    },
+  );
+
   test(
     '应能点击主页刷新按钮并等待刷新完成',
     {},

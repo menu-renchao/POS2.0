@@ -1,10 +1,6 @@
 export const inventoryMenu = {
-  group: 'Lunch',
-  category: 'Chicken Lunch E',
-  groupTestId: 'menu-group-card-grp_67',
-  categoryTestId: 'menu-category-card-ctg_4863',
-  inventoryCategoryPanelId: 'cty_4863',
-  dishTestId: 'menu-item-card-dsh1_112_36627',
+  group: 'Group 001',
+  category: 'Category 001',
 } as const;
 
 export const inventoryDishes = {

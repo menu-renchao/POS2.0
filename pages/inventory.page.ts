@@ -4,10 +4,10 @@ import { OrderDishesPage } from './order-dishes.page';
 import { waitForInputSettled } from '../utils/input-stability';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
+import { resolveFirstVisibleLocator } from './shared/locator-scope';
 
 export type InventoryMenuNavigation = {
   category: string;
-  inventoryCategoryPanelId?: string;
 };
 
 export type InventoryItemFocusParams = {
@@ -67,18 +67,17 @@ export class InventoryPage {
   async focusItem(params: InventoryItemFocusParams): Promise<void> {
     await this.expectLoaded();
 
-    if (params.menu?.inventoryCategoryPanelId) {
-      await this.page
-        .locator(`#${params.menu.inventoryCategoryPanelId}`)
-        .getByText(params.menu.category, { exact: true })
-        .click();
+    if (params.menu?.category) {
+      const categoryTrigger = await this.resolveVisibleCategoryTrigger(params.menu.category);
+      await categoryTrigger.click();
     }
 
     if (params.limitedStockFilter) {
       await this.limitedStockFilter.click();
     }
 
-    await expect(this.itemNameLocator(params.itemName)).toBeVisible({ timeout: 15_000 });
+    const itemLocator = await this.resolveVisibleItemNameLocator(params.itemName);
+    await expect(itemLocator).toBeVisible({ timeout: 15_000 });
   }
 
   @step((params: InventoryItemFocusParams) => `页面操作：搜索库存商品 ${params.itemName}`)
@@ -88,7 +87,8 @@ export class InventoryPage {
       await this.itemNameInput.fill(params.itemName);
       await waitForInputSettled();
       await this.searchButton.click();
-      await expect(this.itemNameLocator(params.itemName)).toBeVisible({ timeout: 15_000 });
+      const itemLocator = await this.resolveVisibleItemNameLocator(params.itemName);
+      await expect(itemLocator).toBeVisible({ timeout: 15_000 });
       return;
     }
 
@@ -97,7 +97,8 @@ export class InventoryPage {
 
   @step((itemName: string) => `页面操作：打开商品 ${itemName} 的库存设置弹窗`)
   async openStockSetting(itemName: string): Promise<InventoryStockSettingPage> {
-    await this.itemNameLocator(itemName).click();
+    const itemLocator = await this.resolveVisibleItemNameLocator(itemName);
+    await itemLocator.click();
 
     const stockSettingPage = new InventoryStockSettingPage(this.page, itemName);
     await stockSettingPage.expectVisible();
@@ -107,7 +108,7 @@ export class InventoryPage {
 
   @step((itemName: string) => `页面读取：读取商品 ${itemName} 的库存状态文案`)
   async readItemStockState(itemName: string): Promise<string> {
-    const stockStateLocator = this.itemStockStateLocator(itemName);
+    const stockStateLocator = await this.resolveItemStockStateLocator(itemName);
     await expect(stockStateLocator).toBeVisible({ timeout: 10_000 });
     const stockText = (await stockStateLocator.innerText()).trim();
     const matchedStock = stockText.match(/Stock:\s*\d+/);
@@ -149,13 +150,46 @@ export class InventoryPage {
     return this.page.getByText(itemName, { exact: true }).first();
   }
 
-  private itemStockStateLocator(itemName: string): Locator {
+  private async resolveVisibleItemNameLocator(itemName: string): Promise<Locator> {
+    const itemLocators = this.page.getByText(itemName, { exact: true });
+    const count = await itemLocators.count();
+    const candidates: Locator[] = [];
+
+    for (let index = 0; index < count; index += 1) {
+      candidates.push(itemLocators.nth(index));
+    }
+
+    return await resolveFirstVisibleLocator(
+      candidates,
+      `Unable to find visible inventory item on inventory page: ${itemName}.`,
+      15_000,
+    );
+  }
+
+  private async resolveVisibleCategoryTrigger(category: string): Promise<Locator> {
+    const categoryLocators = this.page.getByText(category, { exact: true });
+    const count = await categoryLocators.count();
+    const candidates: Locator[] = [];
+
+    for (let index = 0; index < count; index += 1) {
+      candidates.push(categoryLocators.nth(index));
+    }
+
+    return await resolveFirstVisibleLocator(
+      candidates,
+      `Unable to find visible inventory category on inventory page: ${category}.`,
+      15_000,
+    );
+  }
+
+  private async resolveItemStockStateLocator(itemName: string): Promise<Locator> {
     const combinedRow = this.page
       .locator('motion.div, div')
       .filter({ hasText: new RegExp(`^${escapeRegExp(itemName)}\\s*Stock:\\s*\\d+$`) })
       .first();
+    const visibleItemLocator = await this.resolveVisibleItemNameLocator(itemName);
 
-    return this.itemNameLocator(itemName)
+    return visibleItemLocator
       .locator('xpath=ancestor::*[.//*[contains(normalize-space(.),"Stock:")]][1]')
       .getByText(/Stock:\s*\d+/)
       .or(combinedRow.getByText(/Stock:\s*\d+/))

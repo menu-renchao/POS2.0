@@ -101,7 +101,7 @@ test.describe('库存管理', () => {
         const recallPage = await recallRecentOrderFromHome(currentHomePage, orderDishesPage);
         expect(trackedOrderNumber, '首次保存后应记录目标 Recall 订单号').toBeTruthy();
         orderDishesPage = await recallPage.openOrderForEditing(trackedOrderNumber as string);
-        await addRegularDish(orderDishesPage, dish.name, dish.menu, 15);
+        await addRegularDish(orderDishesPage, dish.name, dish.menu, 5);
         currentHomePage = await saveOrderAndReturnHome(orderDishesPage);
         await currentHomePage.expectPrimaryFunctionCardsVisible();
         await currentHomePage.clickRefresh();

@@ -172,7 +172,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       });
 
       const savedOrderContext = await test.step('通过 New Order 不选桌完成堂食点单并保存', async () => {
-        const selectTablePage = await readyHomePage.clickDineIn();
+        const selectTablePage = await readyHomePage.enterDineIn();
         const orderDishesPage = await skipTableSelectionAndEnterOrderDishes(selectTablePage);
 
         await addRegularDish(

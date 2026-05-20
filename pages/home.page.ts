@@ -11,18 +11,26 @@ import { expectPathname } from '../utils/expectations';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 import { createHomeScope, type FrameOrHostScope } from './shared/locator-scope';
-import { HOME_ENTRY_TEST_IDS, type HomeEntry } from './shared/page-method-contracts';
+import type { HomeEntry } from './shared/page-method-contracts';
 
 export class HomePage {
   private readonly scope: FrameOrHostScope;
   private readonly openDrawerButton: Locator;
+  private readonly themeToggleButton: Locator;
+  private readonly languageButton: Locator;
+  private readonly supportButton: Locator;
   private readonly refreshButton: Locator;
+  private readonly exitButton: Locator;
   private readonly refreshLoadingText: Locator;
 
   constructor(private readonly page: Page) {
     this.scope = createHomeScope(page);
     this.openDrawerButton = this.scope.appFrame.getByRole('button', { name: 'Open drawer' });
+    this.themeToggleButton = this.scope.appFrame.getByTestId('pos-ui-theme-toggle');
+    this.languageButton = this.scope.appFrame.getByTestId('icon-button-language');
+    this.supportButton = this.scope.appFrame.getByTestId('icon-button-support');
     this.refreshButton = this.scope.appFrame.getByTestId('icon-button-refresh');
+    this.exitButton = this.scope.appFrame.getByTestId('icon-button-exit');
     this.refreshLoadingText = this.page.locator('#floatmsgbx');
   }
 
@@ -61,14 +69,13 @@ export class HomePage {
     await this.expectEmployeeReady();
   }
 
-  @step('页面操作：确认主页的核心功能入口已经可用')
+  @step('页面操作：确认主页固定头部按钮已经可用')
   async expectPrimaryFunctionCardsVisible(): Promise<void> {
-    await expect(this.resolveFunctionButton('Dine In')).resolves.toBeDefined();
-    await expect(this.resolveFunctionButton('Delivery')).resolves.toBeDefined();
-    await expect(this.resolveFunctionButton('Pick Up')).resolves.toBeDefined();
-    await expect(this.resolveFunctionButton('Report')).resolves.toBeDefined();
-    await expect(this.resolveFunctionButton('Admin')).resolves.toBeDefined();
-    await expect(this.resolveFunctionButton('Recall')).resolves.toBeDefined();
+    await expect(this.themeToggleButton).toBeVisible();
+    await expect(this.languageButton).toBeVisible();
+    await expect(this.supportButton).toBeVisible();
+    await expect(this.refreshButton).toBeVisible();
+    await expect(this.exitButton).toBeVisible();
   }
 
   @step('页面操作：点击 Dine In 入口并进入选桌页')
@@ -264,6 +271,6 @@ export class HomePage {
   }
 
   private resolveFunctionButtonLocator(buttonName: HomeEntry): Locator {
-    return this.scope.appFrame.getByTestId(HOME_ENTRY_TEST_IDS[buttonName]);
+    return this.scope.appFrame.getByRole('button', { name: buttonName, exact: true });
   }
 }

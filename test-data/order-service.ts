@@ -11,11 +11,11 @@ export const orderServiceDishes = {
     menu: orderServiceMenu,
   },
   test: {
-    name: 'test',
+    name: '普通菜2',
     menu: orderServiceMenu,
   },
   categoryOption: {
-    name: 'test',
+    name: '普通菜2',
     menu: orderServiceMenu,
   },
 } as const;

@@ -83,7 +83,7 @@ test(
 ## Navigation Rules
 
 - Do not open POS inner pages by direct URL, hash, or deep link such as `#orderDishes`.
-- Always enter the app from `http://192.168.0.89:22080/kpos/front2/myhome.html`, then navigate through the UI flow to the target page.
+- Always enter the app from `http://192.168.0.72:22080/kpos/front2/myhome.html`, then navigate through the UI flow to the target page.
 - Apply the same rule to every in-app page, not only the order-dishes page.
 
 ## Test Design
@@ -92,6 +92,7 @@ test(
 - E2E tests should express business intent instead of click-by-click scripts.
 - When a request does not explicitly require table selection, order-entry tests should use the default no-table path; Recall checks should validate the first visible order record directly.
 - Add stronger semantic locators or test ids before introducing fragile selectors.
+- Inventory page and flow navigation must not depend on hard-coded container or panel ids such as `inventoryCategoryPanelId`; use visible business text or stable page-owned selectors instead.
 - Price-related page reads should return numeric values from the page object layer. Do not re-parse currency strings in test cases when the page object can already provide numbers.
 - Data-driven test inputs should be separated from spec files when they represent reusable domain data, business samples, or case matrices.
 - Prefer TypeScript files under `test-data/` for test data so literals keep type checking, `as const` narrowing, factories, and IDE refactoring support.

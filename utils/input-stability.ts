@@ -1,4 +1,4 @@
-export const DEFAULT_INPUT_STABILIZATION_TIMEOUT = 200;
+export const DEFAULT_INPUT_STABILIZATION_TIMEOUT = 400;
 
 export async function waitForInputSettled(
   timeout: number = DEFAULT_INPUT_STABILIZATION_TIMEOUT,
