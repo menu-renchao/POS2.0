@@ -14,6 +14,7 @@ import {
   readLatestVisibleRecallOrderNumber,
   searchRecallOrders,
   viewFirstVisibleRecallOrderDetails,
+  viewRecallOrderDetails,
 } from '../../flows/recall.flow';
 import { skipTableSelectionAndEnterOrderDishes } from '../../flows/select-table.flow';
 import { SplitOrderFlow } from '../../flows/split-order.flow';
@@ -37,7 +38,10 @@ import {
   orderServiceMultiDishQuantityCase,
   orderServiceSplitEvenlyCase,
 } from '../../test-data/order-service';
-import { RecallManualSearchTags, RecallPaymentStatuses } from '../../test-data/recall-search-options';
+import {
+  RecallManualSearchTags,
+  RecallOrderPaymentSuccessStatus,
+} from '../../test-data/recall-search-options';
 import { jiraIssueAnnotation, jiraIssueAnnotations } from '../../utils/jira';
 
 type AppEntryPages = {
@@ -474,8 +478,8 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
   );
 
   test.describe('支付回归', () => {
-    test.skip(
-      '应能在 Recall 为最新 To Go 订单完成现金支付后看到 Paid 状态',
+    test(
+      '应能在 Recall 为最新 To Go 订单完成现金支付后看到 Success 状态',
       {},
       async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
         const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
@@ -499,28 +503,28 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
           await recallPage.openOrderDetails(orderNumber);
           const paymentPage = await recallPage.openPayment();
           await paymentFlow.payByCash(paymentPage, { printReceipt: false });
+          await recallPage.closeOrderDetailsDialog();
           return orderNumber;
         });
 
-        await test.step('按订单号搜索并校验支付后状态为 Paid', async () => {
+        await test.step('按订单号搜索并校验支付后状态为 Success', async () => {
           await recallPage.expectLoaded();
           await searchRecallOrders(recallPage, {
-            paymentStatus: RecallPaymentStatuses.paid,
             manualSearch: {
               tag: RecallManualSearchTags.orderNumber,
               keyword: latestOrderNumber.replace(/^#/, ''),
             },
           });
 
-          const orderDetails = await viewFirstVisibleRecallOrderDetails(recallPage);
+          const orderDetails = await viewRecallOrderDetails(recallPage, latestOrderNumber);
           expect(orderDetails.orderNumber).toBe(latestOrderNumber);
-          expect(orderDetails.paymentStatus).toBe(RecallPaymentStatuses.paid);
+          expect(orderDetails.paymentStatus).toBe(RecallOrderPaymentSuccessStatus);
         });
       },
     );
 
-    test.skip(
-      '应能在 Recall 为最新 To Go 订单完成信用卡支付后看到 Paid 状态',
+    test(
+      '应能在 Recall 为最新 To Go 订单完成信用卡支付后看到 Success 状态',
       {},
       async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
         const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
@@ -544,22 +548,22 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
           await recallPage.openOrderDetails(orderNumber);
           const paymentPage = await recallPage.openPayment();
           await paymentFlow.payByCreditCard(paymentPage, { printReceipt: false });
+          await recallPage.closeOrderDetailsDialog();
           return orderNumber;
         });
 
-        await test.step('按订单号搜索并校验支付后状态为 Paid', async () => {
+        await test.step('按订单号搜索并校验支付后状态为 Success', async () => {
           await recallPage.expectLoaded();
           await searchRecallOrders(recallPage, {
-            paymentStatus: RecallPaymentStatuses.paid,
             manualSearch: {
               tag: RecallManualSearchTags.orderNumber,
               keyword: latestOrderNumber.replace(/^#/, ''),
             },
           });
 
-          const orderDetails = await viewFirstVisibleRecallOrderDetails(recallPage);
+          const orderDetails = await viewRecallOrderDetails(recallPage, latestOrderNumber);
           expect(orderDetails.orderNumber).toBe(latestOrderNumber);
-          expect(orderDetails.paymentStatus).toBe(RecallPaymentStatuses.paid);
+          expect(orderDetails.paymentStatus).toBe(RecallOrderPaymentSuccessStatus);
         });
       },
     );

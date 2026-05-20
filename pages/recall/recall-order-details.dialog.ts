@@ -25,7 +25,6 @@ export class RecallOrderDetailsDialog {
   private readonly visibleOrderDetailsDialogs: Locator;
   readonly orderDetailsDialog: Locator;
   private readonly orderDetailsEditButton: Locator;
-  private readonly orderDetailsPayButton: Locator;
   readonly orderDetailsMoreButton: Locator;
   private readonly legacyOrderDetailsMoreButton: Locator;
   private readonly namedOrderDetailsMoreButton: Locator;
@@ -46,10 +45,6 @@ export class RecallOrderDetailsDialog {
     this.orderDetailsEditButton = recallScopedTestId(
       this.orderDetailsDialog,
       'shared-order-detail-side-action-editod',
-    );
-    this.orderDetailsPayButton = recallScopedTestId(
-      this.orderDetailsDialog,
-      'shared-order-detail-side-action-pay',
     );
     this.orderDetailsMoreButton = recallScopedTestId(
       this.orderDetailsDialog,
@@ -136,8 +131,10 @@ export class RecallOrderDetailsDialog {
   @step('页面操作：从 Recall 订单详情点击 Pay 并进入支付页面')
   async openPayment(): Promise<PaymentPage> {
     await this.waitForOrderDetailsDialogReady();
-    await expect(this.orderDetailsPayButton).toBeVisible({ timeout: 10_000 });
-    await this.orderDetailsPayButton.click();
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+    const payButton = orderDetailsDialog.getByRole('button', { name: /^Pay$/i });
+    await expect(payButton).toBeVisible({ timeout: 10_000 });
+    await payButton.click();
 
     const paymentPage = new PaymentPage(this.page);
     await paymentPage.expectLoaded();

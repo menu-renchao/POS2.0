@@ -52,6 +52,14 @@ export class RecallFlow {
 
     if (clearFirst) {
       await recallPage.clearAllSearchConditions();
+      await waitUntil(
+        async () => (await recallPage.readActiveFilterTexts()).length,
+        (activeFilterCount) => activeFilterCount === 0,
+        {
+          timeout: 5_000,
+          message: 'Recall 筛选条件在清空后仍残留激活标签。',
+        },
+      ).catch(() => undefined);
     }
 
     if (paymentStatus && paymentStatus !== 'Unpaid') {
@@ -79,6 +87,7 @@ export class RecallFlow {
       await recallPage.selectManualSearchTag(manualSearch.tag);
       await recallPage.fillManualSearchKeyword(manualSearch.keyword);
       await recallPage.submitManualSearch();
+      await recallPage.removeUnpaidPaymentStatusFilterIfPresent();
     }
 
     return recallPage;

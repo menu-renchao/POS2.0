@@ -104,6 +104,10 @@ export class RecallPage {
     return this.filterBar.clearAllSearchConditions();
   }
 
+  async removeUnpaidPaymentStatusFilterIfPresent(): Promise<void> {
+    return this.filterBar.removeUnpaidPaymentStatusFilterIfPresent();
+  }
+
   async readVisibleOrderNumbers(): Promise<string[]> {
     return this.filterBar.readVisibleOrderNumbers();
   }
