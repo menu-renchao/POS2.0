@@ -20,7 +20,6 @@ export class InventoryFlow {
       itemName,
       menu: {
         category: menu.category,
-        inventoryCategoryPanelId: menu.inventoryCategoryPanelId,
       },
     });
 
@@ -41,7 +40,6 @@ export class InventoryFlow {
       itemName,
       menu: {
         category: menu.category,
-        inventoryCategoryPanelId: menu.inventoryCategoryPanelId,
       },
       limitedStockFilter: true,
     });
@@ -64,7 +62,6 @@ export class InventoryFlow {
       itemName,
       menu: {
         category: menu.category,
-        inventoryCategoryPanelId: menu.inventoryCategoryPanelId,
       },
       limitedStockFilter: true,
     });

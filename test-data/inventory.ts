@@ -1,6 +1,6 @@
 export const inventoryMenu = {
-  group: 'Auto Group 001',
-  category: 'Auto Category 001',
+  group: 'Group 001',
+  category: 'Category 001',
 } as const;
 
 export const inventoryDishes = {
