@@ -14,6 +14,7 @@ This repository is a maintainable Playwright + TypeScript UI automation project 
 - Use Playwright Test as the default runner.
 - Prefer `data-testid` locators first for stable elements. Only fall back to other locator strategies such as `getByRole`, `getByLabel`, or `getByText` when no reliable `data-testid` is available.
 - Prefer semantic locators such as `getByRole`, `getByLabel`, and `getByText`.
+- Automation does not need to cover Chinese UI business copy. Do not require multilingual locators or Chinese/English fallback selectors for application controls unless the product explicitly exposes both variants as stable DOM contracts. This does not change the requirement that test titles, report steps, and `@step(...)` descriptions use Chinese.
 - Page object selectors must match the actual DOM contract of the target page. Use the one selector that the page really exposes; do not broaden scope with `.or()` chains, alias attribute lists, multilingual regexes, or parent-page fallbacks just to make a locator pass.
 - Do not enumerate or traverse candidate selectors to guess the target element. If the page lacks a stable selector, add or request a `data-testid` instead of stacking fallback locators.
 - Do not default to brittle CSS chains, nth-child selectors, or XPath.
