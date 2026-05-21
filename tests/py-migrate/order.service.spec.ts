@@ -705,7 +705,14 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
             },
           });
           await recallPage.openOrderDetails(paidOrderNumber);
-          const bigTipConfirmMessage = await recallPage.addPaymentCardTip(bigTipAmountInCents);
+          const payments = await recallPage.readOrderPayments();
+
+          expect(payments.length, '已支付订单应至少有一条支付记录').toBeGreaterThan(0);
+
+          const bigTipConfirmMessage = await recallPage.addPaymentCardTip(
+            bigTipAmountInCents,
+            payments[0]?.method,
+          );
 
           expect(bigTipConfirmMessage).toBe(
             'The tip is more than 50% of the meal. Confirm to add?',

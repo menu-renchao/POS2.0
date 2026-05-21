@@ -1,5 +1,8 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import { findFirstVisibleLocator } from '../shared/locator-scope';
+import {
+  findFirstVisibleLocator,
+  resolveFirstVisibleLocator,
+} from '../shared/locator-scope';
 import { step } from '../../utils/step';
 import { waitForInputSettled } from '../../utils/input-stability';
 import { waitUntil } from '../../utils/wait';
@@ -30,7 +33,6 @@ export class RecallOrderDetailsDialog {
   private readonly legacyOrderDetailsMoreButton: Locator;
   private readonly namedOrderDetailsMoreButton: Locator;
   private readonly orderDetailsTipsButton: Locator;
-  private readonly paymentCardTipsButton: Locator;
   private readonly globalLoadingOverlay: Locator;
 
   constructor(
@@ -57,7 +59,6 @@ export class RecallOrderDetailsDialog {
     this.legacyOrderDetailsMoreButton = this.page.locator('#odsmymoreicon');
     this.namedOrderDetailsMoreButton = this.page.getByRole('button', { name: /^MoreIcon More$/i });
     this.orderDetailsTipsButton = recallScopedTestId(this.page, 'recall2-order-detail-tips');
-    this.paymentCardTipsButton = this.page.getByTestId('payment-card-tips-button');
     this.globalLoadingOverlay = this.page.locator('#floatmsgbx');
   }
 
@@ -1321,89 +1322,74 @@ export class RecallOrderDetailsDialog {
     throw new Error('Recall 订单详情 More 菜单未出现 Tips 入口。');
   }
 
-  private async resolvePaymentCardTipsButton(paymentMethod?: string): Promise<Locator> {
-    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
-
-    if (!paymentMethod) {
-      const directButton = orderDetailsDialog.getByTestId('payment-card-tips-button').first();
-
-      if (await directButton.isVisible().catch(() => false)) {
-        return directButton;
-      }
-
-      const visibleNamedButton = await this.findVisibleTipsButton(orderDetailsDialog);
-      if (visibleNamedButton) {
-        return visibleNamedButton;
-      }
-
-      return this.paymentCardTipsButton.first();
-    }
-
-    const paymentCardByAttribute = orderDetailsDialog
-      .locator(`[data-payment-method="${paymentMethod}"]`)
-      .first();
-
-    if (await paymentCardByAttribute.isVisible().catch(() => false)) {
-      const directButton = paymentCardByAttribute.getByTestId('payment-card-tips-button').first();
-      if (await directButton.isVisible().catch(() => false)) {
-        return directButton;
-      }
-
-      const visibleNamedButton = await this.findVisibleTipsButton(paymentCardByAttribute);
-      if (visibleNamedButton) {
-        return visibleNamedButton;
-      }
-    }
-
-    const paymentCard = orderDetailsDialog
-      .locator('[data-payment-method], [class*="_card_"]')
-      .filter({
-        has: this.page.getByText(paymentMethod, { exact: true }),
-      })
-      .first();
-
-    if (await paymentCard.isVisible().catch(() => false)) {
-      const directButton = paymentCard.getByTestId('payment-card-tips-button').first();
-      if (await directButton.isVisible().catch(() => false)) {
-        return directButton;
-      }
-
-      const visibleNamedButton = await this.findVisibleTipsButton(paymentCard);
-      if (visibleNamedButton) {
-        return visibleNamedButton;
-      }
-    }
-
-    throw new Error(`Recall PAYMENT 卡片未找到 ${paymentMethod} 的 Tips 入口。`);
-  }
-
-  private async clickPaymentCardTipsButton(paymentMethod?: string): Promise<void> {
-    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
-    const paymentSection = orderDetailsDialog
+  private resolvePaymentSection(orderDetailsDialog: Locator): Locator {
+    return orderDetailsDialog
       .locator('[class*="_section_"]')
       .filter({
         has: orderDetailsDialog.getByRole('heading', { name: /^PAYMENT$/i }),
       })
       .first();
+  }
 
-    if (await paymentSection.isVisible().catch(() => false)) {
-      const tipButtonScope = paymentMethod
-        ? paymentSection
-            .locator('[class*="_card_"]')
-            .filter({
-              has: paymentSection.getByText(paymentMethod, { exact: false }),
-            })
-            .last()
-        : paymentSection.locator('[class*="_card_"]').last();
-      const visibleTipsButton = await this.findVisibleTipsButton(tipButtonScope);
+  private async resolvePaymentCardScope(
+    paymentSection: Locator,
+    paymentMethod?: string,
+  ): Promise<Locator> {
+    if (paymentMethod) {
+      const paymentCardByAttribute = paymentSection
+        .locator(`[data-payment-method="${paymentMethod}"]`)
+        .first();
 
-      if (visibleTipsButton) {
-        await visibleTipsButton.click();
-        return;
+      if (await paymentCardByAttribute.isVisible().catch(() => false)) {
+        return paymentCardByAttribute;
+      }
+
+      const paymentCardByText = paymentSection
+        .locator('[data-payment-method], [class*="_card_"], [class*="_paymentInfo_"]')
+        .filter({ hasText: paymentMethod })
+        .first();
+
+      if (await paymentCardByText.isVisible().catch(() => false)) {
+        return paymentCardByText;
       }
     }
 
-    await (await this.resolvePaymentCardTipsButton(paymentMethod)).click();
+    const fallbackCard = paymentSection
+      .locator('[data-payment-method], [class*="_card_"], [class*="_paymentInfo_"]')
+      .last();
+
+    return fallbackCard;
+  }
+
+  private buildPaymentCardTipsButtonCandidates(paymentCardScope: Locator): Locator[] {
+    return [
+      recallScopedTestId(paymentCardScope, 'payment-card-tips-button'),
+      paymentCardScope.getByTestId('payment-card-tips-button'),
+      paymentCardScope
+        .locator('[class*="_contentItem_"]')
+        .filter({ hasText: /^Tips\b/i })
+        .getByRole('button', { name: /^(Tips|小费)$/ }),
+      paymentCardScope.getByRole('button', { name: /^(Tips|小费)$/ }),
+    ];
+  }
+
+  private async clickPaymentCardTipsButton(paymentMethod?: string): Promise<void> {
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+    const paymentSection = this.resolvePaymentSection(orderDetailsDialog);
+
+    await paymentSection.scrollIntoViewIfNeeded().catch(() => undefined);
+
+    const paymentCardScope = await this.resolvePaymentCardScope(paymentSection, paymentMethod);
+    const tipsButton = await resolveFirstVisibleLocator(
+      this.buildPaymentCardTipsButtonCandidates(paymentCardScope),
+      paymentMethod
+        ? `Recall PAYMENT 卡片 ${paymentMethod} 的 Tips 按钮未在预期时间内出现。`
+        : 'Recall PAYMENT 卡片的 Tips 按钮未在预期时间内出现。',
+      15_000,
+    );
+
+    await tipsButton.scrollIntoViewIfNeeded();
+    await tipsButton.click();
   }
 
   private async resolveTipDialog(isPaymentCardDialog: boolean): Promise<Locator> {
@@ -1686,17 +1672,7 @@ export class RecallOrderDetailsDialog {
   }
 
   private async findVisibleTipsButton(scope: Locator): Promise<Locator | null> {
-    const tipsButtons = scope.getByRole('button', { name: /^(Tips|小费)$/ });
-    const buttonCount = await tipsButtons.count().catch(() => 0);
-
-    for (let index = 0; index < buttonCount; index += 1) {
-      const button = tipsButtons.nth(index);
-      if (await button.isVisible().catch(() => false)) {
-        return button;
-      }
-    }
-
-    return null;
+    return findFirstVisibleLocator(this.buildPaymentCardTipsButtonCandidates(scope));
   }
 
   private async waitForVisibleOrderDialogCount(expectedCount: number): Promise<void> {
