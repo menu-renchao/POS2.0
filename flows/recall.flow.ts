@@ -4,6 +4,8 @@ import {
 } from '../pages/recall.page';
 import { HomePage } from '../pages/home.page';
 import { OrderDishesPage } from '../pages/order-dishes.page';
+import { PaymentPage } from '../pages/payment.page';
+import { SplitOrderPage } from '../pages/split-order.page';
 import {
   type RecallManualSearchTag,
   type RecallOrderStatus,
@@ -170,6 +172,244 @@ export class RecallFlow {
     await recallPage.expectLoaded();
     return await recallPage.openFirstVisibleOrderForEditing();
   }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并送厨`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并送厨`,
+  )
+  async sendOrderToKitchen(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickSendInOrderDetails();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并进入支付页面`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并进入支付页面`,
+  )
+  async openPayment(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<PaymentPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.openPayment();
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并打印`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并打印`,
+  )
+  async printOrder(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickPrintInOrderDetails();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并进入分单面板`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并进入分单面板`,
+  )
+  async openSplitOrder(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<SplitOrderPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.openSplitInOrderDetails();
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并打开折扣入口`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并打开折扣入口`,
+  )
+  async openDiscount(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickDiscountInOrderDetails();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并打开更多操作`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并打开更多操作`,
+  )
+  async openMoreActions(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickOrderDetailsMoreButton();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Charge`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并点击 More 中的 Charge`,
+  )
+  async openChargeFromMore(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickChargeInMoreMenu();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Move Item`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并点击 More 中的 Move Item`,
+  )
+  async openMoveItemFromMore(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickMoveItemInMoreMenu();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Combine`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并点击 More 中的 Combine`,
+  )
+  async openCombineFromMore(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickCombineInMoreMenu();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Tips`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并点击 More 中的 Tips`,
+  )
+  async openTipsFromMore(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickTipsInMoreMenu();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Paging`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并点击 More 中的 Paging`,
+  )
+  async openPagingFromMore(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickPagingInMoreMenu();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Call Off`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并点击 More 中的 Call Off`,
+  )
+  async openCallOffFromMore(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickCallOffInMoreMenu();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Copy`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并点击 More 中的 Copy`,
+  )
+  async openCopyFromMore(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickCopyInMoreMenu();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Void`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并点击 More 中的 Void`,
+  )
+  async openVoidFromMore(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickVoidInMoreMenu();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Sort`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并点击 More 中的 Sort`,
+  )
+  async openSortFromMore(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.clickSortInMoreMenu();
+    return recallPage;
+  }
 }
 
 export async function searchRecallOrders(
@@ -229,4 +469,139 @@ export async function editFirstVisibleRecallOrder(
 ): Promise<OrderDishesPage> {
   const recallFlow = new RecallFlow();
   return await recallFlow.editFirstVisibleOrder(recallPage);
+}
+
+export async function sendRecallOrderToKitchen(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.sendOrderToKitchen(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderPayment(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<PaymentPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openPayment(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function printRecallOrder(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.printOrder(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderSplitPanel(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<SplitOrderPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openSplitOrder(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderDiscount(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openDiscount(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderMoreActions(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openMoreActions(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderChargeFromMore(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openChargeFromMore(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderMoveItemFromMore(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openMoveItemFromMore(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderCombineFromMore(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openCombineFromMore(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderTipsFromMore(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openTipsFromMore(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderPagingFromMore(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openPagingFromMore(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderCallOffFromMore(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openCallOffFromMore(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderCopyFromMore(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openCopyFromMore(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderVoidFromMore(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openVoidFromMore(recallPage, orderNumber, targetOrderNumber);
+}
+
+export async function openRecallOrderSortFromMore(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber?: string,
+): Promise<RecallPage> {
+  const recallFlow = new RecallFlow();
+  return await recallFlow.openSortFromMore(recallPage, orderNumber, targetOrderNumber);
 }

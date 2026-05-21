@@ -1,6 +1,33 @@
 import { expect, test } from '@playwright/test';
-import { viewRecallOrderDetails } from '../../flows/recall.flow';
+import {
+  openRecallOrderCallOffFromMore,
+  openRecallOrderChargeFromMore,
+  openRecallOrderCombineFromMore,
+  openRecallOrderCopyFromMore,
+  openRecallOrderDiscount,
+  openRecallOrderMoreActions,
+  openRecallOrderMoveItemFromMore,
+  openRecallOrderPagingFromMore,
+  openRecallOrderPayment,
+  openRecallOrderSplitPanel,
+  openRecallOrderSortFromMore,
+  openRecallOrderTipsFromMore,
+  openRecallOrderVoidFromMore,
+  printRecallOrder,
+  viewRecallOrderDetails,
+} from '../../flows/recall.flow';
 import { RecallPage } from '../../pages/recall.page';
+
+const noAvailableActions = {
+  edit: false,
+  send: false,
+  print: false,
+  pay: false,
+  split: false,
+  discount: false,
+  reopen: false,
+  more: false,
+} as const;
 
 const fullOrderDetailFixtureHtml = String.raw`
 <!DOCTYPE html>
@@ -387,6 +414,16 @@ const changedSelectorOrderDetailFixtureHtml = String.raw`
         <div><span>Subtotal</span><span>$18.00</span></div>
         <div><span>Total</span><span>$19.00</span></div>
       </div>
+
+      <div class="_sideActionsPanel_ti4a2_509">
+        <button type="button" data-testid="button-default">Edit</button>
+        <button type="button" data-testid="button-default">Send</button>
+        <button type="button" data-testid="button-default">Print</button>
+        <button type="button" data-testid="button-default">Pay</button>
+        <button type="button" data-testid="button-default">Split</button>
+        <button type="button" data-testid="button-default">Discount</button>
+        <button type="button" data-testid="button-default">More</button>
+      </div>
     </div>
 
     <script>
@@ -489,6 +526,278 @@ const orderDetailWithOptionsFixtureHtml = String.raw`
         window.addEventListener('keydown', (event) => {
           if (event.key === 'Escape') {
             dialog.hidden = true;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
+`;
+
+const partialPaidTotalOnlyFixtureHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <button type="button" data-testid="recall2-header-new-order">New Order</button>
+    <button type="button" data-testid="recall2-filter-dropdown-paymentStatus">Payment Status</button>
+    <button type="button" data-testid="recall2-filter-dropdown-orderStatus">Order Status</button>
+    <button type="button" data-testid="recall2-filter-dropdown-orderType">Order Type</button>
+    <button type="button" data-testid="recall2-filter-dropdown-paymentType">Payment Type</button>
+    <button type="button" data-testid="recall2-filter-dropdown-productLine">Product Line</button>
+    <button type="button" data-testid="recall2-search-trigger">Search</button>
+    <input data-testid="recall2-search-input" value="" />
+
+    <div data-testid="recall2-order-list-container">
+      <button type="button" data-testid="recall2-order-card-6">#6</button>
+    </div>
+
+    <div role="dialog" aria-modal="true" data-testid="pos-ui-modal" hidden>
+      <div class="_header_1ej2d_479">
+        <div class="_orderNumber_1bmdj_459"><span class="_number_1bmdj_480">#6</span></div>
+        <div class="_status_1bmdj_494"><span class="_statusTag_1bmdj_500">Semi-Paid</span></div>
+        <div class="_actionButtons_gham7_478">
+          <button type="button">To Go</button>
+          <button type="button">Boss</button>
+        </div>
+      </div>
+
+      <div class="_section_201h3_462">
+        <div class="_header_blu61_457"><h3>PAYMENT</h3></div>
+        <div class="_content_blu61_472">
+          <div class="_card_7kgct_437">
+            <div class="_paymentType_7kgct_465">
+              <span class="_methodLabel_7kgct_492">Cash</span>
+              <span class="_amount_7kgct_501">$2.50</span>
+            </div>
+            <div class="_contentItem_7kgct_517">
+              <span class="_detailLabel_7kgct_523">Tips:</span>
+              <span class="_detailAmount_7kgct_524">$0.00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-testid="pos-ui-dish-item" class="_dishItem_99zrf_198">
+        <div class="_dishMainRow_99zrf_241">
+          <div class="_dishInfo_99zrf_205">
+            <section class="_prefix_99zrf_282"><span class="_quantity_99zrf_236">1</span></section>
+            <span class="_dishName_99zrf_333">普通菜1</span>
+          </div>
+          <span class="_dishPrice_99zrf_342">$8.80</span>
+        </div>
+      </div>
+
+      <div data-testid="shared-order-price-summary-toggle">
+        <div><span>Total</span><span>$209.90</span></div>
+      </div>
+
+      <div class="_sideActionsPanel_ti4a2_509">
+        <button type="button" data-testid="button-default">Reopen</button>
+        <button type="button" data-testid="button-default">Send</button>
+        <button type="button" data-testid="button-default">Print</button>
+        <button type="button" data-testid="button-default">Pay</button>
+        <button type="button" data-testid="button-default">More</button>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const orderCard = document.querySelector('[data-testid="recall2-order-list-container"] button');
+        const dialog = document.querySelector('[data-testid="pos-ui-modal"]');
+        orderCard?.addEventListener('click', () => {
+          dialog.hidden = false;
+        });
+        window.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            dialog.hidden = true;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
+`;
+
+const unpaidOrderActionsFixtureHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <button type="button" data-testid="recall2-header-new-order">New Order</button>
+    <button type="button" data-testid="recall2-filter-dropdown-paymentStatus">Payment Status</button>
+    <button type="button" data-testid="recall2-filter-dropdown-orderStatus">Order Status</button>
+    <button type="button" data-testid="recall2-filter-dropdown-orderType">Order Type</button>
+    <button type="button" data-testid="recall2-filter-dropdown-paymentType">Payment Type</button>
+    <button type="button" data-testid="recall2-filter-dropdown-productLine">Product Line</button>
+    <button type="button" data-testid="recall2-search-trigger">Search</button>
+    <input data-testid="recall2-search-input" value="" />
+
+    <div data-testid="recall2-order-list-container">
+      <button type="button" data-testid="shared-order-card-open-1">#1</button>
+    </div>
+
+    <div role="dialog" aria-modal="true" data-testid="pos-ui-modal" hidden>
+      <div class="_header_1ej2d_479">
+        <div class="_orderNumber_1bmdj_459"><span class="_number_1bmdj_480">#1</span></div>
+        <div class="_status_1bmdj_494"><span class="_statusTag_1bmdj_500">Unpaid</span></div>
+      </div>
+      <div class="_sideActionsPanel_ti4a2_509">
+        <button type="button" data-testid="button-default" data-action="print">Print</button>
+        <button type="button" data-testid="button-default" data-action="pay">Pay</button>
+        <button type="button" data-testid="button-default" data-action="split">Split</button>
+        <button type="button" data-testid="button-default" data-action="discount">Discount</button>
+        <button type="button" data-testid="button-default" data-action="more">More</button>
+      </div>
+    </div>
+
+    <div data-testid="payment-page" hidden>
+      <div id="_summaryContent">
+        <div class="summary-row">
+          <span class="label">Total</span>
+          <span class="value">$10.00</span>
+        </div>
+      </div>
+      <section aria-label="Balance due">
+        <button type="button" data-testid="balance-due-cash">Cash</button>
+        <button type="button" data-testid="balance-due-cards">Cards</button>
+      </section>
+      <section aria-label="Payment type">
+        <button type="button" data-testid="payment-type-cash">Cash</button>
+        <button type="button" data-testid="payment-type-credit-card">Credit Card</button>
+      </section>
+    </div>
+
+    <iframe
+      data-wujie-id="splitPanel"
+      hidden
+      srcdoc="<body><div role='dialog'><h1>Split Order #1</h1></div></body>"
+    ></iframe>
+
+    <script>
+      (() => {
+        const state = {
+          print: false,
+          pay: false,
+          split: false,
+          discount: false,
+          more: false,
+        };
+
+        window.__recallUnpaidActionState = state;
+
+        const dialog = document.querySelector('[data-testid="pos-ui-modal"]');
+        const orderCard = document.querySelector('[data-testid="shared-order-card-open-1"]');
+        const paymentPage = document.querySelector('[data-testid="payment-page"]');
+        const splitFrame = document.querySelector('iframe[data-wujie-id="splitPanel"]');
+
+        orderCard.addEventListener('click', () => {
+          dialog.hidden = false;
+        });
+
+        document.querySelector('[data-action="print"]').addEventListener('click', () => {
+          state.print = true;
+        });
+        document.querySelector('[data-action="pay"]').addEventListener('click', () => {
+          state.pay = true;
+          dialog.hidden = true;
+          paymentPage.hidden = false;
+        });
+        document.querySelector('[data-action="split"]').addEventListener('click', () => {
+          state.split = true;
+          splitFrame.hidden = false;
+        });
+        document.querySelector('[data-action="discount"]').addEventListener('click', () => {
+          state.discount = true;
+        });
+        document.querySelector('[data-action="more"]').addEventListener('click', () => {
+          state.more = true;
+        });
+        window.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            dialog.hidden = true;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
+`;
+
+const moreMenuActionsFixtureHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <button type="button" data-testid="recall2-header-new-order">New Order</button>
+    <button type="button" data-testid="recall2-filter-dropdown-paymentStatus">Payment Status</button>
+    <button type="button" data-testid="recall2-filter-dropdown-orderStatus">Order Status</button>
+    <button type="button" data-testid="recall2-filter-dropdown-orderType">Order Type</button>
+    <button type="button" data-testid="recall2-filter-dropdown-paymentType">Payment Type</button>
+    <button type="button" data-testid="recall2-filter-dropdown-productLine">Product Line</button>
+    <button type="button" data-testid="recall2-search-trigger">Search</button>
+    <input data-testid="recall2-search-input" value="" />
+
+    <div data-testid="recall2-order-list-container">
+      <button type="button" data-testid="shared-order-card-open-1">#1</button>
+    </div>
+
+    <div role="dialog" aria-modal="true" data-testid="pos-ui-modal" hidden>
+      <div class="_header_1ej2d_479">
+        <div class="_orderNumber_1bmdj_459"><span class="_number_1bmdj_480">#1</span></div>
+        <div class="_status_1bmdj_494"><span class="_statusTag_1bmdj_500">Unpaid</span></div>
+      </div>
+      <div class="_sideActionsPanel_ti4a2_509">
+        <button type="button" data-testid="button-default" data-action="more">More</button>
+      </div>
+    </div>
+
+    <div role="menu" aria-label="Recall order more actions" hidden>
+      <button type="button" data-more-action="charge">Charge</button>
+      <button type="button" data-more-action="moveItem">Move Item</button>
+      <button type="button" data-more-action="combine">Combine</button>
+      <button type="button" data-more-action="tips">Tips</button>
+      <button type="button" data-more-action="paging">Paging</button>
+      <button type="button" data-more-action="callOff">Call Off</button>
+      <button type="button" data-more-action="copy">Copy</button>
+      <button type="button" data-more-action="void">Void</button>
+      <button type="button" data-more-action="sort">Sort</button>
+    </div>
+
+    <script>
+      (() => {
+        const state = {
+          charge: false,
+          moveItem: false,
+          combine: false,
+          tips: false,
+          paging: false,
+          callOff: false,
+          copy: false,
+          void: false,
+          sort: false,
+        };
+
+        window.__recallMoreMenuActionState = state;
+
+        const dialog = document.querySelector('[data-testid="pos-ui-modal"]');
+        const orderCard = document.querySelector('[data-testid="shared-order-card-open-1"]');
+        const moreButton = document.querySelector('[data-action="more"]');
+        const moreMenu = document.querySelector('[role="menu"]');
+
+        orderCard.addEventListener('click', () => {
+          dialog.hidden = false;
+        });
+        moreButton.addEventListener('click', () => {
+          moreMenu.hidden = false;
+        });
+        document.querySelectorAll('[data-more-action]').forEach((button) => {
+          button.addEventListener('click', () => {
+            state[button.dataset.moreAction] = true;
+            moreMenu.hidden = true;
+          });
+        });
+        window.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            dialog.hidden = true;
+            moreMenu.hidden = true;
           }
         });
       })();
@@ -669,6 +978,7 @@ test.describe('Recall 订单详情读取', () => {
           'Total Before Tips': 186.44,
           Total: 188.44,
         },
+        availableActions: noAvailableActions,
       });
 
       await expect(page.getByRole('dialog')).toBeHidden();
@@ -706,6 +1016,7 @@ test.describe('Recall 订单详情读取', () => {
         priceSummary: {
           Total: 0,
         },
+        availableActions: noAvailableActions,
       });
 
       await expect(page.getByRole('dialog')).toBeHidden();
@@ -767,6 +1078,16 @@ test.describe('Recall 订单详情读取', () => {
           Subtotal: 18,
           Total: 19,
         },
+        availableActions: {
+          edit: true,
+          send: true,
+          print: true,
+          pay: true,
+          split: true,
+          discount: true,
+          reopen: false,
+          more: true,
+        },
       });
 
       await expect(page.getByRole('dialog')).toBeHidden();
@@ -803,6 +1124,216 @@ test.describe('Recall 订单详情读取', () => {
         },
       ]);
       await expect(page.getByRole('dialog')).toBeHidden();
+    },
+  );
+
+  test(
+    '应能读取仅稳定展示 Total 的部分支付订单详情',
+    {},
+    async ({ page }) => {
+      const recallPage = new RecallPage(page);
+
+      await test.step('准备仅稳定展示 Total 的部分支付订单详情', async () => {
+        await page.setContent(partialPaidTotalOnlyFixtureHtml);
+        await page.evaluate(() => {
+          window.location.hash = '#recall';
+        });
+      });
+
+      const details = await viewRecallOrderDetails(recallPage, '6');
+
+      expect(details).toEqual({
+        orderNumber: '#6',
+        paymentStatus: 'Semi-Paid',
+        customerInfo: null,
+        memberInfo: null,
+        orderContext: {
+          orderType: 'To Go',
+          tableName: null,
+          guestCount: null,
+          serverName: 'Boss',
+        },
+        payments: [
+          {
+            method: 'Cash',
+            amount: '$2.50',
+            details: {
+              Tips: '$0.00',
+            },
+          },
+        ],
+        items: [
+          {
+            seat: null,
+            sentTime: null,
+            quantity: '1',
+            name: '普通菜1',
+            price: '$8.80',
+            additions: [],
+          },
+        ],
+        priceSummary: {
+          Total: 209.9,
+        },
+        availableActions: {
+          edit: false,
+          send: true,
+          print: true,
+          pay: true,
+          split: false,
+          discount: false,
+          reopen: true,
+          more: true,
+        },
+      });
+      await expect(page.getByRole('dialog')).toBeHidden();
+    },
+  );
+
+  test(
+    '应能从未支付订单详情触发右侧操作入口',
+    {},
+    async ({ page }) => {
+      const readActionState = async () =>
+        await page.evaluate(
+          () =>
+            (window as typeof window & {
+              __recallUnpaidActionState: Record<string, boolean>;
+            }).__recallUnpaidActionState,
+        );
+      const loadActionFixture = async () => {
+        await page.setContent(unpaidOrderActionsFixtureHtml);
+        await page.evaluate(() => {
+          window.location.hash = '#recall';
+        });
+      };
+
+      await test.step('触发未支付订单 Print 入口', async () => {
+        await loadActionFixture();
+        const recallPage = new RecallPage(page);
+
+        await printRecallOrder(recallPage, '1');
+
+        expect(await readActionState()).toMatchObject({ print: true });
+      });
+
+      await test.step('触发未支付订单 Pay 入口并进入支付页', async () => {
+        await loadActionFixture();
+        const recallPage = new RecallPage(page);
+
+        const paymentPage = await openRecallOrderPayment(recallPage, '1');
+
+        await paymentPage.expectLoaded();
+        expect(await readActionState()).toMatchObject({ pay: true });
+      });
+
+      await test.step('触发未支付订单 Split 入口并进入分单面板', async () => {
+        await loadActionFixture();
+        const recallPage = new RecallPage(page);
+
+        const splitOrderPage = await openRecallOrderSplitPanel(recallPage, '1');
+
+        await splitOrderPage.expectLoaded('1');
+        expect(await readActionState()).toMatchObject({ split: true });
+      });
+
+      await test.step('触发未支付订单 Discount 入口', async () => {
+        await loadActionFixture();
+        const recallPage = new RecallPage(page);
+
+        await openRecallOrderDiscount(recallPage, '1');
+
+        expect(await readActionState()).toMatchObject({ discount: true });
+      });
+
+      await test.step('触发未支付订单 More 入口', async () => {
+        await loadActionFixture();
+        const recallPage = new RecallPage(page);
+
+        await openRecallOrderMoreActions(recallPage, '1');
+
+        expect(await readActionState()).toMatchObject({ more: true });
+      });
+    },
+  );
+
+  test(
+    '应能从订单详情 More 菜单触发二级操作入口',
+    {},
+    async ({ page }) => {
+      const readMoreActionState = async () =>
+        await page.evaluate(
+          () =>
+            (window as typeof window & {
+              __recallMoreMenuActionState: Record<string, boolean>;
+            }).__recallMoreMenuActionState,
+        );
+      const loadMoreActionFixture = async () => {
+        await page.setContent(moreMenuActionsFixtureHtml);
+        await page.evaluate(() => {
+          window.location.hash = '#recall';
+        });
+      };
+      const cases = [
+        {
+          name: 'Charge',
+          stateKey: 'charge',
+          run: async (recallPage: RecallPage) => await openRecallOrderChargeFromMore(recallPage, '1'),
+        },
+        {
+          name: 'Move Item',
+          stateKey: 'moveItem',
+          run: async (recallPage: RecallPage) => await openRecallOrderMoveItemFromMore(recallPage, '1'),
+        },
+        {
+          name: 'Combine',
+          stateKey: 'combine',
+          run: async (recallPage: RecallPage) => await openRecallOrderCombineFromMore(recallPage, '1'),
+        },
+        {
+          name: 'Tips',
+          stateKey: 'tips',
+          run: async (recallPage: RecallPage) => await openRecallOrderTipsFromMore(recallPage, '1'),
+        },
+        {
+          name: 'Paging',
+          stateKey: 'paging',
+          run: async (recallPage: RecallPage) => await openRecallOrderPagingFromMore(recallPage, '1'),
+        },
+        {
+          name: 'Call Off',
+          stateKey: 'callOff',
+          run: async (recallPage: RecallPage) => await openRecallOrderCallOffFromMore(recallPage, '1'),
+        },
+        {
+          name: 'Copy',
+          stateKey: 'copy',
+          run: async (recallPage: RecallPage) => await openRecallOrderCopyFromMore(recallPage, '1'),
+        },
+        {
+          name: 'Void',
+          stateKey: 'void',
+          run: async (recallPage: RecallPage) => await openRecallOrderVoidFromMore(recallPage, '1'),
+        },
+        {
+          name: 'Sort',
+          stateKey: 'sort',
+          run: async (recallPage: RecallPage) => await openRecallOrderSortFromMore(recallPage, '1'),
+        },
+      ];
+
+      for (const actionCase of cases) {
+        await test.step(`触发 More 菜单中的 ${actionCase.name} 入口`, async () => {
+          await loadMoreActionFixture();
+          const recallPage = new RecallPage(page);
+
+          await actionCase.run(recallPage);
+
+          expect(await readMoreActionState()).toMatchObject({
+            [actionCase.stateKey]: true,
+          });
+        });
+      }
     },
   );
 
