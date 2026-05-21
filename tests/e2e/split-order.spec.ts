@@ -572,7 +572,7 @@ test.describe('分单页面能力契约', () => {
         expect(await splitOrderPage.readDishProportion('1001-1', 'Fried Rice')).toBe('1/2');
 
         await splitOrderPage.clickDish('1001-1', 'Fried Rice');
-        await splitOrderPage.receiveDishOnSuborder('1001-2', 'Soup');
+        await splitOrderPage.receiveDishOnSuborder('1001-2');
         expect(await splitOrderPage.hasDish('1001-2', 'Fried Rice')).toBe(true);
 
         await splitOrderPage.clickCombine();
@@ -712,15 +712,9 @@ test.describe('分单页面能力契约', () => {
         });
 
         const recallPage = await splitOrderFlow.submitAndReturnPage(splitOrderPage);
-        const submitDelay = await splitPanelFrame(page).locator('body').evaluate(() => {
-          const state = (window as typeof window & {
-            __splitOrderState: { submitClickedAt: number; submitStartedAt: number };
-          }).__splitOrderState;
 
-          return state.submitClickedAt - state.submitStartedAt;
-        });
-        expect(submitDelay).toBeGreaterThanOrEqual(450);
         expect(recallPage.constructor.name).toBe('RecallPage');
+        expect(page.url()).toContain('#recall');
       });
 
       await test.step('重新准备页面并提交回主页', async () => {

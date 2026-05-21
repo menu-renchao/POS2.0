@@ -116,15 +116,11 @@ export class SplitOrderFlow {
       return;
     }
 
-    const snapshot = await splitOrderPage.readSnapshot();
-    const targetSuborder = snapshot.suborders.find(
-      (suborder) => suborder.orderNumber === targetOrderNumber,
-    );
-    const anchorDishName = targetSuborder?.dishes[0]?.name ?? undefined;
+    const normalizedTargetOrderNumber = targetOrderNumber.replace(/^#/, '');
 
     for (const dishName of dishNames) {
       await splitOrderPage.clickDish(sourceOrderNumber, dishName);
-      await splitOrderPage.receiveDishOnSuborder(targetOrderNumber, anchorDishName);
+      await splitOrderPage.receiveDishOnSuborder(normalizedTargetOrderNumber);
     }
   }
 
@@ -174,6 +170,11 @@ export class SplitOrderFlow {
     }
 
     await splitOrderPage.confirmCombine();
+  }
+
+  @step('业务步骤：撤销当前分单')
+  async cancelSplit(splitOrderPage: SplitOrderPage): Promise<void> {
+    await splitOrderPage.clickCancelSplit();
   }
 
   @step('业务步骤：提交分单并根据当前地址返回对应页面对象')
@@ -232,6 +233,11 @@ export async function moveDishes(
 ): Promise<void> {
   const flow = new SplitOrderFlow();
   await flow.moveDishes(splitOrderPage, sourceOrderNumber, dishNames, targetOrderNumber);
+}
+
+export async function cancelSplit(splitOrderPage: SplitOrderPage): Promise<void> {
+  const flow = new SplitOrderFlow();
+  await flow.cancelSplit(splitOrderPage);
 }
 
 export async function moveDishesBySuborderIndex(

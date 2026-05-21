@@ -18,6 +18,7 @@ import {
 } from '../../flows/recall.flow';
 import { skipTableSelectionAndEnterOrderDishes } from '../../flows/select-table.flow';
 import { SplitOrderFlow } from '../../flows/split-order.flow';
+import type { SplitOrderSnapshot } from '../../pages/split-order.page';
 import {
   startDeliveryOrder,
   startPickUpOrder,
@@ -36,6 +37,9 @@ import {
   orderServiceDishes,
   orderServiceEditRecallTaxCase,
   orderServiceMultiDishQuantityCase,
+  orderServiceCancelSplitCase,
+  orderServiceSplitByAmountCase,
+  orderServiceSplitByDishCase,
   orderServiceSplitEvenlyCase,
 } from '../../test-data/order-service';
 import {
@@ -87,6 +91,26 @@ function buildLargeTipAmountInCents(totalBeforeTips: number): number {
 
 function formatCurrencyFromCents(amountInCents: number): string {
   return `$${(amountInCents / 100).toFixed(2)}`;
+}
+
+function normalizeSplitOrderNumber(orderNumber: string): string {
+  return orderNumber.replace(/^#/, '').trim();
+}
+
+function countSplitDishRows(
+  snapshot: SplitOrderSnapshot,
+  orderNumber: string,
+  dishName: string,
+): number {
+  const normalizedOrderNumber = normalizeSplitOrderNumber(orderNumber);
+
+  return (
+    snapshot.suborders
+      .find(
+        (suborder) => normalizeSplitOrderNumber(suborder.orderNumber) === normalizedOrderNumber,
+      )
+      ?.dishes.filter((dish) => dish.name === dishName).length ?? 0
+  );
 }
 
 async function enterReadyHome({
@@ -778,4 +802,237 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
     );
 
   });
+});
+
+test.describe('分单按菜回归', () => {
+  test.describe.configure({ timeout: 180_000 });
+
+  test(
+    '应能在子单 1 上对指定菜品执行 Even Item 平分并校验比例',
+    {
+      annotation: [jiraIssueAnnotation('POS-16325')],
+    },
+    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      });
+
+      await test.step(
+        `在点单页打开分单并对子单 ${orderServiceSplitByDishCase.evenSplitSuborderIndex} 的菜品执行 Even Item 平分`,
+        async () => {
+          const orderDishesPage = await startToGoOrder(readyHomePage);
+          const splitOrderFlow = new SplitOrderFlow();
+
+          await addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+
+          const splitOrderPage = await orderDishesPage.openSplitOrder();
+          await splitOrderFlow.evenSplitDishOnSuborder(splitOrderPage, {
+            suborderIndex: orderServiceSplitByDishCase.evenSplitSuborderIndex,
+            dishName: orderServiceDishes.regular.name,
+            splitCount: orderServiceSplitByDishCase.evenSplitCount,
+          });
+
+          const sourceOrderNumber = await splitOrderFlow.resolveSuborderIndex(
+            splitOrderPage,
+            orderServiceSplitByDishCase.evenSplitSuborderIndex,
+          );
+
+          expect(
+            await splitOrderPage.readDishProportion(sourceOrderNumber, orderServiceDishes.regular.name),
+          ).toBe(orderServiceSplitByDishCase.expectedProportion);
+
+          await splitOrderFlow.submitAndReturnPage(splitOrderPage);
+        },
+      );
+    },
+  );
+
+  test(
+    '应能在平分三份后将子单 1 的菜品移动到子单 3',
+    {
+      annotation: [jiraIssueAnnotation('POS-16314')],
+    },
+    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      });
+
+      await test.step('点两个菜、平分三份并在子单间移动菜品', async () => {
+        const orderDishesPage = await startToGoOrder(readyHomePage);
+        const splitOrderFlow = new SplitOrderFlow();
+
+        await addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
+        await addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.test.name,
+          orderServiceDishes.test.menu,
+        );
+
+        const splitOrderPage = await orderDishesPage.openSplitOrder();
+
+        await splitOrderFlow.splitOrderEvenly(
+          splitOrderPage,
+          orderServiceSplitByDishCase.moveAfterEvenOrderCount,
+        );
+
+        const evenlySplitSnapshot = await splitOrderPage.readSnapshot();
+        expect(evenlySplitSnapshot.suborders).toHaveLength(
+          orderServiceSplitByDishCase.moveAfterEvenOrderCount,
+        );
+
+        const sourceOrderNumber = await splitOrderFlow.resolveSuborderIndex(
+          splitOrderPage,
+          orderServiceSplitByDishCase.moveSourceSuborderIndex,
+        );
+        const targetOrderNumber = await splitOrderFlow.resolveSuborderIndex(
+          splitOrderPage,
+          orderServiceSplitByDishCase.moveTargetSuborderIndex,
+        );
+
+        const sourceCountBeforeMove = countSplitDishRows(
+          evenlySplitSnapshot,
+          sourceOrderNumber,
+          orderServiceDishes.regular.name,
+        );
+        const targetCountBeforeMove = countSplitDishRows(
+          evenlySplitSnapshot,
+          targetOrderNumber,
+          orderServiceDishes.regular.name,
+        );
+
+        expect(sourceCountBeforeMove, '移动前源子单应包含待移动菜品').toBeGreaterThan(0);
+
+        await splitOrderFlow.moveDishesBySuborderIndex(
+          splitOrderPage,
+          orderServiceSplitByDishCase.moveSourceSuborderIndex,
+          [orderServiceDishes.regular.name],
+          orderServiceSplitByDishCase.moveTargetSuborderIndex,
+        );
+
+        const movedSnapshot = await splitOrderPage.readSnapshot();
+
+        expect(
+          countSplitDishRows(movedSnapshot, sourceOrderNumber, orderServiceDishes.regular.name),
+        ).toBe(sourceCountBeforeMove - 1);
+        expect(
+          countSplitDishRows(movedSnapshot, targetOrderNumber, orderServiceDishes.regular.name),
+        ).toBe(targetCountBeforeMove + 1);
+
+        await splitOrderFlow.submitAndReturnPage(splitOrderPage);
+      });
+    },
+  );
+});
+
+test.describe('分单扩展回归', () => {
+  test.describe.configure({ timeout: 180_000 });
+
+  test(
+    '应能按自定义金额拆成两个子单且金额与输入一致',
+    {
+      annotation: [jiraIssueAnnotation('POS-16316')],
+    },
+    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      });
+
+      await test.step('点单后按金额分单并校验两个子单金额', async () => {
+        const orderDishesPage = await startToGoOrder(readyHomePage);
+        const splitOrderFlow = new SplitOrderFlow();
+
+        await addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
+
+        const splitOrderPage = await orderDishesPage.openSplitOrder();
+        const beforeSplitSnapshot = await splitOrderPage.readSnapshot();
+        const orderTotal = Number(beforeSplitSnapshot.total);
+
+        expect(orderTotal, '分单前应能读取订单总额').toBeGreaterThan(0);
+
+        const firstAmount = orderServiceSplitByAmountCase.firstAmount;
+        const secondAmount = Number((orderTotal - firstAmount).toFixed(2));
+
+        await splitOrderFlow.splitOrderByAmounts(splitOrderPage, [firstAmount, secondAmount]);
+
+        const afterSplitSnapshot = await splitOrderPage.readSnapshot();
+
+        expect(afterSplitSnapshot.suborders).toHaveLength(
+          orderServiceSplitByAmountCase.expectedSuborderCount,
+        );
+
+        const suborderTotals = afterSplitSnapshot.suborders
+          .map((suborder) => Number(suborder.total))
+          .sort((left, right) => left - right);
+
+        expect(suborderTotals).toEqual(
+          [firstAmount, secondAmount].sort((left, right) => left - right),
+        );
+
+        await splitOrderFlow.submitAndReturnPage(splitOrderPage);
+      });
+    },
+  );
+
+  test(
+    '应能在平分两个子单后撤销分单并恢复订单总额',
+    {
+      annotation: [jiraIssueAnnotation('POS-16318')],
+    },
+    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      });
+
+      await test.step('平分两份后撤销分单并校验总额恢复', async () => {
+        const orderDishesPage = await startToGoOrder(readyHomePage);
+        const splitOrderFlow = new SplitOrderFlow();
+
+        await addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
+
+        const splitOrderPage = await orderDishesPage.openSplitOrder();
+        const beforeSplitSnapshot = await splitOrderPage.readSnapshot();
+        const totalBeforeSplit = Number(beforeSplitSnapshot.total);
+
+        expect(totalBeforeSplit, '分单前应能读取订单总额').toBeGreaterThan(0);
+
+        await splitOrderFlow.splitOrderEvenly(
+          splitOrderPage,
+          orderServiceCancelSplitCase.splitSuborderCount,
+        );
+
+        const afterEvenSplitSnapshot = await splitOrderPage.readSnapshot();
+        expect(afterEvenSplitSnapshot.suborders).toHaveLength(
+          orderServiceCancelSplitCase.splitSuborderCount,
+        );
+
+        await splitOrderFlow.cancelSplit(splitOrderPage);
+
+        const afterCancelSnapshot = await splitOrderPage.readSnapshot();
+        const totalAfterCancel = Number(afterCancelSnapshot.total);
+
+        expect(afterCancelSnapshot.suborders.length).toBeLessThan(
+          orderServiceCancelSplitCase.splitSuborderCount,
+        );
+        expect(totalAfterCancel, '撤销分单后订单总额应恢复').toBeCloseTo(totalBeforeSplit, 2);
+
+        await splitOrderFlow.submitAndReturnPage(splitOrderPage);
+      });
+    },
+  );
 });

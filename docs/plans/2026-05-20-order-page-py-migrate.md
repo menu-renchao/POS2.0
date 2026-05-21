@@ -33,6 +33,10 @@
 | `test_delivery_order` | POS-30575 | 应能创建 Delivery 订单并在 Recall 详情展示客户信息 |
 | `test_order_with_name` | POS-31409 | 应能创建带姓名的 Pick Up 订单并在 Recall 详情展示客户姓名 |
 | `test_even_split_two` | POS-16303 | 应能在点单页将订单平分为两份并校验子单金额 |
+| `test_even_item`（Even Item 语义） | POS-16325 | 应能在子单 1 上对指定菜品执行 Even Item 平分并校验比例 |
+| `test_add_split_by_item`（移动子菜部分） | POS-16314 | 应能在平分三份后将子单 1 的菜品移动到子单 3（**完整** item_add_split 仍未迁） |
+| `test_add_split_by_amount` | POS-16316 | 应能按自定义金额拆成两个子单且金额与输入一致 |
+| `test_cancel_split` | POS-16318 | 应能在平分两个子单后撤销分单并恢复订单总额 |
 | `test_order_big_tip` | POS-33110 | 应能在点单页添加超过餐费 50% 的小费并完成确认 |
 | `test_order_after_big_tip` | POS-33122 | 应能在信用卡支付后追加超过餐费 50% 的小费并完成确认 |
 | `test_order_category_option` 等 | POS-15643 / 15758 / 15759 | option 选择回显（合并为 1～2 条；断言方式与 Python 不完全一致） |
