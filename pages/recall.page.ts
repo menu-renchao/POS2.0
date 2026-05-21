@@ -104,6 +104,10 @@ export class RecallPage {
     return this.filterBar.clearAllSearchConditions();
   }
 
+  async removeUnpaidPaymentStatusFilterIfPresent(): Promise<void> {
+    return this.filterBar.removeUnpaidPaymentStatusFilterIfPresent();
+  }
+
   async readVisibleOrderNumbers(): Promise<string[]> {
     return this.filterBar.readVisibleOrderNumbers();
   }
@@ -176,12 +180,34 @@ export class RecallPage {
     return this.orderDetails.readOrderPriceSummary();
   }
 
+  async readDisplayedOrderPriceSummary(): Promise<Record<string, number>> {
+    return this.orderDetails.readDisplayedOrderPriceSummary();
+  }
+
   async readOrderContext(): Promise<RecallOrderContext> {
     return this.orderDetails.readOrderContext();
   }
 
   async readOrderPayments(): Promise<RecallOrderPaymentRecord[]> {
     return this.orderDetails.readOrderPayments();
+  }
+
+  async readPaymentCardTip(
+    ...args: Parameters<RecallOrderDetailsDialog['readPaymentCardTip']>
+  ): Promise<string | null> {
+    return this.orderDetails.readPaymentCardTip(...args);
+  }
+
+  async addOrderDetailsTip(
+    ...args: Parameters<RecallOrderDetailsDialog['addOrderDetailsTip']>
+  ): Promise<string | null> {
+    return this.orderDetails.addOrderDetailsTip(...args);
+  }
+
+  async addPaymentCardTip(
+    ...args: Parameters<RecallOrderDetailsDialog['addPaymentCardTip']>
+  ): Promise<string | null> {
+    return this.orderDetails.addPaymentCardTip(...args);
   }
 
   async readOrderDetailsSnapshot(): Promise<RecallOrderDetails> {

@@ -510,6 +510,12 @@ export class OrderDishesReadsSection {
     async readPriceSummary(): Promise<OrderPriceSummary> {
       await this.host.expectLoaded();
       await this.expandPriceSummary();
+      const structuredPriceSummary = await this.tryReadStructuredPriceSummary();
+
+      if (structuredPriceSummary) {
+        return structuredPriceSummary;
+      }
+
       const inlinePriceSummary = await this.tryReadInlinePriceSummary();
 
       if (inlinePriceSummary) {
@@ -522,10 +528,110 @@ export class OrderDishesReadsSection {
       summary.Subtotal = await this.readPriceSummaryRowNumber('Subtotal');
       summary.Tax = await this.readPriceSummaryRowNumber('Tax');
       summary['Total Before Tips'] = await this.readPriceSummaryRowNumber('Total Before Tips');
-      summary['Total(Cash)'] = await this.readPriceSummaryMoneyNumber('Total(Cash)');
-      summary['Total(Card)'] = await this.readPriceSummaryMoneyNumber('Total(Card)');
+      summary.Tips = await this.tryReadPriceSummaryRowNumber('Tips');
+      const total = await this.tryReadPriceSummaryMoneyNumber('Total');
+      summary['Total(Cash)'] =
+        (await this.tryReadPriceSummaryMoneyNumber('Total(Cash)')) ?? total ?? 0;
+      summary['Total(Card)'] =
+        (await this.tryReadPriceSummaryMoneyNumber('Total(Card)')) ??
+        total ??
+        summary['Total(Cash)'];
 
       return summary as OrderPriceSummary;
+    }
+
+    private async tryReadStructuredPriceSummary(): Promise<OrderPriceSummary | null> {
+      const containers = [
+        this.locators.priceSummaryDetailsContainer,
+        this.locators.priceSummaryTotalContainer,
+        this.locators.priceSummaryToggle,
+      ];
+      const entries: Record<string, number> = {};
+
+      for (const container of containers) {
+        if (!(await container.isVisible().catch(() => false))) {
+          continue;
+        }
+
+        const pairs = await container.evaluate((rootElement) => {
+          const cleanText = (value: string | null | undefined): string =>
+            value?.replace(/\s+/g, ' ').trim() ?? '';
+          const rows = [rootElement, ...Array.from(rootElement.querySelectorAll('div, section, button'))];
+          const results: Array<{ label: string; value: string }> = [];
+
+          for (const row of rows) {
+            const spanChildren = Array.from(row.children).filter(
+              (childElement) => childElement.tagName === 'SPAN',
+            );
+
+            if (spanChildren.length < 2) {
+              continue;
+            }
+
+            for (let index = 0; index < spanChildren.length - 1; index += 1) {
+              const label = cleanText(spanChildren[index]?.textContent);
+              const followingTexts = spanChildren
+                .slice(index + 1)
+                .map((childElement) => cleanText(childElement.textContent))
+                .filter((text) => text && !/^Save/i.test(text));
+              const value =
+                followingTexts.find((text) => /^\$?[\d,.]+$/.test(text)) ??
+                followingTexts.at(-1) ??
+                '';
+
+              if (label && value) {
+                results.push({ label, value });
+              }
+            }
+          }
+
+          return results;
+        });
+
+        for (const pair of pairs) {
+          const normalizedLabel =
+            /^(Count|Subtotal|Tax|Total Before Tips|Tips|Total(?:\((?:Cash|Card)\))?)$/i.test(
+              pair.label,
+            )
+              ? pair.label
+              : null;
+
+          if (!normalizedLabel) {
+            continue;
+          }
+
+          const parsedValue = Number(pair.value.replace(/[$,]/g, ''));
+          if (!Number.isNaN(parsedValue)) {
+            entries[normalizedLabel] = parsedValue;
+          }
+        }
+      }
+
+      if (
+        entries.Count === undefined ||
+        entries.Subtotal === undefined ||
+        entries.Tax === undefined ||
+        entries['Total Before Tips'] === undefined
+      ) {
+        return null;
+      }
+
+      const resolvedTotal = entries['Total(Cash)'] ?? entries.Total;
+      const resolvedCardTotal = entries['Total(Card)'] ?? entries.Total ?? resolvedTotal;
+
+      if (resolvedTotal === undefined || resolvedCardTotal === undefined) {
+        return null;
+      }
+
+      return {
+        Count: entries.Count,
+        Subtotal: entries.Subtotal,
+        Tax: entries.Tax,
+        'Total Before Tips': entries['Total Before Tips'],
+        ...(entries.Tips === undefined ? {} : { Tips: entries.Tips }),
+        'Total(Cash)': resolvedTotal,
+        'Total(Card)': resolvedCardTotal,
+      };
     }
 
     private async tryReadInlinePriceSummary(): Promise<OrderPriceSummary | null> {
@@ -558,6 +664,7 @@ export class OrderDishesReadsSection {
       const subtotal = readNumber(/\bSubtotal\s+\$?([\d,.]+)/);
       const tax = readNumber(/\bTax\s+\$?([\d,.]+)/);
       const totalBeforeTips = readNumber(/\bTotal Before Tips\s+\$?([\d,.]+)/);
+      const tips = readNumber(/\bTips\s+\$?([\d,.]+)/);
       const totalMatch = [...normalizedText.matchAll(/\bTotal\s+\$?([\d,.]+)/g)];
       const totalValue =
         totalMatch.length > 0
@@ -579,6 +686,7 @@ export class OrderDishesReadsSection {
         Subtotal: subtotal,
         Tax: tax,
         'Total Before Tips': totalBeforeTips,
+        ...(tips === null ? {} : { Tips: tips }),
         'Total(Cash)': totalValue,
         'Total(Card)': totalValue,
       };
@@ -623,84 +731,119 @@ export class OrderDishesReadsSection {
     }
 
     private async readPriceSummaryRowNumber(label: string): Promise<number> {
-      const labelLocator = await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByText(label, { exact: true }).first(),
-          this.page.getByText(label, { exact: true }).first(),
-        ],
-        `Unable to find ${label} from order price summary.`,
-      );
-      await expect(labelLocator).toBeVisible();
-      const value = await labelLocator.evaluate((labelElement) => {
-        const nextElement = labelElement.nextElementSibling;
+      const containers = [this.locators.priceSummaryDetailsContainer, this.locators.priceSummaryToggle];
 
-        return nextElement?.textContent ?? '';
-      });
-      const normalizedValue = value.replace(/\s+/g, ' ').trim();
+      for (const container of containers) {
+        if (!(await container.isVisible().catch(() => false))) {
+          continue;
+        }
 
-      if (!normalizedValue) {
-        throw new Error(`Unable to read ${label} from order price summary.`);
+        const value = await container.evaluate((rootElement, targetLabel) => {
+          const cleanText = (value: string | null | undefined): string =>
+            value?.replace(/\s+/g, ' ').trim() ?? '';
+          const rows = [rootElement, ...Array.from(rootElement.querySelectorAll('div, section, button'))];
+
+          for (const row of rows) {
+            const spans = Array.from(row.querySelectorAll(':scope > span'));
+
+            if (spans.length < 2) {
+              continue;
+            }
+
+            const labelText = cleanText(spans[0]?.textContent);
+            if (labelText !== targetLabel) {
+              continue;
+            }
+
+            return cleanText(spans.at(-1)?.textContent);
+          }
+
+          return '';
+        }, label);
+        const normalizedValue = value.replace(/\s+/g, ' ').trim();
+
+        if (!normalizedValue) {
+          continue;
+        }
+
+        const parsedValue = Number(normalizedValue.replace(/[$,]/g, ''));
+        if (!Number.isNaN(parsedValue)) {
+          return parsedValue;
+        }
       }
 
-      const parsedValue = Number(normalizedValue.replace(/[$,]/g, ''));
+      throw new Error(`Unable to read ${label} from order price summary.`);
+    }
 
-      if (Number.isNaN(parsedValue)) {
-        throw new Error(`Unable to parse ${label} from order price summary: ${normalizedValue}`);
+    private async tryReadPriceSummaryRowNumber(label: string): Promise<number | undefined> {
+      try {
+        return await this.readPriceSummaryRowNumber(label);
+      } catch {
+        return undefined;
       }
-
-      return parsedValue;
     }
 
     private async readPriceSummaryMoneyNumber(label: string): Promise<number> {
-      const labelLocator = await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByText(label, { exact: true }).first(),
-          this.page.getByText(label, { exact: true }).first(),
-        ],
-        `Unable to find ${label} from order price summary.`,
-      );
-      await expect(labelLocator).toBeVisible();
-      const value = await labelLocator.evaluate((labelElement) => {
-        let currentElement = labelElement.nextElementSibling;
-        const isPriceSummaryLabel = (value: string): boolean =>
-          /^(Count|Subtotal|Tax|Total Before Tips|Total(?:\((?:Cash|Card)\))?)$/i.test(value);
+      const containers = [this.locators.priceSummaryTotalContainer, this.locators.priceSummaryToggle];
 
-        while (currentElement) {
-          const currentText = currentElement.textContent?.replace(/\s+/g, ' ').trim() ?? '';
-          const moneyMatches = currentText.match(/\$[\d,.]+/g);
-
-          if (isPriceSummaryLabel(currentText)) {
-            return '';
-          }
-
-          if (moneyMatches && moneyMatches.length > 1) {
-            return moneyMatches.at(-1) ?? '';
-          }
-
-          if (moneyMatches?.length === 1 && !/^Save/i.test(currentText)) {
-            return moneyMatches[0];
-          }
-
-          currentElement = currentElement.nextElementSibling;
+      for (const container of containers) {
+        if (!(await container.isVisible().catch(() => false))) {
+          continue;
         }
 
-        return '';
-      });
-      const normalizedValue = value.replace(/\s+/g, ' ').trim();
-      const moneyMatches = normalizedValue.match(/\$[\d,.]+/g);
-      const moneyValue = moneyMatches?.at(-1) ?? '';
+        const value = await container.evaluate((rootElement, targetLabel) => {
+          const cleanText = (value: string | null | undefined): string =>
+            value?.replace(/\s+/g, ' ').trim() ?? '';
+          const rows = [rootElement, ...Array.from(rootElement.querySelectorAll('div, section, button'))];
 
-      if (!moneyValue) {
-        throw new Error(`Unable to read ${label} from order price summary.`);
+          for (const row of rows) {
+            const spans = Array.from(row.querySelectorAll(':scope > span'));
+
+            if (spans.length < 2) {
+              continue;
+            }
+
+            for (let index = 0; index < spans.length; index += 1) {
+              const labelText = cleanText(spans[index]?.textContent);
+              if (labelText !== targetLabel) {
+                continue;
+              }
+
+              const followingTexts = spans
+                .slice(index + 1)
+                .map((span) => cleanText(span.textContent))
+                .filter((text) => text && !/^Save/i.test(text));
+              const moneyValue = followingTexts.find((text) => /^\$[\d,.]+$/.test(text));
+
+              if (moneyValue) {
+                return moneyValue;
+              }
+            }
+          }
+
+          return '';
+        }, label);
+        const normalizedValue = value.replace(/\s+/g, ' ').trim();
+
+        if (!normalizedValue) {
+          continue;
+        }
+
+        const parsedValue = Number(normalizedValue.replace(/[$,]/g, ''));
+        if (!Number.isNaN(parsedValue)) {
+          return parsedValue;
+        }
       }
 
-      const parsedValue = Number(moneyValue.replace(/[$,]/g, ''));
+      throw new Error(`Unable to read ${label} from order price summary.`);
+    }
 
-      if (Number.isNaN(parsedValue)) {
-        throw new Error(`Unable to parse ${label} from order price summary: ${moneyValue}`);
+    private async tryReadPriceSummaryMoneyNumber(label: string): Promise<number | undefined> {
+      try {
+        return await this.readPriceSummaryMoneyNumber(label);
+      } catch {
+        return undefined;
       }
-
-      return parsedValue;
     }
 
     @step('页面读取：读取点单页税额')

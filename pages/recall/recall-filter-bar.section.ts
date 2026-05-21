@@ -155,17 +155,56 @@ export class RecallFilterBarSection {
   async clearAllSearchConditions(): Promise<void> {
     await this.clearManualSearchConditionIfNeeded();
 
-    let previousFilterCount = Number.POSITIVE_INFINITY;
-
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const currentFilterCount = await this.activeFilterTags.count().catch(() => 0);
-
-      if (currentFilterCount === 0 || currentFilterCount >= previousFilterCount) {
-        break;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      if ((await this.readActiveFilterCount()) === 0) {
+        return;
       }
 
-      previousFilterCount = currentFilterCount;
-      await this.activeFilterTags.first().click({ timeout: 1_000 }).catch(() => undefined);
+      const clearAllButton = this.page.getByRole('button', { name: /^Clear All$/i });
+      if (await clearAllButton.isVisible().catch(() => false)) {
+        await clearAllButton.evaluate((button) => {
+          (button as HTMLElement).click();
+        });
+        await waitUntil(
+          async () => await this.readActiveFilterCount(),
+          (filterCount) => filterCount === 0,
+          {
+            timeout: 3_000,
+            message: 'Recall 筛选条件在点击 Clear All 后仍未清空。',
+          },
+        ).catch(() => undefined);
+
+        if ((await this.readActiveFilterCount()) === 0) {
+          return;
+        }
+      }
+
+      if ((await this.activeFilterTags.count().catch(() => 0)) > 0) {
+        await this.activeFilterTags.first().click({ timeout: 1_000 }).catch(() => undefined);
+        continue;
+      }
+
+      const removeFilterButton = this.page.getByRole('button', { name: /^Remove filter:/i }).first();
+      if (!(await removeFilterButton.isVisible().catch(() => false))) {
+        return;
+      }
+
+      await removeFilterButton.evaluate((button) => {
+        (button as HTMLElement).click();
+      });
+    }
+  }
+
+  @step('页面操作：移除 Recall 支付状态 Unpaid 筛选标签')
+  async removeUnpaidPaymentStatusFilterIfPresent(): Promise<void> {
+    const unpaidFilterButton = this.page.getByRole('button', {
+      name: /^Remove filter:\s*Payment Status\s+Unpaid$/i,
+    });
+
+    if (await unpaidFilterButton.isVisible().catch(() => false)) {
+      await unpaidFilterButton.evaluate((button) => {
+        (button as HTMLElement).click();
+      });
     }
   }
 
@@ -216,7 +255,19 @@ export class RecallFilterBarSection {
   @step('页面读取：读取当前激活的筛选条件')
   async readActiveFilterTexts(): Promise<string[]> {
     const filterTexts = await this.activeFilterTags.allTextContents();
-    return filterTexts.map((filterText) => filterText.trim()).filter(Boolean);
+    const removeFilterLabels = await this.page
+      .getByRole('button', { name: /^Remove filter:/i })
+      .evaluateAll((buttons) =>
+        buttons
+          .map((button) => button.getAttribute('aria-label') ?? button.textContent ?? '')
+          .map((label) => label.replace(/\s+/g, ' ').trim())
+          .filter(Boolean),
+      )
+      .catch(() => []);
+
+    return [...filterTexts, ...removeFilterLabels]
+      .map((filterText) => filterText.trim())
+      .filter(Boolean);
   }
 
   @step((_filterButton: Locator, optionName: string) => `页面操作：从顶部筛选下拉菜单中选择 ${optionName}`)
@@ -308,6 +359,16 @@ export class RecallFilterBarSection {
     }
 
     throw new Error('Unable to find a visible manual search input in the Recall search dialog.');
+  }
+
+  private async readActiveFilterCount(): Promise<number> {
+    const tagCount = await this.activeFilterTags.count().catch(() => 0);
+    const removeFilterCount = await this.page
+      .getByRole('button', { name: /^Remove filter:/i })
+      .count()
+      .catch(() => 0);
+
+    return tagCount + removeFilterCount;
   }
 
   private async resolveVisibleSearchDialogClearButton(): Promise<Locator | null> {

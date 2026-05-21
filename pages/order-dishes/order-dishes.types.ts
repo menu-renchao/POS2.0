@@ -16,6 +16,7 @@ export type OrderPriceSummary = {
   Subtotal: number;
   Tax: number;
   'Total Before Tips': number;
+  Tips?: number;
   'Total(Cash)': number;
   'Total(Card)': number;
 };

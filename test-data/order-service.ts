@@ -46,6 +46,32 @@ export const orderServiceSplitEvenlyCase = {
   splitSuborderCount: 2,
 } as const;
 
+/** 分单页初始仅一个子单时展示为母单 x 的 x-1；序号 1 对应该子单，平分后出现 x-2、x-3 等。 */
+export const orderServiceSplitByDishCase = {
+  evenSplitSuborderIndex: '1',
+  evenSplitCount: 2,
+  expectedProportion: '1/2',
+  moveAfterEvenOrderCount: 3,
+  moveSourceSuborderIndex: '1',
+  moveTargetSuborderIndex: '3',
+} as const satisfies {
+  evenSplitSuborderIndex: '1';
+  evenSplitCount: number;
+  expectedProportion: string;
+  moveAfterEvenOrderCount: number;
+  moveSourceSuborderIndex: '1';
+  moveTargetSuborderIndex: '3';
+};
+
+export const orderServiceSplitByAmountCase = {
+  firstAmount: 2,
+  expectedSuborderCount: 2,
+} as const;
+
+export const orderServiceCancelSplitCase = {
+  splitSuborderCount: 2,
+} as const;
+
 export const orderServiceCustomers = {
   delivery: {
     address: 'menusifu-test',

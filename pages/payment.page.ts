@@ -65,7 +65,10 @@ export class PaymentPage {
 
   @step('页面操作：在 Payment type 区域点击 Credit Card')
   async clickPaymentTypeCreditCard(): Promise<void> {
-    await (await this.resolvePaymentTypeCreditCardButton()).click();
+    await this.waitForPaymentOverlayToClear();
+    const creditCardButton = await this.resolvePaymentTypeCreditCardButton();
+    await expect(creditCardButton).toBeVisible({ timeout: 5_000 });
+    await creditCardButton.dispatchEvent('click');
   }
 
   @step('页面操作：填写信用卡表单')
@@ -451,5 +454,18 @@ export class PaymentPage {
     }
 
     return resolvedLocator;
+  }
+
+  private async waitForPaymentOverlayToClear(): Promise<void> {
+    const overlay = this.paymentFrame.locator('.mycover, [id^="floatcover"]').first();
+
+    await waitUntil(
+      async () => await overlay.isVisible().catch(() => false),
+      (visible) => !visible,
+      {
+        timeout: 5_000,
+        message: 'Payment overlay did not disappear in time.',
+      },
+    ).catch(() => undefined);
   }
 }

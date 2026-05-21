@@ -30,18 +30,22 @@ export type SplitOrderReturnPage = HomePage | OrderDishesPage | RecallPage;
 
 const CONFIRM_BUTTON_NAME = /^(Confirm|确认)$/;
 const CANCEL_BUTTON_NAME = /^(Cancel|取消)$/;
-const COMBINE_BUTTON_NAME = /^(Combine|Merge|合并)$/;
-const BY_AMOUNT_BUTTON_NAME = /^(By Amount|Amount|按金额分单)$/;
-const UNSPLIT_BUTTON_NAME = /^(Unsplit|Cancel Split|取消分单)$/;
+const SPLIT_DISH_ITEM_TEST_ID = 'pos-ui-dish-item';
+const SPLIT_ADD_TO_SUBORDER_BUTTON_TEST_ID = 'button-default';
+const REMOVE_DISH_ITEM_BUTTON_NAME = /^Remove dish item$/;
 
 export class SplitOrderPage {
+  private readonly splitFrame: ReturnType<Page['frameLocator']>;
   private readonly modal: Locator;
   private readonly title: Locator;
   private readonly evenOrderButton: Locator;
   private readonly bySeatsButton: Locator;
   private readonly evenItemsButton: Locator;
+  private readonly byAmountMenuItem: Locator;
   private readonly byAmountButton: Locator;
+  private readonly combineMenuItem: Locator;
   private readonly combineButton: Locator;
+  private readonly unsplitMenuItem: Locator;
   private readonly unsplitButton: Locator;
   private readonly moreButton: Locator;
   private readonly confirmButton: Locator;
@@ -58,16 +62,21 @@ export class SplitOrderPage {
   private readonly combineConfirmButton: Locator;
 
   constructor(private readonly page: Page) {
-    const splitFrame = this.page.frameLocator('iframe[data-wujie-id="splitPanel"]');
+    this.splitFrame = this.page.frameLocator('iframe[data-wujie-id="splitPanel"]');
 
-    this.modal = splitFrame.getByRole('dialog').first();
+    this.modal = this.splitFrame.getByRole('dialog').first();
     this.title = this.modal.getByRole('heading').first();
     this.evenOrderButton = this.modal.getByRole('button', { name: /Even Order|平分订单/ }).first();
     this.bySeatsButton = this.modal.getByRole('button', { name: /By Seats|按座位分单/ }).first();
     this.evenItemsButton = this.modal.getByRole('button', { name: /Even Item|Even Items|平分菜品/ }).first();
-    this.byAmountButton = this.modal.getByRole('button', { name: BY_AMOUNT_BUTTON_NAME }).first();
-    this.combineButton = this.modal.getByRole('button', { name: COMBINE_BUTTON_NAME }).first();
-    this.unsplitButton = this.modal.getByRole('button', { name: UNSPLIT_BUTTON_NAME }).first();
+    this.byAmountMenuItem = this.splitFrame.getByRole('menuitem', { name: /^By Amount$/ }).first();
+    this.byAmountButton = this.modal.getByRole('button', { name: /^By Amount$|按金额分单$/ }).first();
+    this.combineMenuItem = this.splitFrame.getByRole('menuitem', { name: /^Combine suborders$/ }).first();
+    this.combineButton = this.modal
+      .getByRole('button', { name: /^Combine suborders$|^Combine$|^Merge$|合并$/ })
+      .first();
+    this.unsplitMenuItem = this.splitFrame.getByRole('menuitem', { name: /^Unsplit$/ }).first();
+    this.unsplitButton = this.modal.getByRole('button', { name: /^Unsplit$|取消分单$/ }).first();
     this.moreButton = this.modal.getByRole('button', { name: /^More$/ }).first();
     this.confirmButton = this.modal
       .locator('[data-testid="splitPanelModal-confirm-button"], [data-testid="split-panel-confirm"]')
@@ -78,12 +87,12 @@ export class SplitOrderPage {
     this.subordersContainer = this.modal;
     this.totalValue = this.modal.locator('._value_1lomb_35, [class*="_value_"]').first();
     this.remainValue = this.modal.locator('._remainValue_1lomb_41, [class*="_remainValue_"]').first();
-    this.splitInputDialog = splitFrame
+    this.splitInputDialog = this.splitFrame
       .getByRole('dialog')
       .filter({
-        has: splitFrame.getByRole('heading', { name: /Even order|平分订单|Split Input/i }),
+        has: this.splitFrame.getByRole('heading', { name: /Even order|Even Item|平分订单|平分菜品|Split Input/i }),
       })
-      .or(splitFrame.locator('.splitInputModalOverlay [role="dialog"], [data-testid="split-input-dialog"]'))
+      .or(this.splitFrame.locator('.splitInputModalOverlay [role="dialog"], [data-testid="split-input-dialog"]'))
       .first();
     this.splitInputField = this.splitInputDialog
       .locator('[data-testid="split-input-value"]')
@@ -95,7 +104,7 @@ export class SplitOrderPage {
     this.splitInputCancelButton = this.splitInputDialog
       .getByRole('button', { name: CANCEL_BUTTON_NAME })
       .first();
-    this.combineDialog = splitFrame.locator('.splitCombineModal, [role="dialog"]').last();
+    this.combineDialog = this.splitFrame.locator('.splitCombineModal, [role="dialog"]').last();
     this.combineConfirmButton = this.combineDialog
       .getByRole('button', { name: CONFIRM_BUTTON_NAME })
       .first();
@@ -138,45 +147,21 @@ export class SplitOrderPage {
   @step('页面操作：点击按金额分单按钮')
   async clickByAmount(): Promise<void> {
     await this.expectLoaded();
-    await this.resolveActionButton(
-      [this.byAmountButton, this.page.getByRole('button', { name: BY_AMOUNT_BUTTON_NAME }).first()],
-      async () => {
-        await this.openMoreActionsIfNeeded();
-      },
-      'Unable to find the "By Amount" split action.',
-    ).then(async (button) => {
-      await button.click();
-    });
+    await this.clickSplitAction(this.byAmountMenuItem, this.byAmountButton, 'By Amount');
     await this.expectSplitInputVisible();
   }
 
   @step('页面操作：点击合并订单按钮')
   async clickCombine(): Promise<void> {
     await this.expectLoaded();
-    await this.resolveActionButton(
-      [this.combineButton, this.page.getByRole('button', { name: COMBINE_BUTTON_NAME }).first()],
-      async () => {
-        await this.openMoreActionsIfNeeded();
-      },
-      'Unable to find the "Combine" split action.',
-    ).then(async (button) => {
-      await button.click();
-    });
+    await this.clickSplitAction(this.combineMenuItem, this.combineButton, 'Combine suborders');
     await expect(this.combineDialog).toBeVisible();
   }
 
   @step('页面操作：点击取消分单按钮')
   async clickCancelSplit(): Promise<void> {
     await this.expectLoaded();
-    await this.resolveActionButton(
-      [this.unsplitButton, this.page.getByRole('button', { name: UNSPLIT_BUTTON_NAME }).first()],
-      async () => {
-        await this.openMoreActionsIfNeeded();
-      },
-      'Unable to find the "Unsplit" split action.',
-    ).then(async (button) => {
-      await button.click();
-    });
+    await this.clickSplitAction(this.unsplitMenuItem, this.unsplitButton, 'Unsplit');
   }
 
   @step((count: number) => `页面操作：输入分单份数 ${count}`)
@@ -220,11 +205,73 @@ export class SplitOrderPage {
 
   @step((orderNumber: string, dishName: string) => `页面操作：切换子单 ${orderNumber} 的菜品 ${dishName} 选中状态`)
   async toggleDishSelection(orderNumber: string, dishName: string): Promise<void> {
-    await this.resolveDish(orderNumber, dishName).click();
+    await this.clickDish(orderNumber, dishName);
+    await this.expectEvenItemsActionEnabled();
+  }
+
+  @step('页面操作：确认 Even Item 按钮已可用')
+  async expectEvenItemsActionEnabled(): Promise<void> {
+    await waitUntil(
+      async () => this.evenItemsButton.isEnabled().catch(() => false),
+      (isEnabled) => isEnabled,
+      {
+        timeout: 10_000,
+        message: 'Even Item 按钮在选中菜品后仍未可用。',
+      },
+    );
+  }
+
+  @step((targetOrderNumber: string) => `页面操作：点击 Add to #${targetOrderNumber} 将已选菜品加入目标子单`)
+  async clickAddToSuborder(targetOrderNumber: string): Promise<void> {
+    const clicked = await this.clickAddToSuborderIfVisible(targetOrderNumber);
+
+    if (!clicked) {
+      throw new Error(`Unable to find the "Add to #${targetOrderNumber}" split action.`);
+    }
+  }
+
+  @step((targetOrderNumber: string) => `页面操作：若可见则点击 Add to #${targetOrderNumber}`)
+  async clickAddToSuborderIfVisible(targetOrderNumber: string): Promise<boolean> {
+    const addToButton = this.resolveAddToSuborderButton(targetOrderNumber);
+
+    try {
+      await waitUntil(
+        async () => addToButton.isVisible().catch(() => false),
+        (isVisible) => isVisible,
+        {
+          timeout: 5_000,
+          message: `选中菜品后未出现 Add to #${targetOrderNumber} 按钮。`,
+        },
+      );
+    } catch {
+      return false;
+    }
+
+    await addToButton.click();
+    return true;
+  }
+
+  @step((targetOrderNumber: string) => `页面操作：将已选菜品移动到目标子单（Add to 或子单卡片）`)
+  async receiveDishOnSuborder(targetOrderNumber: string): Promise<void> {
+    const normalizedTargetOrderNumber = this.normalizeOrderNumber(targetOrderNumber);
+    const movedByAddToButton = await this.clickAddToSuborderIfVisible(normalizedTargetOrderNumber);
+
+    if (!movedByAddToButton) {
+      await this.clickSuborder(normalizedTargetOrderNumber);
+    }
   }
 
   @step((orderNumber: string, dishName: string) => `页面操作：点击子单 ${orderNumber} 中的菜品 ${dishName}`)
   async clickDish(orderNumber: string, dishName: string): Promise<void> {
+    await this.expectLoaded();
+    const normalizedOrderNumber = this.normalizeOrderNumber(orderNumber);
+    const dishLocator = this.resolveDish(normalizedOrderNumber, dishName);
+
+    if (await dishLocator.isVisible().catch(() => false)) {
+      await dishLocator.click();
+      return;
+    }
+
     await this.modal.evaluate(
       (modalElement, payload: { dishName: string; orderNumber: string }) => {
         const normalizeText = (value: string | null | undefined): string =>
@@ -260,6 +307,18 @@ export class SplitOrderPage {
           throw new Error(`Unable to find split suborder: ${payload.orderNumber}`);
         }
 
+        const dishItemElement = Array.from(
+          suborderElement.querySelectorAll<HTMLElement>('[data-testid="pos-ui-dish-item"]'),
+        ).find((element) => {
+          const dishNameElement = element.querySelector('[class*="_dishName_"]');
+          return normalizeText(dishNameElement?.textContent) === payload.dishName;
+        });
+
+        if (dishItemElement) {
+          dishItemElement.click();
+          return;
+        }
+
         const dishTextElement = Array.from(suborderElement.querySelectorAll<HTMLElement>('*')).find(
           (element) => normalizeText(element.textContent) === payload.dishName,
         );
@@ -269,22 +328,59 @@ export class SplitOrderPage {
         }
 
         const clickableElement =
-          dishTextElement.closest<HTMLElement>('button, [role="button"], div, span') ?? dishTextElement;
+          dishTextElement.closest<HTMLElement>(
+            '[data-testid="pos-ui-dish-item"], button, [role="button"]',
+          ) ?? dishTextElement;
 
         clickableElement.click();
       },
-      { dishName, orderNumber },
+      { dishName, orderNumber: normalizedOrderNumber },
     );
   }
 
-  @step((orderNumber: string) => `页面操作：点击子单 ${orderNumber}`)
+  @step((orderNumber: string, dishName: string) => `页面操作：点击子单 ${orderNumber} 中菜品 ${dishName} 的删除按钮`)
+  async clickRemoveDish(orderNumber: string, dishName: string): Promise<void> {
+    await this.expectLoaded();
+    const dishItem = this.resolveDish(this.normalizeOrderNumber(orderNumber), dishName);
+    await dishItem.getByRole('button', { name: REMOVE_DISH_ITEM_BUTTON_NAME }).click();
+  }
+
+  @step((orderNumber: string) => `页面操作：点击子单 ${orderNumber} 卡片`)
   async clickSuborder(orderNumber: string): Promise<void> {
+    const normalizedOrderNumber = this.normalizeOrderNumber(orderNumber);
+    const suborder = this.resolveSuborder(normalizedOrderNumber);
+    const suborderBody = suborder.locator('[class*="_suborderBody_"]').first();
+    const suborderHeader = suborder.locator('[class*="_suborderHeader_"]').first();
+
+    if (await suborderBody.isVisible().catch(() => false)) {
+      await suborderBody.click({ position: { x: 8, y: 8 } });
+      return;
+    }
+
+    if (await suborderHeader.isVisible().catch(() => false)) {
+      await suborderHeader.click();
+      return;
+    }
+
     await this.modal.evaluate((modalElement, targetOrderNumber: string) => {
       const normalizeText = (value: string | null | undefined): string =>
         String(value ?? '')
           .replace(/\s+/g, ' ')
           .trim();
       const orderLabelText = `#${targetOrderNumber}`;
+      const attributedSuborder = modalElement.querySelector<HTMLElement>(
+        `[data-testid="split-suborder"][data-order-number="${targetOrderNumber}"], [class*="_suborderContainer_"][data-order-number="${targetOrderNumber}"], [class*="_suborderCard_"][data-order-number="${targetOrderNumber}"]`,
+      );
+
+      if (attributedSuborder) {
+        const clickTarget =
+          attributedSuborder.querySelector<HTMLElement>('[class*="_suborderBody_"]') ??
+          attributedSuborder;
+
+        clickTarget.click();
+        return;
+      }
+
       const allElements = Array.from(modalElement.querySelectorAll<HTMLElement>('*'));
       const orderLabel = allElements.find(
         (element) => normalizeText(element.textContent) === orderLabelText,
@@ -297,7 +393,22 @@ export class SplitOrderPage {
       let currentElement: HTMLElement | null = orderLabel;
       while (currentElement) {
         const currentText = normalizeText(currentElement.textContent);
-        if (currentText.includes(orderLabelText) && currentText.includes('Print') && currentText.includes('Pay')) {
+
+        if (
+          currentElement.matches('[data-testid="split-suborder"], [class*="_suborderContainer_"], [class*="_suborderCard_"]')
+        ) {
+          const clickTarget =
+            currentElement.querySelector<HTMLElement>('[class*="_suborderBody_"]') ?? currentElement;
+
+          clickTarget.click();
+          return;
+        }
+
+        if (
+          currentText.includes(orderLabelText) &&
+          currentText.includes('Print') &&
+          currentText.includes('Pay')
+        ) {
           currentElement.click();
           return;
         }
@@ -306,7 +417,7 @@ export class SplitOrderPage {
       }
 
       throw new Error(`Unable to find clickable split suborder container: ${targetOrderNumber}`);
-    }, orderNumber);
+    }, normalizedOrderNumber);
   }
 
   @step((orderNumber: string) => `页面操作：在合并弹窗中切换子单 ${orderNumber}`)
@@ -361,11 +472,45 @@ export class SplitOrderPage {
         return matchedNumber?.[0] ?? null;
       };
 
-      const suborders = Array.from(
-        modal.querySelectorAll<HTMLElement>(
-          '[data-testid="split-suborder"], [class*="_suborderContainer_"], [class*="_suborderCard_"]',
-        ),
-      ).map((suborder) => {
+      const findSuborderElements = (): HTMLElement[] => {
+        const attributedSuborders = Array.from(
+          modal.querySelectorAll<HTMLElement>(
+            '[data-testid="split-suborder"], [class*="_suborderContainer_"], [class*="_suborderCard_"]',
+          ),
+        );
+
+        if (attributedSuborders.length > 0) {
+          return attributedSuborders;
+        }
+
+        const orderLabels = Array.from(modal.querySelectorAll<HTMLElement>('*')).filter((element) =>
+          /^#\d+-\d+$/.test(normalizeText(element.textContent)),
+        );
+
+        return orderLabels
+          .map((orderLabel) => {
+            let currentElement: HTMLElement | null = orderLabel;
+
+            while (currentElement) {
+              const currentText = normalizeText(currentElement.textContent);
+
+              if (
+                currentText.includes(normalizeText(orderLabel.textContent)) &&
+                currentText.includes('Print') &&
+                currentText.includes('Pay')
+              ) {
+                return currentElement;
+              }
+
+              currentElement = currentElement.parentElement;
+            }
+
+            return orderLabel.parentElement;
+          })
+          .filter((suborder): suborder is HTMLElement => suborder !== null);
+      };
+
+      const suborders = findSuborderElements().map((suborder) => {
         const orderNumber =
           suborder.getAttribute('data-order-number') ??
           normalizeText(suborder.querySelector('[class*="_orderNumber_"]')?.textContent).replace(/^#/, '');
@@ -379,20 +524,121 @@ export class SplitOrderPage {
         const seats = Array.from(suborder.querySelectorAll('[class*="_seatHeader_"]'))
           .map((seat) => normalizeText(seat.textContent))
           .filter(Boolean);
-        const dishes = Array.from(
-          suborder.querySelectorAll<HTMLElement>('[data-testid="split-dish"], [class*="_dishItem_"]'),
-        ).map((dishRow) => ({
-          name:
-            dishRow.getAttribute('data-dish-name') ??
-            normalizeText(dishRow.querySelector('[class*="_dishName_"]')?.textContent),
-          proportion:
-            normalizeOptionalText(dishRow.getAttribute('data-proportion')) ??
-            normalizeOptionalText(dishRow.querySelector('[class*="_proportion_"]')?.textContent),
-        }));
+        const parseAttributedDish = (dishElement: HTMLElement) => {
+          const dishName =
+            normalizeOptionalText(dishElement.getAttribute('data-dish-name')) ??
+            normalizeOptionalText(dishElement.querySelector('[class*="_dishName_"]')?.textContent);
+
+          if (!dishName) {
+            return null;
+          }
+
+          return {
+            name: dishName,
+            proportion:
+              normalizeOptionalText(dishElement.getAttribute('data-proportion')) ??
+              normalizeOptionalText(dishElement.querySelector('[class*="_proportion_"]')?.textContent),
+          };
+        };
+
+        const parseSplitProportion = (
+          ariaLabel: string,
+          buttonText: string,
+          proportionElementText: string | null | undefined,
+        ): string | null => {
+          const normalizedProportionElement = normalizeOptionalText(proportionElementText);
+
+          if (normalizedProportionElement && /^1\/\d+$/.test(normalizedProportionElement)) {
+            return normalizedProportionElement;
+          }
+
+          for (const sourceText of [ariaLabel, buttonText]) {
+            const matchedProportion = sourceText.match(/(?:^|\s)(1\/\d+)(?!\d)/);
+
+            if (matchedProportion?.[1]) {
+              return matchedProportion[1];
+            }
+          }
+
+          return null;
+        };
+
+        const parseSplitDishName = (
+          ariaLabel: string,
+          buttonText: string,
+          dataDishName: string | null,
+          dishNameElementText: string | null | undefined,
+        ): string | null => {
+          return (
+            normalizeOptionalText(dataDishName) ??
+            normalizeOptionalText(dishNameElementText) ??
+            normalizeOptionalText(ariaLabel.match(/\d+\/\d+\s+\d+\s+(.+?)\s+\$/)?.[1]) ??
+            normalizeOptionalText(buttonText.match(/\d+\/\d+\s+\d+\s+(.+?)\s+\$/)?.[1])
+          );
+        };
+
+        const parseButtonDish = (button: HTMLButtonElement) => {
+          const buttonText = normalizeText(button.textContent);
+          const ariaLabel = normalizeText(button.getAttribute('aria-label'));
+          const labelText = ariaLabel || buttonText;
+
+          if (!labelText || /^(Print|Pay|Remove|Add to)/i.test(labelText)) {
+            return null;
+          }
+
+          const dishName = parseSplitDishName(
+            ariaLabel,
+            buttonText,
+            button.getAttribute('data-dish-name'),
+            button.querySelector('[class*="_dishName_"]')?.textContent,
+          );
+
+          if (!dishName) {
+            return null;
+          }
+
+          return {
+            name: dishName,
+            proportion: parseSplitProportion(
+              ariaLabel,
+              buttonText,
+              button.querySelector('[class*="_proportion_"]')?.textContent,
+            ),
+          };
+        };
+
+        const liveDishes = Array.from(
+          suborder.querySelectorAll<HTMLElement>('[data-testid="pos-ui-dish-item"]'),
+        )
+          .map(parseAttributedDish)
+          .filter((dish): dish is SplitOrderDishSnapshot => dish !== null);
+        const attributedDishes = Array.from(
+          suborder.querySelectorAll<HTMLElement>(
+            '[data-testid="split-dish"], [class*="_dishItem_"][data-dish-name]',
+          ),
+        )
+          .map(parseAttributedDish)
+          .filter((dish): dish is SplitOrderDishSnapshot => dish !== null);
+        const dishes =
+          liveDishes.length > 0
+            ? liveDishes
+            : attributedDishes.length > 0
+              ? attributedDishes
+              : Array.from(suborder.querySelectorAll<HTMLButtonElement>('button'))
+                  .map(parseButtonDish)
+                  .filter((dish): dish is SplitOrderDishSnapshot => dish !== null);
+
+        const resolvedOrderNumber =
+          orderNumber ||
+          (Array.from(suborder.querySelectorAll<HTMLElement>('*'))
+            .map((element) => normalizeText(element.textContent))
+            .find((text) => /^#\d+-\d+$/.test(text))
+            ?.replace(/^#/, '') ??
+            '');
 
         return {
           dishes,
-          orderNumber: orderNumber.replace(/^#/, ''),
+          orderNumber: resolvedOrderNumber.replace(/^#/, ''),
           paidStatus,
           seats,
           total,
@@ -421,20 +667,139 @@ export class SplitOrderPage {
 
   @step((orderNumber: string, dishName: string) => `页面读取：读取子单 ${orderNumber} 中菜品 ${dishName} 的平分比例`)
   async readDishProportion(orderNumber: string, dishName: string): Promise<string | null> {
-    const dishRow = this.resolveDish(orderNumber, dishName);
-    const proportionText =
-      (await dishRow.getAttribute('data-proportion').catch(() => null)) ??
-      (await dishRow.locator('[class*="_proportion_"]').first().textContent().catch(() => null));
+    await this.expectLoaded();
 
-    return this.normalizeOptionalText(proportionText);
+    const proportion = await this.modal.evaluate(
+      (modalElement, payload: { dishName: string; orderNumber: string }) => {
+        const normalizeText = (value: string | null | undefined): string =>
+          String(value ?? '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const orderLabelText = `#${payload.orderNumber}`;
+
+        const findSuborderElement = (): HTMLElement | null => {
+          const attributedSuborder = modalElement.querySelector<HTMLElement>(
+            `[data-testid="split-suborder"][data-order-number="${payload.orderNumber}"], [class*="_suborderContainer_"][data-order-number="${payload.orderNumber}"], [class*="_suborderCard_"][data-order-number="${payload.orderNumber}"]`,
+          );
+
+          if (attributedSuborder) {
+            return attributedSuborder;
+          }
+
+          const orderLabel = Array.from(modalElement.querySelectorAll<HTMLElement>('*')).find(
+            (element) => normalizeText(element.textContent) === orderLabelText,
+          );
+
+          if (!orderLabel) {
+            return null;
+          }
+
+          let currentElement: HTMLElement | null = orderLabel;
+          while (currentElement) {
+            const currentText = normalizeText(currentElement.textContent);
+
+            if (
+              currentElement.matches(
+                '[data-testid="split-suborder"], [class*="_suborderContainer_"], [class*="_suborderCard_"]',
+              )
+            ) {
+              return currentElement;
+            }
+
+            if (
+              currentText.includes(orderLabelText) &&
+              currentText.includes('Print') &&
+              currentText.includes('Pay')
+            ) {
+              return currentElement;
+            }
+
+            currentElement = currentElement.parentElement;
+          }
+
+          return orderLabel.parentElement;
+        };
+
+        const readProportionFromDishElement = (dishElement: HTMLElement): string | null => {
+          const proportionText = normalizeText(
+            dishElement.getAttribute('data-proportion') ??
+              dishElement.querySelector('[class*="_proportion_"]')?.textContent,
+          );
+
+          if (proportionText && /^1\/\d+$/.test(proportionText)) {
+            return proportionText;
+          }
+
+          return null;
+        };
+
+        const suborderElement = findSuborderElement();
+
+        if (!suborderElement) {
+          return null;
+        }
+
+        const dishElements = Array.from(
+          suborderElement.querySelectorAll<HTMLElement>(
+            '[data-testid="pos-ui-dish-item"], [data-testid="split-dish"], [class*="_dishItem_"]',
+          ),
+        );
+
+        for (const dishElement of dishElements) {
+          const dishNameText = normalizeText(
+            dishElement.getAttribute('data-dish-name') ??
+              dishElement.querySelector('[class*="_dishName_"]')?.textContent,
+          );
+
+          if (dishNameText !== payload.dishName) {
+            continue;
+          }
+
+          const proportion = readProportionFromDishElement(dishElement);
+
+          if (proportion) {
+            return proportion;
+          }
+        }
+
+        const dishButtons = Array.from(
+          suborderElement.querySelectorAll<HTMLElement>('[role="button"]'),
+        ).filter((button) => normalizeText(button.getAttribute('aria-label')) !== 'Remove dish item');
+
+        for (const dishButton of dishButtons) {
+          const dishNameText = normalizeText(
+            dishButton.querySelector('[class*="_dishName_"]')?.textContent,
+          );
+
+          if (dishNameText !== payload.dishName) {
+            continue;
+          }
+
+          const proportion = readProportionFromDishElement(dishButton);
+
+          if (proportion) {
+            return proportion;
+          }
+        }
+
+        return null;
+      },
+      { dishName, orderNumber: this.normalizeOrderNumber(orderNumber) },
+    );
+
+    return proportion;
   }
 
   @step((orderNumber: string, dishName: string) => `页面读取：检查子单 ${orderNumber} 中是否存在菜品 ${dishName}`)
   async hasDish(orderNumber: string, dishName: string): Promise<boolean> {
     const snapshot = await this.readSnapshot();
+    const normalizedOrderNumber = this.normalizeOrderNumber(orderNumber);
+
     return (
       snapshot.suborders
-        .find((suborder) => suborder.orderNumber === orderNumber)
+        .find(
+          (suborder) => this.normalizeOrderNumber(suborder.orderNumber) === normalizedOrderNumber,
+        )
         ?.dishes.some((dish) => dish.name === dishName) ?? false
     );
   }
@@ -442,13 +807,72 @@ export class SplitOrderPage {
   @step((orderNumber: string, dishName: string) => `页面读取：判断子单 ${orderNumber} 的菜品 ${dishName} 是否允许按菜品平分`)
   async isDishEligibleForEvenSplit(orderNumber: string, dishName: string): Promise<boolean> {
     const snapshot = await this.readSnapshot();
+    const normalizedOrderNumber = this.normalizeOrderNumber(orderNumber);
     const suborder = snapshot.suborders.find(
-      (currentSuborder) => currentSuborder.orderNumber === orderNumber,
+      (currentSuborder) =>
+        this.normalizeOrderNumber(currentSuborder.orderNumber) === normalizedOrderNumber,
     );
     const dish = suborder?.dishes.find((currentDish) => currentDish.name === dishName);
     const normalizedProportion = this.normalizeOptionalText(dish?.proportion);
 
     return !normalizedProportion || !/^1\/\d+$/.test(normalizedProportion);
+  }
+
+  @step((suborderIndex: string) => `页面读取：根据子单序号 ${suborderIndex} 解析子单单号（母单 x 对应 x-1、x-2…）`)
+  async readSuborderOrderNumberByIndex(suborderIndex: string): Promise<string | null> {
+    const snapshot = await this.readSnapshot();
+    const normalizedIndex = this.normalizeOrderNumber(suborderIndex);
+    const orderNumbers = snapshot.suborders.map((suborder) =>
+      this.normalizeOrderNumber(suborder.orderNumber),
+    );
+
+    // 进入分单页初始态通常仅有一个子单，展示为 x-1，业务上视同母单；序号 1 即对应该子单。
+    if (orderNumbers.length === 1 && normalizedIndex === '1') {
+      return orderNumbers[0];
+    }
+
+    const parentOrderNumber = this.resolveParentOrderNumber(orderNumbers);
+
+    if (parentOrderNumber) {
+      const resolvedOrderNumber = `${parentOrderNumber}-${normalizedIndex}`;
+
+      if (orderNumbers.includes(resolvedOrderNumber)) {
+        return resolvedOrderNumber;
+      }
+    }
+
+    for (const orderNumber of orderNumbers) {
+      if (orderNumber === normalizedIndex) {
+        return orderNumber;
+      }
+
+      if (orderNumber.endsWith(`-${normalizedIndex}`)) {
+        return orderNumber;
+      }
+    }
+
+    return null;
+  }
+
+  private resolveParentOrderNumber(orderNumbers: string[]): string | null {
+    const parentPrefixes = orderNumbers
+      .map((orderNumber) => {
+        const matchedParts = orderNumber.match(/^(.+)-(\d+)$/);
+        return matchedParts?.[1] ?? null;
+      })
+      .filter((prefix): prefix is string => Boolean(prefix));
+
+    if (parentPrefixes.length === 0) {
+      return null;
+    }
+
+    const [firstPrefix] = parentPrefixes;
+
+    if (parentPrefixes.every((prefix) => prefix === firstPrefix)) {
+      return firstPrefix;
+    }
+
+    return firstPrefix;
   }
 
   @step('页面读取：读取剩余金额')
@@ -479,46 +903,66 @@ export class SplitOrderPage {
     }
   }
 
+  private async isMoreMenuOpen(): Promise<boolean> {
+    return (
+      (await this.byAmountMenuItem.isVisible().catch(() => false)) ||
+      (await this.unsplitMenuItem.isVisible().catch(() => false)) ||
+      (await this.combineMenuItem.isVisible().catch(() => false))
+    );
+  }
+
   private async openMoreActionsIfNeeded(): Promise<void> {
+    if (await this.isMoreMenuOpen()) {
+      return;
+    }
+
+    const isMoreExpanded = (await this.moreButton.getAttribute('aria-expanded').catch(() => null)) === 'true';
+
+    if (isMoreExpanded) {
+      return;
+    }
+
     if (await this.moreButton.isVisible().catch(() => false)) {
       await this.moreButton.click();
     }
   }
 
-  private async resolveActionButton(
-    candidates: Locator[],
-    openMoreActions: () => Promise<void>,
-    message: string,
-  ): Promise<Locator> {
-    const directButton = await this.findVisibleLocator(candidates);
-    if (directButton) {
-      return directButton;
+  private async clickSplitAction(
+    menuItem: Locator,
+    toolbarButton: Locator,
+    actionLabel: string,
+  ): Promise<void> {
+    if (await menuItem.isVisible().catch(() => false)) {
+      await menuItem.click();
+      return;
     }
 
-    await openMoreActions();
-
-    const buttonAfterMore = await this.findVisibleLocator(candidates);
-    if (buttonAfterMore) {
-      return buttonAfterMore;
+    if (await toolbarButton.isVisible().catch(() => false)) {
+      await toolbarButton.click();
+      return;
     }
 
-    throw new Error(message);
-  }
+    await this.openMoreActionsIfNeeded();
 
-  private async findVisibleLocator(candidates: Locator[]): Promise<Locator | null> {
-    for (const candidate of candidates) {
-      if (await candidate.isVisible().catch(() => false)) {
-        return candidate;
-      }
+    if (await menuItem.isVisible().catch(() => false)) {
+      await menuItem.click();
+      return;
     }
 
-    return null;
+    if (await toolbarButton.isVisible().catch(() => false)) {
+      await toolbarButton.click();
+      return;
+    }
+
+    throw new Error(`Unable to find the "${actionLabel}" split action.`);
   }
 
   private resolveSuborder(orderNumber: string): Locator {
-    const escapedOrderNumber = this.escapeCssAttribute(orderNumber);
+    const normalizedOrderNumber = this.normalizeOrderNumber(orderNumber);
+    const orderLabel = `#${normalizedOrderNumber}`;
+    const escapedOrderNumber = this.escapeCssAttribute(normalizedOrderNumber);
 
-    return this.subordersContainer
+    const attributedSuborder = this.subordersContainer
       .locator(
         [
           `[data-testid="split-suborder"][data-order-number="${escapedOrderNumber}"]`,
@@ -527,15 +971,50 @@ export class SplitOrderPage {
         ].join(', '),
       )
       .first();
+
+    return attributedSuborder.or(
+      this.subordersContainer
+        .locator('[class*="_suborderContainer_"], [class*="_suborderCard_"], [data-testid="split-suborder"]')
+        .filter({ hasText: orderLabel })
+        .first(),
+    );
+  }
+
+  private resolveAddToSuborderButton(targetOrderNumber: string): Locator {
+    const normalizedTargetOrderNumber = this.normalizeOrderNumber(targetOrderNumber);
+
+    return this.modal
+      .getByTestId(SPLIT_ADD_TO_SUBORDER_BUTTON_TEST_ID)
+      .filter({
+        hasText: new RegExp(`^Add to #${this.escapeRegExp(normalizedTargetOrderNumber)}$`, 'i'),
+      })
+      .first();
   }
 
   private resolveDish(orderNumber: string, dishName: string): Locator {
-    return this.resolveSuborder(orderNumber)
-      .locator('[data-testid="split-dish"], [class*="_dishItem_"], [data-dish-name]')
-      .filter({
-        hasText: new RegExp(this.escapeRegExp(dishName)),
-      })
-      .first();
+    const suborder = this.resolveSuborder(orderNumber);
+    const escapedDishName = this.escapeCssAttribute(dishName);
+    const dishNamePattern = new RegExp(`^${this.escapeRegExp(dishName)}$`);
+    const dishNameLocator = suborder.locator('[class*="_dishName_"]').filter({ hasText: dishNamePattern });
+
+    return suborder
+      .getByTestId(SPLIT_DISH_ITEM_TEST_ID)
+      .filter({ has: dishNameLocator })
+      .first()
+      .or(
+        suborder
+          .getByRole('button')
+          .filter({ has: dishNameLocator })
+          .filter({ hasNot: suborder.getByRole('button', { name: REMOVE_DISH_ITEM_BUTTON_NAME }) })
+          .first(),
+      )
+      .or(
+        suborder
+          .locator(
+            `[data-testid="split-dish"][data-dish-name="${escapedDishName}"], [class*="_dishItem_"][data-dish-name="${escapedDishName}"]`,
+          )
+          .first(),
+      );
   }
 
   private resolveCombineOrder(orderNumber: string): Locator {
@@ -583,6 +1062,11 @@ export class SplitOrderPage {
     }
 
     return new HomePage(this.page);
+  }
+
+  private parseSplitDishProportionFromText(text: string): string | null {
+    const matchedProportion = text.match(/(?:^|\s)(1\/\d+)(?!\d)/);
+    return matchedProportion?.[1] ?? null;
   }
 
   private normalizeOrderNumber(value: string | null | undefined): string {

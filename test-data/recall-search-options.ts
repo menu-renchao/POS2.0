@@ -8,6 +8,9 @@ export const RecallPaymentStatuses = {
   pending: 'Pending',
 } as const;
 
+/** Recall 订单详情中现金/卡支付完成后的状态文案。 */
+export const RecallOrderPaymentSuccessStatus = 'Success' as const;
+
 export const RecallOrderStatuses = {
   unpaid: 'Unpaid',
   inKitchen: 'In Kitchen',
