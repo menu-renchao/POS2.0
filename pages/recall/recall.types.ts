@@ -37,6 +37,29 @@ export type RecallOrderItem = {
   additions: RecallOrderItemAddition[];
 };
 
+export type RecallOrderDetailAction =
+  | 'edit'
+  | 'send'
+  | 'print'
+  | 'pay'
+  | 'split'
+  | 'discount'
+  | 'reopen'
+  | 'more';
+
+export type RecallOrderDetailActions = Record<RecallOrderDetailAction, boolean>;
+
+export type RecallOrderDetailsMoreAction =
+  | 'charge'
+  | 'moveItem'
+  | 'combine'
+  | 'tips'
+  | 'paging'
+  | 'callOff'
+  | 'copy'
+  | 'void'
+  | 'sort';
+
 export type RecallOrderDetails = {
   orderNumber: string;
   paymentStatus: string | null;
@@ -46,4 +69,5 @@ export type RecallOrderDetails = {
   payments: RecallOrderPaymentRecord[];
   items: RecallOrderItem[];
   priceSummary: Record<string, number>;
+  availableActions: RecallOrderDetailActions;
 };

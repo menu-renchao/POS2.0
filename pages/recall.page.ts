@@ -3,6 +3,7 @@ import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 import { OrderDishesPage } from './order-dishes.page';
 import { PaymentPage } from './payment.page';
+import { SplitOrderPage } from './split-order.page';
 import { RecallFilterBarSection } from './recall/recall-filter-bar.section';
 import { RecallOrderDetailsDialog } from './recall/recall-order-details.dialog';
 import { RecallVoidDialog } from './recall/recall-void.dialog';
@@ -11,6 +12,9 @@ export type {
   RecallCustomerInfo,
   RecallMemberInfo,
   RecallOrderContext,
+  RecallOrderDetailAction,
+  RecallOrderDetailActions,
+  RecallOrderDetailsMoreAction,
   RecallOrderDetails,
   RecallOrderItem,
   RecallOrderItemAddition,
@@ -21,6 +25,7 @@ import type {
   RecallCustomerInfo,
   RecallMemberInfo,
   RecallOrderContext,
+  RecallOrderDetailActions,
   RecallOrderDetails,
   RecallOrderItem,
   RecallOrderPaymentRecord,
@@ -212,6 +217,81 @@ export class RecallPage {
 
   async readOrderDetailsSnapshot(): Promise<RecallOrderDetails> {
     return this.orderDetails.readOrderDetailsSnapshot();
+  }
+
+  @step('页面读取：读取 Recall 订单详情可用操作')
+  async readOrderDetailAvailableActions(): Promise<RecallOrderDetailActions> {
+    return this.orderDetails.readOrderDetailAvailableActions();
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Send 按钮')
+  async clickSendInOrderDetails(): Promise<void> {
+    return this.orderDetails.clickSendInOrderDetails();
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Print 按钮')
+  async clickPrintInOrderDetails(): Promise<void> {
+    return this.orderDetails.clickPrintInOrderDetails();
+  }
+
+  @step('页面操作：从 Recall 订单详情点击 Split 并进入分单面板')
+  async openSplitInOrderDetails(): Promise<SplitOrderPage> {
+    return this.orderDetails.openSplitInOrderDetails();
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Discount 按钮')
+  async clickDiscountInOrderDetails(): Promise<void> {
+    return this.orderDetails.clickDiscountInOrderDetails();
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 More 按钮')
+  async clickOrderDetailsMoreButton(): Promise<void> {
+    return this.orderDetails.clickOrderDetailsMoreButton();
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Charge 按钮')
+  async clickChargeInMoreMenu(): Promise<void> {
+    return this.orderDetails.clickChargeInMoreMenu();
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Move Item 按钮')
+  async clickMoveItemInMoreMenu(): Promise<void> {
+    return this.orderDetails.clickMoveItemInMoreMenu();
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Combine 按钮')
+  async clickCombineInMoreMenu(): Promise<void> {
+    return this.orderDetails.clickCombineInMoreMenu();
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Tips 按钮')
+  async clickTipsInMoreMenu(): Promise<void> {
+    return this.orderDetails.clickTipsInMoreMenu();
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Paging 按钮')
+  async clickPagingInMoreMenu(): Promise<void> {
+    return this.orderDetails.clickPagingInMoreMenu();
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Call Off 按钮')
+  async clickCallOffInMoreMenu(): Promise<void> {
+    return this.orderDetails.clickCallOffInMoreMenu();
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Copy 按钮')
+  async clickCopyInMoreMenu(): Promise<void> {
+    return this.orderDetails.clickCopyInMoreMenu();
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Void 按钮')
+  async clickVoidInMoreMenu(): Promise<void> {
+    return this.orderDetails.clickVoidInMoreMenu();
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Sort 按钮')
+  async clickSortInMoreMenu(): Promise<void> {
+    return this.orderDetails.clickSortInMoreMenu();
   }
 
   async voidCurrentOrder(...args: Parameters<RecallVoidDialog['voidCurrentOrder']>): Promise<void> {
