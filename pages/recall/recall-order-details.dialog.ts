@@ -5,6 +5,7 @@ import { waitForInputSettled } from '../../utils/input-stability';
 import { waitUntil } from '../../utils/wait';
 import { OrderDishesPage } from '../order-dishes.page';
 import { PaymentPage } from '../payment.page';
+import { SplitOrderPage } from '../split-order.page';
 import type { RecallFilterBarSection } from './recall-filter-bar.section';
 import {
   escapeRegExp,
@@ -15,17 +16,49 @@ import type {
   RecallCustomerInfo,
   RecallMemberInfo,
   RecallOrderContext,
+  RecallOrderDetailAction,
+  RecallOrderDetailsMoreAction,
   RecallOrderDetails,
   RecallOrderItem,
   RecallOrderItemAddition,
   RecallOrderPaymentRecord,
 } from './recall.types';
 
+const recallOrderDetailActionNames = {
+  edit: 'Edit',
+  send: 'Send',
+  print: 'Print',
+  pay: 'Pay',
+  split: 'Split',
+  discount: 'Discount',
+  reopen: 'Reopen',
+  more: 'More',
+} as const satisfies Record<RecallOrderDetailAction, string>;
+
+const recallOrderDetailActionTestIds: Partial<Record<RecallOrderDetailAction, string>> = {
+  edit: 'shared-order-detail-side-action-editod',
+  pay: 'shared-order-detail-side-action-pay',
+  more: 'recall2-order-detail-more',
+};
+
+const recallOrderDetailsMoreActionNames = {
+  charge: 'Charge',
+  moveItem: 'Move Item',
+  combine: 'Combine',
+  tips: 'Tips',
+  paging: 'Paging',
+  callOff: 'Call Off',
+  copy: 'Copy',
+  void: 'Void',
+  sort: 'Sort',
+} as const satisfies Record<RecallOrderDetailsMoreAction, string>;
+
 export class RecallOrderDetailsDialog {
   private readonly openOrderCards: Locator;
   private readonly visibleOrderDetailsDialogs: Locator;
   readonly orderDetailsDialog: Locator;
   private readonly orderDetailsEditButton: Locator;
+  private readonly orderDetailsPayButton: Locator;
   readonly orderDetailsMoreButton: Locator;
   private readonly legacyOrderDetailsMoreButton: Locator;
   private readonly namedOrderDetailsMoreButton: Locator;
@@ -49,6 +82,10 @@ export class RecallOrderDetailsDialog {
     this.orderDetailsEditButton = recallScopedTestId(
       this.orderDetailsDialog,
       'shared-order-detail-side-action-editod',
+    );
+    this.orderDetailsPayButton = recallScopedTestId(
+      this.orderDetailsDialog,
+      'shared-order-detail-side-action-pay',
     );
     this.orderDetailsMoreButton = recallScopedTestId(
       this.orderDetailsDialog,
@@ -138,10 +175,7 @@ export class RecallOrderDetailsDialog {
   @step('页面操作：从 Recall 订单详情点击 Pay 并进入支付页面')
   async openPayment(): Promise<PaymentPage> {
     await this.waitForOrderDetailsDialogReady();
-    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
-    const payButton = orderDetailsDialog.getByRole('button', { name: /^Pay$/i });
-    await expect(payButton).toBeVisible({ timeout: 10_000 });
-    await payButton.click();
+    await this.clickOrderDetailsAction('pay');
 
     const paymentPage = new PaymentPage(this.page);
     await paymentPage.expectLoaded();
@@ -149,26 +183,107 @@ export class RecallOrderDetailsDialog {
     return paymentPage;
   }
 
+  @step('页面操作：点击 Recall 订单详情中的 Send 按钮')
+  async clickSendInOrderDetails(): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    await this.clickOrderDetailsAction('send');
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Print 按钮')
+  async clickPrintInOrderDetails(): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    await this.clickOrderDetailsAction('print');
+  }
+
+  @step('页面操作：从 Recall 订单详情点击 Split 并进入分单面板')
+  async openSplitInOrderDetails(): Promise<SplitOrderPage> {
+    await this.waitForOrderDetailsDialogReady();
+    await this.clickOrderDetailsAction('split');
+
+    const splitOrderPage = new SplitOrderPage(this.page);
+    await splitOrderPage.expectLoaded();
+
+    return splitOrderPage;
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Discount 按钮')
+  async clickDiscountInOrderDetails(): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    await this.clickOrderDetailsAction('discount');
+  }
+
+  @step('页面读取：读取 Recall 订单详情可用操作')
+  async readOrderDetailAvailableActions(): Promise<Record<RecallOrderDetailAction, boolean>> {
+    await this.waitForOrderDetailsDialogReady();
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+
+    return await this.readAvailableActionsFromDialog(orderDetailsDialog);
+  }
+
+  private async readAvailableActionsFromDialog(
+    orderDetailsDialog: Locator,
+  ): Promise<Record<RecallOrderDetailAction, boolean>> {
+    return {
+      edit: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'edit'),
+      send: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'send'),
+      print: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'print'),
+      pay: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'pay'),
+      split: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'split'),
+      discount: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'discount'),
+      reopen: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'reopen'),
+      more: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'more'),
+    };
+  }
+
   @step('页面操作：点击 Recall 订单详情中的 More 按钮')
   async clickOrderDetailsMoreButton(): Promise<void> {
     await this.waitForOrderDetailsDialogReady();
+    await this.clickOrderDetailsAction('more');
+  }
 
-    const moreButtonCandidates = [
-      this.orderDetailsMoreButton,
-      this.legacyOrderDetailsMoreButton,
-      this.namedOrderDetailsMoreButton,
-    ];
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Charge 按钮')
+  async clickChargeInMoreMenu(): Promise<void> {
+    await this.clickOrderDetailsMoreMenuAction('charge');
+  }
 
-    for (const moreButtonCandidate of moreButtonCandidates) {
-      if (!(await moreButtonCandidate.isVisible().catch(() => false))) {
-        continue;
-      }
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Move Item 按钮')
+  async clickMoveItemInMoreMenu(): Promise<void> {
+    await this.clickOrderDetailsMoreMenuAction('moveItem');
+  }
 
-      await moreButtonCandidate.click();
-      return;
-    }
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Combine 按钮')
+  async clickCombineInMoreMenu(): Promise<void> {
+    await this.clickOrderDetailsMoreMenuAction('combine');
+  }
 
-    throw new Error('Recall 订单详情未找到 More 按钮。');
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Tips 按钮')
+  async clickTipsInMoreMenu(): Promise<void> {
+    await this.clickOrderDetailsMoreMenuAction('tips');
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Paging 按钮')
+  async clickPagingInMoreMenu(): Promise<void> {
+    await this.clickOrderDetailsMoreMenuAction('paging');
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Call Off 按钮')
+  async clickCallOffInMoreMenu(): Promise<void> {
+    await this.clickOrderDetailsMoreMenuAction('callOff');
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Copy 按钮')
+  async clickCopyInMoreMenu(): Promise<void> {
+    await this.clickOrderDetailsMoreMenuAction('copy');
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Void 按钮')
+  async clickVoidInMoreMenu(): Promise<void> {
+    await this.clickOrderDetailsMoreMenuAction('void');
+  }
+
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Sort 按钮')
+  async clickSortInMoreMenu(): Promise<void> {
+    await this.clickOrderDetailsMoreMenuAction('sort');
   }
 
   @step('页面操作：展开 Recall 订单详情价格汇总')
@@ -183,17 +298,27 @@ export class RecallOrderDetailsDialog {
       return;
     }
 
+    if (await this.isOrderDetailsPriceSummaryReadableWithoutSubtotal()) {
+      return;
+    }
+
     await waitUntil(
       async () => {
         await this.waitForGlobalLoadingOverlayHidden();
 
-        if (await this.isOrderDetailsPriceSummaryExpanded()) {
+        if (
+          (await this.isOrderDetailsPriceSummaryExpanded()) ||
+          (await this.isOrderDetailsPriceSummaryReadableWithoutSubtotal())
+        ) {
           return true;
         }
 
         await this.clickOrderDetailsPriceSummaryHeaderRow();
 
-        return await this.isOrderDetailsPriceSummaryExpanded();
+        return (
+          (await this.isOrderDetailsPriceSummaryExpanded()) ||
+          (await this.isOrderDetailsPriceSummaryReadableWithoutSubtotal())
+        );
       },
       (expanded) => expanded,
       {
@@ -231,6 +356,20 @@ export class RecallOrderDetailsDialog {
     const toggleText = (await priceSummaryToggle.innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
 
     return /\bSubtotal\b/i.test(toggleText);
+  }
+
+  private async isOrderDetailsPriceSummaryReadableWithoutSubtotal(): Promise<boolean> {
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+
+    return await orderDetailsDialog.evaluate((dialogElement) => {
+      const cleanText = (value: string | null | undefined): string =>
+        value?.replace(/\s+/g, ' ').trim() ?? '';
+      const hasPaymentRecord =
+        dialogElement.querySelector('[class*="_methodLabel_"], [class*="_paymentText_"]') !== null;
+      const hasTotal = /\bTotal\s*\$[\d,.]+/i.test(cleanText(dialogElement.textContent));
+
+      return hasPaymentRecord && hasTotal;
+    });
   }
 
   @step('页面操作：点击 Recall 订单详情价格汇总折叠头')
@@ -989,9 +1128,11 @@ export class RecallOrderDetailsDialog {
       };
     });
         const labelPriceSummary = await this.readOrderDetailsPriceSummaryFromLabels();
+        const availableActions = await this.readAvailableActionsFromDialog(orderDetailsDialog);
 
         return {
           ...snapshot,
+          availableActions,
           priceSummary: {
             ...snapshot.priceSummary,
             ...labelPriceSummary,
@@ -1005,6 +1146,10 @@ export class RecallOrderDetailsDialog {
           snapshot.priceSummary.Total !== undefined && !hasSubtotal;
 
         if (hasItems && hasSubtotal) {
+          return true;
+        }
+
+        if (hasItems && snapshot.priceSummary.Total !== undefined && snapshot.payments.length > 0) {
           return true;
         }
 
@@ -1129,8 +1274,87 @@ export class RecallOrderDetailsDialog {
   @step('页面操作：在 Recall 订单详情中点击 Edit')
   private async clickEditInOrderDetails(): Promise<void> {
     await this.waitForOrderDetailsDialogReady();
-    await expect(this.orderDetailsEditButton).toBeVisible({ timeout: 10_000 });
-    await this.orderDetailsEditButton.click();
+    await this.clickOrderDetailsAction('edit');
+  }
+
+  @step((action: RecallOrderDetailAction) =>
+    `页面操作：点击 Recall 订单详情中的 ${recallOrderDetailActionNames[action]} 按钮`,
+  )
+  private async clickOrderDetailsAction(action: RecallOrderDetailAction): Promise<void> {
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+    const actionButton = await this.resolveOrderDetailsActionButton(orderDetailsDialog, action);
+
+    await expect(actionButton).toBeVisible({ timeout: 10_000 });
+    await actionButton.click();
+  }
+
+  private orderDetailsActionTestIdButton(
+    orderDetailsDialog: Locator,
+    action: RecallOrderDetailAction,
+  ): Locator | null {
+    const actionTestId = recallOrderDetailActionTestIds[action];
+
+    return actionTestId ? recallScopedTestId(orderDetailsDialog, actionTestId) : null;
+  }
+
+  private orderDetailsActionNamedButton(
+    orderDetailsDialog: Locator,
+    action: RecallOrderDetailAction,
+  ): Locator {
+    return orderDetailsDialog.getByRole('button', {
+      name: new RegExp(`^${escapeRegExp(recallOrderDetailActionNames[action])}$`, 'i'),
+    });
+  }
+
+  private async resolveOrderDetailsActionButton(
+    orderDetailsDialog: Locator,
+    action: RecallOrderDetailAction,
+  ): Promise<Locator> {
+    const actionTestIdButton = this.orderDetailsActionTestIdButton(orderDetailsDialog, action);
+
+    if (actionTestIdButton && (await actionTestIdButton.isVisible().catch(() => false))) {
+      return actionTestIdButton;
+    }
+
+    return this.orderDetailsActionNamedButton(orderDetailsDialog, action);
+  }
+
+  private async isOrderDetailsActionVisible(
+    orderDetailsDialog: Locator,
+    action: RecallOrderDetailAction,
+  ): Promise<boolean> {
+    const actionTestIdButton = this.orderDetailsActionTestIdButton(orderDetailsDialog, action);
+
+    if (actionTestIdButton && (await actionTestIdButton.isVisible().catch(() => false))) {
+      return true;
+    }
+
+    const actionButton = this.orderDetailsActionNamedButton(orderDetailsDialog, action);
+
+    return await actionButton.isVisible().catch(() => false);
+  }
+
+  @step((action: RecallOrderDetailsMoreAction) =>
+    `页面操作：点击 Recall 订单详情 More 菜单中的 ${recallOrderDetailsMoreActionNames[action]} 按钮`,
+  )
+  private async clickOrderDetailsMoreMenuAction(
+    action: RecallOrderDetailsMoreAction,
+  ): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    await this.clickOrderDetailsMoreButton();
+
+    const actionButton = this.orderDetailsMoreMenuActionButton(action);
+
+    await expect(actionButton).toBeVisible({ timeout: 10_000 });
+    await actionButton.click();
+  }
+
+  private orderDetailsMoreMenuActionButton(action: RecallOrderDetailsMoreAction): Locator {
+    return this.page
+      .getByRole('button', {
+        name: new RegExp(`^${escapeRegExp(recallOrderDetailsMoreActionNames[action])}$`, 'i'),
+      })
+      .last();
   }
 
   @step((orderNumber: string) => `页面操作：点击 Recall 列表中的订单 ${orderNumber}`)

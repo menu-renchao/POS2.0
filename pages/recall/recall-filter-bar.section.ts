@@ -249,7 +249,7 @@ export class RecallFilterBarSection {
 
   @step('页面读取：读取当前手动搜索关键字')
   async readManualSearchKeyword(): Promise<string> {
-    return await this.topSearchInput.inputValue();
+    return await this.topSearchInput.inputValue({ timeout: 1_000 }).catch(() => '');
   }
 
   @step('页面读取：读取当前激活的筛选条件')
