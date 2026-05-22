@@ -367,9 +367,19 @@ export class RecallOrderDetailsDialog {
         value?.replace(/\s+/g, ' ').trim() ?? '';
       const hasPaymentRecord =
         dialogElement.querySelector('[class*="_methodLabel_"], [class*="_paymentText_"]') !== null;
+      const hasCustomerInfo =
+        dialogElement.querySelector(
+          '[class*="_customerPrimaryText_"], [class*="_customerAddressText_"], [class*="_customerNoteText_"]',
+        ) !== null;
+      const headerChipTexts = Array.from(
+        dialogElement.querySelectorAll('[class*="_header_1ej2d_"] button, [class*="_actionButtons_"] button'),
+      )
+        .map((buttonElement) => cleanText(buttonElement.textContent))
+        .filter(Boolean);
+      const hasDeliveryOrderType = headerChipTexts.some((text) => /^delivery$/i.test(text));
       const hasTotal = /\bTotal\s*\$[\d,.]+/i.test(cleanText(dialogElement.textContent));
 
-      return hasPaymentRecord && hasTotal;
+      return hasTotal && (hasPaymentRecord || (hasCustomerInfo && hasDeliveryOrderType));
     });
   }
 
@@ -532,6 +542,21 @@ export class RecallOrderDetailsDialog {
     }
 
     return summary;
+  }
+
+  private isCollapsedTotalOnlySnapshotReady(snapshot: RecallOrderDetails): boolean {
+    const hasSubtotal = snapshot.priceSummary.Subtotal !== undefined;
+    const hasItems = snapshot.items.length > 0;
+    const hasCollapsedTotalOnly =
+      snapshot.priceSummary.Total !== undefined && !hasSubtotal;
+    const hasDeliveryCustomerContext =
+      snapshot.customerInfo !== null && /^delivery$/i.test(snapshot.orderContext.orderType ?? '');
+
+    if (!hasItems || !hasCollapsedTotalOnly) {
+      return false;
+    }
+
+    return snapshot.payments.length > 0 || hasDeliveryCustomerContext;
   }
 
   @step('页面读取：读取订单详情中的客户信息')
@@ -1143,14 +1168,12 @@ export class RecallOrderDetailsDialog {
       (snapshot) => {
         const hasSubtotal = snapshot.priceSummary.Subtotal !== undefined;
         const hasItems = snapshot.items.length > 0;
-        const hasCollapsedTotalOnly =
-          snapshot.priceSummary.Total !== undefined && !hasSubtotal;
 
         if (hasItems && hasSubtotal) {
           return true;
         }
 
-        if (hasItems && snapshot.priceSummary.Total !== undefined && snapshot.payments.length > 0) {
+        if (this.isCollapsedTotalOnlySnapshotReady(snapshot)) {
           return true;
         }
 
@@ -1317,6 +1340,10 @@ export class RecallOrderDetailsDialog {
       return actionTestIdButton;
     }
 
+    if (action === 'more' && (await this.namedOrderDetailsMoreButton.isVisible().catch(() => false))) {
+      return this.namedOrderDetailsMoreButton;
+    }
+
     return this.orderDetailsActionNamedButton(orderDetailsDialog, action);
   }
 
@@ -1327,6 +1354,10 @@ export class RecallOrderDetailsDialog {
     const actionTestIdButton = this.orderDetailsActionTestIdButton(orderDetailsDialog, action);
 
     if (actionTestIdButton && (await actionTestIdButton.isVisible().catch(() => false))) {
+      return true;
+    }
+
+    if (action === 'more' && (await this.namedOrderDetailsMoreButton.isVisible().catch(() => false))) {
       return true;
     }
 
@@ -1360,9 +1391,26 @@ export class RecallOrderDetailsDialog {
 
   @step((orderNumber: string) => `页面操作：点击 Recall 列表中的订单 ${orderNumber}`)
   private async clickVisibleOrderNumber(orderNumber: string): Promise<void> {
-    const orderInContainer = this.filterBar.orderListContainer
-      .getByText(orderNumber, { exact: true })
+    const normalizedOrderNumber = orderNumber.replace(/^#/, '');
+    const orderCardTrigger = this.filterBar.orderListContainer
+      .locator(
+        [
+          `[data-test-id="shared-order-card-open-${normalizedOrderNumber}"]`,
+          `[data-testid="shared-order-card-open-${normalizedOrderNumber}"]`,
+          `[data-test-id="recall2-order-card-${normalizedOrderNumber}"]`,
+          `[data-testid="recall2-order-card-${normalizedOrderNumber}"]`,
+        ].join(', '),
+      )
       .first();
+
+    if (await orderCardTrigger.isVisible().catch(() => false)) {
+      await orderCardTrigger.evaluate((triggerElement) => {
+        (triggerElement as HTMLElement).click();
+      });
+      return;
+    }
+
+    const orderInContainer = this.filterBar.orderListContainer.getByText(orderNumber, { exact: true }).first();
 
     if (await orderInContainer.isVisible().catch(() => false)) {
       await orderInContainer.click();

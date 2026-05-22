@@ -112,6 +112,37 @@ const inventoryCategoryTextOnlyFixtureHtml = String.raw`
 </html>
 `;
 
+const inventoryDelayedCategoryFixtureHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <div>Inventory Management</div>
+    <div id="root"><span>Limited Stock</span></div>
+    <div id="category-host"></div>
+    <button type="button" id="visible-item" hidden>superman item4</button>
+
+    <script>
+      (() => {
+        const categoryHost = document.querySelector('#category-host');
+        const visibleItem = document.querySelector('#visible-item');
+
+        window.setTimeout(() => {
+          const categoryTrigger = document.createElement('button');
+          categoryTrigger.type = 'button';
+          categoryTrigger.textContent = 'Category 001';
+          categoryTrigger.addEventListener('click', () => {
+            window.setTimeout(() => {
+              visibleItem.hidden = false;
+            }, 150);
+          });
+          categoryHost.appendChild(categoryTrigger);
+        }, 150);
+      })();
+    </script>
+  </body>
+</html>
+`;
+
 test.describe('库存设置输入稳定契约', () => {
   test(
     '库存页定位商品时不应依赖 inventoryCategoryPanelId 这类写死 id',
@@ -130,6 +161,28 @@ test.describe('库存设置输入稳定契约', () => {
         await inventoryPage.focusItem({
           itemName: 'superman item4',
           menu: { category: 'Auto Category 001' },
+        });
+      });
+    },
+  );
+
+  test(
+    '库存分类和商品延迟渲染时仍应等待后定位目标商品',
+    {},
+    async ({ page }) => {
+      const inventoryPage = new InventoryPage(page);
+
+      await test.step('准备分类与商品都在页面加载后异步出现的库存页骨架', async () => {
+        await page.setContent(inventoryDelayedCategoryFixtureHtml);
+        await page.evaluate(() => {
+          window.location.hash = 'inventory';
+        });
+      });
+
+      await test.step('按分类定位商品时应等待延迟渲染完成后再命中目标商品', async () => {
+        await inventoryPage.focusItem({
+          itemName: 'superman item4',
+          menu: { category: 'Category 001' },
         });
       });
     },

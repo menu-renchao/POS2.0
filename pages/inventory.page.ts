@@ -4,7 +4,6 @@ import { OrderDishesPage } from './order-dishes.page';
 import { waitForInputSettled } from '../utils/input-stability';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
-import { resolveFirstVisibleLocator } from './shared/locator-scope';
 
 export type InventoryMenuNavigation = {
   category: string;
@@ -151,35 +150,47 @@ export class InventoryPage {
   }
 
   private async resolveVisibleItemNameLocator(itemName: string): Promise<Locator> {
-    const itemLocators = this.page.getByText(itemName, { exact: true });
-    const count = await itemLocators.count();
-    const candidates: Locator[] = [];
-
-    for (let index = 0; index < count; index += 1) {
-      candidates.push(itemLocators.nth(index));
-    }
-
-    return await resolveFirstVisibleLocator(
-      candidates,
+    return await this.resolveVisibleExactTextLocator(
+      itemName,
       `Unable to find visible inventory item on inventory page: ${itemName}.`,
-      15_000,
     );
   }
 
   private async resolveVisibleCategoryTrigger(category: string): Promise<Locator> {
-    const categoryLocators = this.page.getByText(category, { exact: true });
-    const count = await categoryLocators.count();
-    const candidates: Locator[] = [];
+    return await this.resolveVisibleExactTextLocator(
+      category,
+      `Unable to find visible inventory category on inventory page: ${category}.`,
+    );
+  }
 
-    for (let index = 0; index < count; index += 1) {
-      candidates.push(categoryLocators.nth(index));
+  private async resolveVisibleExactTextLocator(text: string, message: string): Promise<Locator> {
+    const resolvedLocator = await waitUntil(
+      async () => {
+        const textLocators = this.page.getByText(text, { exact: true });
+        const count = await textLocators.count().catch(() => 0);
+
+        for (let index = 0; index < count; index += 1) {
+          const candidate = textLocators.nth(index);
+
+          if (await candidate.isVisible().catch(() => false)) {
+            return candidate;
+          }
+        }
+
+        return null;
+      },
+      (locator): locator is Locator => locator !== null,
+      {
+        timeout: 15_000,
+        message,
+      },
+    );
+
+    if (!resolvedLocator) {
+      throw new Error(message);
     }
 
-    return await resolveFirstVisibleLocator(
-      candidates,
-      `Unable to find visible inventory category on inventory page: ${category}.`,
-      15_000,
-    );
+    return resolvedLocator;
   }
 
   private async resolveItemStockStateLocator(itemName: string): Promise<Locator> {
