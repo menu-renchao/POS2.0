@@ -1,5 +1,8 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import { findFirstVisibleLocator } from '../shared/locator-scope';
+import {
+  findFirstVisibleLocator,
+  resolveFirstVisibleLocator,
+} from '../shared/locator-scope';
 import { step } from '../../utils/step';
 import { waitForInputSettled } from '../../utils/input-stability';
 import { waitUntil } from '../../utils/wait';
@@ -63,7 +66,6 @@ export class RecallOrderDetailsDialog {
   private readonly legacyOrderDetailsMoreButton: Locator;
   private readonly namedOrderDetailsMoreButton: Locator;
   private readonly orderDetailsTipsButton: Locator;
-  private readonly paymentCardTipsButton: Locator;
   private readonly globalLoadingOverlay: Locator;
 
   constructor(
@@ -94,7 +96,6 @@ export class RecallOrderDetailsDialog {
     this.legacyOrderDetailsMoreButton = this.page.locator('#odsmymoreicon');
     this.namedOrderDetailsMoreButton = this.page.getByRole('button', { name: /^MoreIcon More$/i });
     this.orderDetailsTipsButton = recallScopedTestId(this.page, 'recall2-order-detail-tips');
-    this.paymentCardTipsButton = this.page.getByTestId('payment-card-tips-button');
     this.globalLoadingOverlay = this.page.locator('#floatmsgbx');
   }
 
@@ -366,9 +367,19 @@ export class RecallOrderDetailsDialog {
         value?.replace(/\s+/g, ' ').trim() ?? '';
       const hasPaymentRecord =
         dialogElement.querySelector('[class*="_methodLabel_"], [class*="_paymentText_"]') !== null;
+      const hasCustomerInfo =
+        dialogElement.querySelector(
+          '[class*="_customerPrimaryText_"], [class*="_customerAddressText_"], [class*="_customerNoteText_"]',
+        ) !== null;
+      const headerChipTexts = Array.from(
+        dialogElement.querySelectorAll('[class*="_header_1ej2d_"] button, [class*="_actionButtons_"] button'),
+      )
+        .map((buttonElement) => cleanText(buttonElement.textContent))
+        .filter(Boolean);
+      const hasDeliveryOrderType = headerChipTexts.some((text) => /^delivery$/i.test(text));
       const hasTotal = /\bTotal\s*\$[\d,.]+/i.test(cleanText(dialogElement.textContent));
 
-      return hasPaymentRecord && hasTotal;
+      return hasTotal && (hasPaymentRecord || (hasCustomerInfo && hasDeliveryOrderType));
     });
   }
 
@@ -531,6 +542,21 @@ export class RecallOrderDetailsDialog {
     }
 
     return summary;
+  }
+
+  private isCollapsedTotalOnlySnapshotReady(snapshot: RecallOrderDetails): boolean {
+    const hasSubtotal = snapshot.priceSummary.Subtotal !== undefined;
+    const hasItems = snapshot.items.length > 0;
+    const hasCollapsedTotalOnly =
+      snapshot.priceSummary.Total !== undefined && !hasSubtotal;
+    const hasDeliveryCustomerContext =
+      snapshot.customerInfo !== null && /^delivery$/i.test(snapshot.orderContext.orderType ?? '');
+
+    if (!hasItems || !hasCollapsedTotalOnly) {
+      return false;
+    }
+
+    return snapshot.payments.length > 0 || hasDeliveryCustomerContext;
   }
 
   @step('页面读取：读取订单详情中的客户信息')
@@ -1142,14 +1168,12 @@ export class RecallOrderDetailsDialog {
       (snapshot) => {
         const hasSubtotal = snapshot.priceSummary.Subtotal !== undefined;
         const hasItems = snapshot.items.length > 0;
-        const hasCollapsedTotalOnly =
-          snapshot.priceSummary.Total !== undefined && !hasSubtotal;
 
         if (hasItems && hasSubtotal) {
           return true;
         }
 
-        if (hasItems && snapshot.priceSummary.Total !== undefined && snapshot.payments.length > 0) {
+        if (this.isCollapsedTotalOnlySnapshotReady(snapshot)) {
           return true;
         }
 
@@ -1316,6 +1340,10 @@ export class RecallOrderDetailsDialog {
       return actionTestIdButton;
     }
 
+    if (action === 'more' && (await this.namedOrderDetailsMoreButton.isVisible().catch(() => false))) {
+      return this.namedOrderDetailsMoreButton;
+    }
+
     return this.orderDetailsActionNamedButton(orderDetailsDialog, action);
   }
 
@@ -1326,6 +1354,10 @@ export class RecallOrderDetailsDialog {
     const actionTestIdButton = this.orderDetailsActionTestIdButton(orderDetailsDialog, action);
 
     if (actionTestIdButton && (await actionTestIdButton.isVisible().catch(() => false))) {
+      return true;
+    }
+
+    if (action === 'more' && (await this.namedOrderDetailsMoreButton.isVisible().catch(() => false))) {
       return true;
     }
 
@@ -1359,9 +1391,26 @@ export class RecallOrderDetailsDialog {
 
   @step((orderNumber: string) => `页面操作：点击 Recall 列表中的订单 ${orderNumber}`)
   private async clickVisibleOrderNumber(orderNumber: string): Promise<void> {
-    const orderInContainer = this.filterBar.orderListContainer
-      .getByText(orderNumber, { exact: true })
+    const normalizedOrderNumber = orderNumber.replace(/^#/, '');
+    const orderCardTrigger = this.filterBar.orderListContainer
+      .locator(
+        [
+          `[data-test-id="shared-order-card-open-${normalizedOrderNumber}"]`,
+          `[data-testid="shared-order-card-open-${normalizedOrderNumber}"]`,
+          `[data-test-id="recall2-order-card-${normalizedOrderNumber}"]`,
+          `[data-testid="recall2-order-card-${normalizedOrderNumber}"]`,
+        ].join(', '),
+      )
       .first();
+
+    if (await orderCardTrigger.isVisible().catch(() => false)) {
+      await orderCardTrigger.evaluate((triggerElement) => {
+        (triggerElement as HTMLElement).click();
+      });
+      return;
+    }
+
+    const orderInContainer = this.filterBar.orderListContainer.getByText(orderNumber, { exact: true }).first();
 
     if (await orderInContainer.isVisible().catch(() => false)) {
       await orderInContainer.click();
@@ -1545,99 +1594,206 @@ export class RecallOrderDetailsDialog {
     throw new Error('Recall 订单详情 More 菜单未出现 Tips 入口。');
   }
 
-  private async resolvePaymentCardTipsButton(paymentMethod?: string): Promise<Locator> {
-    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
-
-    if (!paymentMethod) {
-      const directButton = orderDetailsDialog.getByTestId('payment-card-tips-button').first();
-
-      if (await directButton.isVisible().catch(() => false)) {
-        return directButton;
-      }
-
-      const visibleNamedButton = await this.findVisibleTipsButton(orderDetailsDialog);
-      if (visibleNamedButton) {
-        return visibleNamedButton;
-      }
-
-      return this.paymentCardTipsButton.first();
-    }
-
-    const paymentCardByAttribute = orderDetailsDialog
-      .locator(`[data-payment-method="${paymentMethod}"]`)
-      .first();
-
-    if (await paymentCardByAttribute.isVisible().catch(() => false)) {
-      const directButton = paymentCardByAttribute.getByTestId('payment-card-tips-button').first();
-      if (await directButton.isVisible().catch(() => false)) {
-        return directButton;
-      }
-
-      const visibleNamedButton = await this.findVisibleTipsButton(paymentCardByAttribute);
-      if (visibleNamedButton) {
-        return visibleNamedButton;
-      }
-    }
-
-    const paymentCard = orderDetailsDialog
-      .locator('[data-payment-method], [class*="_card_"]')
-      .filter({
-        has: this.page.getByText(paymentMethod, { exact: true }),
-      })
-      .first();
-
-    if (await paymentCard.isVisible().catch(() => false)) {
-      const directButton = paymentCard.getByTestId('payment-card-tips-button').first();
-      if (await directButton.isVisible().catch(() => false)) {
-        return directButton;
-      }
-
-      const visibleNamedButton = await this.findVisibleTipsButton(paymentCard);
-      if (visibleNamedButton) {
-        return visibleNamedButton;
-      }
-    }
-
-    throw new Error(`Recall PAYMENT 卡片未找到 ${paymentMethod} 的 Tips 入口。`);
-  }
-
-  private async clickPaymentCardTipsButton(paymentMethod?: string): Promise<void> {
-    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
-    const paymentSection = orderDetailsDialog
+  private resolvePaymentSection(orderDetailsDialog: Locator): Locator {
+    return orderDetailsDialog
       .locator('[class*="_section_"]')
       .filter({
         has: orderDetailsDialog.getByRole('heading', { name: /^PAYMENT$/i }),
       })
       .first();
+  }
 
-    if (await paymentSection.isVisible().catch(() => false)) {
-      const tipButtonScope = paymentMethod
-        ? paymentSection
-            .locator('[class*="_card_"]')
-            .filter({
-              has: paymentSection.getByText(paymentMethod, { exact: false }),
-            })
-            .last()
-        : paymentSection.locator('[class*="_card_"]').last();
-      const visibleTipsButton = await this.findVisibleTipsButton(tipButtonScope);
+  private buildPaymentMethodHasTextPattern(paymentMethod: string): RegExp {
+    const tokens = paymentMethod
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(' ')
+      .filter(Boolean)
+      .map((token) => escapeRegExp(token));
 
-      if (visibleTipsButton) {
-        await visibleTipsButton.click();
-        return;
+    if (tokens.length === 0) {
+      return /.^/;
+    }
+
+    if (tokens.length === 1) {
+      return new RegExp(tokens[0], 'i');
+    }
+
+    return new RegExp(tokens.map((token) => `(?=.*${token})`).join(''), 'i');
+  }
+
+  private async resolvePaymentCardScope(
+    paymentSection: Locator,
+    paymentMethod?: string,
+  ): Promise<Locator> {
+    const paymentCards = paymentSection.locator(
+      '[data-payment-method], [class*="_card_"], [class*="_paymentInfo_"]',
+    );
+
+    if (paymentMethod) {
+      const paymentMethodPattern = this.buildPaymentMethodHasTextPattern(paymentMethod);
+      const paymentBrand = paymentMethod.replace(/\s+/g, ' ').trim().split(' ')[0] ?? paymentMethod;
+
+      const paymentCardByAttribute = paymentSection
+        .locator(`[data-payment-method="${paymentMethod}"], [data-payment-method="${paymentBrand}"]`)
+        .first();
+
+      if (await paymentCardByAttribute.isVisible().catch(() => false)) {
+        return paymentCardByAttribute;
+      }
+
+      const paymentCardByText = paymentCards.filter({ hasText: paymentMethodPattern }).first();
+
+      if (await paymentCardByText.isVisible().catch(() => false)) {
+        return paymentCardByText;
       }
     }
 
-    await (await this.resolvePaymentCardTipsButton(paymentMethod)).click();
+    return paymentCards.last();
+  }
+
+  private buildPaymentCardTipsButtonCandidates(paymentCard: Locator): Locator[] {
+    const actionGrid = paymentCard.locator('[class*="_actionGrid_"]');
+
+    return [
+      paymentCard.getByRole('button', { name: /^(Tips|小费)$/ }).first(),
+      actionGrid.getByTestId('button-default').filter({ hasText: /^(Tips|小费)$/ }).first(),
+      actionGrid.getByRole('button', { name: /^(Tips|小费)$/ }).first(),
+    ];
+  }
+
+  private paymentCardTipDialogCandidates(): Locator[] {
+    const visiblePosUiModals = this.page.locator(
+      '[role="dialog"][data-testid="pos-ui-modal"]:visible',
+    );
+    const hostCreditCardTipsPopup = this.page.locator('#responsePopuWin.creditcardtips-ipt:visible');
+    const hostCreditCardTipsPopupWithInput = this.page
+      .locator('#responsePopuWin:visible')
+      .filter({ has: this.page.locator('#tipsonly') });
+
+    return [
+      hostCreditCardTipsPopup.first(),
+      hostCreditCardTipsPopupWithInput.first(),
+      this.page.locator('#tipsonly:visible').first(),
+      this.page.getByTestId('payment-tip-dialog').first(),
+      visiblePosUiModals
+        .filter({ has: this.page.getByTestId('payment-tip-input-value') })
+        .last(),
+      visiblePosUiModals
+        .filter({ has: this.page.getByRole('heading', { name: /^Credit Card Tips$/i }) })
+        .last(),
+      visiblePosUiModals
+        .filter({ has: this.page.getByRole('heading', { name: /^Payment Tips$/i }) })
+        .last(),
+      this.page.getByRole('dialog', { name: /^Credit Card Tips$/i }).first(),
+      this.page.getByRole('dialog', { name: /^Payment Tips$/i }).first(),
+    ];
+  }
+
+  @step('页面操作：等待 Credit Card Tips 弹窗出现')
+  private async expectPaymentCardTipDialogVisible(): Promise<void> {
+    await resolveFirstVisibleLocator(
+      this.paymentCardTipDialogCandidates(),
+      '点击 PAYMENT 区 Tips 后，Credit Card Tips 弹窗未在预期时间内出现。',
+      10_000,
+    );
+  }
+
+  private async clickPaymentCardTipsButton(paymentMethod?: string): Promise<void> {
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+    const paymentSection = this.resolvePaymentSection(orderDetailsDialog);
+
+    await paymentSection.scrollIntoViewIfNeeded().catch(() => undefined);
+    await this.waitForGlobalLoadingOverlayHidden();
+
+    const paymentCard = await this.resolvePaymentCardScope(paymentSection, paymentMethod);
+    await paymentCard.scrollIntoViewIfNeeded();
+
+    const tipsButton = await resolveFirstVisibleLocator(
+      this.buildPaymentCardTipsButtonCandidates(paymentCard),
+      paymentMethod
+        ? `Recall PAYMENT 卡片 ${paymentMethod} 的 Tips 操作按钮未在预期时间内出现。`
+        : 'Recall PAYMENT 区的 Tips 操作按钮未在预期时间内出现。',
+      15_000,
+    );
+
+    await tipsButton.scrollIntoViewIfNeeded();
+    await tipsButton.click({ timeout: 5_000 });
+
+    const paymentCardTipDialogVisible = await waitUntil(
+      async () => {
+        for (const candidate of this.paymentCardTipDialogCandidates()) {
+          if (await candidate.isVisible().catch(() => false)) {
+            return true;
+          }
+        }
+
+        return false;
+      },
+      (isVisible) => isVisible,
+      {
+        timeout: 3_000,
+        message: '点击 PAYMENT Tips 后未检测到 Credit Card Tips 弹窗，准备重试点击。',
+      },
+    ).catch(() => false);
+
+    if (paymentCardTipDialogVisible) {
+      return;
+    }
+
+    await tipsButton.click({ force: true, timeout: 5_000 });
+
+    const paymentCardTipDialogVisibleAfterClick = await waitUntil(
+      async () => {
+        for (const candidate of this.paymentCardTipDialogCandidates()) {
+          if (await candidate.isVisible().catch(() => false)) {
+            return true;
+          }
+        }
+
+        return false;
+      },
+      (isVisible) => isVisible,
+      {
+        timeout: 3_000,
+        message: '点击 PAYMENT Tips 后未检测到 Credit Card Tips 弹窗，准备使用 DOM 点击重试。',
+      },
+    ).catch(() => false);
+
+    if (paymentCardTipDialogVisibleAfterClick) {
+      return;
+    }
+
+    await paymentCard.evaluate((cardElement) => {
+      const actionGrid = cardElement.querySelector<HTMLElement>('[class*="_actionGrid_"]');
+
+      if (!actionGrid) {
+        throw new Error('Unable to find PAYMENT action grid for Tips button.');
+      }
+
+      const tipsButtonElement = Array.from(
+        actionGrid.querySelectorAll<HTMLButtonElement>('[data-testid="button-default"]'),
+      ).find((button) => {
+        const label = String(button.textContent ?? '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        return /^(Tips|小费)$/.test(label);
+      });
+
+      if (!tipsButtonElement) {
+        throw new Error('Unable to find PAYMENT Tips action button in action grid.');
+      }
+
+      tipsButtonElement.click();
+    });
+
+    await this.expectPaymentCardTipDialogVisible();
   }
 
   private async resolveTipDialog(isPaymentCardDialog: boolean): Promise<Locator> {
     const candidates = isPaymentCardDialog
-      ? [
-          this.page.getByTestId('payment-tip-dialog').first(),
-          this.page.getByRole('dialog', { name: /^Credit Card Tips$/i }).first(),
-          this.page.getByRole('dialog', { name: /Tips/i }).first(),
-          this.page.getByRole('dialog', { name: /Payment Tips/i }).first(),
-        ]
+      ? this.paymentCardTipDialogCandidates()
       : [
           this.page.getByTestId('tip-input-dialog').first(),
           this.page.getByRole('dialog', { name: /^Tips$/i }).first(),
@@ -1685,6 +1841,7 @@ export class RecallOrderDetailsDialog {
     const valueText = isPaymentCardDialog
       ? this.formatPaymentCardTipInputValue(amountInCents)
       : this.formatTipInputDigits(amountInCents);
+    const keypadText = this.formatTipInputDigits(amountInCents);
 
     await input.fill(valueText).catch(async () => {
       await input.evaluate((inputElement, nextValue) => {
@@ -1710,16 +1867,12 @@ export class RecallOrderDetailsDialog {
       return;
     }
 
-    if (isPaymentCardDialog) {
-      return;
-    }
-
-    await this.enterTipValueByKeypad(tipDialog, valueText);
+    await this.enterTipValueByKeypad(tipDialog, keypadText);
   }
 
   private async confirmTipDialog(isPaymentCardDialog: boolean): Promise<void> {
     const tipDialog = await this.resolveTipDialog(isPaymentCardDialog);
-    const confirmButton = await this.resolveTipDialogConfirmButton(tipDialog);
+    const confirmButton = await this.resolveTipDialogConfirmButton(tipDialog, isPaymentCardDialog);
     await waitForInputSettled();
     await confirmButton.click();
   }
@@ -1730,6 +1883,8 @@ export class RecallOrderDetailsDialog {
   ): Promise<Locator> {
     const candidates = isPaymentCardDialog
       ? [
+          this.page.locator('#tipsonly:visible').first(),
+          tipDialog.locator('#tipsonly').first(),
           tipDialog.getByTestId('payment-tip-input-value').first(),
           tipDialog.locator('input[type="text"], input').first(),
           tipDialog.getByRole('textbox').first(),
@@ -1749,11 +1904,21 @@ export class RecallOrderDetailsDialog {
     throw new Error('Recall Tips 输入框不可见。');
   }
 
-  private async resolveTipDialogConfirmButton(tipDialog: Locator): Promise<Locator> {
-    const candidates = [
-      tipDialog.getByRole('button', { name: /^(Confirm|确认)$/ }).first(),
-      tipDialog.getByTestId('tip-input-confirm').first(),
-    ];
+  private async resolveTipDialogConfirmButton(
+    tipDialog: Locator,
+    isPaymentCardDialog = false,
+  ): Promise<Locator> {
+    const candidates = isPaymentCardDialog
+      ? [
+          this.page.locator('#smpiptgo:visible').first(),
+          tipDialog.locator('#smpiptgo').first(),
+          tipDialog.getByRole('button', { name: /^(Confirm|确认)$/ }).first(),
+          tipDialog.getByTestId('tip-input-confirm').first(),
+        ]
+      : [
+          tipDialog.getByRole('button', { name: /^(Confirm|确认)$/ }).first(),
+          tipDialog.getByTestId('tip-input-confirm').first(),
+        ];
 
     for (const candidate of candidates) {
       if (await candidate.isVisible().catch(() => false)) {
@@ -1881,7 +2046,13 @@ export class RecallOrderDetailsDialog {
     }
 
     for (const digit of valueText) {
-      await tipDialog.getByRole('button', { name: digit, exact: true }).first().click();
+      const digitButton = tipDialog.getByRole('button', { name: digit, exact: true }).first();
+
+      if (!(await digitButton.isVisible().catch(() => false))) {
+        continue;
+      }
+
+      await digitButton.click({ timeout: 2_000 });
     }
   }
 
@@ -1910,17 +2081,7 @@ export class RecallOrderDetailsDialog {
   }
 
   private async findVisibleTipsButton(scope: Locator): Promise<Locator | null> {
-    const tipsButtons = scope.getByRole('button', { name: /^(Tips|小费)$/ });
-    const buttonCount = await tipsButtons.count().catch(() => 0);
-
-    for (let index = 0; index < buttonCount; index += 1) {
-      const button = tipsButtons.nth(index);
-      if (await button.isVisible().catch(() => false)) {
-        return button;
-      }
-    }
-
-    return null;
+    return findFirstVisibleLocator(this.buildPaymentCardTipsButtonCandidates(scope));
   }
 
   private async waitForVisibleOrderDialogCount(expectedCount: number): Promise<void> {

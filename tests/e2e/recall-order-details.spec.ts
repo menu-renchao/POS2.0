@@ -618,6 +618,99 @@ const partialPaidTotalOnlyFixtureHtml = String.raw`
 </html>
 `;
 
+const deliveryTotalOnlyWithCustomerFixtureHtml = String.raw`
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <button type="button" data-testid="recall2-header-new-order">New Order</button>
+    <button type="button" data-testid="recall2-filter-dropdown-paymentStatus">Payment Status</button>
+    <button type="button" data-testid="recall2-filter-dropdown-orderStatus">Order Status</button>
+    <button type="button" data-testid="recall2-filter-dropdown-orderType">Order Type</button>
+    <button type="button" data-testid="recall2-filter-dropdown-paymentType">Payment Type</button>
+    <button type="button" data-testid="recall2-filter-dropdown-productLine">Product Line</button>
+    <button type="button" data-testid="recall2-search-trigger">Search</button>
+    <input data-testid="recall2-search-input" value="" />
+
+    <div data-testid="recall2-order-list-container">
+      <button type="button" data-testid="shared-order-card-open-61">#61</button>
+    </div>
+
+    <div role="dialog" aria-modal="true" data-testid="pos-ui-modal" hidden>
+      <div class="_header_1ej2d_479">
+        <div class="_container_1bmdj_453">
+          <div class="_orderNumber_1bmdj_459"><span class="_number_1bmdj_480">#61</span></div>
+          <div class="_status_1bmdj_494"><span class="_statusTag_1bmdj_500">Unpaid</span></div>
+        </div>
+        <div class="_actionButtons_gham7_478">
+          <button type="button">Delivery</button>
+          <button type="button">Boss</button>
+        </div>
+      </div>
+
+      <div class="_section_201h3_462">
+        <div class="_header_blu61_457"><h3>CUSTOMER INFO</h3></div>
+        <div class="_content_blu61_472">
+          <div data-test-id="shared-order-detail-customer-info-open" class="_customerInfoCard_1l2ju_594">
+            <div class="_customerPrimaryRow_1l2ju_606">
+              <div class="_customerPrimaryCell_1l2ju_613">
+                <span class="_customerPrimaryText_1l2ju_640">pos-test</span>
+              </div>
+              <div class="_customerPrimaryCell_1l2ju_613">
+                <span class="_customerPrimaryText_1l2ju_640">(012)345-67890</span>
+              </div>
+            </div>
+            <div class="_customerDetailRow_1l2ju_651">
+              <span class="_customerDetailText_1l2ju_657 _customerAddressText_1l2ju_667">
+                menusifu-test, 55, Flushing, NY, 10016
+              </span>
+            </div>
+            <div class="_customerDetailRow_1l2ju_651">
+              <span class="_customerDetailText_1l2ju_657 _customerNoteText_1l2ju_675">
+                我的备注
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="_section_201h3_462">
+        <div class="_header_blu61_457"><h3>PAYMENT</h3></div>
+        <div class="_content_blu61_472"></div>
+      </div>
+
+      <div data-testid="pos-ui-dish-item" class="_dishItem_99zrf_198">
+        <div class="_dishMainRow_99zrf_241">
+          <div class="_dishInfo_99zrf_205">
+            <section class="_prefix_99zrf_282"><span class="_quantity_99zrf_236">1</span></section>
+            <span class="_dishName_99zrf_333">普通菜1</span>
+          </div>
+          <span class="_dishPrice_99zrf_342">$8.80</span>
+        </div>
+      </div>
+
+      <div data-testid="shared-order-price-summary-toggle">
+        <div><span>Total</span><span>$9.68</span></div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const orderCard = document.querySelector('[data-testid="shared-order-card-open-61"]');
+        const dialog = document.querySelector('[data-testid="pos-ui-modal"]');
+        orderCard?.addEventListener('click', () => {
+          dialog.hidden = false;
+        });
+        window.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            dialog.hidden = true;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
+`;
+
 const unpaidOrderActionsFixtureHtml = String.raw`
 <!DOCTYPE html>
 <html lang="en">
@@ -1185,6 +1278,57 @@ test.describe('Recall 订单详情读取', () => {
           reopen: true,
           more: true,
         },
+      });
+      await expect(page.getByRole('dialog')).toBeHidden();
+    },
+  );
+
+  test(
+    '应能读取仅展示 Total 的 Delivery 未支付订单详情客户信息',
+    {},
+    async ({ page }) => {
+      const recallPage = new RecallPage(page);
+
+      await test.step('准备仅展示 Total 的 Delivery 未支付订单详情', async () => {
+        await page.setContent(deliveryTotalOnlyWithCustomerFixtureHtml);
+        await page.evaluate(() => {
+          window.location.hash = '#recall';
+        });
+      });
+
+      const details = await viewRecallOrderDetails(recallPage, '61');
+
+      expect(details).toEqual({
+        orderNumber: '#61',
+        paymentStatus: 'Unpaid',
+        customerInfo: {
+          name: 'pos-test',
+          phone: '(012)345-67890',
+          address: 'menusifu-test, 55, Flushing, NY, 10016',
+          note: '我的备注',
+        },
+        memberInfo: null,
+        orderContext: {
+          orderType: 'Delivery',
+          tableName: null,
+          guestCount: null,
+          serverName: 'Boss',
+        },
+        payments: [],
+        items: [
+          {
+            seat: null,
+            sentTime: null,
+            quantity: '1',
+            name: '普通菜1',
+            price: '$8.80',
+            additions: [],
+          },
+        ],
+        priceSummary: {
+          Total: 9.68,
+        },
+        availableActions: noAvailableActions,
       });
       await expect(page.getByRole('dialog')).toBeHidden();
     },
