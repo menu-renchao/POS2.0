@@ -5,17 +5,17 @@ pipeline {
         string(
             name: 'PLAYWRIGHT_BASE_URL',
             defaultValue: 'http://192.168.0.72:22080',
-            description: '目标服务器地址，格式: http://IP:PORT'
+            description: 'Target server URL, e.g. http://IP:PORT'
         )
         choice(
             name: 'TEST_SUITE',
             choices: ['all', 'smoke', 'e2e', 'py-migrate'],
-            description: '选择要执行的测试套件'
+            description: 'Test suite to run'
         )
         booleanParam(
             name: 'HEADED',
             defaultValue: false,
-            description: '是否以有头模式运行（调试用）'
+            description: 'Run in headed mode (for debugging)'
         )
     }
 
@@ -91,10 +91,10 @@ pipeline {
             archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true
         }
         success {
-            echo "测试通过! 目标地址: ${params.PLAYWRIGHT_BASE_URL}"
+            echo "Tests PASSED. Target: ${params.PLAYWRIGHT_BASE_URL}"
         }
         failure {
-            echo "测试失败! 目标地址: ${params.PLAYWRIGHT_BASE_URL}"
+            echo "Tests FAILED. Target: ${params.PLAYWRIGHT_BASE_URL}"
         }
     }
 }
