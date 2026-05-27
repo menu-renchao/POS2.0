@@ -55,7 +55,7 @@ export class RecallVoidDialog {
       await keyboardCloseButton.click();
     }
 
-    await waitForInputSettled();
+    await waitForInputSettled(this.voidNoteInput);
     await this.voidSubmitButton.click();
     await expect(this.voidSubmitButton).toBeHidden({ timeout: 15_000 }).catch(() => undefined);
     await this.orderDetails.dismissOrderDetailsDialogIfNeeded();

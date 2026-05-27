@@ -1,8 +1,8 @@
 import { expect } from '@playwright/test';
-import { enterEmployeeContext } from '../../flows/employee-login.flow';
-import { openHome } from '../../flows/home.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import { openRecallFromHome, viewRecallOrderDetails } from '../../flows/recall.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
+import { RecallFlow } from '../../flows/recall.flow';
 import { test } from '../../fixtures/test.fixture';
 
 test.describe('Recall 订单详情冒烟', () => {
@@ -18,16 +18,16 @@ test.describe('Recall 订单详情冒烟', () => {
       ],
     },
     async ({ page, homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await openHome(homePage);
+      await new HomeFlow().openHome(homePage);
 
       if (await licenseSelectionPage.isVisible(10_000)) {
-        await enterWithAvailableLicense(licenseSelectionPage, homePage);
+        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
-      const loggedInHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
-      const recallPage = await openRecallFromHome(loggedInHomePage);
+      const loggedInHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
+      const recallPage = await new RecallFlow().openRecallFromHome(loggedInHomePage);
 
-      const details = await viewRecallOrderDetails(recallPage, '1');
+      const details = await new RecallFlow().viewOrderDetails(recallPage, '1');
       console.log(JSON.stringify(details, null, 2));
       expect(details.orderNumber).toBe('#1');
       expect(details.paymentStatus).toBeTruthy();

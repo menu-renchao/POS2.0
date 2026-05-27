@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { openHome } from '../../flows/home.flow';
+import { HomeFlow } from '../../flows/home.flow';
 import { test } from '../../fixtures/test.fixture';
 
 test.describe('license selection smoke', () => {
@@ -7,7 +7,7 @@ test.describe('license selection smoke', () => {
     homePage,
     licenseSelectionPage,
   }) => {
-    await openHome(homePage);
+    await new HomeFlow().openHome(homePage);
 
     const selectedLicense = await licenseSelectionPage.selectAvailableLicenseByType();
 
@@ -21,7 +21,7 @@ test.describe('license selection smoke', () => {
     licenseSelectionPage,
     page,
   }) => {
-    await openHome(homePage);
+    await new HomeFlow().openHome(homePage);
 
     const selectedLicense = await licenseSelectionPage.selectAvailableLicenseByType('Android');
     await licenseSelectionPage.clickEnter();

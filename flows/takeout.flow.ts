@@ -101,24 +101,3 @@ export class TakeoutFlow {
     }
   }
 }
-
-export async function startToGoOrder(homePage: HomePage): Promise<OrderDishesPage> {
-  const takeoutFlow = new TakeoutFlow();
-  return await takeoutFlow.startToGoOrder(homePage);
-}
-
-export async function startPickUpOrder(
-  homePage: HomePage,
-  params: PickUpOrderParams = {},
-): Promise<OrderDishesPage> {
-  const takeoutFlow = new TakeoutFlow();
-  return await takeoutFlow.startPickUpOrder(homePage, params);
-}
-
-export async function startDeliveryOrder(
-  homePage: HomePage,
-  params: DeliveryOrderParams,
-): Promise<OrderDishesPage> {
-  const takeoutFlow = new TakeoutFlow();
-  return await takeoutFlow.startDeliveryOrder(homePage, params);
-}

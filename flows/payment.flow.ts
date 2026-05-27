@@ -74,19 +74,3 @@ export class PaymentFlow {
     await paymentPage.handlePrintReceiptChoice(options.printReceipt);
   }
 }
-
-export async function payByCash(
-  paymentPage: PaymentPage,
-  options: PaymentCompletionOptions,
-): Promise<void> {
-  const paymentFlow = new PaymentFlow();
-  await paymentFlow.payByCash(paymentPage, options);
-}
-
-export async function payByCreditCard(
-  paymentPage: PaymentPage,
-  options: PaymentCompletionOptions,
-): Promise<void> {
-  const paymentFlow = new PaymentFlow();
-  await paymentFlow.payByCreditCard(paymentPage, options);
-}

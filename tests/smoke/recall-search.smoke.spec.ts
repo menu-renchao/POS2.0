@@ -1,12 +1,10 @@
 import { expect } from '@playwright/test';
-import { enterEmployeeContext } from '../../flows/employee-login.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import {
-  clearRecallSearchConditions,
-  openRecallFromHome,
-  searchRecallOrders,
+  RecallFlow,
 } from '../../flows/recall.flow';
-import { openHome } from '../../flows/home.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { test } from '../../fixtures/test.fixture';
 import { RecallManualSearchTags } from '../../test-data/recall-search-options';
 import { waitUntil } from '../../utils/wait';
@@ -24,14 +22,14 @@ test.describe('Recall 搜索冒烟', () => {
       ],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await openHome(homePage);
+      await new HomeFlow().openHome(homePage);
 
       if (await licenseSelectionPage.isVisible(10_000)) {
-        await enterWithAvailableLicense(licenseSelectionPage, homePage);
+        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
-      const loggedInHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
-      const recallPage = await openRecallFromHome(loggedInHomePage);
+      const loggedInHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
+      const recallPage = await new RecallFlow().openRecallFromHome(loggedInHomePage);
 
       const visibleOrderNumbers = await waitUntil(
         async () => await recallPage.readVisibleOrderNumbers(),
@@ -45,7 +43,7 @@ test.describe('Recall 搜索冒烟', () => {
 
       expect(targetOrderNumber).toBeTruthy();
 
-      await searchRecallOrders(recallPage, {
+      await new RecallFlow().searchOrders(recallPage, {
         manualSearch: {
           tag: RecallManualSearchTags.orderNumber,
           keyword: targetOrderNumber.replace(/^#/, ''),
@@ -66,7 +64,7 @@ test.describe('Recall 搜索冒烟', () => {
       expect(filteredOrderNumbers.length).toBeGreaterThan(0);
       expect(filteredOrderNumbers.every((orderNumber) => orderNumber === targetOrderNumber)).toBe(true);
 
-      await clearRecallSearchConditions(recallPage);
+      await new RecallFlow().clearSearchConditions(recallPage);
 
       const clearedKeyword = await waitUntil(
         async () => await recallPage.readManualSearchKeyword(),

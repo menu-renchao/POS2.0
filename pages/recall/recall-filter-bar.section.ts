@@ -129,7 +129,7 @@ export class RecallFilterBarSection {
   @step('页面操作：提交手动搜索条件')
   async submitManualSearch(): Promise<void> {
     await expect(this.searchDialog).toBeVisible();
-    await waitForInputSettled();
+    await waitForInputSettled(await this.resolveVisibleSearchDialogInput());
     await this.searchDialogSubmitButton.click();
     await expect(this.searchDialog).toBeHidden();
   }

@@ -73,7 +73,7 @@ export class OrderDishesModifierSection {
       await (await this.resolveModifySectionButton('Price', 'Custom')).click();
       const customPriceInput = await this.resolveModifyCustomPriceInput();
       await customPriceInput.fill(this.formatModifierPriceInput(price.value));
-      await waitForInputSettled();
+      await waitForInputSettled(customPriceInput);
       await customPriceInput.press('Enter').catch(() => {});
       await customPriceInput.blur().catch(() => {});
     }
@@ -83,7 +83,7 @@ export class OrderDishesModifierSection {
       await this.expectModifyPanelVisible();
       await this.locators.customModifierNameInput.fill(name);
       await this.locators.customModifierPriceInput.fill(this.formatModifierPriceInput(price));
-      await waitForInputSettled();
+      await waitForInputSettled(this.locators.customModifierPriceInput);
       await this.locators.customModifierAddButton.click();
     }
 

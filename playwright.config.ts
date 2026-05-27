@@ -22,6 +22,7 @@ export default defineConfig({
     ],
   ],
   globalSetup: require.resolve('./tests/setup/global.setup'),
+  globalTeardown: require.resolve('./tests/setup/global.teardown'),
   use: {
     baseURL: appConfig.baseURL,
     trace: 'on-first-retry',
@@ -32,11 +33,22 @@ export default defineConfig({
   projects: [
     {
       name: 'chrome',
+      testIgnore: /py-migrate/,
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chrome',
         viewport: { width: 1920, height: 1080 },
-        headless: false,
+        headless: !!process.env.CI,
+      },
+    },
+    {
+      name: 'py-migrate',
+      testMatch: /py-migrate/,
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chrome',
+        viewport: { width: 1920, height: 1080 },
+        headless: !!process.env.CI,
       },
     },
   ],

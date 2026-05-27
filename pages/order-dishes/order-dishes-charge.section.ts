@@ -188,7 +188,7 @@ export class OrderDishesChargeSection {
     @step('页面操作：确认自定义加收弹窗')
     async confirmCustomChargeDialog(): Promise<void> {
       await expect(this.locators.customChargeDialog).toBeVisible();
-      await waitForInputSettled();
+      await waitForInputSettled(this.locators.customChargeValueInput);
       await this.locators.customChargeConfirmButton.click();
       await expect(this.locators.customChargeDialog).toBeHidden();
 

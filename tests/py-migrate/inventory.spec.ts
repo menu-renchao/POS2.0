@@ -1,11 +1,11 @@
 import { expect } from '@playwright/test';
-import { enterEmployeeContext } from '../../flows/employee-login.flow';
-import { expectPosItemStockStateAndReturn, configureLimitedStock } from '../../flows/inventory.flow';
-import { openHome } from '../../flows/home.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import { addRegularDish, sendOrderToKitchen } from '../../flows/order-dishes.flow';
-import { openRecallFromHome, readLatestVisibleRecallOrderNumber } from '../../flows/recall.flow';
-import { startToGoOrder } from '../../flows/takeout.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
+import { InventoryFlow } from '../../flows/inventory.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
+import { OrderDishesFlow } from '../../flows/order-dishes.flow';
+import { RecallFlow } from '../../flows/recall.flow';
+import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import { EmployeeLoginPage } from '../../pages/employee-login.page';
 import { HomePage } from '../../pages/home.page';
@@ -31,19 +31,19 @@ async function enterReadyHome({
   homePage,
   licenseSelectionPage,
 }: AppEntryPages): Promise<HomePage> {
-  await openHome(homePage);
+  await new HomeFlow().openHome(homePage);
 
   if (await licenseSelectionPage.isVisible(30_000)) {
-    await enterWithAvailableLicense(licenseSelectionPage, homePage);
+    await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
   }
 
-  const readyHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
+  const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
   await readyHomePage.expectPrimaryFunctionCardsVisible();
   return readyHomePage;
 }
 
 async function startInventoryToGoOrder(homePage: HomePage): Promise<OrderDishesPage> {
-  return await startToGoOrder(homePage);
+  return await new TakeoutFlow().startToGoOrder(homePage);
 }
 
 async function saveOrderAndReturnHome(orderDishesPage: OrderDishesPage): Promise<HomePage> {
@@ -53,8 +53,8 @@ async function saveOrderAndReturnHome(orderDishesPage: OrderDishesPage): Promise
 }
 
 async function readLatestRecallOrderNumberAndReturnHome(homePage: HomePage): Promise<string> {
-  const recallPage = await openRecallFromHome(homePage);
-  const orderNumber = await readLatestVisibleRecallOrderNumber(recallPage);
+  const recallPage = await new RecallFlow().openRecallFromHome(homePage);
+  const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
   await recallPage.exitRecall();
   await homePage.expectPrimaryFunctionCardsVisible();
   return orderNumber;
@@ -63,10 +63,10 @@ async function readLatestRecallOrderNumberAndReturnHome(homePage: HomePage): Pro
 async function recallRecentOrderFromHome(homePage: HomePage, orderDishesPage: OrderDishesPage) {
   await orderDishesPage.exitOrderPage();
   await homePage.expectPrimaryFunctionCardsVisible();
-  return await openRecallFromHome(homePage);
+  return await new RecallFlow().openRecallFromHome(homePage);
 }
 
-test.describe('库存管理', () => {
+test.describe('库存管理', { tag: ['@py-migrate'] }, () => {
   test.describe.configure({ timeout: 120_000 });
 
   test(
@@ -80,17 +80,17 @@ test.describe('库存管理', () => {
       let orderDishesPage = await startInventoryToGoOrder(currentHomePage);
 
       orderDishesPage = await test.step('配置 superman item4 为有限库存 20', async () => {
-        return await configureLimitedStock(orderDishesPage, dish.name, 20);
+        return await new InventoryFlow().configureLimitedStock(orderDishesPage, dish.name, 20);
       });
 
       await test.step('点菜 10 份并保存后库存应剩余 10', async () => {
-        await addRegularDish(orderDishesPage, dish.name, dish.menu, 10);
+        await new OrderDishesFlow().addRegularDish(orderDishesPage, dish.name, dish.menu, 10);
         currentHomePage = await saveOrderAndReturnHome(orderDishesPage);
         trackedOrderNumber = await readLatestRecallOrderNumberAndReturnHome(currentHomePage);
         await currentHomePage.expectPrimaryFunctionCardsVisible();
         await currentHomePage.clickRefresh();
         orderDishesPage = await startInventoryToGoOrder(currentHomePage);
-        orderDishesPage = await expectPosItemStockStateAndReturn(
+        orderDishesPage = await new InventoryFlow().expectPosItemStockStateAndReturn(
           orderDishesPage,
           dish.name,
           inventoryStockLabel(10),
@@ -101,12 +101,12 @@ test.describe('库存管理', () => {
         const recallPage = await recallRecentOrderFromHome(currentHomePage, orderDishesPage);
         expect(trackedOrderNumber, '首次保存后应记录目标 Recall 订单号').toBeTruthy();
         orderDishesPage = await recallPage.openOrderForEditing(trackedOrderNumber as string);
-        await addRegularDish(orderDishesPage, dish.name, dish.menu, 5);
+        await new OrderDishesFlow().addRegularDish(orderDishesPage, dish.name, dish.menu, 5);
         currentHomePage = await saveOrderAndReturnHome(orderDishesPage);
         await currentHomePage.expectPrimaryFunctionCardsVisible();
         await currentHomePage.clickRefresh();
         orderDishesPage = await startInventoryToGoOrder(currentHomePage);
-        orderDishesPage = await expectPosItemStockStateAndReturn(
+        orderDishesPage = await new InventoryFlow().expectPosItemStockStateAndReturn(
           orderDishesPage,
           dish.name,
           inventoryStockLabel(5),
@@ -122,7 +122,7 @@ test.describe('库存管理', () => {
         await currentHomePage.expectPrimaryFunctionCardsVisible();
         await currentHomePage.clickRefresh();
         orderDishesPage = await startInventoryToGoOrder(currentHomePage);
-        orderDishesPage = await expectPosItemStockStateAndReturn(
+        orderDishesPage = await new InventoryFlow().expectPosItemStockStateAndReturn(
           orderDishesPage,
           dish.name,
           inventoryStockLabel(8),
@@ -142,15 +142,15 @@ test.describe('库存管理', () => {
       let orderDishesPage = await startInventoryToGoOrder(currentHomePage);
 
       orderDishesPage = await test.step('配置 superman item4 为有限库存 20', async () => {
-        return await configureLimitedStock(orderDishesPage, dish.name, 20);
+        return await new InventoryFlow().configureLimitedStock(orderDishesPage, dish.name, 20);
       });
 
       await test.step('送厨 10 份后库存应剩余 10', async () => {
-        await addRegularDish(orderDishesPage, dish.name, dish.menu, 10);
-        currentHomePage = await sendOrderToKitchen(orderDishesPage);
+        await new OrderDishesFlow().addRegularDish(orderDishesPage, dish.name, dish.menu, 10);
+        currentHomePage = await new OrderDishesFlow().sendOrderToKitchen(orderDishesPage);
         trackedOrderNumber = await readLatestRecallOrderNumberAndReturnHome(currentHomePage);
         orderDishesPage = await startInventoryToGoOrder(currentHomePage);
-        orderDishesPage = await expectPosItemStockStateAndReturn(
+        orderDishesPage = await new InventoryFlow().expectPosItemStockStateAndReturn(
           orderDishesPage,
           dish.name,
           inventoryStockLabel(10),
@@ -166,7 +166,7 @@ test.describe('库存管理', () => {
         await currentHomePage.expectPrimaryFunctionCardsVisible();
         await currentHomePage.clickRefresh();
         orderDishesPage = await startInventoryToGoOrder(currentHomePage);
-        orderDishesPage = await expectPosItemStockStateAndReturn(
+        orderDishesPage = await new InventoryFlow().expectPosItemStockStateAndReturn(
           orderDishesPage,
           dish.name,
           inventoryStockLabel(20),
@@ -174,13 +174,13 @@ test.describe('库存管理', () => {
       });
 
       await test.step('不勾选恢复库存 Void 后库存应保持 15', async () => {
-        await addRegularDish(orderDishesPage, dish.name, dish.menu, 5);
-        currentHomePage = await sendOrderToKitchen(orderDishesPage);
+        await new OrderDishesFlow().addRegularDish(orderDishesPage, dish.name, dish.menu, 5);
+        currentHomePage = await new OrderDishesFlow().sendOrderToKitchen(orderDishesPage);
         trackedOrderNumber = await readLatestRecallOrderNumberAndReturnHome(currentHomePage);
         await currentHomePage.expectPrimaryFunctionCardsVisible();
         await currentHomePage.clickRefresh();
         orderDishesPage = await startInventoryToGoOrder(currentHomePage);
-        orderDishesPage = await expectPosItemStockStateAndReturn(
+        orderDishesPage = await new InventoryFlow().expectPosItemStockStateAndReturn(
           orderDishesPage,
           dish.name,
           inventoryStockLabel(15),
@@ -194,7 +194,7 @@ test.describe('库存管理', () => {
         await currentHomePage.expectPrimaryFunctionCardsVisible();
         await currentHomePage.clickRefresh();
         orderDishesPage = await startInventoryToGoOrder(currentHomePage);
-        orderDishesPage = await expectPosItemStockStateAndReturn(
+        orderDishesPage = await new InventoryFlow().expectPosItemStockStateAndReturn(
           orderDishesPage,
           dish.name,
           inventoryStockLabel(15),
@@ -213,15 +213,15 @@ test.describe('库存管理', () => {
       let currentHomePage = await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
       let orderDishesPage = await startInventoryToGoOrder(currentHomePage);
 
-      orderDishesPage = await configureLimitedStock(orderDishesPage, dish.name, 10);
+      orderDishesPage = await new InventoryFlow().configureLimitedStock(orderDishesPage, dish.name, 10);
 
       await test.step('点小数数量送厨后库存应剩余 6', async () => {
-        await addRegularDish(orderDishesPage, dish.name, dish.menu, 1);
+        await new OrderDishesFlow().addRegularDish(orderDishesPage, dish.name, dish.menu, 1);
         await orderDishesPage.changeOrderedDishQuantity(dish.name, 3.44);
-        currentHomePage = await sendOrderToKitchen(orderDishesPage);
+        currentHomePage = await new OrderDishesFlow().sendOrderToKitchen(orderDishesPage);
         trackedOrderNumber = await readLatestRecallOrderNumberAndReturnHome(currentHomePage);
         orderDishesPage = await startInventoryToGoOrder(currentHomePage);
-        orderDishesPage = await expectPosItemStockStateAndReturn(
+        orderDishesPage = await new InventoryFlow().expectPosItemStockStateAndReturn(
           orderDishesPage,
           dish.name,
           inventoryStockLabel(6),
@@ -238,7 +238,7 @@ test.describe('库存管理', () => {
         await currentHomePage.expectPrimaryFunctionCardsVisible();
         await currentHomePage.clickRefresh();
         orderDishesPage = await startInventoryToGoOrder(currentHomePage);
-        orderDishesPage = await expectPosItemStockStateAndReturn(
+        orderDishesPage = await new InventoryFlow().expectPosItemStockStateAndReturn(
           orderDishesPage,
           dish.name,
           inventoryStockLabel(10),
@@ -256,8 +256,8 @@ test.describe('库存管理', () => {
       const readyHomePage = await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
       let orderDishesPage = await startInventoryToGoOrder(readyHomePage);
 
-      orderDishesPage = await configureLimitedStock(orderDishesPage, dish.name, 2);
-      await addRegularDish(orderDishesPage, dish.name, dish.menu, 3);
+      orderDishesPage = await new InventoryFlow().configureLimitedStock(orderDishesPage, dish.name, 2);
+      await new OrderDishesFlow().addRegularDish(orderDishesPage, dish.name, dish.menu, 3);
       await orderDishesPage.clickSaveOrder();
 
       const alertText = await orderDishesPage.readInventoryAlertText();

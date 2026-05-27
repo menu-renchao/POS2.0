@@ -1873,7 +1873,7 @@ export class RecallOrderDetailsDialog {
   private async confirmTipDialog(isPaymentCardDialog: boolean): Promise<void> {
     const tipDialog = await this.resolveTipDialog(isPaymentCardDialog);
     const confirmButton = await this.resolveTipDialogConfirmButton(tipDialog, isPaymentCardDialog);
-    await waitForInputSettled();
+    await waitForInputSettled(await this.resolveTipDialogInput(tipDialog, isPaymentCardDialog));
     await confirmButton.click();
   }
 

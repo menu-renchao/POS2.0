@@ -84,7 +84,7 @@ export class InventoryPage {
     if (await this.itemNameInput.isVisible().catch(() => false)) {
       await this.itemNameInput.fill('');
       await this.itemNameInput.fill(params.itemName);
-      await waitForInputSettled();
+      await waitForInputSettled(this.itemNameInput);
       await this.searchButton.click();
       const itemLocator = await this.resolveVisibleItemNameLocator(params.itemName);
       await expect(itemLocator).toBeVisible({ timeout: 15_000 });

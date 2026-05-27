@@ -1,21 +1,5 @@
 import { expect, test } from '@playwright/test';
-import {
-  openRecallOrderCallOffFromMore,
-  openRecallOrderChargeFromMore,
-  openRecallOrderCombineFromMore,
-  openRecallOrderCopyFromMore,
-  openRecallOrderDiscount,
-  openRecallOrderMoreActions,
-  openRecallOrderMoveItemFromMore,
-  openRecallOrderPagingFromMore,
-  openRecallOrderPayment,
-  openRecallOrderSplitPanel,
-  openRecallOrderSortFromMore,
-  openRecallOrderTipsFromMore,
-  openRecallOrderVoidFromMore,
-  printRecallOrder,
-  viewRecallOrderDetails,
-} from '../../flows/recall.flow';
+import { RecallFlow } from '../../flows/recall.flow';
 import { RecallPage } from '../../pages/recall.page';
 
 const noAvailableActions = {
@@ -1005,7 +989,7 @@ test.describe('Recall 订单详情读取', () => {
         });
       });
 
-      const details = await viewRecallOrderDetails(recallPage, '1');
+      const details = await new RecallFlow().viewOrderDetails(recallPage, '1');
 
       expect(details).toEqual({
         orderNumber: '#1',
@@ -1091,7 +1075,7 @@ test.describe('Recall 订单详情读取', () => {
         });
       });
 
-      const details = await viewRecallOrderDetails(recallPage, '2');
+      const details = await new RecallFlow().viewOrderDetails(recallPage, '2');
 
       expect(details).toEqual({
         orderNumber: '#2',
@@ -1129,7 +1113,7 @@ test.describe('Recall 订单详情读取', () => {
         });
       });
 
-      const details = await viewRecallOrderDetails(recallPage, '3');
+      const details = await new RecallFlow().viewOrderDetails(recallPage, '3');
 
       expect(details).toEqual({
         orderNumber: '#3',
@@ -1200,7 +1184,7 @@ test.describe('Recall 订单详情读取', () => {
         });
       });
 
-      const details = await viewRecallOrderDetails(recallPage, '4');
+      const details = await new RecallFlow().viewOrderDetails(recallPage, '4');
 
       expect(details.items).toEqual([
         {
@@ -1233,7 +1217,7 @@ test.describe('Recall 订单详情读取', () => {
         });
       });
 
-      const details = await viewRecallOrderDetails(recallPage, '6');
+      const details = await new RecallFlow().viewOrderDetails(recallPage, '6');
 
       expect(details).toEqual({
         orderNumber: '#6',
@@ -1296,7 +1280,7 @@ test.describe('Recall 订单详情读取', () => {
         });
       });
 
-      const details = await viewRecallOrderDetails(recallPage, '61');
+      const details = await new RecallFlow().viewOrderDetails(recallPage, '61');
 
       expect(details).toEqual({
         orderNumber: '#61',
@@ -1356,7 +1340,7 @@ test.describe('Recall 订单详情读取', () => {
         await loadActionFixture();
         const recallPage = new RecallPage(page);
 
-        await printRecallOrder(recallPage, '1');
+        await new RecallFlow().printOrder(recallPage, '1');
 
         expect(await readActionState()).toMatchObject({ print: true });
       });
@@ -1365,7 +1349,7 @@ test.describe('Recall 订单详情读取', () => {
         await loadActionFixture();
         const recallPage = new RecallPage(page);
 
-        const paymentPage = await openRecallOrderPayment(recallPage, '1');
+        const paymentPage = await new RecallFlow().openPayment(recallPage, '1');
 
         await paymentPage.expectLoaded();
         expect(await readActionState()).toMatchObject({ pay: true });
@@ -1375,7 +1359,7 @@ test.describe('Recall 订单详情读取', () => {
         await loadActionFixture();
         const recallPage = new RecallPage(page);
 
-        const splitOrderPage = await openRecallOrderSplitPanel(recallPage, '1');
+        const splitOrderPage = await new RecallFlow().openSplitOrder(recallPage, '1');
 
         await splitOrderPage.expectLoaded('1');
         expect(await readActionState()).toMatchObject({ split: true });
@@ -1385,7 +1369,7 @@ test.describe('Recall 订单详情读取', () => {
         await loadActionFixture();
         const recallPage = new RecallPage(page);
 
-        await openRecallOrderDiscount(recallPage, '1');
+        await new RecallFlow().openDiscount(recallPage, '1');
 
         expect(await readActionState()).toMatchObject({ discount: true });
       });
@@ -1394,7 +1378,7 @@ test.describe('Recall 订单详情读取', () => {
         await loadActionFixture();
         const recallPage = new RecallPage(page);
 
-        await openRecallOrderMoreActions(recallPage, '1');
+        await new RecallFlow().openMoreActions(recallPage, '1');
 
         expect(await readActionState()).toMatchObject({ more: true });
       });
@@ -1422,47 +1406,47 @@ test.describe('Recall 订单详情读取', () => {
         {
           name: 'Charge',
           stateKey: 'charge',
-          run: async (recallPage: RecallPage) => await openRecallOrderChargeFromMore(recallPage, '1'),
+          run: async (recallPage: RecallPage) => await new RecallFlow().openChargeFromMore(recallPage, '1'),
         },
         {
           name: 'Move Item',
           stateKey: 'moveItem',
-          run: async (recallPage: RecallPage) => await openRecallOrderMoveItemFromMore(recallPage, '1'),
+          run: async (recallPage: RecallPage) => await new RecallFlow().openMoveItemFromMore(recallPage, '1'),
         },
         {
           name: 'Combine',
           stateKey: 'combine',
-          run: async (recallPage: RecallPage) => await openRecallOrderCombineFromMore(recallPage, '1'),
+          run: async (recallPage: RecallPage) => await new RecallFlow().openCombineFromMore(recallPage, '1'),
         },
         {
           name: 'Tips',
           stateKey: 'tips',
-          run: async (recallPage: RecallPage) => await openRecallOrderTipsFromMore(recallPage, '1'),
+          run: async (recallPage: RecallPage) => await new RecallFlow().openTipsFromMore(recallPage, '1'),
         },
         {
           name: 'Paging',
           stateKey: 'paging',
-          run: async (recallPage: RecallPage) => await openRecallOrderPagingFromMore(recallPage, '1'),
+          run: async (recallPage: RecallPage) => await new RecallFlow().openPagingFromMore(recallPage, '1'),
         },
         {
           name: 'Call Off',
           stateKey: 'callOff',
-          run: async (recallPage: RecallPage) => await openRecallOrderCallOffFromMore(recallPage, '1'),
+          run: async (recallPage: RecallPage) => await new RecallFlow().openCallOffFromMore(recallPage, '1'),
         },
         {
           name: 'Copy',
           stateKey: 'copy',
-          run: async (recallPage: RecallPage) => await openRecallOrderCopyFromMore(recallPage, '1'),
+          run: async (recallPage: RecallPage) => await new RecallFlow().openCopyFromMore(recallPage, '1'),
         },
         {
           name: 'Void',
           stateKey: 'void',
-          run: async (recallPage: RecallPage) => await openRecallOrderVoidFromMore(recallPage, '1'),
+          run: async (recallPage: RecallPage) => await new RecallFlow().openVoidFromMore(recallPage, '1'),
         },
         {
           name: 'Sort',
           stateKey: 'sort',
-          run: async (recallPage: RecallPage) => await openRecallOrderSortFromMore(recallPage, '1'),
+          run: async (recallPage: RecallPage) => await new RecallFlow().openSortFromMore(recallPage, '1'),
         },
       ];
 
@@ -1494,7 +1478,7 @@ test.describe('Recall 订单详情读取', () => {
         });
       });
 
-      const details = await viewRecallOrderDetails(recallPage, '5');
+      const details = await new RecallFlow().viewOrderDetails(recallPage, '5');
 
       expect(details.items).toEqual([
         {

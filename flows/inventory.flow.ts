@@ -77,33 +77,3 @@ export class InventoryFlow {
     return await inventoryPage.backToOrderPage();
   }
 }
-
-export async function configureLimitedStock(
-  orderDishesPage: OrderDishesPage,
-  itemName: string,
-  quantity: number,
-): Promise<OrderDishesPage> {
-  const inventoryFlow = new InventoryFlow();
-  return await inventoryFlow.configureLimitedStock(orderDishesPage, itemName, quantity);
-}
-
-export async function readPosItemStockState(
-  orderDishesPage: OrderDishesPage,
-  itemName: string,
-): Promise<string> {
-  const inventoryFlow = new InventoryFlow();
-  return await inventoryFlow.readPosItemStockState(orderDishesPage, itemName);
-}
-
-export async function expectPosItemStockStateAndReturn(
-  orderDishesPage: OrderDishesPage,
-  itemName: string,
-  expectedState: string,
-): Promise<OrderDishesPage> {
-  const inventoryFlow = new InventoryFlow();
-  return await inventoryFlow.expectPosItemStockStateAndReturn(
-    orderDishesPage,
-    itemName,
-    expectedState,
-  );
-}
