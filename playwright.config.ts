@@ -38,7 +38,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         channel: 'chrome',
         viewport: { width: 1920, height: 1080 },
-        headless: false,
+        headless: !!process.env.CI,
       },
     },
     {
@@ -48,7 +48,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         channel: 'chrome',
         viewport: { width: 1920, height: 1080 },
-        headless: false,
+        headless: !!process.env.CI,
       },
     },
   ],
