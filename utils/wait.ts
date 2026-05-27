@@ -3,6 +3,7 @@ export type WaitUntilOptions = {
   interval?: number;
   message?: string;
   probeTimeout?: number;
+  onRetry?: (info: { attempt: number; elapsed: number; value: unknown }) => void;
 };
 
 export async function waitUntil<T>(
@@ -15,10 +16,12 @@ export async function waitUntil<T>(
     interval = 100,
     probeTimeout,
     message = 'Condition was not satisfied within the timeout.',
+    onRetry,
   } = options;
   const startedAt = Date.now();
 
   let lastValue: T | undefined;
+  let attempt = 0;
 
   while (Date.now() - startedAt <= timeout) {
     const remainingTimeout = timeout - (Date.now() - startedAt);
@@ -35,6 +38,12 @@ export async function waitUntil<T>(
 
     if (predicate(lastValue)) {
       return lastValue;
+    }
+
+    attempt += 1;
+
+    if (onRetry) {
+      onRetry({ attempt, elapsed: Date.now() - startedAt, value: lastValue });
     }
 
     await delay(interval);

@@ -1,10 +1,10 @@
 import { expect } from '@playwright/test';
-import { enterEmployeeContext } from '../../flows/employee-login.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { PaymentFlow } from '../../flows/payment.flow';
-import { openHome } from '../../flows/home.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import { addRegularDish } from '../../flows/order-dishes.flow';
-import { startToGoOrder } from '../../flows/takeout.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
+import { OrderDishesFlow } from '../../flows/order-dishes.flow';
+import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import { orderServiceDishes } from '../../test-data/order-service';
 import { waitUntil } from '../../utils/wait';
@@ -14,13 +14,13 @@ async function enterReadyHomePage(
   licenseSelectionPage: any,
   employeeLoginPage: any,
 ) {
-  await openHome(homePage);
+  await new HomeFlow().openHome(homePage);
 
   if (await licenseSelectionPage.isVisible(10_000)) {
-    await enterWithAvailableLicense(licenseSelectionPage, homePage);
+    await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
   }
 
-  const readyHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
+  const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
   await readyHomePage.expectPrimaryFunctionCardsVisible();
   return readyHomePage;
 }
@@ -54,8 +54,8 @@ test.describe('支付功能验证', () => {
         licenseSelectionPage,
         employeeLoginPage,
       );
-      const orderDishesPage = await startToGoOrder(readyHomePage);
-      await addRegularDish(
+      const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
+      await new OrderDishesFlow().addRegularDish(
         orderDishesPage,
         orderServiceDishes.test.name,
         orderServiceDishes.test.menu,
@@ -88,8 +88,8 @@ test.describe('支付功能验证', () => {
         licenseSelectionPage,
         employeeLoginPage,
       );
-      const orderDishesPage = await startToGoOrder(readyHomePage);
-      await addRegularDish(
+      const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
+      await new OrderDishesFlow().addRegularDish(
         orderDishesPage,
         orderServiceDishes.test.name,
         orderServiceDishes.test.menu,

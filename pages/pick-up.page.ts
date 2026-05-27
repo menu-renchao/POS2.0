@@ -49,7 +49,7 @@ export class PickUpPage {
   @step('页面操作：在 Pick Up 页面点击 Start Order 并进入点单页')
   async clickStartOrder(): Promise<OrderDishesPage> {
     await this.closeKeyboardIfVisible();
-    await waitForInputSettled();
+    await waitForInputSettled(this.noteInput);
     await this.startOrderButton.evaluate((buttonElement) => {
       (buttonElement as HTMLElement).click();
     });

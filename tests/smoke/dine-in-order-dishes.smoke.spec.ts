@@ -1,7 +1,7 @@
-import { enterWithEmployeePassword } from '../../flows/employee-login.flow';
-import { openHome } from '../../flows/home.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import { skipTableSelectionAndEnterOrderDishes } from '../../flows/select-table.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
+import { SelectTableFlow } from '../../flows/select-table.flow';
 import { test } from '../../fixtures/test.fixture';
 
 test.describe('堂食点餐冒烟', () => {
@@ -17,13 +17,13 @@ test.describe('堂食点餐冒烟', () => {
       ],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await openHome(homePage);
+      await new HomeFlow().openHome(homePage);
 
       if (await licenseSelectionPage.isVisible(10_000)) {
-        await enterWithAvailableLicense(licenseSelectionPage, homePage);
+        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
-      const loggedInHomePage = await enterWithEmployeePassword(
+      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
         employeeLoginPage,
         homePage,
         '11',
@@ -31,7 +31,7 @@ test.describe('堂食点餐冒烟', () => {
 
       await loggedInHomePage.expectPrimaryFunctionCardsVisible();
       const selectTablePage = await loggedInHomePage.clickDineIn();
-      const orderDishesPage = await skipTableSelectionAndEnterOrderDishes(selectTablePage);
+      const orderDishesPage = await new SelectTableFlow().skipTableSelectionAndEnterOrderDishes(selectTablePage);
 
       await orderDishesPage.expectLoaded();
     },

@@ -19,16 +19,3 @@ export class LicenseSelectionFlow {
     return homePage;
   }
 }
-
-export async function enterWithAvailableLicense(
-  licenseSelectionPage: LicenseSelectionPage,
-  homePage: HomePage,
-  type = 'PC',
-): Promise<HomePage> {
-  const licenseSelectionFlow = new LicenseSelectionFlow();
-  return await licenseSelectionFlow.enterWithAvailableLicense(
-    licenseSelectionPage,
-    homePage,
-    type,
-  );
-}

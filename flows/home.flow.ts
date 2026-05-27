@@ -8,8 +8,3 @@ export class HomeFlow {
     await homePage.expectLoaded();
   }
 }
-
-export async function openHome(homePage: HomePage): Promise<void> {
-  const homeFlow = new HomeFlow();
-  await homeFlow.openHome(homePage);
-}

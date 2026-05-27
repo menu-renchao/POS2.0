@@ -32,9 +32,9 @@ import type {
 } from './recall/recall.types';
 
 export class RecallPage {
-  private readonly filterBar: RecallFilterBarSection;
-  private readonly orderDetails: RecallOrderDetailsDialog;
-  private readonly voidDialog: RecallVoidDialog;
+  public readonly filterBar: RecallFilterBarSection;
+  public readonly orderDetails: RecallOrderDetailsDialog;
+  public readonly voidDialog: RecallVoidDialog;
   private readonly newOrderButton: Locator;
   private readonly exitRecallButton: Locator;
 

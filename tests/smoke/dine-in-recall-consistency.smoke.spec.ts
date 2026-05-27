@@ -1,15 +1,12 @@
 import { expect } from '@playwright/test';
-import { enterEmployeeContext, enterWithEmployeePassword } from '../../flows/employee-login.flow';
-import { openHome } from '../../flows/home.flow';
-import { addRegularDish, addWeightedDish } from '../../flows/order-dishes.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { OrderDishesFlow } from '../../flows/order-dishes.flow';
 import {
-  readLatestVisibleRecallOrderNumber,
-  openRecallFromHome,
-  searchRecallOrders,
-  viewRecallOrderDetails,
+  RecallFlow,
 } from '../../flows/recall.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import { selectAnyAvailableTableAndEnterOrderDishes } from '../../flows/select-table.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
+import { SelectTableFlow } from '../../flows/select-table.flow';
 import { SplitOrderFlow } from '../../flows/split-order.flow';
 import { test } from '../../fixtures/test.fixture';
 import { EmployeeLoginPage } from '../../pages/employee-login.page';
@@ -191,7 +188,7 @@ async function enterRecallAfterSplitSave(
   ).catch(() => false);
 
   const loggedInHomePage = requiresEmployeeRelogin
-    ? await enterEmployeeContext(recallReadyHomePage, employeeLoginPage)
+    ? await new EmployeeLoginFlow().enterEmployeeContext(recallReadyHomePage, employeeLoginPage)
     : recallReadyHomePage;
 
   const recallPage = await loggedInHomePage.clickRecall();
@@ -202,7 +199,7 @@ async function enterRecallAfterSplitSave(
   }
 
   if (await employeeLoginPage.isVisible().catch(() => false)) {
-    const reloggedInHomePage = await enterEmployeeContext(loggedInHomePage, employeeLoginPage);
+    const reloggedInHomePage = await new EmployeeLoginFlow().enterEmployeeContext(loggedInHomePage, employeeLoginPage);
     const retriedRecallPage = await reloggedInHomePage.clickRecall();
     await retriedRecallPage.expectLoaded();
     return retriedRecallPage;
@@ -227,19 +224,19 @@ test.describe('堂食点单后 Recall 校验', () => {
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
       await test.step('从首页进入系统并完成堂食点单前置操作', async () => {
-        await openHome(homePage);
+        await new HomeFlow().openHome(homePage);
 
         if (await licenseSelectionPage.isVisible(30_000)) {
-          await enterWithAvailableLicense(licenseSelectionPage, homePage);
+          await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
         }
       });
 
       const dineInOrderContext = await test.step('使用员工口令进入系统并选择任意空桌的 3 人堂食点单页', async () => {
-        const readyHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
+        const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
 
         await readyHomePage.expectPrimaryFunctionCardsVisible();
         const selectTablePage = await readyHomePage.clickDineIn();
-        const { orderDishesPage, selectedTable } = await selectAnyAvailableTableAndEnterOrderDishes(
+        const { orderDishesPage, selectedTable } = await new SelectTableFlow().selectAnyAvailableTableAndEnterOrderDishes(
           selectTablePage,
           expectedGuestCount,
         );
@@ -254,8 +251,8 @@ test.describe('堂食点单后 Recall 校验', () => {
       });
 
       const orderSnapshot = await test.step('执行堂食点单并保存订单', async () => {
-        await addWeightedDish(dineInOrderContext.orderDishesPage, '称重菜', automationMenu, 14);
-        await addRegularDish(dineInOrderContext.orderDishesPage, 'test', automationMenu, 2);
+        await new OrderDishesFlow().addWeightedDish(dineInOrderContext.orderDishesPage, '称重菜', automationMenu, 14);
+        await new OrderDishesFlow().addRegularDish(dineInOrderContext.orderDishesPage, 'test', automationMenu, 2);
 
         const currentOrderPriceSummary = await dineInOrderContext.orderDishesPage.readPriceSummary();
 
@@ -270,16 +267,16 @@ test.describe('堂食点单后 Recall 校验', () => {
 
       const recallDetails = await test.step('进入 Recall 查询包含目标菜品的最新未支付堂食订单', async () => {
         const recallReadyHomePage = await employeeLoginPage.isVisible()
-          ? await enterEmployeeContext(orderSnapshot.savedHomePage, employeeLoginPage)
+          ? await new EmployeeLoginFlow().enterEmployeeContext(orderSnapshot.savedHomePage, employeeLoginPage)
           : orderSnapshot.savedHomePage;
-        const recallPage = await openRecallFromHome(recallReadyHomePage);
+        const recallPage = await new RecallFlow().openRecallFromHome(recallReadyHomePage);
 
-        await searchRecallOrders(recallPage, {
+        await new RecallFlow().searchOrders(recallPage, {
           paymentStatus: RecallPaymentStatuses.unpaid,
         });
 
-        const latestOrderNumber = await readLatestVisibleRecallOrderNumber(recallPage);
-        return await viewRecallOrderDetails(recallPage, latestOrderNumber);
+        const latestOrderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
+        return await new RecallFlow().viewOrderDetails(recallPage, latestOrderNumber);
       });
 
       await test.step('逐项校验 Recall 订单信息', async () => {
@@ -307,19 +304,19 @@ test.describe('堂食点单后 Recall 校验', () => {
       const splitOrderFlow = new SplitOrderFlow();
 
       await test.step('从首页进入系统并完成堂食点单前置操作', async () => {
-        await openHome(homePage);
+        await new HomeFlow().openHome(homePage);
 
         if (await licenseSelectionPage.isVisible(30_000)) {
-          await enterWithAvailableLicense(licenseSelectionPage, homePage);
+          await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
         }
       });
 
       const dineInOrderContext = await test.step('使用员工口令进入系统并选择任意空桌的 3 人堂食点单页', async () => {
-        const readyHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
+        const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
 
         await readyHomePage.expectPrimaryFunctionCardsVisible();
         const selectTablePage = await readyHomePage.clickDineIn();
-        const { orderDishesPage, selectedTable } = await selectAnyAvailableTableAndEnterOrderDishes(
+        const { orderDishesPage, selectedTable } = await new SelectTableFlow().selectAnyAvailableTableAndEnterOrderDishes(
           selectTablePage,
           expectedGuestCount,
         );
@@ -334,8 +331,8 @@ test.describe('堂食点单后 Recall 校验', () => {
       });
 
       await test.step('完成点单', async () => {
-        await addRegularDish(dineInOrderContext.orderDishesPage, 'test', automationMenu, 2);
-        await addRegularDish(dineInOrderContext.orderDishesPage, 'common item2', automationMenu, 1);
+        await new OrderDishesFlow().addRegularDish(dineInOrderContext.orderDishesPage, 'test', automationMenu, 2);
+        await new OrderDishesFlow().addRegularDish(dineInOrderContext.orderDishesPage, 'common item2', automationMenu, 1);
       });
 
       const splitResult = await test.step('将当前订单平分三份并把 x-1 的 test 移动到 x-3', async () => {
@@ -398,11 +395,11 @@ test.describe('堂食点单后 Recall 校验', () => {
           employeeLoginPage,
         );
 
-        await searchRecallOrders(recallPage, {
+        await new RecallFlow().searchOrders(recallPage, {
           paymentStatus: RecallPaymentStatuses.unpaid,
         });
 
-        return await viewRecallOrderDetails(
+        return await new RecallFlow().viewOrderDetails(
           recallPage,
           splitResult.recallOrderNumber,
           splitResult.targetOrderNumber,

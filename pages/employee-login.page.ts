@@ -38,7 +38,7 @@ export class EmployeeLoginPage {
 
   @step('页面操作：提交员工口令')
   async clickConfirm(): Promise<void> {
-    await waitForInputSettled();
+    await waitForInputSettled(this.passcodeInput);
     await this.confirmButton.evaluate((button) => {
       (button as HTMLElement).click();
     });

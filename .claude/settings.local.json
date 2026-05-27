@@ -3,7 +3,12 @@
     "allow": [
       "Bash(npm test:*)",
       "Bash(npx playwright test:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npx tsc:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright-test"
+  ]
 }

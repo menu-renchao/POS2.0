@@ -1,8 +1,8 @@
-import { enterWithEmployeePassword } from '../../flows/employee-login.flow';
-import { openHome } from '../../flows/home.flow';
-import { addComboDish, addRegularDish } from '../../flows/order-dishes.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import { selectAnyAvailableTableAndEnterOrderDishes } from '../../flows/select-table.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { OrderDishesFlow } from '../../flows/order-dishes.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
+import { SelectTableFlow } from '../../flows/select-table.flow';
 import { test } from '../../fixtures/test.fixture';
 
 const automationMenu = {
@@ -19,13 +19,13 @@ test.describe('点餐冒烟测试', () => {
       tag: ['@smoke'],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await openHome(homePage);
+      await new HomeFlow().openHome(homePage);
 
       if (await licenseSelectionPage.isVisible(30_000)) {
-        await enterWithAvailableLicense(licenseSelectionPage, homePage);
+        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
-      const loggedInHomePage = await enterWithEmployeePassword(
+      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
         employeeLoginPage,
         homePage,
         '11',
@@ -35,7 +35,7 @@ test.describe('点餐冒烟测试', () => {
       const selectTablePage = await loggedInHomePage.clickDineIn();
       await selectTablePage.expectLoaded();
 
-      const { orderDishesPage, selectedTable } = await selectAnyAvailableTableAndEnterOrderDishes(
+      const { orderDishesPage, selectedTable } = await new SelectTableFlow().selectAnyAvailableTableAndEnterOrderDishes(
         selectTablePage,
         1,
       );
@@ -43,8 +43,8 @@ test.describe('点餐冒烟测试', () => {
       await orderDishesPage.expectTableNumber(selectedTable.tableNumber);
       await orderDishesPage.expectGuestCount(1);
 
-      await addRegularDish(orderDishesPage, 'test', automationMenu, 3);
-      await addComboDish(
+      await new OrderDishesFlow().addRegularDish(orderDishesPage, 'test', automationMenu, 3);
+      await new OrderDishesFlow().addComboDish(
         orderDishesPage,
         '普通套餐',
         automationMenu,

@@ -1,29 +1,14 @@
 import { expect } from '@playwright/test';
-import { enterEmployeeContext } from '../../flows/employee-login.flow';
-import { openHome } from '../../flows/home.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
-import {
-  addDishToCart,
-  addRegularDish,
-  increaseOrderedDishQuantityByOne,
-} from '../../flows/order-dishes.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
+import { OrderDishesFlow } from '../../flows/order-dishes.flow';
 import { PaymentFlow } from '../../flows/payment.flow';
-import {
-  editFirstVisibleRecallOrder,
-  openRecallFromHome,
-  readLatestVisibleRecallOrderNumber,
-  searchRecallOrders,
-  viewFirstVisibleRecallOrderDetails,
-  viewRecallOrderDetails,
-} from '../../flows/recall.flow';
-import { skipTableSelectionAndEnterOrderDishes } from '../../flows/select-table.flow';
+import { RecallFlow } from '../../flows/recall.flow';
+import { SelectTableFlow } from '../../flows/select-table.flow';
 import { SplitOrderFlow } from '../../flows/split-order.flow';
 import type { SplitOrderSnapshot } from '../../pages/split-order.page';
-import {
-  startDeliveryOrder,
-  startPickUpOrder,
-  startToGoOrder,
-} from '../../flows/takeout.flow';
+import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import { EmployeeLoginPage } from '../../pages/employee-login.page';
 import { HomePage } from '../../pages/home.page';
@@ -118,25 +103,25 @@ async function enterReadyHome({
   homePage,
   licenseSelectionPage,
 }: AppEntryPages): Promise<HomePage> {
-  await openHome(homePage);
+  await new HomeFlow().openHome(homePage);
 
   if (await licenseSelectionPage.isVisible(30_000)) {
-    await enterWithAvailableLicense(licenseSelectionPage, homePage);
+    await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
   }
 
-  const readyHomePage = await enterEmployeeContext(homePage, employeeLoginPage);
+  const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
   await readyHomePage.expectPrimaryFunctionCardsVisible();
   return readyHomePage;
 }
 
 async function saveOrderAndOpenLatestRecallDetails(
   orderDishesPage: OrderDishesPage,
-): Promise<Awaited<ReturnType<typeof viewFirstVisibleRecallOrderDetails>>> {
+): Promise<Awaited<ReturnType<RecallFlow['viewFirstVisibleOrderDetails']>>> {
   const savedHomePage = await orderDishesPage.saveOrder();
   await savedHomePage.expectPrimaryFunctionCardsVisible();
 
-  const recallPage = await openRecallFromHome(savedHomePage);
-  return await viewFirstVisibleRecallOrderDetails(recallPage);
+  const recallPage = await new RecallFlow().openRecallFromHome(savedHomePage);
+  return await new RecallFlow().viewFirstVisibleOrderDetails(recallPage);
 }
 
 async function saveOrderAndOpenRecallPage(
@@ -144,7 +129,7 @@ async function saveOrderAndOpenRecallPage(
 ): Promise<RecallPage> {
   const savedHomePage = await orderDishesPage.saveOrder();
   await savedHomePage.expectPrimaryFunctionCardsVisible();
-  return await openRecallFromHome(savedHomePage);
+  return await new RecallFlow().openRecallFromHome(savedHomePage);
 }
 
 async function assertCategoryOptionOrderRoundTrip(
@@ -195,7 +180,7 @@ async function expectLatestRecallDishMatches(
   expect(recallDish?.price).toBe(orderedDish?.price);
 }
 
-test.describe('堂食点单后 Recall 编辑税额校验', () => {
+test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
   test(
@@ -211,14 +196,14 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
 
       const savedOrderContext = await test.step('通过 New Order 不选桌完成堂食点单并保存', async () => {
         const selectTablePage = await readyHomePage.enterDineIn();
-        const orderDishesPage = await skipTableSelectionAndEnterOrderDishes(selectTablePage);
+        const orderDishesPage = await new SelectTableFlow().skipTableSelectionAndEnterOrderDishes(selectTablePage);
 
-        await addRegularDish(
+        await new OrderDishesFlow().addRegularDish(
           orderDishesPage,
           orderServiceDishes.regular.name,
           orderServiceDishes.regular.menu,
         );
-        await addRegularDish(
+        await new OrderDishesFlow().addRegularDish(
           orderDishesPage,
           orderServiceDishes.test.name,
           orderServiceDishes.test.menu,
@@ -233,8 +218,8 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       });
 
       const recallBeforeEdit = await test.step('进入 Recall 读取最新订单并记录编辑前税额', async () => {
-        const recallPage = await openRecallFromHome(savedOrderContext.savedHomePage);
-        const orderDetails = await viewFirstVisibleRecallOrderDetails(recallPage);
+        const recallPage = await new RecallFlow().openRecallFromHome(savedOrderContext.savedHomePage);
+        const orderDetails = await new RecallFlow().viewFirstVisibleOrderDetails(recallPage);
         const subtotalBeforeEdit = orderDetails.priceSummary.Subtotal;
         const taxBeforeEdit = orderDetails.priceSummary.Tax;
         const testItem = orderDetails.items.find(
@@ -260,9 +245,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         `从 Recall 编辑订单并将 ${orderServiceDishes.test.name} 加 1 后保存`,
         async () => {
           const recallPage: RecallPage = recallBeforeEdit.recallPage;
-          const editingOrderDishesPage = await editFirstVisibleRecallOrder(recallPage);
+          const editingOrderDishesPage = await new RecallFlow().editFirstVisibleOrder(recallPage);
 
-          await increaseOrderedDishQuantityByOne(
+          await new OrderDishesFlow().increaseOrderedDishQuantityByOne(
             editingOrderDishesPage,
             orderServiceDishes.test.name,
           );
@@ -287,13 +272,13 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       );
 
       await test.step('再次进入 Recall 校验保存后的税额已更新', async () => {
-        const readyHomePage = await enterEmployeeContext(
+        const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
           editResult.savedHomePage,
           employeeLoginPage,
         );
-        const recallPage = await openRecallFromHome(readyHomePage);
+        const recallPage = await new RecallFlow().openRecallFromHome(readyHomePage);
 
-        const orderDetailsAfterEdit = await viewFirstVisibleRecallOrderDetails(recallPage);
+        const orderDetailsAfterEdit = await new RecallFlow().viewFirstVisibleOrderDetails(recallPage);
         const subtotalAfterEdit = orderDetailsAfterEdit.priceSummary.Subtotal;
         const taxAfterEdit = orderDetailsAfterEdit.priceSummary.Tax;
         const afterTaxRate = taxAfterEdit / subtotalAfterEdit;
@@ -328,9 +313,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         });
 
         await test.step(testCase.stepTitle, async () => {
-          const orderDishesPage = await startToGoOrder(readyHomePage);
+          const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
 
-          await addRegularDish(orderDishesPage, testCase.dish.name, testCase.dish.menu);
+          await new OrderDishesFlow().addRegularDish(orderDishesPage, testCase.dish.name, testCase.dish.menu);
           await expectLatestRecallDishMatches(orderDishesPage, testCase.dish.name);
         });
       },
@@ -350,14 +335,14 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       const orderDishesPage = await test.step(
         `从 To Go 点两个菜并将第一个菜数量调整为 ${orderServiceMultiDishQuantityCase.multiDishFirstQuantity}`,
         async () => {
-          const page = await startToGoOrder(readyHomePage);
+          const page = await new TakeoutFlow().startToGoOrder(readyHomePage);
 
-          await addDishToCart(page, {
+          await new OrderDishesFlow().addDishToCart(page, {
             ...orderServiceDishes.regular.menu,
             dishName: orderServiceDishes.regular.name,
             quantity: orderServiceMultiDishQuantityCase.multiDishFirstQuantity,
           });
-          await addRegularDish(page, orderServiceDishes.test.name, orderServiceDishes.test.menu);
+          await new OrderDishesFlow().addRegularDish(page, orderServiceDishes.test.name, orderServiceDishes.test.menu);
 
           return page;
         },
@@ -402,11 +387,11 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       });
 
       const orderDishesPage = await test.step('填写 Delivery 客户信息并进入点单页', async () => {
-        return await startDeliveryOrder(readyHomePage, orderServiceCustomers.delivery);
+        return await new TakeoutFlow().startDeliveryOrder(readyHomePage, orderServiceCustomers.delivery);
       });
 
       await test.step('添加菜品、保存订单并在 Recall 校验客户信息', async () => {
-        await addRegularDish(
+        await new OrderDishesFlow().addRegularDish(
           orderDishesPage,
           orderServiceDishes.regular.name,
           orderServiceDishes.regular.menu,
@@ -441,11 +426,11 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       const customer = buildOrderServicePickupCustomer();
 
       const orderDishesPage = await test.step('填写 Pick Up 姓名并进入点单页', async () => {
-        return await startPickUpOrder(readyHomePage, customer);
+        return await new TakeoutFlow().startPickUpOrder(readyHomePage, customer);
       });
 
       await test.step('添加菜品、保存订单并在 Recall 校验客户姓名', async () => {
-        await addRegularDish(
+        await new OrderDishesFlow().addRegularDish(
           orderDishesPage,
           orderServiceDishes.regular.name,
           orderServiceDishes.regular.menu,
@@ -471,10 +456,10 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       await test.step(
         `添加 To Go 菜品并打开分单面板执行平分为 ${orderServiceSplitEvenlyCase.splitSuborderCount} 份`,
         async () => {
-          const orderDishesPage = await startToGoOrder(readyHomePage);
+          const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
           const splitOrderFlow = new SplitOrderFlow();
 
-          await addRegularDish(
+          await new OrderDishesFlow().addRegularDish(
             orderDishesPage,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
@@ -522,8 +507,8 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
 
         const paymentFlow = new PaymentFlow();
         const recallPage = await test.step('创建 To Go 订单并保存后进入 Recall', async () => {
-          const orderDishesPage = await startToGoOrder(readyHomePage);
-          await addRegularDish(
+          const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
+          await new OrderDishesFlow().addRegularDish(
             orderDishesPage,
             orderServiceDishes.test.name,
             orderServiceDishes.test.menu,
@@ -533,7 +518,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         });
 
         const latestOrderNumber = await test.step('读取最新订单号并从 Recall 详情进入支付页', async () => {
-          const orderNumber = await readLatestVisibleRecallOrderNumber(recallPage);
+          const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
           await recallPage.openOrderDetails(orderNumber);
           const paymentPage = await recallPage.openPayment();
           await paymentFlow.payByCash(paymentPage, { printReceipt: false });
@@ -543,14 +528,14 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
 
         await test.step('按订单号搜索并校验支付后状态为 Success', async () => {
           await recallPage.expectLoaded();
-          await searchRecallOrders(recallPage, {
+          await new RecallFlow().searchOrders(recallPage, {
             manualSearch: {
               tag: RecallManualSearchTags.orderNumber,
               keyword: latestOrderNumber.replace(/^#/, ''),
             },
           });
 
-          const orderDetails = await viewRecallOrderDetails(recallPage, latestOrderNumber);
+          const orderDetails = await new RecallFlow().viewOrderDetails(recallPage, latestOrderNumber);
           expect(orderDetails.orderNumber).toBe(latestOrderNumber);
           expect(orderDetails.paymentStatus).toBe(RecallOrderPaymentSuccessStatus);
         });
@@ -567,8 +552,8 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
 
         const paymentFlow = new PaymentFlow();
         const recallPage = await test.step('创建 To Go 订单并保存后进入 Recall', async () => {
-          const orderDishesPage = await startToGoOrder(readyHomePage);
-          await addRegularDish(
+          const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
+          await new OrderDishesFlow().addRegularDish(
             orderDishesPage,
             orderServiceDishes.test.name,
             orderServiceDishes.test.menu,
@@ -578,7 +563,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         });
 
         const latestOrderNumber = await test.step('读取最新订单号并从 Recall 详情进入信用卡支付页', async () => {
-          const orderNumber = await readLatestVisibleRecallOrderNumber(recallPage);
+          const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
           await recallPage.openOrderDetails(orderNumber);
           const paymentPage = await recallPage.openPayment();
           await paymentFlow.payByCreditCard(paymentPage, { printReceipt: false });
@@ -588,14 +573,14 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
 
         await test.step('按订单号搜索并校验支付后状态为 Success', async () => {
           await recallPage.expectLoaded();
-          await searchRecallOrders(recallPage, {
+          await new RecallFlow().searchOrders(recallPage, {
             manualSearch: {
               tag: RecallManualSearchTags.orderNumber,
               keyword: latestOrderNumber.replace(/^#/, ''),
             },
           });
 
-          const orderDetails = await viewRecallOrderDetails(recallPage, latestOrderNumber);
+          const orderDetails = await new RecallFlow().viewOrderDetails(recallPage, latestOrderNumber);
           expect(orderDetails.orderNumber).toBe(latestOrderNumber);
           expect(orderDetails.paymentStatus).toBe(RecallOrderPaymentSuccessStatus);
         });
@@ -615,9 +600,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         });
 
         await test.step('从 To Go 进入点单页，添加菜品并输入超过 50% 的小费', async () => {
-          const orderDishesPage = await startToGoOrder(readyHomePage);
+          const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
 
-          await addRegularDish(
+          await new OrderDishesFlow().addRegularDish(
             orderDishesPage,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
@@ -635,12 +620,12 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
           );
 
           const savedHomePage = await orderDishesPage.saveOrder();
-          const readyHomePageAfterSave = await enterEmployeeContext(
+          const readyHomePageAfterSave = await new EmployeeLoginFlow().enterEmployeeContext(
             savedHomePage,
             employeeLoginPage,
           );
-          const recallPage = await openRecallFromHome(readyHomePageAfterSave);
-          const orderDetails = await viewFirstVisibleRecallOrderDetails(recallPage);
+          const recallPage = await new RecallFlow().openRecallFromHome(readyHomePageAfterSave);
+          const orderDetails = await new RecallFlow().viewFirstVisibleOrderDetails(recallPage);
 
           expect(orderDetails.priceSummary.Tips).toBeCloseTo(bigTipAmountInCents / 100, 2);
         });
@@ -661,9 +646,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
       const { recallPage, bigTipAmountInCents } = await test.step(
         '创建 To Go 订单并保存后进入 Recall',
         async () => {
-          const orderDishesPage = await startToGoOrder(readyHomePage);
+          const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
 
-          await addRegularDish(
+          await new OrderDishesFlow().addRegularDish(
             orderDishesPage,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
@@ -675,19 +660,19 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
           );
 
           const savedHomePage = await orderDishesPage.saveOrder();
-          const readyHomePageAfterSave = await enterEmployeeContext(
+          const readyHomePageAfterSave = await new EmployeeLoginFlow().enterEmployeeContext(
             savedHomePage,
             employeeLoginPage,
           );
           return {
-            recallPage: await openRecallFromHome(readyHomePageAfterSave),
+            recallPage: await new RecallFlow().openRecallFromHome(readyHomePageAfterSave),
             bigTipAmountInCents,
           };
         },
       );
 
       const paidOrderNumber = await test.step('从 Recall 为最新订单完成信用卡支付', async () => {
-          const orderNumber = await readLatestVisibleRecallOrderNumber(recallPage);
+          const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
           await recallPage.openOrderDetails(orderNumber);
           const paymentPage = await recallPage.openPayment();
           await paymentFlow.payByCreditCard(paymentPage, { printReceipt: false });
@@ -697,7 +682,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
 
         await test.step('重新打开已支付订单并追加超过 50% 的小费', async () => {
           await recallPage.expectLoaded();
-          await searchRecallOrders(recallPage, {
+          await new RecallFlow().searchOrders(recallPage, {
             paymentStatus: RecallPaymentStatuses.paid,
             manualSearch: {
               tag: RecallManualSearchTags.orderNumber,
@@ -746,7 +731,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         });
 
         await test.step('从 To Go 进入点单页，选择有价格 option 并校验总额变化', async () => {
-          const orderDishesPage = await startToGoOrder(readyHomePage);
+          const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
           await orderDishesPage.clickDish(orderServiceDishes.categoryOption.name);
 
           const subtotalBeforeOption = (await orderDishesPage.readPriceSummary()).Subtotal;
@@ -796,7 +781,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
         await test.step(
           `从 To Go 进入点单页，选择 ${orderServiceCategoryOptions.freeNested.name} 和 ${orderServiceCategoryOptions.freeNested.suboptionName} 并校验回显`,
           async () => {
-            const orderDishesPage = await startToGoOrder(readyHomePage);
+            const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
             await assertCategoryOptionOrderRoundTrip(
               orderDishesPage,
               orderServiceDishes.categoryOption.name,
@@ -811,7 +796,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', () => {
   });
 });
 
-test.describe('分单按菜回归', () => {
+test.describe('分单按菜回归', { tag: ['@py-migrate'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
   test(
@@ -827,10 +812,10 @@ test.describe('分单按菜回归', () => {
       await test.step(
         `在点单页打开分单并对子单 ${orderServiceSplitByDishCase.evenSplitSuborderIndex} 的菜品执行 Even Item 平分`,
         async () => {
-          const orderDishesPage = await startToGoOrder(readyHomePage);
+          const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
           const splitOrderFlow = new SplitOrderFlow();
 
-          await addRegularDish(
+          await new OrderDishesFlow().addRegularDish(
             orderDishesPage,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
@@ -869,15 +854,15 @@ test.describe('分单按菜回归', () => {
       });
 
       await test.step('点两个菜、平分三份并在子单间移动菜品', async () => {
-        const orderDishesPage = await startToGoOrder(readyHomePage);
+        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
         const splitOrderFlow = new SplitOrderFlow();
 
-        await addRegularDish(
+        await new OrderDishesFlow().addRegularDish(
           orderDishesPage,
           orderServiceDishes.regular.name,
           orderServiceDishes.regular.menu,
         );
-        await addRegularDish(
+        await new OrderDishesFlow().addRegularDish(
           orderDishesPage,
           orderServiceDishes.test.name,
           orderServiceDishes.test.menu,
@@ -939,7 +924,7 @@ test.describe('分单按菜回归', () => {
   );
 });
 
-test.describe('分单扩展回归', () => {
+test.describe('分单扩展回归', { tag: ['@py-migrate'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
   test(
@@ -953,10 +938,10 @@ test.describe('分单扩展回归', () => {
       });
 
       await test.step('点单后按金额分单并校验两个子单金额', async () => {
-        const orderDishesPage = await startToGoOrder(readyHomePage);
+        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
         const splitOrderFlow = new SplitOrderFlow();
 
-        await addRegularDish(
+        await new OrderDishesFlow().addRegularDish(
           orderDishesPage,
           orderServiceDishes.regular.name,
           orderServiceDishes.regular.menu,
@@ -1003,10 +988,10 @@ test.describe('分单扩展回归', () => {
       });
 
       await test.step('平分两份后撤销分单并校验总额恢复', async () => {
-        const orderDishesPage = await startToGoOrder(readyHomePage);
+        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
         const splitOrderFlow = new SplitOrderFlow();
 
-        await addRegularDish(
+        await new OrderDishesFlow().addRegularDish(
           orderDishesPage,
           orderServiceDishes.regular.name,
           orderServiceDishes.regular.menu,
