@@ -177,7 +177,7 @@ export class SplitOrderPage {
   @step('页面操作：确认分单输入弹窗')
   async confirmSplitInput(): Promise<void> {
     await this.expectSplitInputVisible();
-    await waitForInputSettled();
+    await waitForInputSettled(this.splitInputField);
     await this.splitInputConfirmButton.click();
   }
 

@@ -133,7 +133,7 @@ export class OrderDishesMenuSection {
         }
       }
 
-      await waitForInputSettled();
+      await waitForInputSettled(countDialogInput);
       await countDialogConfirmButton.click();
       await expect(countDialog).toBeHidden();
     }
@@ -187,7 +187,7 @@ export class OrderDishesMenuSection {
     @step('页面操作：确认重量输入')
     async confirmWeightDialog(): Promise<void> {
       await this.expectWeightDialogVisible();
-      await waitForInputSettled();
+      await waitForInputSettled(this.locators.weightInput);
       await this.locators.weightConfirmButton.click();
     }
 
@@ -205,7 +205,7 @@ export class OrderDishesMenuSection {
     @step('页面操作：确认价格输入')
     async confirmPriceDialog(): Promise<void> {
       await this.expectPriceDialogVisible();
-      await waitForInputSettled();
+      await waitForInputSettled(this.locators.priceInput);
       await this.locators.priceConfirmButton.click();
     }
 
@@ -375,7 +375,7 @@ export class OrderDishesMenuSection {
         }
       }
 
-      await waitForInputSettled();
+      await waitForInputSettled(countDialogInput);
       await countDialogConfirmButton.click();
       await expect(countDialog).toBeHidden();
     }

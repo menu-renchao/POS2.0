@@ -23,12 +23,12 @@ export type {
 
 export class OrderDishesPage implements OrderDishesPageHost {
   private readonly ctx: OrderDishesPageContext;
-  private readonly navigation: OrderDishesPageNavigation;
-  private readonly menu: OrderDishesMenuSection;
-  private readonly modifier: OrderDishesModifierSection;
-  private readonly charge: OrderDishesChargeSection;
-  private readonly reads: OrderDishesReadsSection;
-  private readonly tips: OrderDishesTipSection;
+  public readonly navigation: OrderDishesPageNavigation;
+  public readonly menu: OrderDishesMenuSection;
+  public readonly modifier: OrderDishesModifierSection;
+  public readonly charge: OrderDishesChargeSection;
+  public readonly reads: OrderDishesReadsSection;
+  public readonly tips: OrderDishesTipSection;
 
   constructor(page: Page) {
     this.ctx = new OrderDishesPageContext(page);

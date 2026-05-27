@@ -42,25 +42,3 @@ export class EmployeeLoginFlow {
     return homePage;
   }
 }
-
-export async function enterWithEmployeePassword(
-  employeeLoginPage: EmployeeLoginPage,
-  homePage: HomePage,
-  password: string,
-): Promise<HomePage> {
-  const employeeLoginFlow = new EmployeeLoginFlow();
-  return await employeeLoginFlow.enterWithEmployeePassword(
-    employeeLoginPage,
-    homePage,
-    password,
-  );
-}
-
-export async function enterEmployeeContext(
-  homePage: HomePage,
-  employeeLoginPage: EmployeeLoginPage,
-  password = '11',
-): Promise<HomePage> {
-  const employeeLoginFlow = new EmployeeLoginFlow();
-  return await employeeLoginFlow.enterEmployeeContext(homePage, employeeLoginPage, password);
-}

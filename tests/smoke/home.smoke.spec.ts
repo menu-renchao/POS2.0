@@ -1,4 +1,4 @@
-import { openHome } from '../../flows/home.flow';
+import { HomeFlow } from '../../flows/home.flow';
 import { test } from '../../fixtures/test.fixture';
 
 test.describe('首页冒烟', () => {
@@ -14,7 +14,7 @@ test.describe('首页冒烟', () => {
       ],
     },
     async ({ homePage }) => {
-      await openHome(homePage);
+      await new HomeFlow().openHome(homePage);
       await homePage.expectEmployeeReady();
     },
   );

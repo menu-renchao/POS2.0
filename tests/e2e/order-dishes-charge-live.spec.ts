@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { enterWithEmployeePassword } from '../../flows/employee-login.flow';
-import { openHome } from '../../flows/home.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
-import { skipTableSelectionAndEnterOrderDishes } from '../../flows/select-table.flow';
+import { SelectTableFlow } from '../../flows/select-table.flow';
 import { test as appTest } from '../../fixtures/test.fixture';
 
 appTest.describe('点单加收真实验证', () => {
@@ -14,20 +14,20 @@ appTest.describe('点单加收真实验证', () => {
       const orderDishesFlow = new OrderDishesFlow();
 
       await test.step('从首页正常进入点单页', async () => {
-        await openHome(homePage);
+        await new HomeFlow().openHome(homePage);
 
         if (await licenseSelectionPage.isVisible(10_000)) {
-          await enterWithAvailableLicense(licenseSelectionPage, homePage);
+          await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
         }
 
-        const readyHomePage = await enterWithEmployeePassword(
+        const readyHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
           employeeLoginPage,
           homePage,
           '11',
         );
 
         const selectTablePage = await readyHomePage.clickDineIn();
-        const orderDishesPage = await skipTableSelectionAndEnterOrderDishes(selectTablePage);
+        const orderDishesPage = await new SelectTableFlow().skipTableSelectionAndEnterOrderDishes(selectTablePage);
 
         await orderDishesPage.expectLoaded();
         await orderDishesPage.clickDish('common item2');

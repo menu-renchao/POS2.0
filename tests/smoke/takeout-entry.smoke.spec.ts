@@ -1,10 +1,8 @@
-import { enterWithEmployeePassword } from '../../flows/employee-login.flow';
-import { openHome } from '../../flows/home.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import {
-  startDeliveryOrder,
-  startPickUpOrder,
-  startToGoOrder,
+  TakeoutFlow,
 } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 
@@ -21,19 +19,19 @@ test.describe('外带入口跳转冒烟', () => {
       ],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await openHome(homePage);
+      await new HomeFlow().openHome(homePage);
 
       if (await licenseSelectionPage.isVisible(10_000)) {
-        await enterWithAvailableLicense(licenseSelectionPage, homePage);
+        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
-      const loggedInHomePage = await enterWithEmployeePassword(
+      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
         employeeLoginPage,
         homePage,
         '11',
       );
 
-      await startToGoOrder(loggedInHomePage);
+      await new TakeoutFlow().startToGoOrder(loggedInHomePage);
     },
   );
 
@@ -49,19 +47,19 @@ test.describe('外带入口跳转冒烟', () => {
       ],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await openHome(homePage);
+      await new HomeFlow().openHome(homePage);
 
       if (await licenseSelectionPage.isVisible(10_000)) {
-        await enterWithAvailableLicense(licenseSelectionPage, homePage);
+        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
-      const loggedInHomePage = await enterWithEmployeePassword(
+      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
         employeeLoginPage,
         homePage,
         '11',
       );
 
-      await startPickUpOrder(loggedInHomePage, {
+      await new TakeoutFlow().startPickUpOrder(loggedInHomePage, {
         phoneNumber: '9342219929',
         customerName: '小林林',
         note: '自动化取餐备注',
@@ -81,19 +79,19 @@ test.describe('外带入口跳转冒烟', () => {
       ],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await openHome(homePage);
+      await new HomeFlow().openHome(homePage);
 
       if (await licenseSelectionPage.isVisible(10_000)) {
-        await enterWithAvailableLicense(licenseSelectionPage, homePage);
+        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
-      const loggedInHomePage = await enterWithEmployeePassword(
+      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
         employeeLoginPage,
         homePage,
         '11',
       );
 
-      await startDeliveryOrder(loggedInHomePage, {
+      await new TakeoutFlow().startDeliveryOrder(loggedInHomePage, {
         phoneNumber: '1934221992',
         customerName: '解决急急急',
         address: '5611 Jersey Ave',

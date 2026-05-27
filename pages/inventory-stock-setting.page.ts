@@ -57,7 +57,7 @@ export class InventoryStockSettingPage {
       await this.keyboardHideButton.click();
     }
 
-    await waitForInputSettled();
+    await waitForInputSettled(this.limitedStockInput);
     await this.confirmButton.click({ force: true });
 
     await expect(this.inventoryDialog).toBeHidden({ timeout: 15_000 });

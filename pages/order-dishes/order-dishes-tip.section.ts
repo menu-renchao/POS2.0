@@ -72,7 +72,7 @@ export class OrderDishesTipSection {
   @step('页面操作：确认点单页 Tips 输入框')
   async confirmTipDialog(): Promise<void> {
     await expect(await this.resolveTipDialog()).toBeVisible();
-    await waitForInputSettled();
+    await waitForInputSettled(await this.resolveTipInput());
     await (await this.resolveTipConfirmButton()).click();
   }
 

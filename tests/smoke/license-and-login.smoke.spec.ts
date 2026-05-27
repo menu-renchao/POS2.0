@@ -1,6 +1,6 @@
-import { enterWithEmployeePassword } from '../../flows/employee-login.flow';
-import { openHome } from '../../flows/home.flow';
-import { enterWithAvailableLicense } from '../../flows/license-selection.flow';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
+import { HomeFlow } from '../../flows/home.flow';
+import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { test } from '../../fixtures/test.fixture';
 
 test.describe('授权选择与员工登录冒烟', () => {
@@ -20,13 +20,13 @@ test.describe('授权选择与员工登录冒烟', () => {
       ],
     },
     async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await openHome(homePage);
+      await new HomeFlow().openHome(homePage);
 
       if (await licenseSelectionPage.isVisible(10_000)) {
-        await enterWithAvailableLicense(licenseSelectionPage, homePage);
+        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
 
-      const loggedInHomePage = await enterWithEmployeePassword(
+      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
         employeeLoginPage,
         homePage,
         '11',
