@@ -55,23 +55,23 @@ pipeline {
             steps {
                 script {
                     def headedFlag = params.HEADED ? ' --headed' : ''
-                    def testCmd
+                    def testTarget
 
                     switch (params.TEST_SUITE) {
                         case 'smoke':
-                            testCmd = "npm run test:smoke${headedFlag}"
+                            testTarget = 'tests/smoke'
                             break
                         case 'e2e':
-                            testCmd = "npm run test:e2e${headedFlag}"
+                            testTarget = 'tests/e2e'
                             break
                         case 'py-migrate':
-                            testCmd = "npm run test:py-migrate${headedFlag}"
+                            testTarget = 'tests/py-migrate'
                             break
                         default:
-                            testCmd = "npm test${headedFlag}"
+                            testTarget = ''
                     }
 
-                    bat testCmd
+                    bat "node node_modules/playwright/cli.js test ${testTarget}${headedFlag}"
                 }
             }
             post {
