@@ -8,7 +8,7 @@
 
 | 软件 | 版本要求 | 验证命令 |
 |------|---------|---------|
-| **Node.js** | 20.x 或更高 LTS | `node --version` |
+| **Node.js** | 20.x LTS（推荐 v20.19.2） | `node --version` |
 | **npm** | 随 Node.js 自带 | `npm --version` |
 | **Chrome 浏览器** | 最新稳定版 | 双击打开验证 |
 
@@ -31,6 +31,13 @@
 - 勾选 `Install automatically`
 - **Version**: `2.24.0`（或最新）
 
+### 4. Git 代理配置（如需访问 GitHub）
+
+```powershell
+git config --global http.proxy http://127.0.0.1:7897
+git config --global https.proxy http://127.0.0.1:7897
+```
+
 ---
 
 ## 二、Jenkins Job 创建步骤
@@ -47,16 +54,16 @@
 
 | 参数类型 | Name | Default Value | Description |
 |---------|------|---------------|-------------|
-| String Parameter | `PLAYWRIGHT_BASE_URL` | `http://192.168.0.72:22080` | 目标服务器地址，格式: `http://IP:PORT` |
-| Choice Parameter | `TEST_SUITE` | `all` | 选项: `all`, `smoke`, `e2e`, `py-migrate` |
-| Boolean Parameter | `HEADED` | `false` | 是否以有头模式运行（调试用） |
+| String Parameter | `PLAYWRIGHT_BASE_URL` | `http://192.168.0.72:22080` | Target server URL |
+| Choice Parameter | `TEST_SUITE` | `smoke` | Options: `all`, `smoke`, `e2e`, `py-migrate` |
+| Boolean Parameter | `HEADED` | `false` | Run in headed mode (for debugging) |
 
 ### 3. 配置 Pipeline
 
 1. **Definition**: 选择 `Pipeline script from SCM`
 2. **SCM**: 选择 `Git`
 3. **Repository URL**: 填入 Git 仓库地址
-4. **Branches to build**: `*/rc-pos2.0`（或目标分支）
+4. **Branches to build**: `*/main`（或目标分支）
 5. **Script Path**: `Jenkinsfile`
 
 ### 4. 保存并构建
@@ -101,10 +108,12 @@ Checkout → Check Environment → Install Dependencies → Run Tests → Genera
 |------|---------|
 | **Checkout** | 拉取 Git 仓库代码 |
 | **Check Environment** | 验证 Node.js 和 npm 是否可用 |
-| **Install Dependencies** | `npm ci` 安装项目依赖 + `npx playwright install chromium` 安装浏览器 |
-| **Run Tests** | 根据 `TEST_SUITE` 参数执行对应测试套件 |
+| **Install Dependencies** | `npm ci` 安装项目依赖 |
+| **Run Tests** | 通过 `node node_modules/playwright/cli.js test` 执行测试 |
 | **Generate Allure Report** | 自动生成可视化测试报告 |
 | **Archive Artifacts** | 归档 `test-results` 和 `allure-results` |
+
+> 注意：测试执行使用 `node node_modules/playwright/cli.js` 而非 `npx playwright`，因为 npx 在某些 Windows/Jenkins 环境下存在模块加载问题。
 
 ---
 
@@ -141,18 +150,11 @@ Checkout → Check Environment → Install Dependencies → Run Tests → Genera
 Windows 上 Jenkins 安装/更新插件时，JAR 文件可能被 JVM 锁定。解决步骤：
 
 ```powershell
-# 停止 Jenkins 服务
 net stop Jenkins
-
-# 手动删除有问题的插件目录
 Remove-Item -Recurse -Force "C:\Users\administrator\Jenkins\.jenkins\plugins\config-file-provider"
 Remove-Item -Recurse -Force "C:\Users\administrator\Jenkins\.jenkins\plugins\nodejs"
-
-# 重新启动 Jenkins
 net start Jenkins
 ```
-
-重启后在插件管理页面重新安装即可。
 
 ### 2. `node` 或 `npm` 命令找不到
 
@@ -168,3 +170,23 @@ Jenkins 服务可能未加载最新的系统 PATH。两种解决方式：
 ### 3. Allure 报告为空
 
 确认 `allure-playwright` 依赖已安装，且 `playwright.config.ts` 中 reporter 配置了 `allure-playwright`。
+
+### 4. `npx playwright` 报错 `test.describe() to be called here`
+
+在某些 Windows + Jenkins 环境下，`npx` 会导致 Playwright 模块加载异常。Jenkinsfile 已使用 `node node_modules/playwright/cli.js` 替代 `npx playwright`，避免此问题。如在其他环境遇到同样问题，同样使用 `node node_modules/playwright/cli.js test` 替代 `npx playwright test`。
+
+### 5. Jenkins 中文乱码
+
+在 `C:\Program Files\Jenkins\Jenkins.xml` 的 `<arguments>` 中添加 `-Dfile.encoding=UTF-8`，然后重启 Jenkins：
+```powershell
+net stop Jenkins
+net start Jenkins
+```
+
+### 6. Git 连接 GitHub 失败
+
+配置代理：
+```powershell
+git config --global http.proxy http://127.0.0.1:7897
+git config --global https.proxy http://127.0.0.1:7897
+```

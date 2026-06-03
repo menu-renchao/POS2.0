@@ -4,7 +4,11 @@
       "Bash(npm test:*)",
       "Bash(npx playwright test:*)",
       "Bash(node:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm view:*)",
+      "Bash(npm install @playwright/test@latest)",
+      "Bash(npm ls:*)",
+      "Bash(claude:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
