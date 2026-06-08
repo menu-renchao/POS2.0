@@ -62,9 +62,6 @@ properties([
                         workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
                         workspaceCandidates << 'D:/menusifu/pos2.0'
 
-                        def literalTestTitlePattern = java.util.regex.Pattern.compile("(?m)^\\s*test\\(\\s*(?:\\r?\\n\\s*)?['\\"]([^'\\"]+)['\\"]")
-                        def caseTitlePattern = java.util.regex.Pattern.compile("(?m)^\\s*title:\\s*['\\"]([^'\\"]+)['\\"]")
-
                         selectedSuite = selectedSuite ?: 'all'
                         def suitePathByName = [
                             'smoke': 'tests/smoke',
@@ -89,16 +86,38 @@ properties([
                                     return
                                 }
 
-                                def specContent = specFile.getText('UTF-8')
+                                def previousLine = ''
+                                specFile.eachLine('UTF-8') { line ->
+                                    def trimmedLine = line.trim()
 
-                                def literalTitleMatcher = literalTestTitlePattern.matcher(specContent)
-                                while (literalTitleMatcher.find()) {
-                                    cases << literalTitleMatcher.group(1)
-                                }
+                                    if (trimmedLine.startsWith("test('") || trimmedLine.startsWith('test("')) {
+                                        def titleText = trimmedLine.substring('test('.length()).trim()
+                                        def quote = titleText.substring(0, 1)
+                                        def endIndex = titleText.indexOf(quote, 1)
+                                        if (endIndex > 1) {
+                                            cases << titleText.substring(1, endIndex)
+                                        }
+                                    }
 
-                                def caseTitleMatcher = caseTitlePattern.matcher(specContent)
-                                while (caseTitleMatcher.find()) {
-                                    cases << caseTitleMatcher.group(1)
+                                    if (previousLine == 'test(' && (trimmedLine.startsWith("'") || trimmedLine.startsWith('"'))) {
+                                        def quote = trimmedLine.substring(0, 1)
+                                        def endIndex = trimmedLine.indexOf(quote, 1)
+                                        if (endIndex > 1) {
+                                            cases << trimmedLine.substring(1, endIndex)
+                                        }
+                                    }
+
+                                    if (trimmedLine.startsWith("title: '") || trimmedLine.startsWith('title: "')) {
+                                        def startIndex = trimmedLine.indexOf(':') + 1
+                                        def titleText = trimmedLine.substring(startIndex).trim()
+                                        def quote = titleText.substring(0, 1)
+                                        def endIndex = titleText.indexOf(quote, 1)
+                                        if (endIndex > 1) {
+                                            cases << titleText.substring(1, endIndex)
+                                        }
+                                    }
+
+                                    previousLine = trimmedLine
                                 }
                             }
 
