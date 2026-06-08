@@ -1,28 +1,98 @@
-pipeline {
-    agent any
-
-    parameters {
+properties([
+    parameters([
         string(
             name: 'PLAYWRIGHT_BASE_URL',
             defaultValue: 'http://192.168.0.72:22080',
             description: 'Target server URL, e.g. http://IP:PORT'
-        )
+        ),
         choice(
             name: 'TEST_SUITE',
             choices: ['all', 'smoke', 'e2e', 'py-migrate'],
             description: 'Test suite to run'
-        )
-        string(
+        ),
+        [
+            $class: 'CascadeChoiceParameter',
+            choiceType: 'PT_CHECKBOX',
+            description: 'Optional Playwright test title filter. Select multiple cases for py-migrate.',
+            filterLength: 1,
+            filterable: true,
             name: 'TEST_CASE_GREP',
-            defaultValue: '',
-            description: 'Optional Playwright test title regex. Use | to run multiple cases, e.g. 用例A|用例B'
-        )
+            randomName: 'choice-parameter-test-case-grep',
+            referencedParameters: 'TEST_SUITE',
+            script: [
+                $class: 'GroovyScript',
+                fallbackScript: [
+                    classpath: [],
+                    sandbox: true,
+                    script: 'return []'
+                ],
+                script: [
+                    classpath: [],
+                    sandbox: false,
+                    script: '''
+                        if (TEST_SUITE != 'py-migrate') {
+                            return []
+                        }
+
+                        def workspaceCandidates = []
+                        def envWorkspace = System.getenv('WORKSPACE')
+                        if (envWorkspace) {
+                            workspaceCandidates << envWorkspace
+                        }
+
+                        def jenkinsHome = System.getenv('JENKINS_HOME')
+                        def jobName = System.getenv('JOB_NAME')
+                        if (jenkinsHome && jobName) {
+                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
+                        }
+
+                        workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+
+                        def literalTestTitlePattern = ~/(?m)^\\s*test\\(\\s*(?:\\r?\\n\\s*)['"]([^'"]+)['"]/
+                        def caseTitlePattern = ~/(?m)^\\s*title:\\s*['"]([^'"]+)['"]/
+
+                        for (workspacePath in workspaceCandidates.unique()) {
+                            def specDir = new File(workspacePath, 'tests/py-migrate')
+
+                            if (!specDir.isDirectory()) {
+                                continue
+                            }
+
+                            def cases = []
+                            specDir.eachFileMatch(~/.*\\.spec\\.ts/) { specFile ->
+                                def specContent = specFile.getText('UTF-8')
+
+                                def literalTitleMatcher = specContent =~ literalTestTitlePattern
+                                literalTitleMatcher.each { match ->
+                                    cases << match[1]
+                                }
+
+                                def caseTitleMatcher = specContent =~ caseTitlePattern
+                                caseTitleMatcher.each { match ->
+                                    cases << match[1]
+                                }
+                            }
+
+                            if (!cases.isEmpty()) {
+                                return cases.unique()
+                            }
+                        }
+
+                        return []
+                    '''
+                ]
+            ]
+        ],
         booleanParam(
             name: 'HEADED',
             defaultValue: false,
             description: 'Run in headed mode (for debugging)'
         )
-    }
+    ])
+])
+
+pipeline {
+    agent any
 
     environment {
         PLAYWRIGHT_BASE_URL = "${params.PLAYWRIGHT_BASE_URL}"
@@ -76,8 +146,10 @@ pipeline {
                             testTarget = ''
                     }
 
-                    def grepFlag = params.TEST_CASE_GREP?.trim()
-                        ? " --grep \"${params.TEST_CASE_GREP.trim().replace('"', '\\"')}\""
+                    def selectedCases = params.TEST_CASE_GREP ?: ''
+                    def grepValue = selectedCases.toString().trim().replaceAll('\\s*,\\s*', '|')
+                    def grepFlag = grepValue
+                        ? " --grep \"${grepValue.replace('"', '\\"')}\""
                         : ''
 
                     bat "node node_modules/playwright/cli.js test ${testTarget}${headedFlag}${grepFlag}"
