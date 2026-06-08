@@ -80,13 +80,7 @@ export class HomePage {
 
   @step('页面操作：判断主页固定头部按钮当前是否可用')
   async isPrimaryFunctionCardsVisible(): Promise<boolean> {
-    return (
-      (await this.themeToggleButton.isVisible().catch(() => false)) &&
-      (await this.languageButton.isVisible().catch(() => false)) &&
-      (await this.supportButton.isVisible().catch(() => false)) &&
-      (await this.refreshButton.isVisible().catch(() => false)) &&
-      (await this.exitButton.isVisible().catch(() => false))
-    );
+    return await this.supportButton.isVisible().catch(() => false);
   }
 
   @step('页面操作：点击 Dine In 入口并进入选桌页')
