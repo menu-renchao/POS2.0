@@ -50,6 +50,13 @@ export class HomePage {
     await expect(this.resolveFunctionButton('Dine In')).resolves.toBeDefined();
   }
 
+  @step((timeoutMs = 1_000) => `页面操作：判断员工主页状态在 ${timeoutMs} 毫秒内是否可用`)
+  async isEmployeeReady(timeoutMs = 1_000): Promise<boolean> {
+    return await this.resolveFunctionButton('Dine In', timeoutMs)
+      .then(() => true)
+      .catch(() => false);
+  }
+
   @step('页面操作：点击主页刷新按钮并等待刷新完成')
   async clickRefresh(): Promise<void> {
     await waitUntil(

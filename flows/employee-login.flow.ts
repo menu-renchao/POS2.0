@@ -3,6 +3,8 @@ import { HomePage } from '../pages/home.page';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 
+type EmployeeEntryState = 'employee-login' | 'employee-ready' | 'pending';
+
 export class EmployeeLoginFlow {
   @step('业务步骤：使用员工密码登录并进入主页')
   async enterWithEmployeePassword(
@@ -24,21 +26,32 @@ export class EmployeeLoginFlow {
     employeeLoginPage: EmployeeLoginPage,
     password = '11',
   ): Promise<HomePage> {
-    const employeeLoginVisible = await waitUntil(
-      async () => await employeeLoginPage.isVisible().catch(() => false),
-      (visible) => visible,
-      {
-        timeout: 5_000,
-        probeTimeout: 1_000,
-        message: 'Employee passcode page did not become visible.',
-      },
-    ).catch(() => false);
+    const entryState = await waitUntil(
+      async (): Promise<EmployeeEntryState> => {
+        if (await employeeLoginPage.isVisible().catch(() => false)) {
+          return 'employee-login';
+        }
 
-    if (employeeLoginVisible) {
+        if (await homePage.isEmployeeReady().catch(() => false)) {
+          return 'employee-ready';
+        }
+
+        return 'pending';
+      },
+      (state) => state !== 'pending',
+      {
+        timeout: 30_000,
+        interval: 500,
+        probeTimeout: 2_000,
+        message: 'POS employee entry state did not become ready.',
+      },
+    );
+
+    if (entryState === 'employee-login') {
       return await this.enterWithEmployeePassword(employeeLoginPage, homePage, password);
     }
 
-    await homePage.expectLoaded();
+    await homePage.expectEmployeeReady();
     return homePage;
   }
 }
