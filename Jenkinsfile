@@ -10,6 +10,11 @@ properties([
             choices: ['all', 'smoke', 'e2e', 'py-migrate'],
             description: 'Test suite to run'
         ),
+        string(
+            name: 'TEST_CASE_SOURCE_DIR',
+            defaultValue: 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI',
+            description: 'Directory that contains the checked-out repo for loading test case choices.'
+        ),
         [
             $class: 'CascadeChoiceParameter',
             choiceType: 'PT_CHECKBOX',
@@ -18,7 +23,7 @@ properties([
             filterable: true,
             name: 'TEST_CASE_GREP',
             randomName: 'choice-parameter-test-case-grep',
-            referencedParameters: 'TEST_SUITE',
+            referencedParameters: 'TEST_SUITE,TEST_CASE_SOURCE_DIR',
             script: [
                 $class: 'GroovyScript',
                 fallbackScript: [
@@ -31,6 +36,10 @@ properties([
                     sandbox: false,
                     script: '''
                         def workspaceCandidates = []
+                        if (TEST_CASE_SOURCE_DIR) {
+                            workspaceCandidates << TEST_CASE_SOURCE_DIR
+                        }
+
                         def envWorkspace = System.getenv('WORKSPACE')
                         if (envWorkspace) {
                             workspaceCandidates << envWorkspace
@@ -56,9 +65,11 @@ properties([
                             'all': 'tests'
                         ]
                         def suitePath = suitePathByName[selectedSuite] ?: 'tests'
+                        def checkedPaths = []
 
                         for (workspacePath in workspaceCandidates.unique()) {
                             def specDir = new File(workspacePath, suitePath)
+                            checkedPaths << specDir.path
 
                             if (!specDir.isDirectory()) {
                                 continue
@@ -88,7 +99,7 @@ properties([
                             }
                         }
 
-                        return []
+                        return ["未找到用例目录: ${checkedPaths.join(' ; ')}"]
                     '''
                 ]
             ]
