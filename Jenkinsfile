@@ -13,7 +13,7 @@ properties([
         [
             $class: 'CascadeChoiceParameter',
             choiceType: 'PT_CHECKBOX',
-            description: 'Optional Playwright test title filter. Select multiple cases for py-migrate.',
+            description: 'Optional Playwright test title filter. Select multiple cases for the selected suite.',
             filterLength: 1,
             filterable: true,
             name: 'TEST_CASE_GREP',
@@ -30,10 +30,6 @@ properties([
                     classpath: [],
                     sandbox: false,
                     script: '''
-                        if (TEST_SUITE != 'py-migrate') {
-                            return []
-                        }
-
                         def workspaceCandidates = []
                         def envWorkspace = System.getenv('WORKSPACE')
                         if (envWorkspace) {
@@ -47,19 +43,33 @@ properties([
                         }
 
                         workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+                        workspaceCandidates << 'D:/menusifu/pos2.0'
 
-                        def literalTestTitlePattern = ~/(?m)^\\s*test\\(\\s*(?:\\r?\\n\\s*)['"]([^'"]+)['"]/
-                        def caseTitlePattern = ~/(?m)^\\s*title:\\s*['"]([^'"]+)['"]/
+                        def literalTestTitlePattern = ~/(?m)^\s*test\(\s*(?:\r?\n\s*)?['"]([^'"]+)['"]/
+                        def caseTitlePattern = ~/(?m)^\s*title:\s*['"]([^'"]+)['"]/
+
+                        def selectedSuite = TEST_SUITE ?: 'all'
+                        def suitePathByName = [
+                            'smoke': 'tests/smoke',
+                            'e2e': 'tests/e2e',
+                            'py-migrate': 'tests/py-migrate',
+                            'all': 'tests'
+                        ]
+                        def suitePath = suitePathByName[selectedSuite] ?: 'tests'
 
                         for (workspacePath in workspaceCandidates.unique()) {
-                            def specDir = new File(workspacePath, 'tests/py-migrate')
+                            def specDir = new File(workspacePath, suitePath)
 
                             if (!specDir.isDirectory()) {
                                 continue
                             }
 
                             def cases = []
-                            specDir.eachFileMatch(~/.*\\.spec\\.ts/) { specFile ->
+                            specDir.eachFileRecurse { specFile ->
+                                if (!specFile.isFile() || !specFile.name.endsWith('.ts')) {
+                                    return
+                                }
+
                                 def specContent = specFile.getText('UTF-8')
 
                                 def literalTitleMatcher = specContent =~ literalTestTitlePattern
