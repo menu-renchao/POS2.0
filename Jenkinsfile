@@ -29,15 +29,23 @@ properties([
                 fallbackScript: [
                     classpath: [],
                     sandbox: true,
-                    script: 'return []'
+                    script: 'return ["Active Choices 脚本执行失败，请检查 In-process Script Approval 或 Jenkins 日志"]'
                 ],
                 script: [
                     classpath: [],
                     sandbox: false,
                     script: '''
+                        try {
                         def workspaceCandidates = []
-                        if (TEST_CASE_SOURCE_DIR) {
-                            workspaceCandidates << TEST_CASE_SOURCE_DIR
+                        def selectedSourceDir = binding.hasVariable('TEST_CASE_SOURCE_DIR')
+                            ? binding.getVariable('TEST_CASE_SOURCE_DIR')
+                            : ''
+                        def selectedSuite = binding.hasVariable('TEST_SUITE')
+                            ? binding.getVariable('TEST_SUITE')
+                            : 'all'
+
+                        if (selectedSourceDir) {
+                            workspaceCandidates << selectedSourceDir
                         }
 
                         def envWorkspace = System.getenv('WORKSPACE')
@@ -54,10 +62,10 @@ properties([
                         workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
                         workspaceCandidates << 'D:/menusifu/pos2.0'
 
-                        def literalTestTitlePattern = java.util.regex.Pattern.compile("(?m)^\\\\s*test\\\\(\\\\s*(?:\\\\r?\\\\n\\\\s*)?['\\"]([^'\\"]+)['\\"]")
-                        def caseTitlePattern = java.util.regex.Pattern.compile("(?m)^\\\\s*title:\\\\s*['\\"]([^'\\"]+)['\\"]")
+                        def literalTestTitlePattern = java.util.regex.Pattern.compile("(?m)^\\s*test\\(\\s*(?:\\r?\\n\\s*)?['\\"]([^'\\"]+)['\\"]")
+                        def caseTitlePattern = java.util.regex.Pattern.compile("(?m)^\\s*title:\\s*['\\"]([^'\\"]+)['\\"]")
 
-                        def selectedSuite = TEST_SUITE ?: 'all'
+                        selectedSuite = selectedSuite ?: 'all'
                         def suitePathByName = [
                             'smoke': 'tests/smoke',
                             'e2e': 'tests/e2e',
@@ -100,6 +108,9 @@ properties([
                         }
 
                         return ["未找到用例目录: ${checkedPaths.join(' ; ')}"]
+                        } catch (Throwable error) {
+                            return ["用例加载失败: ${error.getClass().getSimpleName()}: ${error.getMessage()}"]
+                        }
                     '''
                 ]
             ]
