@@ -15,7 +15,6 @@ test.describe('Playwright Test Agents 种子入口', () => {
       if (await licenseSelectionPage.isVisible(10_000)) {
         await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
       }
-
       const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
         homePage,
         employeeLoginPage,
