@@ -45,8 +45,8 @@ properties([
                         workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
                         workspaceCandidates << 'D:/menusifu/pos2.0'
 
-                        def literalTestTitlePattern = ~/(?m)^\s*test\(\s*(?:\r?\n\s*)?['"]([^'"]+)['"]/
-                        def caseTitlePattern = ~/(?m)^\s*title:\s*['"]([^'"]+)['"]/
+                        def literalTestTitlePattern = java.util.regex.Pattern.compile("(?m)^\\\\s*test\\\\(\\\\s*(?:\\\\r?\\\\n\\\\s*)?['\\"]([^'\\"]+)['\\"]")
+                        def caseTitlePattern = java.util.regex.Pattern.compile("(?m)^\\\\s*title:\\\\s*['\\"]([^'\\"]+)['\\"]")
 
                         def selectedSuite = TEST_SUITE ?: 'all'
                         def suitePathByName = [
@@ -72,14 +72,14 @@ properties([
 
                                 def specContent = specFile.getText('UTF-8')
 
-                                def literalTitleMatcher = specContent =~ literalTestTitlePattern
-                                literalTitleMatcher.each { match ->
-                                    cases << match[1]
+                                def literalTitleMatcher = literalTestTitlePattern.matcher(specContent)
+                                while (literalTitleMatcher.find()) {
+                                    cases << literalTitleMatcher.group(1)
                                 }
 
-                                def caseTitleMatcher = specContent =~ caseTitlePattern
-                                caseTitleMatcher.each { match ->
-                                    cases << match[1]
+                                def caseTitleMatcher = caseTitlePattern.matcher(specContent)
+                                while (caseTitleMatcher.find()) {
+                                    cases << caseTitleMatcher.group(1)
                                 }
                             }
 
