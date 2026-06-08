@@ -12,6 +12,11 @@ pipeline {
             choices: ['all', 'smoke', 'e2e', 'py-migrate'],
             description: 'Test suite to run'
         )
+        string(
+            name: 'TEST_CASE_GREP',
+            defaultValue: '',
+            description: 'Optional Playwright test title regex. Use | to run multiple cases, e.g. 用例A|用例B'
+        )
         booleanParam(
             name: 'HEADED',
             defaultValue: false,
@@ -71,7 +76,11 @@ pipeline {
                             testTarget = ''
                     }
 
-                    bat "node node_modules/playwright/cli.js test ${testTarget}${headedFlag}"
+                    def grepFlag = params.TEST_CASE_GREP?.trim()
+                        ? " --grep \"${params.TEST_CASE_GREP.trim().replace('"', '\\"')}\""
+                        : ''
+
+                    bat "node node_modules/playwright/cli.js test ${testTarget}${headedFlag}${grepFlag}"
                 }
             }
             post {
