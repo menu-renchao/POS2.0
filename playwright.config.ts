@@ -12,7 +12,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [
-    ['list', { printSteps: !!process.env.CI }],
+    ['list', { printSteps: process.env.PLAYWRIGHT_LIST_PRINT_STEPS === 'true' }],
     [
       'allure-playwright',
       {
