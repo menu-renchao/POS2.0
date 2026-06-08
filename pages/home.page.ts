@@ -50,13 +50,6 @@ export class HomePage {
     await expect(this.resolveFunctionButton('Dine In')).resolves.toBeDefined();
   }
 
-  @step((timeoutMs = 1_000) => `页面操作：判断员工主页状态在 ${timeoutMs} 毫秒内是否可用`)
-  async isEmployeeReady(timeoutMs = 1_000): Promise<boolean> {
-    return await this.resolveFunctionButton('Dine In', timeoutMs)
-      .then(() => true)
-      .catch(() => false);
-  }
-
   @step('页面操作：点击主页刷新按钮并等待刷新完成')
   async clickRefresh(): Promise<void> {
     await waitUntil(
@@ -83,6 +76,17 @@ export class HomePage {
     await expect(this.supportButton).toBeVisible();
     await expect(this.refreshButton).toBeVisible();
     await expect(this.exitButton).toBeVisible();
+  }
+
+  @step('页面操作：判断主页固定头部按钮当前是否可用')
+  async isPrimaryFunctionCardsVisible(): Promise<boolean> {
+    return (
+      (await this.themeToggleButton.isVisible().catch(() => false)) &&
+      (await this.languageButton.isVisible().catch(() => false)) &&
+      (await this.supportButton.isVisible().catch(() => false)) &&
+      (await this.refreshButton.isVisible().catch(() => false)) &&
+      (await this.exitButton.isVisible().catch(() => false))
+    );
   }
 
   @step('页面操作：点击 Dine In 入口并进入选桌页')
