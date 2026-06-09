@@ -5,13 +5,13 @@ properties([
         string(
             name: 'PLAYWRIGHT_BASE_URL',
             defaultValue: 'http://192.168.0.72:22080',
-            description: 'Target server URL, e.g. http://IP:PORT'
+            description: '(required) Target server URL, e.g. http://IP:PORT'
         ),
         // 动态测试套件：扫描 tests 下包含 *.spec.ts 的一级目录，并额外提供 all 选项。
         [
             $class: 'ChoiceParameter',
             choiceType: 'PT_SINGLE_SELECT',
-            description: 'Test suite to run. Loaded dynamically from tests/* directories that contain spec files.',
+            description: '(required) Test suite to run. Loaded dynamically from tests/* directories that contain spec files.',
             filterLength: 1,
             filterable: false,
             name: 'TEST_SUITE',
@@ -85,7 +85,7 @@ properties([
         [
             $class: 'CascadeChoiceParameter',
             choiceType: 'PT_CHECKBOX',
-            description: 'Optional Playwright test title filter. Select multiple cases for the selected suite.',
+            description: '(optional) Playwright test title filter. Select multiple cases for the selected suite. Leave empty to run all cases in the selected suite.',
             filterLength: 1,
             filterable: true,
             name: 'TEST_CASE_GREP',
@@ -192,7 +192,7 @@ properties([
         booleanParam(
             name: 'HEADED',
             defaultValue: false,
-            description: 'Run in headed mode (for debugging)'
+            description: '(optional) Run in headed mode (for debugging)'
         )
     ])
 ])
