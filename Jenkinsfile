@@ -95,7 +95,10 @@ properties([
                 fallbackScript: [
                     classpath: [],
                     sandbox: true,
-                    script: 'return ["Active Choices 脚本执行失败，请检查 In-process Script Approval 或 Jenkins 日志"]'
+                    script: '''
+                        def activeChoicesError = binding.hasVariable('error') ? binding.getVariable('error') : null
+                        return ["TEST_CASE_GREP fallback: ${activeChoicesError?.getClass()?.getSimpleName() ?: 'Unknown'}: ${activeChoicesError?.getMessage() ?: 'no error message'}"]
+                    '''
                 ],
                 script: [
                     classpath: [],
@@ -206,7 +209,7 @@ properties([
                         def checkedPaths = []
                         def selectedFiles = selectedFilesValue instanceof Collection
                             ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
-                            : selectedFilesValue.toString().split('\\s*,\\s*').collect { it.trim() }.findAll { it }
+                            : selectedFilesValue.toString().split(',').collect { it.trim() }.findAll { it }
                         if (selectedSuite != 'all') {
                             selectedFiles = selectedFiles.findAll { it.startsWith("tests/${selectedSuite}/") }
                         }
@@ -243,7 +246,7 @@ properties([
                                 }
 
                                 def previousLine = ''
-                                specFile.eachLine('UTF-8') { line ->
+                                specFile.readLines('UTF-8').each { line ->
                                     def trimmedLine = line.trim()
 
                                     if (trimmedLine.startsWith("test('") || trimmedLine.startsWith('test("')) {
