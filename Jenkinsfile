@@ -5,11 +5,79 @@ properties([
             defaultValue: 'http://192.168.0.72:22080',
             description: 'Target server URL, e.g. http://IP:PORT'
         ),
-        choice(
+        [
+            $class: 'ChoiceParameter',
+            choiceType: 'PT_SINGLE_SELECT',
+            description: 'Test suite to run. Loaded dynamically from tests/* directories that contain spec files.',
+            filterLength: 1,
+            filterable: false,
             name: 'TEST_SUITE',
-            choices: ['all', 'smoke', 'e2e', 'py-migrate'],
-            description: 'Test suite to run'
-        ),
+            randomName: 'choice-parameter-test-suite',
+            script: [
+                $class: 'GroovyScript',
+                fallbackScript: [
+                    classpath: [],
+                    sandbox: true,
+                    script: 'return ["all"]'
+                ],
+                script: [
+                    classpath: [],
+                    sandbox: false,
+                    script: '''
+                        try {
+                        def workspaceCandidates = []
+
+                        def envWorkspace = System.getenv('WORKSPACE')
+                        if (envWorkspace) {
+                            workspaceCandidates << envWorkspace
+                        }
+
+                        def jenkinsHome = System.getenv('JENKINS_HOME')
+                        def jobName = System.getenv('JOB_NAME')
+                        if (jenkinsHome && jobName) {
+                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
+                        }
+
+                        workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+                        workspaceCandidates << 'D:/menusifu/pos2.0'
+
+                        for (workspacePath in workspaceCandidates.unique()) {
+                            def testsDir = new File(workspacePath, 'tests')
+                            if (!testsDir.isDirectory()) {
+                                continue
+                            }
+
+                            def suites = []
+                            testsDir.eachFile { suiteDir ->
+                                if (!suiteDir.isDirectory()) {
+                                    return
+                                }
+
+                                def hasSpec = false
+                                suiteDir.eachFileRecurse { testFile ->
+                                    if (testFile.isFile() && testFile.name.endsWith('.spec.ts')) {
+                                        hasSpec = true
+                                    }
+                                }
+
+                                if (hasSpec) {
+                                    suites << suiteDir.name
+                                }
+                            }
+
+                            if (!suites.isEmpty()) {
+                                return (['all'] + suites.sort()).unique()
+                            }
+                        }
+
+                        return ['all']
+                        } catch (Throwable error) {
+                            return ['all']
+                        }
+                    '''
+                ]
+            ]
+        ],
         [
             $class: 'CascadeChoiceParameter',
             choiceType: 'PT_CHECKBOX',
@@ -51,13 +119,7 @@ properties([
                         workspaceCandidates << 'D:/menusifu/pos2.0'
 
                         selectedSuite = selectedSuite ?: 'all'
-                        def suitePathByName = [
-                            'smoke': 'tests/smoke',
-                            'e2e': 'tests/e2e',
-                            'py-migrate': 'tests/py-migrate',
-                            'all': 'tests'
-                        ]
-                        def suitePath = suitePathByName[selectedSuite] ?: 'tests'
+                        def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
                         def checkedPaths = []
 
                         for (workspacePath in workspaceCandidates.unique()) {
@@ -179,21 +241,11 @@ pipeline {
             steps {
                 script {
                     def headedFlag = params.HEADED ? ' --headed' : ''
-                    def testTarget
-
-                    switch (params.TEST_SUITE) {
-                        case 'smoke':
-                            testTarget = 'tests/smoke'
-                            break
-                        case 'e2e':
-                            testTarget = 'tests/e2e'
-                            break
-                        case 'py-migrate':
-                            testTarget = 'tests/py-migrate'
-                            break
-                        default:
-                            testTarget = ''
+                    def selectedSuite = params.TEST_SUITE ?: 'all'
+                    if (selectedSuite != 'all' && !selectedSuite.matches('[A-Za-z0-9_-]+')) {
+                        error "Invalid TEST_SUITE value: ${selectedSuite}"
                     }
+                    def testTarget = selectedSuite == 'all' ? '' : "tests/${selectedSuite}"
 
                     def selectedCases = params.TEST_CASE_GREP ?: ''
                     def selectedCaseText = selectedCases instanceof Collection
