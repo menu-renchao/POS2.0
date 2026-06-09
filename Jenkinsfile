@@ -198,9 +198,42 @@ pipeline {
                     }
 
                     def selectedCases = params.TEST_CASE_GREP ?: ''
-                    def grepValue = selectedCases.toString().trim().replaceAll('\\s*,\\s*', '|')
+                    def selectedCaseText = selectedCases instanceof Collection
+                        ? selectedCases.join(',')
+                        : selectedCases.toString()
+                    def selectedCaseTitles = selectedCaseText
+                        .split('\\s*,\\s*')
+                        .collect { it.trim() }
+                        .findAll { it }
+                    def regexSpecialChars = '\\^$.*+?()[]{}|'
+                    def escapeJsRegexLiteral = { String value ->
+                        def escaped = new StringBuilder()
+                        for (int index = 0; index < value.length(); index++) {
+                            def currentChar = value.charAt(index)
+                            if (regexSpecialChars.indexOf(currentChar as int) >= 0) {
+                                escaped.append('\\')
+                            }
+                            escaped.append(currentChar)
+                        }
+                        return escaped.toString()
+                    }
+                    def unicodeEscapeForBatch = { String value ->
+                        def escaped = new StringBuilder()
+                        for (int index = 0; index < value.length(); index++) {
+                            int currentChar = value.charAt(index)
+                            if (currentChar < 128) {
+                                escaped.append(value.charAt(index))
+                            } else {
+                                escaped.append('\\').append(String.format('u%04x', currentChar))
+                            }
+                        }
+                        return escaped.toString()
+                    }
+                    def grepValue = selectedCaseTitles
+                        .collect { unicodeEscapeForBatch(escapeJsRegexLiteral(it)) }
+                        .join('|')
                     def grepFlag = grepValue
-                        ? " --grep \"${grepValue.replace('"', '\\"')}\""
+                        ? " --grep \"${grepValue.replace('"', '\\"').replace('%', '%%')}\""
                         : ''
 
                     bat "node node_modules/playwright/cli.js test ${testTarget}${headedFlag}${grepFlag}"
