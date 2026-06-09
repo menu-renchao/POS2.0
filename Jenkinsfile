@@ -1,3 +1,101 @@
+def activeChoicesSupportScript = '''
+def workspaceCandidates() {
+    def candidates = []
+
+    def envWorkspace = System.getenv('WORKSPACE')
+    if (envWorkspace) {
+        candidates << envWorkspace
+    }
+
+    def jenkinsHome = System.getenv('JENKINS_HOME')
+    def jobName = System.getenv('JOB_NAME')
+    if (jenkinsHome && jobName) {
+        candidates << new File(jenkinsHome, "workspace/${jobName}").path
+    }
+
+    candidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+
+    return candidates.unique()
+}
+
+def suitePathFor(String selectedSuite) {
+    def suite = selectedSuite ?: 'all'
+    return suite == 'all' ? 'tests' : "tests/${suite}"
+}
+
+def selectedValues(value) {
+    if (value instanceof Collection) {
+        return value.collect { it.toString().trim() }.findAll { it }
+    }
+
+    return value.toString().split('\\s*,\\s*').collect { it.trim() }.findAll { it }
+}
+
+def relativeUnixPath(String workspacePath, File file) {
+    return new File(workspacePath).toPath()
+        .relativize(file.toPath())
+        .toString()
+        .replace(File.separator, '/')
+}
+
+def specFilesUnder(File rootDir) {
+    def specFiles = []
+    if (!rootDir.isDirectory()) {
+        return specFiles
+    }
+
+    rootDir.eachFileRecurse { file ->
+        if (file.isFile() && file.name.endsWith('.spec.ts')) {
+            specFiles << file
+        }
+    }
+
+    return specFiles.sort { it.path }
+}
+
+def readTestTitles(List specFiles) {
+    def titles = []
+
+    specFiles.each { specFile ->
+        def previousLine = ''
+        specFile.eachLine('UTF-8') { line ->
+            def trimmedLine = line.trim()
+
+            if (trimmedLine.startsWith("test('") || trimmedLine.startsWith('test("')) {
+                def titleText = trimmedLine.substring('test('.length()).trim()
+                def quote = titleText.substring(0, 1)
+                def endIndex = titleText.indexOf(quote, 1)
+                if (endIndex > 1) {
+                    titles << titleText.substring(1, endIndex)
+                }
+            }
+
+            if (previousLine == 'test(' && (trimmedLine.startsWith("'") || trimmedLine.startsWith('"'))) {
+                def quote = trimmedLine.substring(0, 1)
+                def endIndex = trimmedLine.indexOf(quote, 1)
+                if (endIndex > 1) {
+                    titles << trimmedLine.substring(1, endIndex)
+                }
+            }
+
+            if (trimmedLine.startsWith("title: '") || trimmedLine.startsWith('title: "')) {
+                def startIndex = trimmedLine.indexOf(':') + 1
+                def titleText = trimmedLine.substring(startIndex).trim()
+                def quote = titleText.substring(0, 1)
+                def endIndex = titleText.indexOf(quote, 1)
+                if (endIndex > 1) {
+                    titles << titleText.substring(1, endIndex)
+                }
+            }
+
+            previousLine = trimmedLine
+        }
+    }
+
+    return titles.unique()
+}
+'''
+
 properties([
     // 构建参数：控制目标环境、测试套件、用例过滤和是否显示浏览器。
     parameters([
@@ -26,25 +124,9 @@ properties([
                 script: [
                     classpath: [],
                     sandbox: false,
-                    script: '''
+                    script: activeChoicesSupportScript + '''
                         try {
-                        def workspaceCandidates = []
-
-                        def envWorkspace = System.getenv('WORKSPACE')
-                        if (envWorkspace) {
-                            workspaceCandidates << envWorkspace
-                        }
-
-                        def jenkinsHome = System.getenv('JENKINS_HOME')
-                        def jobName = System.getenv('JOB_NAME')
-                        if (jenkinsHome && jobName) {
-                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
-                        }
-
-                        workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
-                        workspaceCandidates << 'D:/menusifu/pos2.0'
-
-                        for (workspacePath in workspaceCandidates.unique()) {
+                        for (workspacePath in workspaceCandidates()) {
                             def testsDir = new File(workspacePath, 'tests')
                             if (!testsDir.isDirectory()) {
                                 continue
@@ -101,32 +183,17 @@ properties([
                 script: [
                     classpath: [],
                     sandbox: false,
-                    script: '''
+                    script: activeChoicesSupportScript + '''
                         try {
-                        def workspaceCandidates = []
                         def selectedSuite = binding.hasVariable('TEST_SUITE')
                             ? binding.getVariable('TEST_SUITE')
                             : 'all'
 
-                        def envWorkspace = System.getenv('WORKSPACE')
-                        if (envWorkspace) {
-                            workspaceCandidates << envWorkspace
-                        }
-
-                        def jenkinsHome = System.getenv('JENKINS_HOME')
-                        def jobName = System.getenv('JOB_NAME')
-                        if (jenkinsHome && jobName) {
-                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
-                        }
-
-                        workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
-                        workspaceCandidates << 'D:/menusifu/pos2.0'
-
                         selectedSuite = selectedSuite ?: 'all'
-                        def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
+                        def suitePath = suitePathFor(selectedSuite)
                         def checkedPaths = []
 
-                        for (workspacePath in workspaceCandidates.unique()) {
+                        for (workspacePath in workspaceCandidates()) {
                             def suiteDir = new File(workspacePath, suitePath)
                             checkedPaths << suiteDir.path
 
@@ -135,15 +202,8 @@ properties([
                             }
 
                             def files = []
-                            suiteDir.eachFileRecurse { specFile ->
-                                if (!specFile.isFile() || !specFile.name.endsWith('.spec.ts')) {
-                                    return
-                                }
-
-                                def relativePath = new File(workspacePath).toPath()
-                                    .relativize(specFile.toPath())
-                                    .toString()
-                                    .replace(File.separator, '/')
+                            specFilesUnder(suiteDir).each { specFile ->
+                                def relativePath = relativeUnixPath(workspacePath, specFile)
                                 files << relativePath
                             }
 
@@ -180,9 +240,8 @@ properties([
                 script: [
                     classpath: [],
                     sandbox: false,
-                    script: '''
+                    script: activeChoicesSupportScript + '''
                         try {
-                        def workspaceCandidates = []
                         def selectedSuite = binding.hasVariable('TEST_SUITE')
                             ? binding.getVariable('TEST_SUITE')
                             : 'all'
@@ -190,31 +249,15 @@ properties([
                             ? binding.getVariable('TEST_FILE')
                             : ''
 
-                        def envWorkspace = System.getenv('WORKSPACE')
-                        if (envWorkspace) {
-                            workspaceCandidates << envWorkspace
-                        }
-
-                        def jenkinsHome = System.getenv('JENKINS_HOME')
-                        def jobName = System.getenv('JOB_NAME')
-                        if (jenkinsHome && jobName) {
-                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
-                        }
-
-                        workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
-                        workspaceCandidates << 'D:/menusifu/pos2.0'
-
                         selectedSuite = selectedSuite ?: 'all'
-                        def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
+                        def suitePath = suitePathFor(selectedSuite)
                         def checkedPaths = []
-                        def selectedFiles = selectedFilesValue instanceof Collection
-                            ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
-                            : selectedFilesValue.toString().split('\\s*,\\s*').collect { it.trim() }.findAll { it }
+                        def selectedFiles = selectedValues(selectedFilesValue)
                         if (selectedSuite != 'all') {
                             selectedFiles = selectedFiles.findAll { it.startsWith("tests/${selectedSuite}/") }
                         }
 
-                        for (workspacePath in workspaceCandidates.unique()) {
+                        for (workspacePath in workspaceCandidates()) {
                             def specDir = new File(workspacePath, suitePath)
                             checkedPaths << specDir.path
 
@@ -233,52 +276,10 @@ properties([
                                     }
                                 }
                             } else {
-                                specDir.eachFileRecurse { specFile ->
-                                    if (specFile.isFile() && specFile.name.endsWith('.spec.ts')) {
-                                        specFiles << specFile
-                                    }
-                                }
+                                specFiles = specFilesUnder(specDir)
                             }
 
-                            specFiles.each { specFile ->
-                                if (!specFile.isFile() || !specFile.name.endsWith('.ts')) {
-                                    return
-                                }
-
-                                def previousLine = ''
-                                specFile.eachLine('UTF-8') { line ->
-                                    def trimmedLine = line.trim()
-
-                                    if (trimmedLine.startsWith("test('") || trimmedLine.startsWith('test("')) {
-                                        def titleText = trimmedLine.substring('test('.length()).trim()
-                                        def quote = titleText.substring(0, 1)
-                                        def endIndex = titleText.indexOf(quote, 1)
-                                        if (endIndex > 1) {
-                                            cases << titleText.substring(1, endIndex)
-                                        }
-                                    }
-
-                                    if (previousLine == 'test(' && (trimmedLine.startsWith("'") || trimmedLine.startsWith('"'))) {
-                                        def quote = trimmedLine.substring(0, 1)
-                                        def endIndex = trimmedLine.indexOf(quote, 1)
-                                        if (endIndex > 1) {
-                                            cases << trimmedLine.substring(1, endIndex)
-                                        }
-                                    }
-
-                                    if (trimmedLine.startsWith("title: '") || trimmedLine.startsWith('title: "')) {
-                                        def startIndex = trimmedLine.indexOf(':') + 1
-                                        def titleText = trimmedLine.substring(startIndex).trim()
-                                        def quote = titleText.substring(0, 1)
-                                        def endIndex = titleText.indexOf(quote, 1)
-                                        if (endIndex > 1) {
-                                            cases << titleText.substring(1, endIndex)
-                                        }
-                                    }
-
-                                    previousLine = trimmedLine
-                                }
-                            }
+                            cases = readTestTitles(specFiles)
 
                             if (!cases.isEmpty()) {
                                 return cases.unique()
