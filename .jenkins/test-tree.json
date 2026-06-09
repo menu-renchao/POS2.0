@@ -1,0 +1,273 @@
+{
+  "suites": [
+    "all",
+    "e2e",
+    "py-migrate",
+    "smoke"
+  ],
+  "files": {
+    "all": [
+      "tests/e2e/home-page-refresh.spec.ts",
+      "tests/e2e/inventory-stock-setting.spec.ts",
+      "tests/e2e/order-dishes-charge-live.spec.ts",
+      "tests/e2e/order-dishes-charge.spec.ts",
+      "tests/e2e/order-dishes-combo-quantity.spec.ts",
+      "tests/e2e/order-dishes-edit-quantity.spec.ts",
+      "tests/e2e/order-dishes-load.spec.ts",
+      "tests/e2e/order-dishes-modifier.spec.ts",
+      "tests/e2e/order-dishes-ordered-items.spec.ts",
+      "tests/e2e/order-dishes-price-summary.spec.ts",
+      "tests/e2e/order-dishes-quantity.spec.ts",
+      "tests/e2e/order-dishes-weight-exception.spec.ts",
+      "tests/e2e/order-tips.spec.ts",
+      "tests/e2e/payment-live.spec.ts",
+      "tests/e2e/payment-page.spec.ts",
+      "tests/e2e/recall-order-details.spec.ts",
+      "tests/e2e/recall-order-edit.spec.ts",
+      "tests/e2e/recall-order-void.spec.ts",
+      "tests/e2e/recall-page-selectors.spec.ts",
+      "tests/e2e/recall-payment.spec.ts",
+      "tests/e2e/recall-recent-order.spec.ts",
+      "tests/e2e/report-noise-guard.spec.ts",
+      "tests/e2e/select-table-page.spec.ts",
+      "tests/e2e/split-order.spec.ts",
+      "tests/e2e/wait-utils.spec.ts",
+      "tests/py-migrate/inventory.spec.ts",
+      "tests/py-migrate/order.service.spec.ts",
+      "tests/seed.spec.ts",
+      "tests/smoke/dine-in-order-dishes.smoke.spec.ts",
+      "tests/smoke/dine-in-recall-consistency.smoke.spec.ts",
+      "tests/smoke/home.smoke.spec.ts",
+      "tests/smoke/license-and-login.smoke.spec.ts",
+      "tests/smoke/license-selection.smoke.spec.ts",
+      "tests/smoke/order-dishes.smoke.spec.ts",
+      "tests/smoke/recall-order-details.smoke.spec.ts",
+      "tests/smoke/recall-search.smoke.spec.ts",
+      "tests/smoke/step-decorator.smoke.spec.ts",
+      "tests/smoke/takeout-entry.smoke.spec.ts"
+    ],
+    "e2e": [
+      "tests/e2e/home-page-refresh.spec.ts",
+      "tests/e2e/inventory-stock-setting.spec.ts",
+      "tests/e2e/order-dishes-charge-live.spec.ts",
+      "tests/e2e/order-dishes-charge.spec.ts",
+      "tests/e2e/order-dishes-combo-quantity.spec.ts",
+      "tests/e2e/order-dishes-edit-quantity.spec.ts",
+      "tests/e2e/order-dishes-load.spec.ts",
+      "tests/e2e/order-dishes-modifier.spec.ts",
+      "tests/e2e/order-dishes-ordered-items.spec.ts",
+      "tests/e2e/order-dishes-price-summary.spec.ts",
+      "tests/e2e/order-dishes-quantity.spec.ts",
+      "tests/e2e/order-dishes-weight-exception.spec.ts",
+      "tests/e2e/order-tips.spec.ts",
+      "tests/e2e/payment-live.spec.ts",
+      "tests/e2e/payment-page.spec.ts",
+      "tests/e2e/recall-order-details.spec.ts",
+      "tests/e2e/recall-order-edit.spec.ts",
+      "tests/e2e/recall-order-void.spec.ts",
+      "tests/e2e/recall-page-selectors.spec.ts",
+      "tests/e2e/recall-payment.spec.ts",
+      "tests/e2e/recall-recent-order.spec.ts",
+      "tests/e2e/report-noise-guard.spec.ts",
+      "tests/e2e/select-table-page.spec.ts",
+      "tests/e2e/split-order.spec.ts",
+      "tests/e2e/wait-utils.spec.ts"
+    ],
+    "py-migrate": [
+      "tests/py-migrate/inventory.spec.ts",
+      "tests/py-migrate/order.service.spec.ts"
+    ],
+    "smoke": [
+      "tests/smoke/dine-in-order-dishes.smoke.spec.ts",
+      "tests/smoke/dine-in-recall-consistency.smoke.spec.ts",
+      "tests/smoke/home.smoke.spec.ts",
+      "tests/smoke/license-and-login.smoke.spec.ts",
+      "tests/smoke/license-selection.smoke.spec.ts",
+      "tests/smoke/order-dishes.smoke.spec.ts",
+      "tests/smoke/recall-order-details.smoke.spec.ts",
+      "tests/smoke/recall-search.smoke.spec.ts",
+      "tests/smoke/step-decorator.smoke.spec.ts",
+      "tests/smoke/takeout-entry.smoke.spec.ts"
+    ]
+  },
+  "cases": {
+    "tests/e2e/home-page-refresh.spec.ts": [
+      "主页核心可用信号应基于固定头部按钮而非可配置菜单项",
+      "应能通过按钮名称识别没有 data-testid 的 Pick Up 入口",
+      "应能点击主页刷新按钮并等待刷新完成",
+      "刷新后应等待 To Go 入口恢复跳转能力再进入点单页"
+    ],
+    "tests/e2e/inventory-stock-setting.spec.ts": [
+      "库存页定位商品时不应依赖 inventoryCategoryPanelId 这类写死 id",
+      "库存分类和商品延迟渲染时仍应等待后定位目标商品",
+      "同名商品存在隐藏副本时仍应定位并打开可见商品的库存设置",
+      "设置有限库存后提交前应等待输入稳定 200ms"
+    ],
+    "tests/e2e/order-dishes-charge-live.spec.ts": [
+      "应能在真实环境中执行整单自定义固定金额加收"
+    ],
+    "tests/e2e/order-dishes-charge.spec.ts": [
+      "应能快捷执行整单预置加收并在重新打开后读取结果",
+      "应能按菜品多选执行百分比自定义加收并返回详细菜品",
+      "应能清除已选加收和全部加收"
+    ],
+    "tests/e2e/order-dishes-combo-quantity.spec.ts": [
+      "应能在同一套餐分组下按数量重复选择子菜",
+      "应能在新版分组按钮套餐面板下选择带数量的子菜"
+    ],
+    "tests/e2e/order-dishes-edit-quantity.spec.ts": [
+      "应能选中已下单菜品并点击加 1"
+    ],
+    "tests/e2e/order-dishes-load.spec.ts": [
+      "应能通过 Back 的 data-testid 识别点餐页已加载"
+    ],
+    "tests/e2e/order-dishes-modifier.spec.ts": [
+      "应能先聚焦已点菜品再打开 Modify 并连续选择多条系统预置调味",
+      "应能通过顶部独立输入区添加自定义调味并返回关闭",
+      "应能选择分类 option 且不强制选择二级 option",
+      "应能选择分类 option 后再选择二级 option"
+    ],
+    "tests/e2e/order-dishes-ordered-items.spec.ts": [
+      "应能读取多节点渲染且不含调味的购物车菜品行",
+      "应能读取已点菜品下的调味名称和价格并兼容 Less 前缀",
+      "应能读取已点菜品下的二级调味名称"
+    ],
+    "tests/e2e/order-dishes-price-summary.spec.ts": [
+      "应在读取点单页价格汇总前自动展开折叠态汇总",
+      "应兼容后台仅展示 Total 的价格汇总配置"
+    ],
+    "tests/e2e/order-dishes-quantity.spec.ts": [
+      "当 quantity 不等于 1 时应先点菜再通过 Count 修改已点菜数量",
+      "添加菜品前必须先按 group 和 category 切换菜单"
+    ],
+    "tests/e2e/order-dishes-weight-exception.spec.ts": [
+      "当称重弹窗持续处于 Loading 时应抛出磅秤模式异常"
+    ],
+    "tests/e2e/order-tips.spec.ts": [
+      "应能在点单页通过 More 打开 Tips 并在大额小费确认后更新价格汇总",
+      "应能在 Recall 订单详情和 PAYMENT 卡片分别添加 Tips"
+    ],
+    "tests/e2e/payment-live.spec.ts": [
+      "应能从 To Go 进入点单页后完成现金支付",
+      "应能从 To Go 进入点单页后完成信用卡支付"
+    ],
+    "tests/e2e/payment-page.spec.ts": [
+      "应能完成现金支付并读取左侧支付详情",
+      "应能完成信用卡支付并自动填写测试卡",
+      "应能在支付面板关闭后结束打印小票分支而不强等弹窗隐藏"
+    ],
+    "tests/e2e/recall-order-details.spec.ts": [
+      "应能读取指定订单的详情并在完成后主动关闭详情弹窗",
+      "应能在客户会员支付菜品为空时返回空结果并关闭详情弹窗",
+      "应能在订单详情选择器换 hash 或改用 data-test-id 后继续读出菜名与价格汇总",
+      "应能读取 Recall 菜品下的调味名称和价格",
+      "应能读取仅稳定展示 Total 的部分支付订单详情",
+      "应能读取仅展示 Total 的 Delivery 未支付订单详情客户信息",
+      "应能从未支付订单详情触发右侧操作入口",
+      "应能从订单详情 More 菜单触发二级操作入口",
+      "应能读取 Recall 菜品下的二级调味"
+    ],
+    "tests/e2e/recall-order-edit.spec.ts": [
+      "应能从 Recall 订单详情点击编辑并进入点单页",
+      "按订单号进入编辑时应优先点击订单卡触发器而不是内部文本节点"
+    ],
+    "tests/e2e/recall-order-void.spec.ts": [
+      "应能从订单详情页的 More 进入 Void All 并完成作废",
+      "应能识别带图标文本名称的 More 按钮并进入 Void All",
+      "应能在恢复库存默认未勾选时主动勾选后再提交 Void",
+      "应能在恢复库存原生 checkbox 脱离视口时仍切换为不勾选后提交 Void",
+      "应能在退出 Recall 后等待页面真正离开 Recall",
+      "应能通过左上角 Back 按钮退出 Recall",
+      "应能在订单详情仍遮挡退出按钮时先关闭详情再退出 Recall"
+    ],
+    "tests/e2e/recall-page-selectors.spec.ts": [
+      "应能通过筛选与搜索相关的 data-testid 完成 Recall 页面操作",
+      "手动搜索提交前应等待输入稳定 200ms"
+    ],
+    "tests/e2e/recall-payment.spec.ts": [
+      "应能从 Recall 订单详情点击 Pay 后进入支付页面并完成现金支付"
+    ],
+    "tests/e2e/recall-recent-order.spec.ts": [
+      "应按最新订单号而不是第一张卡片打开最近一笔订单详情"
+    ],
+    "tests/e2e/report-noise-guard.spec.ts": [
+      "业务代码中不应重新引入会制造假红灯的重试断言写法",
+      "页面对象不应回潮为超长 locator 猜测链或膨胀的单体 facade"
+    ],
+    "tests/e2e/select-table-page.spec.ts": [
+      "应能在返回控件变为 ChevronLeftIcon 时仍识别选桌页已加载"
+    ],
+    "tests/e2e/split-order.spec.ts": [
+      "应能完成分单页面读取、按菜品平分、移动菜品、合并与取消分单",
+      "应能按子单序号对指定菜品执行平分并在子单间移动菜品",
+      "应能通过 flow 完成平分订单、金额分单与按座位分单",
+      "应能在提交后根据当前地址返回对应页面对象"
+    ],
+    "tests/e2e/wait-utils.spec.ts": [
+      "应能在条件满足前持续重试并返回最终值",
+      "应能在超时时抛出包含最后值的错误"
+    ],
+    "tests/py-migrate/inventory.spec.ts": [
+      "[POS-43898 POS-43890 POS-43889] 未送厨点菜、加菜、减菜应正确更新库存",
+      "[POS-43898 POS-43890 POS-43889] 送厨后退菜应支持恢复或不恢复库存",
+      "[POS-43891] 库存点餐数量为小数时应正确扣减并在恢复库存后回退",
+      "[POS-43892] 超出库存点单保存时应提示库存不足"
+    ],
+    "tests/py-migrate/order.service.spec.ts": [
+      "[POS-30543] 应能堂食保存后在 Recall 编辑菜品数量并校验税额实时更新",
+      "[POS-15602] 应能 To Go 点普通菜后在 Recall 校验菜品名称和价格",
+      "[POS-15641] 应能 To Go 点另一个分类菜品后在 Recall 校验菜品名称和价格",
+      "[POS-32905] 应能点单时累计整数菜品数量并在 Recall 保持数量",
+      "[POS-30575] 应能创建 Delivery 订单并在 Recall 详情展示客户信息",
+      "[POS-31409] 应能创建带姓名的 Pick Up 订单并在 Recall 详情展示客户姓名",
+      "[POS-16303] 应能在点单页将订单平分为两份并校验子单金额",
+      "应能在 Recall 为最新 To Go 订单完成现金支付后看到 Success 状态",
+      "应能在 Recall 为最新 To Go 订单完成信用卡支付后看到 Success 状态",
+      "[POS-33110] 应能在点单页添加超过餐费 50% 的小费并完成确认",
+      "[POS-33122] 应能在信用卡支付后追加超过餐费 50% 的小费并完成确认",
+      "[POS-24394] 应能在分类菜品上选择有价格 option 并正确计算总额",
+      "[POS-15643 POS-15758 POS-15759] 应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显",
+      "[POS-16325] 应能在子单 1 上对指定菜品执行 Even Item 平分并校验比例",
+      "[POS-16314] 应能在平分三份后将子单 1 的菜品移动到子单 3",
+      "[POS-16316] 应能按自定义金额拆成两个子单且金额与输入一致",
+      "[POS-16318] 应能在平分两个子单后撤销分单并恢复订单总额"
+    ],
+    "tests/seed.spec.ts": [
+      "应能进入 POS 首页并建立员工上下文"
+    ],
+    "tests/smoke/dine-in-order-dishes.smoke.spec.ts": [
+      "应能通过 New order 跳过选桌直接进入点餐页面"
+    ],
+    "tests/smoke/dine-in-recall-consistency.smoke.spec.ts": [
+      "应能在任意空桌以 3 人堂食点单保存后通过 Recall 校验订单信息一致",
+      "应能在堂食点单后将订单平分三份并移动 x-1 的 test 到 x-3 后保存分单并在 Recall 查看订单"
+    ],
+    "tests/smoke/home.smoke.spec.ts": [
+      "应能成功打开首页壳"
+    ],
+    "tests/smoke/license-and-login.smoke.spec.ts": [
+      "应能通过 License 选择和员工口令登录进入 POS 主页"
+    ],
+    "tests/smoke/license-selection.smoke.spec.ts": [
+      "default selection should pick a PC license that is not in use",
+      "submitting an available Android license should show the known mismatch error"
+    ],
+    "tests/smoke/order-dishes.smoke.spec.ts": [
+      "应能进入点餐页面并添加普通菜与带数量的套餐子菜到购物车"
+    ],
+    "tests/smoke/recall-order-details.smoke.spec.ts": [
+      "应能读取 #1 订单详情并在完成后恢复 Recall 页面状态"
+    ],
+    "tests/smoke/recall-search.smoke.spec.ts": [
+      "应能按订单号搜索 Recall 订单并清空当前搜索条件"
+    ],
+    "tests/smoke/step-decorator.smoke.spec.ts": [
+      "步骤装饰器不应改变原始返回值"
+    ],
+    "tests/smoke/takeout-entry.smoke.spec.ts": [
+      "应能从主页点击 To Go 直接进入点单页",
+      "应能从主页填写 Pick Up 信息后进入点单页",
+      "应能从主页填写 Delivery 信息后进入点单页"
+    ]
+  }
+}

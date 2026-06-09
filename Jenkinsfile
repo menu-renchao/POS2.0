@@ -7,15 +7,99 @@ properties([
             defaultValue: 'http://192.168.0.72:22080',
             description: '(required) Target server URL, e.g. http://IP:PORT'
         ),
-        // 动态测试套件：扫描 tests 下包含 *.spec.ts 的一级目录，并额外提供 all 选项。
+        // Git 分支：参数页打开时在现有 workspace 执行 git fetch，并从 origin 远端分支生成选项。
         [
             $class: 'ChoiceParameter',
+            choiceType: 'PT_SINGLE_SELECT',
+            description: '(required) Git branch to checkout. Loaded dynamically from git fetch origin results.',
+            filterLength: 1,
+            filterable: true,
+            name: 'GIT_BRANCH',
+            randomName: 'choice-parameter-git-branch',
+            script: [
+                $class: 'GroovyScript',
+                fallbackScript: [
+                    classpath: [],
+                    sandbox: true,
+                    script: 'return ["main:selected"]'
+                ],
+                script: [
+                    classpath: [],
+                    sandbox: false,
+                    script: '''
+                        try {
+                            def workspaceCandidates = []
+
+                            def envWorkspace = System.getenv('WORKSPACE')
+                            if (envWorkspace) {
+                                workspaceCandidates << envWorkspace
+                            }
+
+                            def jenkinsHome = System.getenv('JENKINS_HOME')
+                            def jobName = System.getenv('JOB_NAME')
+                            if (jenkinsHome && jobName) {
+                                workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
+                            }
+
+                            workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def workspaceDir = new File(workspacePath)
+                                def gitDir = new File(workspaceDir, '.git')
+                                if (!workspaceDir.isDirectory() || !gitDir.exists()) {
+                                    continue
+                                }
+
+                                def fetchCommand = ['cmd', '/c', 'git fetch --prune origin +refs/heads/*:refs/remotes/origin/*']
+                                def fetchProcess = fetchCommand.execute(null, workspaceDir)
+                                fetchProcess.waitFor()
+
+                                def listCommand = ['cmd', '/c', 'git for-each-ref --format=%(refname:short) refs/remotes/origin']
+                                def listProcess = listCommand.execute(null, workspaceDir)
+                                def output = new StringBuffer()
+                                def errorOutput = new StringBuffer()
+                                listProcess.consumeProcessOutput(output, errorOutput)
+                                listProcess.waitFor()
+
+                                if (listProcess.exitValue() != 0) {
+                                    continue
+                                }
+
+                                def branches = output.toString()
+                                    .readLines()
+                                    .collect { it.trim() }
+                                    .findAll { it && it != 'origin/HEAD' }
+                                    .collect { it.startsWith('origin/') ? it.substring('origin/'.length()) : it }
+                                    .findAll { it }
+                                    .unique()
+                                    .sort()
+
+                                if (branches) {
+                                    if (!branches.contains('main')) {
+                                        branches = ['main'] + branches
+                                    }
+                                    return branches.collect { it == 'main' ? "${it}:selected" : it }
+                                }
+                            }
+
+                            return ['main:selected']
+                        } catch (Throwable error) {
+                            return ['main:selected']
+                        }
+                    '''
+                ]
+            ]
+        ],
+        // 动态测试套件：优先读取 Playwright 生成的用例树；缺失时扫描 tests 目录兜底。
+        [
+            $class: 'CascadeChoiceParameter',
             choiceType: 'PT_SINGLE_SELECT',
             description: '(required) Test suite to run. Loaded dynamically from tests/* directories that contain spec files.',
             filterLength: 1,
             filterable: false,
             name: 'TEST_SUITE',
             randomName: 'choice-parameter-test-suite',
+            referencedParameters: 'GIT_BRANCH',
             script: [
                 $class: 'GroovyScript',
                 fallbackScript: [
@@ -28,51 +112,118 @@ properties([
                     sandbox: false,
                     script: '''
                         try {
-                        def workspaceCandidates = []
-
-                        def envWorkspace = System.getenv('WORKSPACE')
-                        if (envWorkspace) {
-                            workspaceCandidates << envWorkspace
-                        }
-
-                        def jenkinsHome = System.getenv('JENKINS_HOME')
-                        def jobName = System.getenv('JOB_NAME')
-                        if (jenkinsHome && jobName) {
-                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
-                        }
-
-                        workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
-
-                        for (workspacePath in workspaceCandidates.unique()) {
-                            def testsDir = new File(workspacePath, 'tests')
-                            if (!testsDir.isDirectory()) {
-                                continue
+                            def workspaceCandidates = []
+                            def selectedBranch = binding.hasVariable('GIT_BRANCH')
+                                ? binding.getVariable('GIT_BRANCH')
+                                : 'main'
+                            selectedBranch = selectedBranch?.toString()?.replace(':selected', '')?.trim() ?: 'main'
+                            if (!selectedBranch.matches('[A-Za-z0-9._/-]+')
+                                || selectedBranch.startsWith('/')
+                                || selectedBranch.endsWith('/')
+                                || selectedBranch.contains('..')
+                                || selectedBranch.contains('//')
+                                || selectedBranch.contains('@{')
+                                || selectedBranch.endsWith('.lock')) {
+                                return ['all']
                             }
 
-                            def suites = []
-                            testsDir.eachFile { suiteDir ->
-                                if (!suiteDir.isDirectory()) {
-                                    return
+                            def envWorkspace = System.getenv('WORKSPACE')
+                            if (envWorkspace) {
+                                workspaceCandidates << envWorkspace
+                            }
+
+                            def jenkinsHome = System.getenv('JENKINS_HOME')
+                            def jobName = System.getenv('JOB_NAME')
+                            if (jenkinsHome && jobName) {
+                                workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
+                            }
+
+                            workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+
+                            def runGit = { File workspaceDir, String command ->
+                                def process = ['cmd', '/c', command].execute(null, workspaceDir)
+                                def output = new StringBuffer()
+                                def errorOutput = new StringBuffer()
+                                process.consumeProcessOutput(output, errorOutput)
+                                process.waitFor()
+                                return process.exitValue() == 0 ? output.toString() : ''
+                            }
+
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def workspaceDir = new File(workspacePath)
+                                if (!new File(workspaceDir, '.git').exists()) {
+                                    continue
                                 }
 
-                                def hasSpec = false
-                                suiteDir.eachFileRecurse { testFile ->
-                                    if (testFile.isFile() && testFile.name.endsWith('.spec.ts')) {
-                                        hasSpec = true
+                                runGit(workspaceDir, 'git fetch --prune origin +refs/heads/*:refs/remotes/origin/*')
+
+                                def suitesFromTree = []
+                                def remoteTreeText = runGit(workspaceDir, 'git show "origin/' + selectedBranch + ':.jenkins/test-tree.json"')
+                                if (remoteTreeText) {
+                                    def tree = new groovy.json.JsonSlurperClassic().parseText(remoteTreeText)
+                                    if (tree.suites) {
+                                        suitesFromTree = tree.suites.collect { it.toString() }.findAll { it != 'all' }
                                     }
                                 }
 
-                                if (hasSpec) {
-                                    suites << suiteDir.name
+                                def remoteFilesText = runGit(workspaceDir, 'git ls-tree -r --name-only "origin/' + selectedBranch + '" tests')
+                                def remoteSuites = remoteFilesText
+                                    .readLines()
+                                    .collect { it.trim().replace('\\\\', '/') }
+                                    .findAll { it.startsWith('tests/') && it.endsWith('.spec.ts') }
+                                    .collect { filePath ->
+                                        def parts = filePath.split('/')
+                                        return parts.length >= 3 ? parts[1] : null
+                                    }
+                                    .findAll { it }
+                                    .unique()
+                                    .sort()
+                                def mergedSuites = (suitesFromTree + remoteSuites).unique().sort()
+                                if (mergedSuites) {
+                                    return (['all'] + mergedSuites).unique()
                                 }
                             }
 
-                            if (!suites.isEmpty()) {
-                                return (['all'] + suites.sort()).unique()
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def treeFile = new File(workspacePath, '.jenkins/test-tree.json')
+                                if (treeFile.isFile()) {
+                                    def tree = new groovy.json.JsonSlurperClassic().parseText(treeFile.getText('UTF-8'))
+                                    if (tree.suites) {
+                                        return tree.suites.collect { it.toString() }
+                                    }
+                                }
                             }
-                        }
 
-                        return ['all']
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def testsDir = new File(workspacePath, 'tests')
+                                if (!testsDir.isDirectory()) {
+                                    continue
+                                }
+
+                                def suites = []
+                                testsDir.eachFile { suiteDir ->
+                                    if (!suiteDir.isDirectory()) {
+                                        return
+                                    }
+
+                                    def hasSpec = false
+                                    suiteDir.eachFileRecurse { testFile ->
+                                        if (testFile.isFile() && testFile.name.endsWith('.spec.ts')) {
+                                            hasSpec = true
+                                        }
+                                    }
+
+                                    if (hasSpec) {
+                                        suites << suiteDir.name
+                                    }
+                                }
+
+                                if (!suites.isEmpty()) {
+                                    return (['all'] + suites.sort()).unique()
+                                }
+                            }
+
+                            return ['all']
                         } catch (Throwable error) {
                             return ['all']
                         }
@@ -80,7 +231,7 @@ properties([
                 ]
             ]
         ],
-        // 动态文件列表：根据 TEST_SUITE 读取对应目录里的 spec 文件，支持多选后缩小测试范围。
+        // 动态文件列表：根据 TEST_SUITE 从用例树读取 spec 文件，支持多选后缩小测试范围。
         [
             $class: 'CascadeChoiceParameter',
             choiceType: 'PT_CHECKBOX',
@@ -89,7 +240,7 @@ properties([
             filterable: true,
             name: 'TEST_FILE',
             randomName: 'choice-parameter-test-file',
-            referencedParameters: 'TEST_SUITE',
+            referencedParameters: 'GIT_BRANCH,TEST_SUITE',
             script: [
                 $class: 'GroovyScript',
                 fallbackScript: [
@@ -97,7 +248,7 @@ properties([
                     sandbox: true,
                     script: '''
                         def activeChoicesError = binding.hasVariable('error') ? binding.getVariable('error') : null
-                        return ["TEST_CASE_GREP fallback: ${activeChoicesError?.getClass()?.getSimpleName() ?: 'Unknown'}: ${activeChoicesError?.getMessage() ?: 'no error message'}"]
+                        return ["TEST_FILE fallback: ${activeChoicesError?.getClass()?.getSimpleName() ?: 'Unknown'}: ${activeChoicesError?.getMessage() ?: 'no error message'}"]
                     '''
                 ],
                 script: [
@@ -105,55 +256,121 @@ properties([
                     sandbox: false,
                     script: '''
                         try {
-                        def workspaceCandidates = []
-                        def selectedSuite = binding.hasVariable('TEST_SUITE')
-                            ? binding.getVariable('TEST_SUITE')
-                            : 'all'
-
-                        def envWorkspace = System.getenv('WORKSPACE')
-                        if (envWorkspace) {
-                            workspaceCandidates << envWorkspace
-                        }
-
-                        def jenkinsHome = System.getenv('JENKINS_HOME')
-                        def jobName = System.getenv('JOB_NAME')
-                        if (jenkinsHome && jobName) {
-                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
-                        }
-
-                        workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
-
-                        selectedSuite = selectedSuite ?: 'all'
-                        def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
-                        def checkedPaths = []
-
-                        for (workspacePath in workspaceCandidates.unique()) {
-                            def suiteDir = new File(workspacePath, suitePath)
-                            checkedPaths << suiteDir.path
-
-                            if (!suiteDir.isDirectory()) {
-                                continue
+                            def workspaceCandidates = []
+                            def selectedSuite = binding.hasVariable('TEST_SUITE')
+                                ? binding.getVariable('TEST_SUITE')
+                                : 'all'
+                            def selectedBranch = binding.hasVariable('GIT_BRANCH')
+                                ? binding.getVariable('GIT_BRANCH')
+                                : 'main'
+                            selectedBranch = selectedBranch?.toString()?.replace(':selected', '')?.trim() ?: 'main'
+                            if (!selectedBranch.matches('[A-Za-z0-9._/-]+')
+                                || selectedBranch.startsWith('/')
+                                || selectedBranch.endsWith('/')
+                                || selectedBranch.contains('..')
+                                || selectedBranch.contains('//')
+                                || selectedBranch.contains('@{')
+                                || selectedBranch.endsWith('.lock')) {
+                                return []
                             }
 
-                            def files = []
-                            suiteDir.eachFileRecurse { specFile ->
-                                if (!specFile.isFile() || !specFile.name.endsWith('.spec.ts')) {
-                                    return
+                            def envWorkspace = System.getenv('WORKSPACE')
+                            if (envWorkspace) {
+                                workspaceCandidates << envWorkspace
+                            }
+
+                            def jenkinsHome = System.getenv('JENKINS_HOME')
+                            def jobName = System.getenv('JOB_NAME')
+                            if (jenkinsHome && jobName) {
+                                workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
+                            }
+
+                            workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+
+                            selectedSuite = selectedSuite ?: 'all'
+                            def checkedPaths = []
+
+                            def runGit = { File workspaceDir, String command ->
+                                def process = ['cmd', '/c', command].execute(null, workspaceDir)
+                                def output = new StringBuffer()
+                                def errorOutput = new StringBuffer()
+                                process.consumeProcessOutput(output, errorOutput)
+                                process.waitFor()
+                                return process.exitValue() == 0 ? output.toString() : ''
+                            }
+
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def workspaceDir = new File(workspacePath)
+                                if (!new File(workspaceDir, '.git').exists()) {
+                                    continue
                                 }
 
-                                def relativePath = new File(workspacePath).toPath()
-                                    .relativize(specFile.toPath())
-                                    .toString()
-                                    .replace(File.separator, '/')
-                                files << relativePath
+                                runGit(workspaceDir, 'git fetch --prune origin +refs/heads/*:refs/remotes/origin/*')
+
+                                def filesFromTree = []
+                                def remoteTreeText = runGit(workspaceDir, 'git show "origin/' + selectedBranch + ':.jenkins/test-tree.json"')
+                                if (remoteTreeText) {
+                                    def tree = new groovy.json.JsonSlurperClassic().parseText(remoteTreeText)
+                                    def files = tree.files instanceof Map ? tree.files[selectedSuite] : []
+                                    if (files) {
+                                        filesFromTree = files.collect { it.toString() }
+                                    }
+                                }
+
+                                def remoteFilesText = runGit(workspaceDir, 'git ls-tree -r --name-only "origin/' + selectedBranch + '" tests')
+                                def remoteFiles = remoteFilesText
+                                    .readLines()
+                                    .collect { it.trim().replace('\\\\', '/') }
+                                    .findAll { it.startsWith('tests/') && it.endsWith('.spec.ts') }
+                                    .findAll { selectedSuite == 'all' || it.startsWith("tests/${selectedSuite}/") }
+                                    .unique()
+                                    .sort()
+                                def mergedFiles = (filesFromTree + remoteFiles).unique().sort()
+                                if (mergedFiles) {
+                                    return mergedFiles
+                                }
                             }
 
-                            if (!files.isEmpty()) {
-                                return files.sort().unique()
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def treeFile = new File(workspacePath, '.jenkins/test-tree.json')
+                                checkedPaths << treeFile.path
+                                if (treeFile.isFile()) {
+                                    def tree = new groovy.json.JsonSlurperClassic().parseText(treeFile.getText('UTF-8'))
+                                    def files = tree.files instanceof Map ? tree.files[selectedSuite] : []
+                                    if (files) {
+                                        return files.collect { it.toString() }.sort().unique()
+                                    }
+                                }
                             }
-                        }
 
-                        return ["未找到用例文件: ${checkedPaths.join(' ; ')}"]
+                            def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def suiteDir = new File(workspacePath, suitePath)
+                                checkedPaths << suiteDir.path
+
+                                if (!suiteDir.isDirectory()) {
+                                    continue
+                                }
+
+                                def files = []
+                                suiteDir.eachFileRecurse { specFile ->
+                                    if (!specFile.isFile() || !specFile.name.endsWith('.spec.ts')) {
+                                        return
+                                    }
+
+                                    def relativePath = new File(workspacePath).toPath()
+                                        .relativize(specFile.toPath())
+                                        .toString()
+                                        .replace(File.separator, '/')
+                                    files << relativePath
+                                }
+
+                                if (!files.isEmpty()) {
+                                    return files.sort().unique()
+                                }
+                            }
+
+                            return ["未找到用例文件: ${checkedPaths.join(' ; ')}"]
                         } catch (Throwable error) {
                             return ["文件加载失败: ${error.getClass().getSimpleName()}: ${error.getMessage()}"]
                         }
@@ -161,7 +378,7 @@ properties([
                 ]
             ]
         ],
-        // 动态用例列表：根据 TEST_SUITE 和 TEST_FILE 读取 test 标题，支持多选后传给 Playwright --grep。
+        // 动态用例列表：根据 TEST_SUITE 和 TEST_FILE 从用例树读取标题，支持多选后传给 Playwright --grep。
         [
             $class: 'CascadeChoiceParameter',
             choiceType: 'PT_CHECKBOX',
@@ -170,7 +387,7 @@ properties([
             filterable: true,
             name: 'TEST_CASE_GREP',
             randomName: 'choice-parameter-test-case-grep',
-            referencedParameters: 'TEST_SUITE,TEST_FILE',
+            referencedParameters: 'GIT_BRANCH,TEST_SUITE,TEST_FILE',
             script: [
                 $class: 'GroovyScript',
                 fallbackScript: [
@@ -183,70 +400,61 @@ properties([
                     sandbox: false,
                     script: '''
                         try {
-                        def workspaceCandidates = []
-                        def selectedSuite = binding.hasVariable('TEST_SUITE')
-                            ? binding.getVariable('TEST_SUITE')
-                            : 'all'
-                        def selectedFilesValue = binding.hasVariable('TEST_FILE')
-                            ? binding.getVariable('TEST_FILE')
-                            : ''
-
-                        def envWorkspace = System.getenv('WORKSPACE')
-                        if (envWorkspace) {
-                            workspaceCandidates << envWorkspace
-                        }
-
-                        def jenkinsHome = System.getenv('JENKINS_HOME')
-                        def jobName = System.getenv('JOB_NAME')
-                        if (jenkinsHome && jobName) {
-                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
-                        }
-
-                        workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
-
-                        selectedSuite = selectedSuite ?: 'all'
-                        def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
-                        def checkedPaths = []
-                        def selectedFiles = selectedFilesValue instanceof Collection
-                            ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
-                            : selectedFilesValue.toString().split(',').collect { it.trim() }.findAll { it }
-                        if (selectedSuite != 'all') {
-                            selectedFiles = selectedFiles.findAll { it.startsWith("tests/${selectedSuite}/") }
-                        }
-
-                        for (workspacePath in workspaceCandidates.unique()) {
-                            def specDir = new File(workspacePath, suitePath)
-                            checkedPaths << specDir.path
-
-                            if (!specDir.isDirectory()) {
-                                continue
+                            def workspaceCandidates = []
+                            def selectedSuite = binding.hasVariable('TEST_SUITE')
+                                ? binding.getVariable('TEST_SUITE')
+                                : 'all'
+                            def selectedBranch = binding.hasVariable('GIT_BRANCH')
+                                ? binding.getVariable('GIT_BRANCH')
+                                : 'main'
+                            def selectedFilesValue = binding.hasVariable('TEST_FILE')
+                                ? binding.getVariable('TEST_FILE')
+                                : ''
+                            selectedBranch = selectedBranch?.toString()?.replace(':selected', '')?.trim() ?: 'main'
+                            if (!selectedBranch.matches('[A-Za-z0-9._/-]+')
+                                || selectedBranch.startsWith('/')
+                                || selectedBranch.endsWith('/')
+                                || selectedBranch.contains('..')
+                                || selectedBranch.contains('//')
+                                || selectedBranch.contains('@{')
+                                || selectedBranch.endsWith('.lock')) {
+                                return []
                             }
 
-                            def cases = []
-                            def specFiles = []
-                            if (selectedFiles) {
-                                selectedFiles.each { selectedFile ->
-                                    def specFile = new File(workspacePath, selectedFile)
-                                    checkedPaths << specFile.path
-                                    if (specFile.isFile() && specFile.name.endsWith('.spec.ts')) {
-                                        specFiles << specFile
-                                    }
-                                }
-                            } else {
-                                specDir.eachFileRecurse { specFile ->
-                                    if (specFile.isFile() && specFile.name.endsWith('.spec.ts')) {
-                                        specFiles << specFile
-                                    }
-                                }
+                            def envWorkspace = System.getenv('WORKSPACE')
+                            if (envWorkspace) {
+                                workspaceCandidates << envWorkspace
                             }
 
-                            specFiles.each { specFile ->
-                                if (!specFile.isFile() || !specFile.name.endsWith('.ts')) {
-                                    return
-                                }
+                            def jenkinsHome = System.getenv('JENKINS_HOME')
+                            def jobName = System.getenv('JOB_NAME')
+                            if (jenkinsHome && jobName) {
+                                workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
+                            }
 
+                            workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+
+                            selectedSuite = selectedSuite ?: 'all'
+                            def checkedPaths = []
+                            def selectedFiles = selectedFilesValue instanceof Collection
+                                ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
+                                : selectedFilesValue.toString().split(',').collect { it.trim() }.findAll { it }
+                            if (selectedSuite != 'all') {
+                                selectedFiles = selectedFiles.findAll { it.startsWith("tests/${selectedSuite}/") }
+                            }
+
+                            def runGit = { File workspaceDir, String command ->
+                                def process = ['cmd', '/c', command].execute(null, workspaceDir)
+                                def output = new StringBuffer()
+                                def errorOutput = new StringBuffer()
+                                process.consumeProcessOutput(output, errorOutput)
+                                process.waitFor()
+                                return process.exitValue() == 0 ? output.toString() : ''
+                            }
+                            def parseCasesFromText = { String specText ->
+                                def cases = []
                                 def previousLine = ''
-                                specFile.readLines('UTF-8').each { line ->
+                                specText.readLines().each { line ->
                                     def trimmedLine = line.trim()
 
                                     if (trimmedLine.startsWith("test('") || trimmedLine.startsWith('test("')) {
@@ -278,14 +486,152 @@ properties([
 
                                     previousLine = trimmedLine
                                 }
+                                return cases
                             }
 
-                            if (!cases.isEmpty()) {
-                                return cases.unique()
-                            }
-                        }
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def workspaceDir = new File(workspacePath)
+                                if (!new File(workspaceDir, '.git').exists()) {
+                                    continue
+                                }
 
-                        return ["未找到用例目录: ${checkedPaths.join(' ; ')}"]
+                                runGit(workspaceDir, 'git fetch --prune origin +refs/heads/*:refs/remotes/origin/*')
+
+                                def cases = []
+                                def filesFromTree = []
+                                def remoteTreeText = runGit(workspaceDir, 'git show "origin/' + selectedBranch + ':.jenkins/test-tree.json"')
+                                if (remoteTreeText) {
+                                    def tree = new groovy.json.JsonSlurperClassic().parseText(remoteTreeText)
+                                    def files = selectedFiles
+                                        ? selectedFiles
+                                        : (tree.files instanceof Map ? tree.files[selectedSuite] : [])
+                                    filesFromTree = files.collect { it.toString() }
+                                    files.each { file ->
+                                        def fileCases = tree.cases instanceof Map ? tree.cases[file.toString()] : []
+                                        if (fileCases) {
+                                            cases.addAll(fileCases.collect { it.toString() })
+                                        }
+                                    }
+                                }
+
+                                def remoteFilesText = runGit(workspaceDir, 'git ls-tree -r --name-only "origin/' + selectedBranch + '" tests')
+                                def filesFromRemoteList = remoteFilesText
+                                    .readLines()
+                                    .collect { it.trim().replace('\\\\', '/') }
+                                    .findAll { it.startsWith('tests/') && it.endsWith('.spec.ts') }
+                                    .findAll { selectedSuite == 'all' || it.startsWith("tests/${selectedSuite}/") }
+                                def remoteFiles = selectedFiles
+                                    ? selectedFiles
+                                    : (filesFromTree + filesFromRemoteList).unique().sort()
+                                remoteFiles.each { file ->
+                                    def specText = runGit(workspaceDir, 'git show "origin/' + selectedBranch + ':' + file.toString() + '"')
+                                    if (specText) {
+                                        cases.addAll(parseCasesFromText(specText))
+                                    }
+                                }
+
+                                if (!cases.isEmpty()) {
+                                    return cases.unique()
+                                }
+                            }
+
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def treeFile = new File(workspacePath, '.jenkins/test-tree.json')
+                                checkedPaths << treeFile.path
+                                if (!treeFile.isFile()) {
+                                    continue
+                                }
+
+                                def tree = new groovy.json.JsonSlurperClassic().parseText(treeFile.getText('UTF-8'))
+                                def files = selectedFiles
+                                    ? selectedFiles
+                                    : (tree.files instanceof Map ? tree.files[selectedSuite] : [])
+                                def cases = []
+                                files.each { file ->
+                                    def fileCases = tree.cases instanceof Map ? tree.cases[file.toString()] : []
+                                    if (fileCases) {
+                                        cases.addAll(fileCases.collect { it.toString() })
+                                    }
+                                }
+
+                                if (!cases.isEmpty()) {
+                                    return cases.unique()
+                                }
+                            }
+
+                            def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def specDir = new File(workspacePath, suitePath)
+                                checkedPaths << specDir.path
+
+                                if (!specDir.isDirectory()) {
+                                    continue
+                                }
+
+                                def cases = []
+                                def specFiles = []
+                                if (selectedFiles) {
+                                    selectedFiles.each { selectedFile ->
+                                        def specFile = new File(workspacePath, selectedFile)
+                                        checkedPaths << specFile.path
+                                        if (specFile.isFile() && specFile.name.endsWith('.spec.ts')) {
+                                            specFiles << specFile
+                                        }
+                                    }
+                                } else {
+                                    specDir.eachFileRecurse { specFile ->
+                                        if (specFile.isFile() && specFile.name.endsWith('.spec.ts')) {
+                                            specFiles << specFile
+                                        }
+                                    }
+                                }
+
+                                specFiles.each { specFile ->
+                                    if (!specFile.isFile() || !specFile.name.endsWith('.ts')) {
+                                        return
+                                    }
+
+                                    def previousLine = ''
+                                    specFile.readLines('UTF-8').each { line ->
+                                        def trimmedLine = line.trim()
+
+                                        if (trimmedLine.startsWith("test('") || trimmedLine.startsWith('test("')) {
+                                            def titleText = trimmedLine.substring('test('.length()).trim()
+                                            def quote = titleText.substring(0, 1)
+                                            def endIndex = titleText.indexOf(quote, 1)
+                                            if (endIndex > 1) {
+                                                cases << titleText.substring(1, endIndex)
+                                            }
+                                        }
+
+                                        if (previousLine == 'test(' && (trimmedLine.startsWith("'") || trimmedLine.startsWith('"'))) {
+                                            def quote = trimmedLine.substring(0, 1)
+                                            def endIndex = trimmedLine.indexOf(quote, 1)
+                                            if (endIndex > 1) {
+                                                cases << trimmedLine.substring(1, endIndex)
+                                            }
+                                        }
+
+                                        if (trimmedLine.startsWith("title: '") || trimmedLine.startsWith('title: "')) {
+                                            def startIndex = trimmedLine.indexOf(':') + 1
+                                            def titleText = trimmedLine.substring(startIndex).trim()
+                                            def quote = titleText.substring(0, 1)
+                                            def endIndex = titleText.indexOf(quote, 1)
+                                            if (endIndex > 1) {
+                                                cases << titleText.substring(1, endIndex)
+                                            }
+                                        }
+
+                                        previousLine = trimmedLine
+                                    }
+                                }
+
+                                if (!cases.isEmpty()) {
+                                    return cases.unique()
+                                }
+                            }
+
+                            return ["未找到用例目录: ${checkedPaths.join(' ; ')}"]
                         } catch (Throwable error) {
                             return ["用例加载失败: ${error.getClass().getSimpleName()}: ${error.getMessage()}"]
                         }
@@ -324,7 +670,24 @@ pipeline {
         // 拉取代码：确保 workspace 使用当前 Jenkins 构建选中的 Git 版本。
         stage('Checkout') {
             steps {
-                checkout scm
+                script {
+                    def selectedBranch = (params.GIT_BRANCH ?: 'main').toString().replace(':selected', '').trim()
+                    if (!selectedBranch.matches('[A-Za-z0-9._/-]+')
+                        || selectedBranch.startsWith('/')
+                        || selectedBranch.endsWith('/')
+                        || selectedBranch.contains('..')
+                        || selectedBranch.contains('//')
+                        || selectedBranch.contains('@{')
+                        || selectedBranch.endsWith('.lock')) {
+                        error "Invalid GIT_BRANCH value: ${selectedBranch}"
+                    }
+
+                    checkout scm
+                    bat 'git fetch --prune origin +refs/heads/*:refs/remotes/origin/*'
+                    bat "git checkout -B \"${selectedBranch}\" \"origin/${selectedBranch}\""
+                    bat 'git rev-parse --abbrev-ref HEAD'
+                    bat 'git rev-parse HEAD'
+                }
             }
         }
 
@@ -340,6 +703,13 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 bat 'npm ci'
+            }
+        }
+
+        // 生成用例树：用 Playwright 自己的 --list 结果产出 suite/file/case 联动数据。
+        stage('Generate Test Tree') {
+            steps {
+                bat 'npm run jenkins:test-tree'
             }
         }
 
