@@ -43,13 +43,13 @@ type AppEntryPages = {
 
 const recallDishRoundTripCases = [
   {
-    title: '应能 To Go 点普通菜后在 Recall 校验菜品名称和价格',
+    title: '[POS-15602] 应能 To Go 点普通菜后在 Recall 校验菜品名称和价格',
     issue: 'POS-15602',
     dish: orderServiceDishes.regular,
     stepTitle: '从 To Go 进入点单页，添加普通菜并保存后在 Recall 校验',
   },
   {
-    title: '应能 To Go 点另一个分类菜品后在 Recall 校验菜品名称和价格',
+    title: '[POS-15641] 应能 To Go 点另一个分类菜品后在 Recall 校验菜品名称和价格',
     issue: 'POS-15641',
     dish: orderServiceDishes.test,
     stepTitle: '从 To Go 进入点单页，添加 test 菜品并保存后在 Recall 校验',
@@ -184,7 +184,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
   test.describe.configure({ timeout: 180_000 });
 
   test(
-    '应能堂食保存后在 Recall 编辑菜品数量并校验税额实时更新',
+    '[POS-30543] 应能堂食保存后在 Recall 编辑菜品数量并校验税额实时更新',
     {
       tag: ['@smoke'],
       annotation: [jiraIssueAnnotation('POS-30543')],
@@ -323,7 +323,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
   }
 
   test(
-    '应能点单时累计整数菜品数量并在 Recall 保持数量',
+    '[POS-32905] 应能点单时累计整数菜品数量并在 Recall 保持数量',
     {
       annotation: [jiraIssueAnnotation('POS-32905')],
     },
@@ -377,7 +377,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
   );
 
   test(
-    '应能创建 Delivery 订单并在 Recall 详情展示客户信息',
+    '[POS-30575] 应能创建 Delivery 订单并在 Recall 详情展示客户信息',
     {
       annotation: [jiraIssueAnnotation('POS-30575')],
     },
@@ -414,7 +414,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
   );
 
   test(
-    '应能创建带姓名的 Pick Up 订单并在 Recall 详情展示客户姓名',
+    '[POS-31409] 应能创建带姓名的 Pick Up 订单并在 Recall 详情展示客户姓名',
     {
       tag: ['@smoke'],
       annotation: [jiraIssueAnnotation('POS-31409')],
@@ -444,7 +444,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
   );
 
   test(
-    '应能在点单页将订单平分为两份并校验子单金额',
+    '[POS-16303] 应能在点单页将订单平分为两份并校验子单金额',
     {
       annotation: [jiraIssueAnnotation('POS-16303')],
     },
@@ -590,7 +590,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
 
   test.describe('小费回归', () => {
     test(
-      '应能在点单页添加超过餐费 50% 的小费并完成确认',
+      '[POS-33110] 应能在点单页添加超过餐费 50% 的小费并完成确认',
       {
         annotation: [jiraIssueAnnotation('POS-33110')],
       },
@@ -633,7 +633,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
     );
 
     test(
-      '应能在信用卡支付后追加超过餐费 50% 的小费并完成确认',
+      '[POS-33122] 应能在信用卡支付后追加超过餐费 50% 的小费并完成确认',
       {
         annotation: [jiraIssueAnnotation('POS-33122')],
       },
@@ -721,7 +721,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
 
   test.describe('option 选择回显', () => {
     test(
-      '应能在分类菜品上选择有价格 option 并正确计算总额',
+      '[POS-24394] 应能在分类菜品上选择有价格 option 并正确计算总额',
       {
         annotation: [jiraIssueAnnotation('POS-24394')],
       },
@@ -769,7 +769,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
     );
 
     test(
-      '应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显',
+      '[POS-15643 POS-15758 POS-15759] 应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显',
       {
         annotation: jiraIssueAnnotations(['POS-15643', 'POS-15758', 'POS-15759']),
       },
@@ -800,7 +800,7 @@ test.describe('分单按菜回归', { tag: ['@py-migrate'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
   test(
-    '应能在子单 1 上对指定菜品执行 Even Item 平分并校验比例',
+    '[POS-16325] 应能在子单 1 上对指定菜品执行 Even Item 平分并校验比例',
     {
       annotation: [jiraIssueAnnotation('POS-16325')],
     },
@@ -844,7 +844,7 @@ test.describe('分单按菜回归', { tag: ['@py-migrate'] }, () => {
   );
 
   test(
-    '应能在平分三份后将子单 1 的菜品移动到子单 3',
+    '[POS-16314] 应能在平分三份后将子单 1 的菜品移动到子单 3',
     {
       annotation: [jiraIssueAnnotation('POS-16314')],
     },
@@ -928,7 +928,7 @@ test.describe('分单扩展回归', { tag: ['@py-migrate'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
   test(
-    '应能按自定义金额拆成两个子单且金额与输入一致',
+    '[POS-16316] 应能按自定义金额拆成两个子单且金额与输入一致',
     {
       annotation: [jiraIssueAnnotation('POS-16316')],
     },
@@ -978,7 +978,7 @@ test.describe('分单扩展回归', { tag: ['@py-migrate'] }, () => {
   );
 
   test(
-    '应能在平分两个子单后撤销分单并恢复订单总额',
+    '[POS-16318] 应能在平分两个子单后撤销分单并恢复订单总额',
     {
       annotation: [jiraIssueAnnotation('POS-16318')],
     },

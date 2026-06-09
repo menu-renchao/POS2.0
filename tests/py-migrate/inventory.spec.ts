@@ -70,7 +70,7 @@ test.describe('库存管理', { tag: ['@py-migrate'] }, () => {
   test.describe.configure({ timeout: 120_000 });
 
   test(
-    '未送厨点菜、加菜、减菜应正确更新库存',
+    '[POS-43898 POS-43890 POS-43889] 未送厨点菜、加菜、减菜应正确更新库存',
     {
       annotation: jiraIssueAnnotations(['POS-43898', 'POS-43890', 'POS-43889']),
     },
@@ -132,7 +132,7 @@ test.describe('库存管理', { tag: ['@py-migrate'] }, () => {
   );
 
   test(
-    '送厨后退菜应支持恢复或不恢复库存',
+    '[POS-43898 POS-43890 POS-43889] 送厨后退菜应支持恢复或不恢复库存',
     {
       annotation: jiraIssueAnnotations(['POS-43898', 'POS-43890', 'POS-43889']),
     },
@@ -204,7 +204,7 @@ test.describe('库存管理', { tag: ['@py-migrate'] }, () => {
   );
 
   test(
-    '库存点餐数量为小数时应正确扣减并在恢复库存后回退',
+    '[POS-43891] 库存点餐数量为小数时应正确扣减并在恢复库存后回退',
     {
       annotation: [jiraIssueAnnotation('POS-43891')],
     },
@@ -248,7 +248,7 @@ test.describe('库存管理', { tag: ['@py-migrate'] }, () => {
   );
 
   test(
-    '超出库存点单保存时应提示库存不足',
+    '[POS-43892] 超出库存点单保存时应提示库存不足',
     {
       annotation: [jiraIssueAnnotation('POS-43892')],
     },
