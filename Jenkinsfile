@@ -652,6 +652,11 @@ pipeline {
     // 执行节点：使用任意可用 Jenkins Windows Agent。
     agent any
 
+    // 定时触发：每天北京时间 20:00 使用默认参数自动运行一次。
+    triggers {
+        cron('TZ=Asia/Shanghai\n0 20 * * *')
+    }
+
     // 全局环境变量：Playwright 目标地址、CI 标记和 Node.js 命令路径。
     environment {
         PLAYWRIGHT_BASE_URL = "${params.PLAYWRIGHT_BASE_URL}"
