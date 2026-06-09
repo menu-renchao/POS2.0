@@ -285,7 +285,7 @@ pipeline {
                         return escaped.toString()
                     }
 
-                    // 转义 Windows bat 中文参数：传 ASCII-only 的 \uXXXX，避免 cmd 代码页导致中文乱码。
+                    // 转义 Windows bat 中文参数：传 ASCII-only 的 Unicode escape，避免 cmd 代码页导致中文乱码。
                     def unicodeEscapeForBatch = { String value ->
                         def escaped = new StringBuilder()
                         for (int index = 0; index < value.length(); index++) {
