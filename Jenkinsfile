@@ -81,15 +81,15 @@ properties([
                 ]
             ]
         ],
-        // 动态用例列表：根据 TEST_SUITE 读取对应目录里的 test 标题，支持多选后传给 Playwright --grep。
+        // 动态文件列表：根据 TEST_SUITE 读取对应目录里的 spec 文件，支持多选后缩小测试范围。
         [
             $class: 'CascadeChoiceParameter',
             choiceType: 'PT_CHECKBOX',
-            description: '(optional) Playwright test title filter. Select multiple cases for the selected suite. Leave empty to run all cases in the selected suite.',
+            description: '(optional) Playwright spec file filter. Select one or more files in the selected suite. Leave empty to run all files in the selected suite.',
             filterLength: 1,
             filterable: true,
-            name: 'TEST_CASE_GREP',
-            randomName: 'choice-parameter-test-case-grep',
+            name: 'TEST_FILE',
+            randomName: 'choice-parameter-test-file',
             referencedParameters: 'TEST_SUITE',
             script: [
                 $class: 'GroovyScript',
@@ -127,6 +127,94 @@ properties([
                         def checkedPaths = []
 
                         for (workspacePath in workspaceCandidates.unique()) {
+                            def suiteDir = new File(workspacePath, suitePath)
+                            checkedPaths << suiteDir.path
+
+                            if (!suiteDir.isDirectory()) {
+                                continue
+                            }
+
+                            def files = []
+                            suiteDir.eachFileRecurse { specFile ->
+                                if (!specFile.isFile() || !specFile.name.endsWith('.spec.ts')) {
+                                    return
+                                }
+
+                                def relativePath = new File(workspacePath).toPath()
+                                    .relativize(specFile.toPath())
+                                    .toString()
+                                    .replace(File.separator, '/')
+                                files << relativePath
+                            }
+
+                            if (!files.isEmpty()) {
+                                return files.sort().unique()
+                            }
+                        }
+
+                        return ["未找到用例文件: ${checkedPaths.join(' ; ')}"]
+                        } catch (Throwable error) {
+                            return ["文件加载失败: ${error.getClass().getSimpleName()}: ${error.getMessage()}"]
+                        }
+                    '''
+                ]
+            ]
+        ],
+        // 动态用例列表：根据 TEST_SUITE 和 TEST_FILE 读取 test 标题，支持多选后传给 Playwright --grep。
+        [
+            $class: 'CascadeChoiceParameter',
+            choiceType: 'PT_CHECKBOX',
+            description: '(optional) Playwright test title filter. Select multiple cases for the selected files or suite. Leave empty to run all cases in the selected files or suite.',
+            filterLength: 1,
+            filterable: true,
+            name: 'TEST_CASE_GREP',
+            randomName: 'choice-parameter-test-case-grep',
+            referencedParameters: 'TEST_SUITE,TEST_FILE',
+            script: [
+                $class: 'GroovyScript',
+                fallbackScript: [
+                    classpath: [],
+                    sandbox: true,
+                    script: 'return ["Active Choices 脚本执行失败，请检查 In-process Script Approval 或 Jenkins 日志"]'
+                ],
+                script: [
+                    classpath: [],
+                    sandbox: false,
+                    script: '''
+                        try {
+                        def workspaceCandidates = []
+                        def selectedSuite = binding.hasVariable('TEST_SUITE')
+                            ? binding.getVariable('TEST_SUITE')
+                            : 'all'
+                        def selectedFilesValue = binding.hasVariable('TEST_FILE')
+                            ? binding.getVariable('TEST_FILE')
+                            : ''
+
+                        def envWorkspace = System.getenv('WORKSPACE')
+                        if (envWorkspace) {
+                            workspaceCandidates << envWorkspace
+                        }
+
+                        def jenkinsHome = System.getenv('JENKINS_HOME')
+                        def jobName = System.getenv('JOB_NAME')
+                        if (jenkinsHome && jobName) {
+                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
+                        }
+
+                        workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+                        workspaceCandidates << 'D:/menusifu/pos2.0'
+
+                        selectedSuite = selectedSuite ?: 'all'
+                        def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
+                        def checkedPaths = []
+                        def selectedFiles = selectedFilesValue instanceof Collection
+                            ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
+                            : selectedFilesValue.toString().split('\\s*,\\s*').collect { it.trim() }.findAll { it }
+                        if (selectedSuite != 'all') {
+                            selectedFiles = selectedFiles.findAll { it.startsWith("tests/${selectedSuite}/") }
+                        }
+
+                        for (workspacePath in workspaceCandidates.unique()) {
                             def specDir = new File(workspacePath, suitePath)
                             checkedPaths << specDir.path
 
@@ -135,7 +223,24 @@ properties([
                             }
 
                             def cases = []
-                            specDir.eachFileRecurse { specFile ->
+                            def specFiles = []
+                            if (selectedFiles) {
+                                selectedFiles.each { selectedFile ->
+                                    def specFile = new File(workspacePath, selectedFile)
+                                    checkedPaths << specFile.path
+                                    if (specFile.isFile() && specFile.name.endsWith('.spec.ts')) {
+                                        specFiles << specFile
+                                    }
+                                }
+                            } else {
+                                specDir.eachFileRecurse { specFile ->
+                                    if (specFile.isFile() && specFile.name.endsWith('.spec.ts')) {
+                                        specFiles << specFile
+                                    }
+                                }
+                            }
+
+                            specFiles.each { specFile ->
                                 if (!specFile.isFile() || !specFile.name.endsWith('.ts')) {
                                     return
                                 }
@@ -253,13 +358,27 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    // 解析运行目标：all 跑全量，其余套件映射到 tests/<suite>。
+                    // 解析运行目标：优先使用已选 spec 文件；未选文件时，all 跑全量，其余套件映射到 tests/<suite>。
                     def headedFlag = params.HEADED ? ' --headed' : ''
                     def selectedSuite = params.TEST_SUITE ?: 'all'
                     if (selectedSuite != 'all' && !selectedSuite.matches('[A-Za-z0-9_-]+')) {
                         error "Invalid TEST_SUITE value: ${selectedSuite}"
                     }
-                    def testTarget = selectedSuite == 'all' ? '' : "tests/${selectedSuite}"
+                    def selectedFilesValue = params.TEST_FILE ?: ''
+                    def selectedFiles = selectedFilesValue instanceof Collection
+                        ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
+                        : selectedFilesValue.toString().split('\\s*,\\s*').collect { it.trim() }.findAll { it }
+                    for (selectedFile in selectedFiles) {
+                        if (!selectedFile.matches('tests/[A-Za-z0-9_./-]+\\.spec\\.ts')) {
+                            error "Invalid TEST_FILE value: ${selectedFile}"
+                        }
+                        if (selectedSuite != 'all' && !selectedFile.startsWith("tests/${selectedSuite}/")) {
+                            error "TEST_FILE is outside selected TEST_SUITE: ${selectedFile}"
+                        }
+                    }
+                    def testTarget = selectedFiles
+                        ? selectedFiles.join(' ')
+                        : (selectedSuite == 'all' ? '' : "tests/${selectedSuite}")
 
                     // 解析多选用例：Active Choices 多选值可能是集合或逗号分隔字符串。
                     def selectedCases = params.TEST_CASE_GREP ?: ''
