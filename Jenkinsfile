@@ -1,10 +1,13 @@
 properties([
+    // 构建参数：控制目标环境、测试套件、用例过滤和是否显示浏览器。
     parameters([
+        // 目标 POS 前端地址，会注入到 Playwright 的 baseURL 配置中。
         string(
             name: 'PLAYWRIGHT_BASE_URL',
             defaultValue: 'http://192.168.0.72:22080',
             description: 'Target server URL, e.g. http://IP:PORT'
         ),
+        // 动态测试套件：扫描 tests 下包含 *.spec.ts 的一级目录，并额外提供 all 选项。
         [
             $class: 'ChoiceParameter',
             choiceType: 'PT_SINGLE_SELECT',
@@ -78,6 +81,7 @@ properties([
                 ]
             ]
         ],
+        // 动态用例列表：根据 TEST_SUITE 读取对应目录里的 test 标题，支持多选后传给 Playwright --grep。
         [
             $class: 'CascadeChoiceParameter',
             choiceType: 'PT_CHECKBOX',
@@ -184,6 +188,7 @@ properties([
                 ]
             ]
         ],
+        // 调试开关：勾选后以 headed 模式运行浏览器。
         booleanParam(
             name: 'HEADED',
             defaultValue: false,
@@ -193,14 +198,17 @@ properties([
 ])
 
 pipeline {
+    // 执行节点：使用任意可用 Jenkins Windows Agent。
     agent any
 
+    // 全局环境变量：Playwright 目标地址、CI 标记和 Node.js 命令路径。
     environment {
         PLAYWRIGHT_BASE_URL = "${params.PLAYWRIGHT_BASE_URL}"
         CI = 'true'
         PATH = "C:\\Program Files\\nodejs;${env.PATH}"
     }
 
+    // 流水线约束：限制总耗时、防止并发构建、保留最近构建记录。
     options {
         timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
@@ -208,12 +216,14 @@ pipeline {
     }
 
     stages {
+        // 拉取代码：确保 workspace 使用当前 Jenkins 构建选中的 Git 版本。
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        // 检查运行环境：打印 Node.js 和 npm 版本，便于排查 Agent 环境差异。
         stage('Check Environment') {
             steps {
                 bat 'node --version'
@@ -221,12 +231,14 @@ pipeline {
             }
         }
 
+        // 安装依赖：使用 npm ci 按 lockfile 还原确定版本的依赖。
         stage('Install Dependencies') {
             steps {
                 bat 'npm ci'
             }
         }
 
+        // 清理报告目录：防止 Allure 或 Playwright 读取上一次构建遗留结果。
         stage('Clean Test Reports') {
             steps {
                 bat '''
@@ -237,9 +249,11 @@ pipeline {
             }
         }
 
+        // 运行测试：按动态套件和动态用例标题过滤执行 Playwright。
         stage('Run Tests') {
             steps {
                 script {
+                    // 解析运行目标：all 跑全量，其余套件映射到 tests/<suite>。
                     def headedFlag = params.HEADED ? ' --headed' : ''
                     def selectedSuite = params.TEST_SUITE ?: 'all'
                     if (selectedSuite != 'all' && !selectedSuite.matches('[A-Za-z0-9_-]+')) {
@@ -247,6 +261,7 @@ pipeline {
                     }
                     def testTarget = selectedSuite == 'all' ? '' : "tests/${selectedSuite}"
 
+                    // 解析多选用例：Active Choices 多选值可能是集合或逗号分隔字符串。
                     def selectedCases = params.TEST_CASE_GREP ?: ''
                     def selectedCaseText = selectedCases instanceof Collection
                         ? selectedCases.join(',')
@@ -255,6 +270,8 @@ pipeline {
                         .split('\\s*,\\s*')
                         .collect { it.trim() }
                         .findAll { it }
+
+                    // 转义 grep 正则：用例标题按字面量匹配，避免 [POS-xxx] 被当作正则字符类。
                     def regexSpecialChars = '\\^$.*+?()[]{}|'
                     def escapeJsRegexLiteral = { String value ->
                         def escaped = new StringBuilder()
@@ -267,6 +284,8 @@ pipeline {
                         }
                         return escaped.toString()
                     }
+
+                    // 转义 Windows bat 中文参数：传 ASCII-only 的 \uXXXX，避免 cmd 代码页导致中文乱码。
                     def unicodeEscapeForBatch = { String value ->
                         def escaped = new StringBuilder()
                         for (int index = 0; index < value.length(); index++) {
@@ -279,6 +298,8 @@ pipeline {
                         }
                         return escaped.toString()
                     }
+
+                    // 生成最终 --grep：多个用例用正则 OR 连接，百分号按 bat 规则转义。
                     def grepValue = selectedCaseTitles
                         .collect { unicodeEscapeForBatch(escapeJsRegexLiteral(it)) }
                         .join('|')
@@ -291,6 +312,7 @@ pipeline {
             }
             post {
                 always {
+                    // 发布 Allure：无论测试成功失败，都基于本次 allure-results 生成报告。
                     allure includeProperties: false,
                            jdk: '',
                            results: [[path: 'allure-results']]
@@ -299,8 +321,10 @@ pipeline {
         }
     }
 
+    // 构建后处理：归档原始测试产物，并输出目标环境的成功/失败信息。
     post {
         always {
+            // 归档 Playwright trace/video/screenshot 等产物，以及 Allure 原始结果。
             archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
             archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true
         }
