@@ -10,11 +10,6 @@ properties([
             choices: ['all', 'smoke', 'e2e', 'py-migrate'],
             description: 'Test suite to run'
         ),
-        string(
-            name: 'TEST_CASE_SOURCE_DIR',
-            defaultValue: 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI',
-            description: 'Directory that contains the checked-out repo for loading test case choices.'
-        ),
         [
             $class: 'CascadeChoiceParameter',
             choiceType: 'PT_CHECKBOX',
@@ -23,7 +18,7 @@ properties([
             filterable: true,
             name: 'TEST_CASE_GREP',
             randomName: 'choice-parameter-test-case-grep',
-            referencedParameters: 'TEST_SUITE,TEST_CASE_SOURCE_DIR',
+            referencedParameters: 'TEST_SUITE',
             script: [
                 $class: 'GroovyScript',
                 fallbackScript: [
@@ -37,16 +32,9 @@ properties([
                     script: '''
                         try {
                         def workspaceCandidates = []
-                        def selectedSourceDir = binding.hasVariable('TEST_CASE_SOURCE_DIR')
-                            ? binding.getVariable('TEST_CASE_SOURCE_DIR')
-                            : ''
                         def selectedSuite = binding.hasVariable('TEST_SUITE')
                             ? binding.getVariable('TEST_SUITE')
                             : 'all'
-
-                        if (selectedSourceDir) {
-                            workspaceCandidates << selectedSourceDir
-                        }
 
                         def envWorkspace = System.getenv('WORKSPACE')
                         if (envWorkspace) {
@@ -174,6 +162,16 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 bat 'npm ci'
+            }
+        }
+
+        stage('Clean Test Reports') {
+            steps {
+                bat '''
+                    if exist "allure-results" rmdir /s /q "allure-results"
+                    if exist "allure-report" rmdir /s /q "allure-report"
+                    if exist "test-results" rmdir /s /q "test-results"
+                '''
             }
         }
 
