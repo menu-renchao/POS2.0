@@ -676,7 +676,13 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
-                    def selectedBranch = (params.GIT_BRANCH ?: 'main').toString().replace(':selected', '').trim()
+                    def isTimerBuild = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0
+                    def selectedBranch = isTimerBuild
+                        ? 'main'
+                        : (params.GIT_BRANCH ?: 'main').toString().replace(':selected', '').trim()
+                    if (isTimerBuild) {
+                        echo 'Timer build detected. Using default branch: main'
+                    }
                     if (!selectedBranch.matches('[A-Za-z0-9._/-]+')
                         || selectedBranch.startsWith('/')
                         || selectedBranch.endsWith('/')
@@ -733,13 +739,18 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
+                    def isTimerBuild = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0
+                    if (isTimerBuild) {
+                        echo 'Timer build detected. Running full default suite without file or case filters.'
+                    }
+
                     // 解析运行目标：优先使用已选 spec 文件；未选文件时，all 跑全量，其余套件映射到 tests/<suite>。
-                    def headedFlag = params.HEADED ? ' --headed' : ''
-                    def selectedSuite = params.TEST_SUITE ?: 'all'
+                    def headedFlag = (!isTimerBuild && params.HEADED) ? ' --headed' : ''
+                    def selectedSuite = isTimerBuild ? 'all' : (params.TEST_SUITE ?: 'all')
                     if (selectedSuite != 'all' && !selectedSuite.matches('[A-Za-z0-9_-]+')) {
                         error "Invalid TEST_SUITE value: ${selectedSuite}"
                     }
-                    def selectedFilesValue = params.TEST_FILE ?: ''
+                    def selectedFilesValue = isTimerBuild ? '' : (params.TEST_FILE ?: '')
                     def selectedFiles = selectedFilesValue instanceof Collection
                         ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
                         : selectedFilesValue.toString().split('\\s*,\\s*').collect { it.trim() }.findAll { it }
@@ -756,7 +767,7 @@ pipeline {
                         : (selectedSuite == 'all' ? '' : "tests/${selectedSuite}")
 
                     // 解析多选用例：Active Choices 多选值可能是集合或逗号分隔字符串。
-                    def selectedCases = params.TEST_CASE_GREP ?: ''
+                    def selectedCases = isTimerBuild ? '' : (params.TEST_CASE_GREP ?: '')
                     def selectedCaseText = selectedCases instanceof Collection
                         ? selectedCases.join(',')
                         : selectedCases.toString()
