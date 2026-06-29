@@ -83,6 +83,34 @@ test.describe('API 核心工具', () => {
 
     expect(receivedHeaders.authorization).toBe('key-1');
   });
+
+  test('应能通过 storageState 为 Cookie 模式创建请求上下文', async () => {
+    const apiContext = await createApiRequestContext({
+      baseURL: 'http://127.0.0.1:22080/kpos',
+      auth: { mode: 'cookie', licenseAuthKey: 'cookie-1' },
+      enableDestructive: false,
+      testPrefix: 'AT',
+    });
+
+    try {
+      const storageState = await apiContext.storageState();
+
+      expect(storageState.cookies).toContainEqual(
+        expect.objectContaining({
+          name: 'licenseAuthKey',
+          value: 'cookie-1',
+          domain: '127.0.0.1',
+          path: '/kpos',
+          expires: -1,
+          httpOnly: true,
+          secure: false,
+          sameSite: 'Lax',
+        }),
+      );
+    } finally {
+      await apiContext.dispose();
+    }
+  });
 });
 
 async function withHeaderEchoServer<T>(callback: (baseURL: string) => Promise<T>): Promise<T> {
