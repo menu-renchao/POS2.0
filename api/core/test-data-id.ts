@@ -6,31 +6,28 @@ export type CreateShortTestNameOptions = {
 };
 
 export function createShortTestName(options: CreateShortTestNameOptions): string {
-  const normalizedPrefix = normalizeToken(options.prefix);
-  if (!normalizedPrefix) {
-    throw new Error('prefix must contain at least one alphanumeric character.');
-  }
-
-  const prefix = `${normalizedPrefix}_`;
   if (!Number.isInteger(options.maxLength) || options.maxLength <= 0) {
     throw new Error('maxLength must be a positive integer.');
   }
 
-  if (options.maxLength < prefix.length) {
+  const prefix = normalizeToken(options.prefix) || 'AT';
+  const seed = normalizeToken(options.seed ?? Math.random().toString(36).slice(2, 10)) || '0';
+  const minimumName = `${prefix}_${seed}`;
+
+  if (options.maxLength < minimumName.length) {
     throw new Error(
-      `maxLength ${options.maxLength} is too short to preserve prefix "${prefix}".`,
+      `maxLength ${options.maxLength} is too short to preserve prefix and seed "${minimumName}".`,
     );
   }
 
-  const domain = normalizeToken(options.domain) || 'TEST';
-  const seed = normalizeToken(options.seed ?? Math.random().toString(36).slice(2, 10)) || '0';
-  const name = `${prefix}${domain}_${seed}`;
+  const domain = compactDomain(options.domain) || 'TEST';
+  const availableDomainLength = options.maxLength - prefix.length - seed.length - 2;
 
-  if (name.length <= options.maxLength) {
-    return name;
+  if (availableDomainLength <= 0) {
+    return minimumName;
   }
 
-  return name.slice(0, options.maxLength);
+  return `${prefix}_${domain.slice(0, availableDomainLength)}_${seed}`;
 }
 
 function normalizeToken(value: string): string {
@@ -39,4 +36,8 @@ function normalizeToken(value: string): string {
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
+}
+
+function compactDomain(value: string): string {
+  return normalizeToken(value).replace(/_/g, '');
 }

@@ -3,17 +3,30 @@ export type ResourceId = string | number;
 export type RegisteredResource = {
   type: string;
   id: ResourceId;
+  name?: string;
   cleanupPriority: number;
   cleanup: () => Promise<unknown> | unknown;
 };
 
+export type RegisteredResourceSnapshot = {
+  type: string;
+  id: ResourceId;
+  name?: string;
+};
+
+export type SerializedCleanupError = {
+  message: string;
+  name: string;
+  stack?: string;
+};
+
 export type CleanupError = {
-  resource: RegisteredResource;
-  error: unknown;
+  resource: RegisteredResourceSnapshot;
+  error: SerializedCleanupError;
 };
 
 export type CleanupResult = {
-  cleaned: RegisteredResource[];
+  cleaned: RegisteredResourceSnapshot[];
   errors: CleanupError[];
 };
 
@@ -39,7 +52,7 @@ export class ResourceRegistry {
   }
 
   async cleanupAll(): Promise<CleanupResult> {
-    const cleaned: RegisteredResource[] = [];
+    const cleaned: RegisteredResourceSnapshot[] = [];
     const errors: CleanupError[] = [];
     const resources = [...this.resources].sort(
       (left, right) => right.cleanupPriority - left.cleanupPriority,
@@ -49,9 +62,12 @@ export class ResourceRegistry {
       for (const resource of resources) {
         try {
           await resource.cleanup();
-          cleaned.push(resource);
+          cleaned.push(toResourceSnapshot(resource));
         } catch (error) {
-          errors.push({ resource, error });
+          errors.push({
+            resource: toResourceSnapshot(resource),
+            error: serializeCleanupError(error),
+          });
         }
       }
     } finally {
@@ -64,4 +80,25 @@ export class ResourceRegistry {
 
 function isSameResource(resource: RegisteredResource, type: string, id: ResourceId): boolean {
   return resource.type === type && resource.id === id;
+}
+
+function toResourceSnapshot(resource: RegisteredResource): RegisteredResourceSnapshot {
+  return resource.name
+    ? { type: resource.type, id: resource.id, name: resource.name }
+    : { type: resource.type, id: resource.id };
+}
+
+function serializeCleanupError(error: unknown): SerializedCleanupError {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      name: error.name,
+      ...(error.stack ? { stack: error.stack } : {}),
+    };
+  }
+
+  return {
+    message: String(error),
+    name: 'NonError',
+  };
 }
