@@ -37,6 +37,15 @@ test.describe('API 配置', () => {
     ).toThrow('API_AUTH_MODE=apiKey requires API_KEY.');
   });
 
+  test('Cookie 模式缺少 API_COOKIE_LICENSE_AUTH_KEY 时应抛出明确错误', () => {
+    expect(() =>
+      loadApiConfig({
+        API_BASE_URL: 'http://127.0.0.1:22080/kpos',
+        API_AUTH_MODE: 'cookie',
+      }),
+    ).toThrow('API_AUTH_MODE=cookie requires API_COOKIE_LICENSE_AUTH_KEY.');
+  });
+
   test('应能规范化 API_AUTH_MODE 的大小写空白和别名', () => {
     for (const authMode of [' APIKEY ', 'api_key', 'ApiKey']) {
       const config = loadApiConfig({

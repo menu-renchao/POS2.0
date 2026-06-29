@@ -88,7 +88,7 @@ function resolveAuthMode(value: string | undefined): ApiAuthMode {
   }
 
   throw new Error(
-    `Unsupported API_AUTH_MODE: ${value.trim()}. Expected apiKey, apikey, api_key, or cookie.`,
+    `Unsupported API_AUTH_MODE: ${normalizedValue}. Expected apiKey, apikey, api_key, or cookie.`,
   );
 }
 
