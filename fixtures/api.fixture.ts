@@ -19,7 +19,11 @@ export const test = base.extend<ApiFixtures>({
     try {
       await use(apiRequest);
     } finally {
-      await apiRequest.dispose();
+      try {
+        await apiRequest.dispose();
+      } catch (error) {
+        console.warn('API request dispose failed.', error);
+      }
     }
   },
   resourceRegistry: async ({}, use) => {
@@ -30,8 +34,16 @@ export const test = base.extend<ApiFixtures>({
     } finally {
       const cleanupResult = await resourceRegistry.cleanupAll();
 
-      for (const cleanupError of cleanupResult.errors) {
-        console.warn('API resource cleanup failed.', cleanupError);
+      if (cleanupResult.errors.length > 0) {
+        const errorSummary = cleanupResult.errors
+          .map(
+            ({ resource, error }) => `${resource.type}:${String(resource.id)} ${error.message}`,
+          )
+          .join('; ');
+
+        console.warn(
+          `API resource cleanup finished with ${cleanupResult.errors.length} error(s): ${errorSummary}`,
+        );
       }
     }
   },
