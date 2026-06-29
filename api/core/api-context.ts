@@ -37,7 +37,7 @@ function toStorageStateCookie(cookie: ApiAuthCookie): ApiStorageStateCookie {
     name: cookie.name,
     value: cookie.value,
     domain: cookieUrl.hostname,
-    path: cookieUrl.pathname || '/',
+    path: '/',
     expires: -1,
     httpOnly: true,
     secure: cookieUrl.protocol === 'https:',

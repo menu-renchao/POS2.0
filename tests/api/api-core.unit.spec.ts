@@ -100,7 +100,7 @@ test.describe('API 核心工具', () => {
           name: 'licenseAuthKey',
           value: 'cookie-1',
           domain: '127.0.0.1',
-          path: '/kpos',
+          path: '/',
           expires: -1,
           httpOnly: true,
           secure: false,
@@ -110,6 +110,27 @@ test.describe('API 核心工具', () => {
     } finally {
       await apiContext.dispose();
     }
+  });
+
+  test('应能在根路径 API 请求中发送 Cookie 模式认证信息', async () => {
+    const receivedHeaders = await withHeaderEchoServer(async (baseURL) => {
+      const apiContext = await createApiRequestContext({
+        baseURL: `${baseURL}/kpos`,
+        auth: { mode: 'cookie', licenseAuthKey: 'cookie-1' },
+        enableDestructive: false,
+        testPrefix: 'AT',
+      });
+
+      try {
+        const response = await apiContext.get('/api/check');
+
+        return (await response.json()) as Record<string, string | undefined>;
+      } finally {
+        await apiContext.dispose();
+      }
+    });
+
+    expect(receivedHeaders.cookie).toContain('licenseAuthKey=cookie-1');
   });
 });
 
