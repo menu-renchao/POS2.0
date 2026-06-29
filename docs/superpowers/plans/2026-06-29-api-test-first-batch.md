@@ -48,6 +48,22 @@ Modify:
 - `playwright.config.ts`: Add `api` project.
 - `tsconfig.json`: Include `api/**/*.ts`.
 
+Client documentation rule:
+
+- Every public method in `api/clients/*.ts` must have a concise JSDoc comment in Chinese.
+- Each comment must include the HTTP method, path, endpoint purpose, and key parameters.
+- Example:
+
+```ts
+/**
+ * POST /api/menu/menuGroup
+ * 创建菜单组。body 需要包含测试菜单 ID、菜单组名称和启用状态。
+ */
+async createMenuGroup(body: Record<string, unknown>) {
+  return await this.request.post('/api/menu/menuGroup', { data: body });
+}
+```
+
 ## Commit Strategy
 
 Commit after each task:
@@ -825,6 +841,9 @@ git commit -m "feat: add api coverage matrix"
 - Create: `api/clients/order-api.client.ts`
 - Create: `api/clients/payment-api.client.ts`
 - Create: `api/clients/admin-config-api.client.ts`
+
+**Client Method Documentation Requirement:**
+Every public method created in this task must include a Chinese JSDoc comment with the HTTP method, path, purpose, and key parameters. If the code block below omits a comment for brevity, add the comment anyway before committing.
 
 - [ ] **Step 1: Create menu client**
 
