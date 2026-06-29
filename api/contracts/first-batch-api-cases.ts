@@ -5,12 +5,22 @@ export type ApiCoverageLevel =
   | 'deferred-external'
   | 'blocked-missing-data';
 
+export const API_SPEC_FILES = {
+  menuCatalog: 'tests/api/menu-catalog.api.spec.ts',
+  saleItem: 'tests/api/sale-item.api.spec.ts',
+  orderPayment: 'tests/api/order-payment.api.spec.ts',
+  adminConfig: 'tests/api/admin-config.api.spec.ts',
+  contractSmoke: 'tests/api/contract-smoke.api.spec.ts',
+} as const;
+
+export type ApiSpecFile = (typeof API_SPEC_FILES)[keyof typeof API_SPEC_FILES];
+
 export type FirstBatchApiCase = {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
   group: string;
   coverage: ApiCoverageLevel;
-  specFile: string;
+  specFile: ApiSpecFile;
   riskNote: string;
 };
 
@@ -20,7 +30,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/checkMenuLastUpdateTime',
     group: '菜单管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '缓存时间戳校验接口，先覆盖响应契约，避免依赖真实菜单缓存刷新时机。',
   },
   {
@@ -28,7 +38,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/clearCache',
     group: '菜单管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '清理缓存会影响全局菜单状态，先做契约覆盖，不纳入正向数据变更链路。',
   },
   {
@@ -36,7 +46,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/fetchGlobalOption',
     group: '菜单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '读取全局选项属于菜单配置核心查询，需要覆盖可用样例数据。',
   },
   {
@@ -44,7 +54,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/listGlobalOption',
     group: '菜单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '全局选项列表影响点餐加料展示，需要验证列表结构稳定。',
   },
   {
@@ -52,7 +62,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/liteMenu/{id}',
     group: '菜单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '轻量菜单读取依赖现有菜单样例，覆盖核心展示字段。',
   },
   {
@@ -60,7 +70,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menu',
     group: '菜单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '当前菜单读取是后续菜单链路前置条件，需要正向覆盖。',
   },
   {
@@ -68,7 +78,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menu',
     group: '菜单管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单创建是核心 CRUD，需要使用隔离测试数据验证。',
   },
   {
@@ -76,7 +86,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menu',
     group: '菜单管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单更新是核心 CRUD，需要验证更新后字段回读。',
   },
   {
@@ -84,7 +94,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menu/{id}',
     group: '菜单管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单详情读取用于 CRUD 回读校验，需要稳定样例菜单。',
   },
   {
@@ -92,7 +102,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menus',
     group: '菜单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单列表是配置入口，覆盖基本列表结构和分页返回。',
   },
   {
@@ -100,7 +110,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/search/menu',
     group: '菜单全局搜索',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '全局搜索依赖菜单索引数据，优先覆盖可搜索样例和响应结构。',
   },
   {
@@ -108,7 +118,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/group/list',
     group: '菜单组管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单组列表是菜单配置导航入口，需要覆盖查询契约。',
   },
   {
@@ -116,7 +126,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/group/listGroupCategoryItems',
     group: '菜单组管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单组分类商品聚合结构复杂，需要正向覆盖核心字段。',
   },
   {
@@ -124,7 +134,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/group/saleItem/all',
     group: '菜单组管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单组商品全集用于配置选择，需要验证基础列表可用。',
   },
   {
@@ -132,7 +142,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGroup',
     group: '菜单组管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单组创建是核心 CRUD，需要隔离数据覆盖。',
   },
   {
@@ -140,7 +150,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGroup',
     group: '菜单组管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单组更新是核心 CRUD，需要校验更新后回读。',
   },
   {
@@ -148,7 +158,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGroup/batch/copy',
     group: '菜单组管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量复制会产生多条配置数据，先覆盖请求响应契约。',
   },
   {
@@ -156,7 +166,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGroup/batch/delete',
     group: '菜单组管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量删除破坏面较大，先做契约覆盖并保留人工数据准备。',
   },
   {
@@ -164,7 +174,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGroup/batch/sequence',
     group: '菜单组管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量排序影响展示顺序，先覆盖契约，避免污染共享菜单。',
   },
   {
@@ -172,7 +182,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGroup/batch/update',
     group: '菜单组管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量更新影响范围大，先用契约烟测保护接口形态。',
   },
   {
@@ -180,7 +190,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGroup/{id}',
     group: '菜单组管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '单个菜单组删除属于 CRUD 闭环，需要使用测试创建的数据。',
   },
   {
@@ -188,7 +198,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGroup/{id}',
     group: '菜单组管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单组详情用于 CRUD 回读，需要覆盖存在记录。',
   },
   {
@@ -196,7 +206,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGroups',
     group: '菜单组管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单组分页列表影响配置管理入口，需要正向覆盖。',
   },
   {
@@ -204,7 +214,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/checkOrderExistsByPhoneAndMember',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '订单存在性查询依赖会员和手机号样例，覆盖常规命中与未命中结构。',
   },
   {
@@ -212,7 +222,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/clearTable',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '清台会改变桌台订单状态，需要使用可控测试桌台数据。',
   },
   {
@@ -220,7 +230,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/combine',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '合单涉及多订单状态变化，需要覆盖受控正向业务路径。',
   },
   {
@@ -228,7 +238,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/dailyClose',
     group: '订单管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/order-payment.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '日结影响营业状态和报表，先覆盖契约，不在普通自动化中触发真实日结。',
   },
   {
@@ -236,7 +246,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/detail/list',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '订单明细列表是订单校验基础，需要覆盖可用订单样例。',
   },
   {
@@ -244,7 +254,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/fetch',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '订单详情读取是保存后校验入口，需要覆盖核心字段。',
   },
   {
@@ -252,7 +262,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/item/move',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '移动订单商品影响订单明细归属，需要受控订单数据覆盖。',
   },
   {
@@ -260,7 +270,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/list',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '订单列表是召回和查询入口，需要覆盖常规查询。',
   },
   {
@@ -268,7 +278,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/listDeliveryTrack',
     group: '订单管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/order-payment.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '配送跟踪依赖外部配送状态，先覆盖接口契约。',
   },
   {
@@ -276,7 +286,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/listOrdersByDateNumber',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '按日期编号查单是业务查询路径，需要覆盖有数据和空结果结构。',
   },
   {
@@ -284,7 +294,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/notice/send',
     group: '订单管理',
     coverage: 'deferred-external',
-    specFile: 'tests/api/order-payment.deferred-external.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '发送通知可能依赖短信或外部通知通道，暂缓真实发送自动化。',
   },
   {
@@ -292,7 +302,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/recall',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '召回订单是前台核心业务入口，需要覆盖可召回订单列表。',
   },
   {
@@ -300,7 +310,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/save',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '保存订单是核心业务写入路径，需要覆盖正向下单数据。',
   },
   {
@@ -308,7 +318,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/save/batch',
     group: '订单管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/order-payment.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量保存订单会产生多笔业务数据，先覆盖契约并等待隔离数据方案。',
   },
   {
@@ -316,7 +326,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/void',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '作废订单是核心业务状态变更，需要使用测试订单覆盖。',
   },
   {
@@ -324,7 +334,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/{id}/reopen',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '重开订单依赖已关闭订单状态，需要受控数据覆盖。',
   },
   {
@@ -332,7 +342,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/order/{id}/split',
     group: '订单管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '拆单会产生新订单关系，需要用隔离订单样例覆盖。',
   },
   {
@@ -340,7 +350,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/payment/deletePaymentRecord',
     group: '订单支付',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '删除支付记录影响订单支付状态，需要使用测试支付记录覆盖。',
   },
   {
@@ -348,7 +358,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/payment/record/delete',
     group: '订单支付',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '支付记录删除兼容接口，需要覆盖受控支付记录。',
   },
   {
@@ -356,7 +366,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/payment/record/save',
     group: '订单支付',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '保存支付记录是本地支付链路核心写入，需要正向覆盖。',
   },
   {
@@ -364,7 +374,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/payment/record/save/batch',
     group: '订单支付',
     coverage: 'contract-only',
-    specFile: 'tests/api/order-payment.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量保存支付记录涉及多笔状态变更，先覆盖契约。',
   },
   {
@@ -372,7 +382,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/payment/refund',
     group: '订单支付',
     coverage: 'deferred-external',
-    specFile: 'tests/api/order-payment.deferred-external.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '退款可能触达外部支付渠道，暂缓真实交易自动化。',
   },
   {
@@ -380,7 +390,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/payment/savePaymentRecord',
     group: '订单支付',
     coverage: 'positive-business',
-    specFile: 'tests/api/order-payment.api.spec.ts',
+    specFile: API_SPEC_FILES.orderPayment,
     riskNote: '旧版保存支付记录接口仍在业务中使用，需要覆盖本地正向路径。',
   },
   {
@@ -388,7 +398,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/payment/{id}/tip',
     group: '订单支付',
     coverage: 'deferred-external',
-    specFile: 'tests/api/order-payment.deferred-external.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '小费调整通常绑定终端支付记录，暂缓真实外部支付覆盖。',
   },
   {
@@ -396,7 +406,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/payment/{id}/void',
     group: '订单支付',
     coverage: 'deferred-external',
-    specFile: 'tests/api/order-payment.deferred-external.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '支付撤销可能触达终端或支付渠道，暂缓真实外部调用。',
   },
   {
@@ -404,7 +414,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/abstractCategory/batch/delete',
     group: '分类管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '抽象分类批量删除破坏面较大，先覆盖契约。',
   },
   {
@@ -412,7 +422,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/abstractCategorys',
     group: '分类管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '抽象分类列表影响分类管理展示，需要覆盖基础查询。',
   },
   {
@@ -420,7 +430,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/abstractCategorys/search',
     group: '分类管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '抽象分类搜索依赖样例名称，需要覆盖搜索响应结构。',
   },
   {
@@ -428,7 +438,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/category/list',
     group: '分类管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '分类列表是商品配置入口，需要正向覆盖。',
   },
   {
@@ -436,7 +446,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menu/{menuId}/menuCategories',
     group: '分类管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '按菜单读取分类用于菜单编辑，需要覆盖存在菜单样例。',
   },
   {
@@ -444,7 +454,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuCategory',
     group: '分类管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单分类创建是核心 CRUD，需要隔离测试分类。',
   },
   {
@@ -452,7 +462,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuCategory',
     group: '分类管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单分类更新是核心 CRUD，需要校验更新后回读。',
   },
   {
@@ -460,7 +470,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuCategory/batch/copy',
     group: '分类管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量复制分类会生成多条配置数据，先覆盖契约。',
   },
   {
@@ -468,7 +478,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuCategory/batch/update',
     group: '分类管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量更新分类影响展示配置，先做契约保护。',
   },
   {
@@ -476,7 +486,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuCategory/quickEdit',
     group: '分类管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '分类快速编辑是常用配置写入，需要覆盖可控字段。',
   },
   {
@@ -484,7 +494,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuCategory/{id}',
     group: '分类管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单分类删除是 CRUD 闭环，需要只删除测试创建数据。',
   },
   {
@@ -492,7 +502,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuCategory/{id}',
     group: '分类管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单分类详情用于 CRUD 回读，需要覆盖存在记录。',
   },
   {
@@ -500,7 +510,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuCategorys/searchByName',
     group: '分类管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '按名称查分类依赖稳定样例名称，需要覆盖搜索契约。',
   },
   {
@@ -508,7 +518,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/admin/role/delete',
     group: '角色管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/admin-config.api.spec.ts',
+    specFile: API_SPEC_FILES.adminConfig,
     riskNote: '角色删除属于权限配置 CRUD，需要限定测试角色。',
   },
   {
@@ -516,7 +526,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/admin/role/list',
     group: '角色管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/admin-config.api.spec.ts',
+    specFile: API_SPEC_FILES.adminConfig,
     riskNote: '角色列表影响权限配置入口，需要覆盖基础查询。',
   },
   {
@@ -524,7 +534,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/admin/role/save',
     group: '角色管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/admin-config.api.spec.ts',
+    specFile: API_SPEC_FILES.adminConfig,
     riskNote: '角色保存是权限配置核心 CRUD，需要使用隔离角色名称。',
   },
   {
@@ -532,7 +542,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/item/fetchItemOption',
     group: '商品管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '商品选项读取影响点餐配置，需要覆盖存在商品样例。',
   },
   {
@@ -540,7 +550,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/item/fetchSaleItem',
     group: '商品管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '商品详情读取是商品链路核心查询，需要覆盖主要字段。',
   },
   {
@@ -548,7 +558,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/item/listByCategory',
     group: '商品管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '按分类列商品是菜单展示核心路径，需要正向覆盖。',
   },
   {
@@ -556,7 +566,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/item/listComboSaleItem',
     group: '商品管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '套餐商品列表影响组合商品配置，需要覆盖可用样例。',
   },
   {
@@ -564,7 +574,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/item/listItemOptions',
     group: '商品管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '商品选项列表用于加料选择，需要验证列表结构。',
   },
   {
@@ -572,7 +582,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/item/listKTVItems',
     group: '商品管理',
     coverage: 'blocked-missing-data',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: 'KTV 商品依赖特定门店数据，当前缺少稳定样例，先记录缺口。',
   },
   {
@@ -580,7 +590,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuComponentItemAssoc',
     group: '商品管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '组件商品关联会影响套餐配置，先覆盖契约。',
   },
   {
@@ -588,7 +598,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem',
     group: '商品管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '菜单商品创建是核心 CRUD，需要隔离测试商品。',
   },
   {
@@ -596,7 +606,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem',
     group: '商品管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '菜单商品更新是核心 CRUD，需要校验更新后回读。',
   },
   {
@@ -604,7 +614,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem/batch/copy',
     group: '商品管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量复制商品会产生多条菜单商品，先覆盖契约。',
   },
   {
@@ -612,7 +622,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem/batch/customizeMenuItemPriceAndMemberPrices',
     group: '商品管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量改价影响价格体系，先用契约烟测保护接口形态。',
   },
   {
@@ -620,7 +630,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem/batch/delete',
     group: '商品管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量删除商品破坏面较大，先覆盖契约。',
   },
   {
@@ -628,7 +638,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem/batch/sequence',
     group: '商品管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量商品排序影响菜单展示，先覆盖契约。',
   },
   {
@@ -636,7 +646,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem/batch/update',
     group: '商品管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量更新商品影响范围大，先覆盖契约。',
   },
   {
@@ -644,7 +654,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem/batch/updateOutOfStock',
     group: '商品管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量售罄会影响营业商品可售状态，先覆盖契约。',
   },
   {
@@ -652,7 +662,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem/link',
     group: '商品管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '商品链接关系会影响 SPU 和菜单商品映射，先覆盖契约。',
   },
   {
@@ -660,7 +670,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem/quickEdit',
     group: '商品管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '商品快速编辑是常用配置写入，需要覆盖可控字段。',
   },
   {
@@ -668,7 +678,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem/{id}',
     group: '商品管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '商品删除是 CRUD 闭环，需要只删除测试创建数据。',
   },
   {
@@ -676,7 +686,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItem/{id}',
     group: '商品管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '菜单商品详情用于 CRUD 回读，需要覆盖存在记录。',
   },
   {
@@ -684,7 +694,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItems/search',
     group: '商品管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '商品搜索是配置入口，需要覆盖稳定搜索条件。',
   },
   {
@@ -692,7 +702,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuSaleItems/searchByName',
     group: '商品管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '按名称查商品依赖样例商品名称，需要覆盖返回结构。',
   },
   {
@@ -700,7 +710,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/tax/delete',
     group: '税费管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/admin-config.api.spec.ts',
+    specFile: API_SPEC_FILES.adminConfig,
     riskNote: '税费删除是配置 CRUD 闭环，需要限定测试税费。',
   },
   {
@@ -708,7 +718,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/tax/list',
     group: '税费管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/admin-config.api.spec.ts',
+    specFile: API_SPEC_FILES.adminConfig,
     riskNote: '税费列表影响结账计算，需要覆盖基础查询。',
   },
   {
@@ -716,7 +726,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/tax/save',
     group: '税费管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/admin-config.api.spec.ts',
+    specFile: API_SPEC_FILES.adminConfig,
     riskNote: '税费保存是配置 CRUD，需要使用隔离税费名称。',
   },
   {
@@ -724,7 +734,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/discount/delete',
     group: '折扣管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/admin-config.api.spec.ts',
+    specFile: API_SPEC_FILES.adminConfig,
     riskNote: '折扣删除是配置 CRUD 闭环，需要限定测试折扣。',
   },
   {
@@ -732,7 +742,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/discount/list',
     group: '折扣管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/admin-config.api.spec.ts',
+    specFile: API_SPEC_FILES.adminConfig,
     riskNote: '折扣列表影响下单优惠选择，需要覆盖基础查询。',
   },
   {
@@ -740,7 +750,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/discount/save',
     group: '折扣管理',
     coverage: 'positive-crud',
-    specFile: 'tests/api/admin-config.api.spec.ts',
+    specFile: API_SPEC_FILES.adminConfig,
     riskNote: '折扣保存是配置 CRUD，需要使用隔离折扣名称。',
   },
   {
@@ -748,7 +758,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/globalOptionCategory',
     group: 'global-option-category-controller',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '全局选项分类创建是核心 CRUD，需要隔离测试分类。',
   },
   {
@@ -756,7 +766,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/globalOptionCategory',
     group: 'global-option-category-controller',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '全局选项分类更新是核心 CRUD，需要校验回读。',
   },
   {
@@ -764,7 +774,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/globalOptionCategory/{id}',
     group: 'global-option-category-controller',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '全局选项分类删除是 CRUD 闭环，需要只删除测试数据。',
   },
   {
@@ -772,7 +782,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/globalOptionCategory/{id}',
     group: 'global-option-category-controller',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '全局选项分类详情用于 CRUD 回读，需要覆盖存在记录。',
   },
   {
@@ -780,7 +790,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menu/{menuId}/globalOptionCategories',
     group: 'global-option-category-controller',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '按菜单读取全局选项分类用于菜单配置，需要覆盖存在菜单。',
   },
   {
@@ -788,7 +798,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/batchCustomizeGlobalOptionPriceAndMemberPrices',
     group: 'global-option-controller',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量改全局选项价格影响价格体系，先覆盖契约。',
   },
   {
@@ -796,7 +806,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGlobalOption',
     group: 'global-option-controller',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单全局选项创建是核心 CRUD，需要隔离测试选项。',
   },
   {
@@ -804,7 +814,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGlobalOption',
     group: 'global-option-controller',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单全局选项更新是核心 CRUD，需要校验回读。',
   },
   {
@@ -812,7 +822,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGlobalOption/batch/copy',
     group: 'global-option-controller',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量复制全局选项会产生多条配置数据，先覆盖契约。',
   },
   {
@@ -820,7 +830,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGlobalOption/batch/delete',
     group: 'global-option-controller',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量删除全局选项破坏面较大，先覆盖契约。',
   },
   {
@@ -828,7 +838,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGlobalOption/batch/sequence',
     group: 'global-option-controller',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量排序全局选项影响展示顺序，先覆盖契约。',
   },
   {
@@ -836,7 +846,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGlobalOption/batch/update',
     group: 'global-option-controller',
     coverage: 'contract-only',
-    specFile: 'tests/api/menu-catalog.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量更新全局选项影响范围大，先覆盖契约。',
   },
   {
@@ -844,7 +854,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGlobalOption/{id}',
     group: 'global-option-controller',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单全局选项删除是 CRUD 闭环，需要只删除测试数据。',
   },
   {
@@ -852,7 +862,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGlobalOption/{id}',
     group: 'global-option-controller',
     coverage: 'positive-crud',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '菜单全局选项详情用于 CRUD 回读，需要覆盖存在记录。',
   },
   {
@@ -860,7 +870,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/menu/menuGlobalOptions/search',
     group: 'global-option-controller',
     coverage: 'positive-business',
-    specFile: 'tests/api/menu-catalog.api.spec.ts',
+    specFile: API_SPEC_FILES.menuCatalog,
     riskNote: '全局选项搜索是配置入口，需要覆盖稳定搜索条件。',
   },
   {
@@ -868,7 +878,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/spu/hack/renumber',
     group: 'SPU 库存管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: 'SPU 重编号属于危险维护操作，先覆盖契约，不执行真实变更。',
   },
   {
@@ -876,7 +886,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/spu/menuSaleItem/assign',
     group: 'SPU 库存管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: 'SPU 分配菜单商品影响库存映射，需要使用隔离商品样例。',
   },
   {
@@ -884,7 +894,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/spu/menuSaleItem/link',
     group: 'SPU 库存管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: 'SPU 与菜单商品链接是库存业务关键路径，需要正向覆盖。',
   },
   {
@@ -892,7 +902,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/spu/menuSaleItem/list/{code}',
     group: 'SPU 库存管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '按 SPU 编码读取菜单商品映射，需要覆盖稳定编码样例。',
   },
   {
@@ -900,7 +910,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/spu/stockOperation',
     group: 'SPU 库存管理',
     coverage: 'positive-business',
-    specFile: 'tests/api/sale-item.api.spec.ts',
+    specFile: API_SPEC_FILES.saleItem,
     riskNote: '单笔库存操作影响库存数量，需要使用隔离库存样例。',
   },
   {
@@ -908,7 +918,7 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     path: '/api/spu/stockOperations',
     group: 'SPU 库存管理',
     coverage: 'contract-only',
-    specFile: 'tests/api/sale-item.contract-smoke.api.spec.ts',
+    specFile: API_SPEC_FILES.contractSmoke,
     riskNote: '批量库存操作影响多条库存记录，先覆盖契约。',
   },
 ];
