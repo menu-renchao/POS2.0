@@ -48,19 +48,25 @@ test.describe('后台配置接口', () => {
         return;
       }
 
+      let deleted = false;
       registerCleanup({
         resourceRegistry,
         type: 'tax',
         id,
         name,
         cleanupPriority: 30,
-        deleteResource: async () => await adminConfigApi.deleteTax({ id }),
+        deleteResource: async () => {
+          if (!deleted) {
+            await adminConfigApi.deleteTax({ id });
+          }
+        },
       });
 
       await test.step('删除本次创建的测试税费并校验响应信封', async () => {
         const response = await adminConfigApi.deleteTax({ id });
 
         await expectJsonEnvelope(response, 'POST /api/tax/delete');
+        deleted = true;
       });
     });
   });
@@ -105,19 +111,25 @@ test.describe('后台配置接口', () => {
         return;
       }
 
+      let deleted = false;
       registerCleanup({
         resourceRegistry,
         type: 'discount',
         id,
         name,
         cleanupPriority: 30,
-        deleteResource: async () => await adminConfigApi.deleteDiscount({ id }),
+        deleteResource: async () => {
+          if (!deleted) {
+            await adminConfigApi.deleteDiscount({ id });
+          }
+        },
       });
 
       await test.step('删除本次创建的测试折扣并校验响应信封', async () => {
         const response = await adminConfigApi.deleteDiscount({ id });
 
         await expectJsonEnvelope(response, 'POST /api/discount/delete');
+        deleted = true;
       });
     });
   });
@@ -162,19 +174,25 @@ test.describe('后台配置接口', () => {
         return;
       }
 
+      let deleted = false;
       registerCleanup({
         resourceRegistry,
         type: 'role',
         id,
         name,
         cleanupPriority: 30,
-        deleteResource: async () => await adminConfigApi.deleteRole({ id }),
+        deleteResource: async () => {
+          if (!deleted) {
+            await adminConfigApi.deleteRole({ id });
+          }
+        },
       });
 
       await test.step('删除本次创建的测试角色并校验响应信封', async () => {
         const response = await adminConfigApi.deleteRole({ id });
 
         await expectJsonEnvelope(response, 'POST /api/admin/role/delete');
+        deleted = true;
       });
     });
   });
@@ -261,7 +279,7 @@ function registerCleanup(options: {
   id: ResourceId;
   name: string;
   cleanupPriority: number;
-  deleteResource: () => Promise<APIResponse>;
+  deleteResource: () => Promise<unknown>;
 }): void {
   options.resourceRegistry.register({
     type: options.type,
