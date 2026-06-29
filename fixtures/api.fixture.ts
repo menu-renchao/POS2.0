@@ -1,4 +1,10 @@
 import { test as base, type APIRequestContext } from '@playwright/test';
+import { AdminConfigApiClient } from '../api/clients/admin-config-api.client';
+import { MenuApiClient } from '../api/clients/menu-api.client';
+import { OrderApiClient } from '../api/clients/order-api.client';
+import { PaymentApiClient } from '../api/clients/payment-api.client';
+import { SaleItemApiClient } from '../api/clients/sale-item-api.client';
+import { SpuApiClient } from '../api/clients/spu-api.client';
 import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
 import { createApiRequestContext } from '../api/core/api-context';
 import { ResourceRegistry } from '../api/core/resource-registry';
@@ -7,6 +13,12 @@ type ApiFixtures = {
   apiConfig: ApiConfig;
   apiRequest: APIRequestContext;
   resourceRegistry: ResourceRegistry;
+  menuApi: MenuApiClient;
+  saleItemApi: SaleItemApiClient;
+  spuApi: SpuApiClient;
+  orderApi: OrderApiClient;
+  paymentApi: PaymentApiClient;
+  adminConfigApi: AdminConfigApiClient;
 };
 
 export const test = base.extend<ApiFixtures>({
@@ -46,5 +58,23 @@ export const test = base.extend<ApiFixtures>({
         );
       }
     }
+  },
+  menuApi: async ({ apiRequest }, use) => {
+    await use(new MenuApiClient(apiRequest));
+  },
+  saleItemApi: async ({ apiRequest }, use) => {
+    await use(new SaleItemApiClient(apiRequest));
+  },
+  spuApi: async ({ apiRequest }, use) => {
+    await use(new SpuApiClient(apiRequest));
+  },
+  orderApi: async ({ apiRequest }, use) => {
+    await use(new OrderApiClient(apiRequest));
+  },
+  paymentApi: async ({ apiRequest }, use) => {
+    await use(new PaymentApiClient(apiRequest));
+  },
+  adminConfigApi: async ({ apiRequest }, use) => {
+    await use(new AdminConfigApiClient(apiRequest));
   },
 });
