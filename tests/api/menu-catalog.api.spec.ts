@@ -11,6 +11,7 @@ import {
 } from '../../test-data/api/menu-api-data';
 
 type MenuCatalogResourceType =
+  | 'menu'
   | 'menuGroup'
   | 'menuCategory'
   | 'globalOptionCategory'
@@ -160,6 +161,20 @@ test.describe('菜单目录接口', () => {
       });
       return;
     }
+
+    let menuArchived = false;
+    registerCleanup({
+      resourceRegistry,
+      type: 'menu',
+      id: menuId,
+      name: menuRequest.name,
+      cleanupPriority: 10,
+      deleteResource: async () => {
+        if (!menuArchived) {
+          await menuApi.updateMenu(toArchivedMenuRequest(menuRequest, menuId));
+        }
+      },
+    });
 
     await test.step('更新测试菜单并校验响应信封', async () => {
       const updatedMenu = buildMenuRequest();
@@ -474,6 +489,12 @@ test.describe('菜单目录接口', () => {
         'DELETE /api/menu/menuGroup/{id}',
       );
       menuGroupDeleted = true;
+
+      await expectJsonEnvelope(
+        await menuApi.updateMenu(toArchivedMenuRequest(menuRequest, menuId)),
+        'PUT /api/menu/menu',
+      );
+      menuArchived = true;
     });
   });
 });
@@ -534,6 +555,19 @@ function toMenuQuery(menuId: ResourceId | undefined): Record<string, ResourceId>
 
 function toSearchQuery(): Record<string, string> {
   return { keyword: 'AT' };
+}
+
+function toArchivedMenuRequest(
+  menuRequest: Record<string, unknown>,
+  menuId: ResourceId,
+): Record<string, unknown> {
+  return {
+    ...menuRequest,
+    id: menuId,
+    enabled: false,
+    active: false,
+    deleted: true,
+  };
 }
 
 function extractResourceId(envelope: ApiEnvelope<unknown>): ResourceId | undefined {
