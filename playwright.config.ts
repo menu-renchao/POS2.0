@@ -34,12 +34,19 @@ export default defineConfig({
   projects: [
     {
       name: 'chrome',
-      testIgnore: /py-migrate/,
+      testIgnore: /py-migrate|api/,
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chrome',
         viewport: { width: 1920, height: 1080 },
         headless: !!process.env.CI,
+      },
+    },
+    {
+      name: 'api',
+      testMatch: /api/,
+      use: {
+        viewport: null,
       },
     },
     {

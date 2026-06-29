@@ -13,6 +13,7 @@
   },
   "include": [
     "playwright.config.ts",
+    "api/**/*.ts",
     "tests/**/*.ts",
     "pages/**/*.ts",
     "flows/**/*.ts",
