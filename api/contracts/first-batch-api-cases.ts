@@ -5,6 +5,22 @@ export type ApiCoverageLevel =
   | 'deferred-external'
   | 'blocked-missing-data';
 
+export const ALLOWED_API_GROUPS = [
+  '菜单管理',
+  '菜单全局搜索',
+  '菜单组管理',
+  '订单管理',
+  '订单支付',
+  '分类管理',
+  '角色管理',
+  '商品管理',
+  '税费管理',
+  '折扣管理',
+  'global-option-category-controller',
+  'global-option-controller',
+  'SPU 库存管理',
+] as const;
+
 export const API_SPEC_FILES = {
   menuCatalog: 'tests/api/menu-catalog.api.spec.ts',
   saleItem: 'tests/api/sale-item.api.spec.ts',
@@ -13,12 +29,13 @@ export const API_SPEC_FILES = {
   contractSmoke: 'tests/api/contract-smoke.api.spec.ts',
 } as const;
 
+export type ApiBatchGroup = (typeof ALLOWED_API_GROUPS)[number];
 export type ApiSpecFile = (typeof API_SPEC_FILES)[keyof typeof API_SPEC_FILES];
 
 export type FirstBatchApiCase = {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
-  group: string;
+  group: ApiBatchGroup;
   coverage: ApiCoverageLevel;
   specFile: ApiSpecFile;
   riskNote: string;

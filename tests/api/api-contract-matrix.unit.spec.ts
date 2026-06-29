@@ -1,25 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { existsSync } from 'node:fs';
 import {
+  ALLOWED_API_GROUPS,
   API_SPEC_FILES,
   firstBatchApiCases,
   type ApiCoverageLevel,
 } from '../../api/contracts/first-batch-api-cases';
-
-const ALLOWED_API_GROUPS = [
-  '菜单管理',
-  '菜单全局搜索',
-  '菜单组管理',
-  '订单管理',
-  '订单支付',
-  '分类管理',
-  '角色管理',
-  '商品管理',
-  '税费管理',
-  '折扣管理',
-  'global-option-category-controller',
-  'global-option-controller',
-  'SPU 库存管理',
-] as const;
 
 const NON_POSITIVE_COVERAGE_LEVELS: readonly ApiCoverageLevel[] = [
   'contract-only',
@@ -44,7 +30,15 @@ test.describe('首批接口覆盖矩阵', () => {
 
       if (NON_POSITIVE_COVERAGE_LEVELS.includes(apiCase.coverage)) {
         expect(apiCase.specFile).toBe(API_SPEC_FILES.contractSmoke);
+      } else {
+        expect(apiCase.specFile).not.toBe(API_SPEC_FILES.contractSmoke);
       }
+    }
+  });
+
+  test('每个声明的用例文件都应存在', () => {
+    for (const specFile of Object.values(API_SPEC_FILES)) {
+      expect(existsSync(specFile), `${specFile} 应存在`).toBe(true);
     }
   });
 
