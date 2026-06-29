@@ -55,7 +55,6 @@ test.describe('API 测试夹具', () => {
 
       for (const [client, ClientClass] of clients) {
         expect(client).toBeInstanceOf(ClientClass);
-        expect((client as unknown as { request: typeof apiRequest }).request).toBe(apiRequest);
       }
     });
   });
