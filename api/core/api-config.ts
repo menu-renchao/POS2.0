@@ -1,12 +1,20 @@
 export type ApiAuthMode = 'apiKey' | 'cookie';
 
+export type ApiAuthConfig =
+  | {
+      mode: 'apiKey';
+      apiKey: string;
+      licenseAuthKey?: never;
+    }
+  | {
+      mode: 'cookie';
+      licenseAuthKey: string;
+      apiKey?: never;
+    };
+
 export type ApiConfig = {
   baseURL: string;
-  auth: {
-    mode: ApiAuthMode;
-    apiKey?: string;
-    licenseAuthKey?: string;
-  };
+  auth: ApiAuthConfig;
   enableDestructive: boolean;
   testPrefix: string;
 };
@@ -16,7 +24,7 @@ type EnvSource = Record<string, string | undefined>;
 export function loadApiConfig(env: EnvSource = process.env): ApiConfig {
   const baseURL = resolveApiBaseURL(env);
   const mode = resolveAuthMode(env.API_AUTH_MODE);
-  const enableDestructive = env.API_ENABLE_DESTRUCTIVE === 'true';
+  const enableDestructive = env.API_ENABLE_DESTRUCTIVE?.trim().toLowerCase() === 'true';
   const testPrefix = env.API_TEST_PREFIX?.trim() || 'AT';
 
   if (mode === 'apiKey') {
@@ -54,22 +62,34 @@ function resolveApiBaseURL(env: EnvSource): string {
 
   const playwrightBaseURL = env.PLAYWRIGHT_BASE_URL?.trim();
   if (playwrightBaseURL) {
-    return `${stripTrailingSlash(playwrightBaseURL)}/kpos`;
+    const normalizedPlaywrightBaseURL = stripTrailingSlash(playwrightBaseURL);
+    if (normalizedPlaywrightBaseURL.endsWith('/kpos')) {
+      return normalizedPlaywrightBaseURL;
+    }
+
+    return `${normalizedPlaywrightBaseURL}/kpos`;
   }
 
   return 'http://192.168.0.182:22080/kpos';
 }
 
 function resolveAuthMode(value: string | undefined): ApiAuthMode {
-  if (!value) {
+  const normalizedValue = value?.trim().toLowerCase();
+  if (!normalizedValue) {
     return 'apiKey';
   }
 
-  if (value === 'apiKey' || value === 'cookie') {
-    return value;
+  if (normalizedValue === 'apikey' || normalizedValue === 'api_key') {
+    return 'apiKey';
   }
 
-  throw new Error(`Unsupported API_AUTH_MODE: ${value}. Expected apiKey or cookie.`);
+  if (normalizedValue === 'cookie') {
+    return 'cookie';
+  }
+
+  throw new Error(
+    `Unsupported API_AUTH_MODE: ${value.trim()}. Expected apiKey, apikey, api_key, or cookie.`,
+  );
 }
 
 function stripTrailingSlash(value: string): string {
