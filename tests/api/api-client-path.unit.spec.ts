@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { AdminConfigApiClient } from '../../api/clients/admin-config-api.client';
 import { toApiClientPath, toRequestParams } from '../../api/clients/client-path';
 import { MenuApiClient } from '../../api/clients/menu-api.client';
@@ -32,5 +34,21 @@ test.describe('API client 路径工具', () => {
       PaymentApiClient,
       AdminConfigApiClient,
     ]).toHaveLength(6);
+  });
+
+  test('领域 API client 不应绕过路径转换工具直接请求绝对 API 路径', () => {
+    const clientDir = path.join(process.cwd(), 'api', 'clients');
+    const clientFiles = readdirSync(clientDir).filter(
+      (fileName) => fileName.endsWith('.ts') && fileName !== 'client-path.ts',
+    );
+
+    for (const clientFile of clientFiles) {
+      const source = readFileSync(path.join(clientDir, clientFile), 'utf8');
+
+      expect(
+        source,
+        `${clientFile} 不应直接调用 this.request.*('/api/...')，应先经过 toApiClientPath()。`,
+      ).not.toMatch(/this\.request\.(?:get|post|put|delete|fetch)\(\s*['"`]\/api\//);
+    }
   });
 });

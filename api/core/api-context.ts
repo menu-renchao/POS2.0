@@ -18,7 +18,7 @@ export async function createApiRequestContext(config: ApiConfig): Promise<APIReq
   const cookies = buildApiAuthCookies(config);
 
   return request.newContext({
-    baseURL: config.baseURL,
+    baseURL: toApiRequestBaseURL(config.baseURL),
     extraHTTPHeaders,
     storageState:
       cookies.length > 0
@@ -28,6 +28,10 @@ export async function createApiRequestContext(config: ApiConfig): Promise<APIReq
           }
         : undefined,
   });
+}
+
+function toApiRequestBaseURL(baseURL: string): string {
+  return baseURL.endsWith('/') ? baseURL : `${baseURL}/`;
 }
 
 function toStorageStateCookie(cookie: ApiAuthCookie): ApiStorageStateCookie {

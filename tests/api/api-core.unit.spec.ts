@@ -132,12 +132,65 @@ test.describe('API 核心工具', () => {
 
     expect(receivedHeaders.cookie).toContain('licenseAuthKey=cookie-1');
   });
+
+  test('应能在 kpos baseURL 下把相对 API 路径请求到 kpos 目录', async () => {
+    const receivedUrl = await withRequestUrlEchoServer(async (baseURL) => {
+      const apiContext = await createApiRequestContext({
+        baseURL: `${baseURL}/kpos`,
+        auth: { mode: 'apiKey', apiKey: 'key-1' },
+        enableDestructive: false,
+        testPrefix: 'AT',
+      });
+
+      try {
+        const response = await apiContext.get('api/check');
+        const body = (await response.json()) as { url: string };
+
+        return body.url;
+      } finally {
+        await apiContext.dispose();
+      }
+    });
+
+    expect(receivedUrl).toBe('/kpos/api/check');
+  });
 });
 
 async function withHeaderEchoServer<T>(callback: (baseURL: string) => Promise<T>): Promise<T> {
   const server = http.createServer((request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify(request.headers));
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', resolve);
+  });
+
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('测试服务启动失败，无法获取监听端口。');
+  }
+
+  try {
+    return await callback(`http://127.0.0.1:${address.port}`);
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+}
+
+async function withRequestUrlEchoServer<T>(callback: (baseURL: string) => Promise<T>): Promise<T> {
+  const server = http.createServer((request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ url: request.url }));
   });
 
   await new Promise<void>((resolve) => {
