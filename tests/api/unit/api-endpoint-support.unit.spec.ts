@@ -1,0 +1,188 @@
+import { expect, test } from '@playwright/test';
+import { toEndpointTitle, type EndpointIdentity } from '../support/endpoint-case';
+import {
+  expectArrayData,
+  expectHttpStatus,
+  expectResourceId,
+  parseApiJson,
+} from '../support/endpoint-assertions';
+import {
+  extractFirstResourceId,
+  findResourceIdByName,
+} from '../support/endpoint-read-model';
+
+test.describe('Endpoint 测试支撑工具', () => {
+  test('应能生成包含方法和路径的 endpoint 标题', () => {
+    expect(toEndpointTitle('POST', '/api/tax/save', '应能保存税费')).toBe(
+      'POST /api/tax/save 应能保存税费',
+    );
+  });
+
+  test('应能解析 JSON 响应并保留 endpoint 上下文', async () => {
+    const identity: EndpointIdentity = { method: 'GET', path: '/api/tax/list' };
+    const response = {
+      status: () => 200,
+      json: async () => ({ code: 0, msg: 'success', data: [{ id: 1 }] }),
+    };
+
+    const body = await parseApiJson(response, identity);
+
+    expect(body).toEqual({ code: 0, msg: 'success', data: [{ id: 1 }] });
+  });
+
+  test('应能从列表或分页容器中读取数组数据', () => {
+    const identity: EndpointIdentity = { method: 'GET', path: '/api/tax/list' };
+
+    expect(expectArrayData({ code: 0, msg: 'success', data: [{ id: 1 }] }, identity)).toEqual([
+      { id: 1 },
+    ]);
+    expect(
+      expectArrayData({ code: 0, msg: 'success', data: { records: [{ id: 2 }] } }, identity),
+    ).toEqual([{ id: 2 }]);
+  });
+
+  test('应在解析 JSON 失败时保留 endpoint 上下文', async () => {
+    const identity: EndpointIdentity = { method: 'GET', path: '/api/tax/list' };
+    const response = {
+      status: () => 200,
+      json: async () => {
+        throw new Error('broken json');
+      },
+    };
+
+    await expect(parseApiJson(response, identity)).rejects.toThrow(
+      'GET /api/tax/list',
+    );
+    await expect(parseApiJson(response, identity)).rejects.toThrow('响应体解析失败');
+  });
+
+  test('应在响应不符合 envelope 时保留 endpoint 上下文', async () => {
+    const identity: EndpointIdentity = { method: 'POST', path: '/api/tax/save' };
+    const response = {
+      status: () => 200,
+      json: async () => ({ ok: true }),
+    };
+
+    await expect(parseApiJson(response, identity)).rejects.toThrow(
+      'POST /api/tax/save',
+    );
+  });
+
+  test('HTTP 状态码不符时应抛错并携带 endpoint 上下文', async () => {
+    const identity: EndpointIdentity = { method: 'GET', path: '/api/tax/list' };
+    const response = {
+      status: () => 500,
+      json: async () => ({ code: 0, msg: 'success' }),
+    };
+
+    await expect(expectHttpStatus(response, identity)).rejects.toThrow('GET /api/tax/list -> 500');
+    await expect(expectHttpStatus(response, identity)).rejects.toThrow('期望值: 200');
+  });
+
+  test('数组数据提取失败时应抛错并携带 endpoint 上下文', () => {
+    const identity: EndpointIdentity = { method: 'GET', path: '/api/tax/list' };
+
+    expect(() =>
+      expectArrayData({ code: 0, msg: 'success', data: { total: 10 } }, identity),
+    ).toThrow('GET /api/tax/list 未能从响应中提取数组数据');
+    expect(() =>
+      expectArrayData({ code: 0, msg: 'success', data: { records: 'not-array' as any } }, identity),
+    ).toThrow('GET /api/tax/list 未能从响应中提取数组数据');
+  });
+
+  test('支持更多资源 ID 键，避免误提取 envelope code', () => {
+    const identity: EndpointIdentity = { method: 'GET', path: '/api/common' };
+    const resourceIdKeys = [
+      'menuGroupId',
+      'menuCategoryId',
+      'menuSaleItemId',
+      'itemId',
+      'globalOptionId',
+      'globalOptionCategoryId',
+      'optionId',
+      'optionCategoryId',
+      'spuId',
+      'paymentRecordId',
+    ] as const;
+
+    resourceIdKeys.forEach((key, index) => {
+      const value = {
+        data: {
+          [key]: index + 1,
+          name: `AT_${key}`,
+        },
+      };
+
+      expect(extractFirstResourceId(value)).toBe(index + 1);
+      expect(findResourceIdByName(value, `AT_${key}`)).toBe(index + 1);
+    });
+
+    expect(() => expectArrayData({ code: 0, msg: 'success', data: {} }, identity)).toThrow(
+      'GET /api/common 未能从响应中提取数组数据',
+    );
+    expect(extractFirstResourceId({ code: 0, msg: 'success', data: {} })).toBeUndefined();
+    expect(() =>
+      expectResourceId({ code: 0, msg: 'success', data: {} }, identity),
+    ).toThrow('GET /api/common 未能从响应中提取资源 ID');
+  });
+
+  test('应能递归提取资源 ID 和按名称查找 ID', () => {
+    const value = {
+      data: {
+        records: [
+          { id: 11, name: 'AT_A' },
+          { roleId: 12, roleName: 'AT_B' },
+        ],
+      },
+    };
+
+    expect(extractFirstResourceId(value)).toBe(11);
+    expect(findResourceIdByName(value, 'AT_B')).toBe(12);
+  });
+
+  test('循环引用应不会导致递归死循环', () => {
+    const root: { data: { records: Array<Record<string, unknown>> } } = { data: { records: [] } };
+    const first: Record<string, unknown> = { name: 'AT_LOOP' };
+    const second: Record<string, unknown> = { roleId: 99, roleName: 'AT_ROLE_LOOP' };
+
+    first.self = second;
+    second.self = first;
+    root.data.records.push(first);
+
+    expect(extractFirstResourceId(root)).toBe(99);
+    expect(findResourceIdByName(root, 'AT_ROLE_LOOP')).toBe(99);
+  });
+
+  test('数组自引用应不会导致递归死循环', () => {
+    const arr: unknown[] = [];
+    arr.push(arr);
+
+    expect(extractFirstResourceId(arr)).toBeUndefined();
+    expect(findResourceIdByName(arr, 'NOT_FOUND')).toBeUndefined();
+  });
+
+  test('数组自引用应跳过自身引用并继续查找后续有效项', () => {
+    const arr: unknown[] = [];
+    arr.push(arr);
+    arr.push({ id: 77, name: 'AT_NEXT' });
+
+    expect(extractFirstResourceId(arr)).toBe(77);
+    expect(findResourceIdByName(arr, 'AT_NEXT')).toBe(77);
+  });
+
+  test('循环引用且缺少 id 时应返回 undefined', () => {
+    const node: Record<string, unknown> = {};
+    node.self = node;
+
+    expect(extractFirstResourceId(node)).toBeUndefined();
+    expect(findResourceIdByName(node, 'NOT_FOUND')).toBeUndefined();
+  });
+
+  test('缺少资源 ID 时应输出 endpoint 上下文', () => {
+    const identity: EndpointIdentity = { method: 'POST', path: '/api/tax/save' };
+
+    expect(() => expectResourceId({ data: {} }, identity)).toThrow(
+      'POST /api/tax/save 未能从响应中提取资源 ID',
+    );
+  });
+});
