@@ -1,0 +1,216 @@
+boolean isValidIpv4(String host) {
+    def octet = '(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])'
+    return host ==~ /^${octet}\.${octet}\.${octet}\.${octet}$/
+}
+
+boolean isValidHostname(String host) {
+    return host ==~ /^(?=.{1,253}$)([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/
+}
+
+String resolveApiHost(Object rawHost) {
+    def host = rawHost?.toString()?.trim() ?: ''
+    if (!host) {
+        error 'API_HOST is required. Example: 192.168.0.182'
+    }
+
+    if (isValidIpv4(host)) {
+        return host
+    }
+
+    if (host ==~ /^[0-9.]+$/) {
+        error "API_HOST must be a complete IPv4 address. Example: 192.168.0.182, actual: ${host}"
+    }
+
+    if (!isValidHostname(host)) {
+        error "API_HOST must be a complete IPv4 address or valid hostname. Actual: ${host}"
+    }
+
+    return host
+}
+
+String resolveApiPort(Object rawPort) {
+    def portText = rawPort?.toString()?.trim() ?: ''
+    if (!(portText ==~ /^[0-9]+$/)) {
+        error "API_PORT must be a number between 1 and 65535. Actual: ${portText}"
+    }
+
+    def port = portText.toInteger()
+    if (port < 1 || port > 65535) {
+        error "API_PORT must be a number between 1 and 65535. Actual: ${portText}"
+    }
+
+    return portText
+}
+
+String resolveApiContextPath(Object rawContextPath) {
+    def contextPath = rawContextPath?.toString()?.trim()?.replaceAll('^/+|/+$', '') ?: ''
+    if (!contextPath) {
+        error 'API_CONTEXT_PATH is required. Example: kpos'
+    }
+
+    if (contextPath.contains('..') || !(contextPath ==~ /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/)) {
+        error "API_CONTEXT_PATH may only contain path segments with letters, numbers, underscore, dot, hyphen, or slash. Actual: ${contextPath}"
+    }
+
+    return contextPath
+}
+
+String resolveGitBranch(Object rawBranch) {
+    def branch = rawBranch?.toString()?.replace(':selected', '')?.trim() ?: 'main'
+    if (!branch.matches('[A-Za-z0-9._/-]+')
+        || branch.startsWith('/')
+        || branch.endsWith('/')
+        || branch.contains('..')
+        || branch.contains('//')
+        || branch.contains('@{')
+        || branch.endsWith('.lock')) {
+        error "Invalid GIT_BRANCH value: ${branch}"
+    }
+
+    return branch
+}
+
+String apiTestCommand(String scope) {
+    def commands = [
+        all      : 'npm run test:api',
+        endpoints: 'npx playwright test tests/api/endpoints --project=api',
+        business : 'npm run test:api:business',
+        contracts: 'npm run test:api:contract',
+        unit     : 'npm run test:api:unit',
+        cleanup  : 'npm run test:api:cleanup',
+    ]
+
+    if (!commands.containsKey(scope)) {
+        error "Unsupported API_TEST_SCOPE: ${scope}"
+    }
+
+    return commands[scope]
+}
+
+pipeline {
+    agent any
+
+    parameters {
+        string(
+            name: 'API_HOST',
+            defaultValue: '192.168.0',
+            description: '(required) Target API host. Complete it before running, e.g. 192.168.0.182'
+        )
+        string(
+            name: 'API_PORT',
+            defaultValue: '22080',
+            description: '(required) Target API port.'
+        )
+        string(
+            name: 'API_CONTEXT_PATH',
+            defaultValue: 'kpos',
+            description: '(required) API context path without leading slash.'
+        )
+        choice(
+            name: 'API_TEST_SCOPE',
+            choices: ['all', 'endpoints', 'business', 'contracts', 'unit', 'cleanup'],
+            description: '(required) API test scope to run.'
+        )
+        string(
+            name: 'GIT_BRANCH',
+            defaultValue: 'main',
+            description: '(required) Git branch to checkout.'
+        )
+    }
+
+    environment {
+        API_AUTH_MODE = 'apiLogin'
+        CI = 'true'
+        PATH = "C:\\Program Files\\nodejs;${env.PATH}"
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    def apiHost = resolveApiHost(params.API_HOST)
+                    def apiPort = resolveApiPort(params.API_PORT)
+                    def apiContextPath = resolveApiContextPath(params.API_CONTEXT_PATH)
+                    env.API_BASE_URL = "http://${apiHost}:${apiPort}/${apiContextPath}"
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} ${params.API_TEST_SCOPE} ${env.API_BASE_URL}"
+                    echo "API_BASE_URL=${env.API_BASE_URL}"
+                    echo "API_TEST_SCOPE=${params.API_TEST_SCOPE}"
+                }
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                script {
+                    def selectedBranch = resolveGitBranch(params.GIT_BRANCH)
+                    checkout scm
+                    bat 'git fetch --prune origin +refs/heads/*:refs/remotes/origin/*'
+                    bat "git checkout -B \"${selectedBranch}\" \"origin/${selectedBranch}\""
+                    bat 'git rev-parse --abbrev-ref HEAD'
+                    bat 'git rev-parse HEAD'
+                }
+            }
+        }
+
+        stage('Check Environment') {
+            steps {
+                bat 'node --version'
+                bat 'npm --version'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                bat 'npm ci'
+            }
+        }
+
+        stage('Clean Test Reports') {
+            steps {
+                bat '''
+                    if exist "allure-results" rmdir /s /q "allure-results"
+                    if exist "allure-report" rmdir /s /q "allure-report"
+                    if exist "test-results" rmdir /s /q "test-results"
+                '''
+            }
+        }
+
+        stage('Run API Tests') {
+            steps {
+                script {
+                    bat apiTestCommand(params.API_TEST_SCOPE)
+                }
+            }
+            post {
+                always {
+                    script {
+                        if (fileExists('allure-results')) {
+                            allure includeProperties: false,
+                                   jdk: '',
+                                   results: [[path: 'allure-results']]
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'allure-results/**', allowEmptyArchive: true
+        }
+        success {
+            echo "API tests PASSED. Target: ${env.API_BASE_URL}. Scope: ${params.API_TEST_SCOPE}"
+        }
+        failure {
+            echo "API tests FAILED. Target: ${env.API_BASE_URL}. Scope: ${params.API_TEST_SCOPE}"
+        }
+    }
+}
