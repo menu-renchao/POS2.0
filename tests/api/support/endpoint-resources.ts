@@ -3,6 +3,8 @@ import type { ApiRequestData } from '../../../api/clients/client-path';
 import { createShortTestName } from '../../../api/core/test-data-id';
 import type { AdminConfigApiClient } from '../../../api/clients/admin-config-api.client';
 import type { MenuApiClient } from '../../../api/clients/menu-api.client';
+import type { OrderApiClient } from '../../../api/clients/order-api.client';
+import type { PaymentApiClient } from '../../../api/clients/payment-api.client';
 import type { SaleItemApiClient } from '../../../api/clients/sale-item-api.client';
 import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
 import {
@@ -11,6 +13,8 @@ import {
   buildMenuRequest,
   buildSaleItemRequest,
 } from '../../../test-data/api/menu-api-data';
+import { buildDefaultOrderListQuery, buildOrderRequest } from '../../../test-data/api/order-api-data';
+import { buildPaymentRecordRequest } from '../../../test-data/api/payment-api-data';
 import {
   expectApiOk,
 } from './endpoint-assertions';
@@ -26,6 +30,8 @@ export type EndpointResource = {
 export type EndpointResourceFactoryOptions = {
   adminConfigApi: AdminConfigApiClient;
   menuApi?: MenuApiClient;
+  orderApi?: OrderApiClient;
+  paymentApi?: PaymentApiClient;
   saleItemApi?: SaleItemApiClient;
   resourceRegistry: ResourceRegistry;
 };
@@ -42,6 +48,8 @@ export type EndpointResources = {
     menuGroupId: ResourceId,
     categoryId: ResourceId,
   ) => Promise<EndpointResource>;
+  createOrderResource: () => Promise<EndpointResource>;
+  createPaymentRecordResource: (orderId: ResourceId) => Promise<EndpointResource>;
 };
 
 const ENDPOINT_RESOURCE_CLEANUP_PRIORITY = 30;
@@ -50,7 +58,7 @@ const SHORT_NAME_MAX_LENGTH = 16;
 export function createEndpointResources(
   options: EndpointResourceFactoryOptions,
 ): EndpointResources {
-  return {
+  const resources: EndpointResources = {
     createTaxResource: async () => {
       const name = buildShortName('TAX');
       const request: ApiRequestData = {
@@ -267,7 +275,69 @@ export function createEndpointResources(
 
       return resolvedResource;
     },
+    createOrderResource: async () => {
+      const orderApi = getOrderApi(options);
+      const menuResource = await resources.createMenuResource();
+      const menuGroupResource = await resources.createMenuGroupResource(menuResource.id);
+      const categoryResource = await resources.createCategoryResource(
+        menuResource.id,
+        menuGroupResource.id,
+      );
+      const saleItemResource = await resources.createSaleItemResource(
+        menuResource.id,
+        menuGroupResource.id,
+        categoryResource.id,
+      );
+      const request = buildOrderRequest(saleItemResource.id);
+      const customerName = String(request.order.customerName);
+
+      const resolvedResource = await createEndpointResource({
+        name: customerName,
+        adminConfigApi: options.adminConfigApi,
+        resourceRegistry: options.resourceRegistry,
+        request,
+        saveIdentity: {
+          method: 'POST',
+          path: '/api/order/save',
+        },
+        saveResource: () => orderApi.saveOrder(request),
+        listIdentity: {
+          method: 'GET',
+          path: '/api/order/list',
+        },
+        listResource: () =>
+          orderApi.listOrders(buildDefaultOrderListQuery(new Date(), { customerName })),
+        resolveResourceType: 'order',
+        cleanupPriority: 80,
+        cleanup: (id) => orderApi.voidOrder(buildOrderVoidRequest(id)),
+      });
+
+      return resolvedResource;
+    },
+    createPaymentRecordResource: async (orderId: ResourceId) => {
+      const paymentApi = getPaymentApi(options);
+      const request = buildPaymentRecordRequest(orderId);
+
+      const resolvedResource = await createEndpointResource({
+        name: `payment-${String(orderId)}`,
+        adminConfigApi: options.adminConfigApi,
+        resourceRegistry: options.resourceRegistry,
+        request,
+        saveIdentity: {
+          method: 'POST',
+          path: '/api/payment/record/save',
+        },
+        saveResource: () => paymentApi.saveRecord(request),
+        resolveResourceType: 'payment',
+        cleanupPriority: 90,
+        cleanup: (id) => paymentApi.deleteRecord(buildPaymentDeleteRequest(id, orderId)),
+      });
+
+      return resolvedResource;
+    },
   };
+
+  return resources;
 }
 
 function buildShortName(domain: string): string {
@@ -285,8 +355,8 @@ async function createEndpointResource(options: {
   request: ApiRequestData;
   saveIdentity: { method: 'POST'; path: string };
   saveResource: () => Promise<APIResponse>;
-  listIdentity: { method: 'GET'; path: string };
-  listResource: () => Promise<APIResponse>;
+  listIdentity?: { method: 'GET'; path: string };
+  listResource?: () => Promise<APIResponse>;
   resolveResourceType: string;
   cleanupPriority?: number;
   cleanup: (id: ResourceId) => Promise<unknown>;
@@ -294,7 +364,7 @@ async function createEndpointResource(options: {
   const saveBody = await expectApiOk(await options.saveResource(), options.saveIdentity);
   let id = extractFirstResourceId(saveBody);
 
-  if (id === undefined) {
+  if (id === undefined && options.listResource !== undefined && options.listIdentity !== undefined) {
     const listBody = await expectApiOk(await options.listResource(), options.listIdentity);
     id = findResourceIdByName(listBody.data, options.name);
   }
@@ -337,6 +407,22 @@ function getSaleItemApi(options: EndpointResourceFactoryOptions): SaleItemApiCli
   return options.saleItemApi;
 }
 
+function getOrderApi(options: EndpointResourceFactoryOptions): OrderApiClient {
+  if (options.orderApi === undefined) {
+    throw new Error('createOrderResource 需要 orderApi 入参。');
+  }
+
+  return options.orderApi;
+}
+
+function getPaymentApi(options: EndpointResourceFactoryOptions): PaymentApiClient {
+  if (options.paymentApi === undefined) {
+    throw new Error('createPaymentRecordResource 需要 paymentApi 入参。');
+  }
+
+  return options.paymentApi;
+}
+
 function archiveMenuRequest(request: ApiRequestData, menuId: ResourceId): ApiRequestData {
   return {
     ...request,
@@ -344,5 +430,22 @@ function archiveMenuRequest(request: ApiRequestData, menuId: ResourceId): ApiReq
     enabled: false,
     active: false,
     deleted: true,
+  };
+}
+
+function buildOrderVoidRequest(orderId: ResourceId): ApiRequestData {
+  return {
+    id: orderId,
+    orderId,
+    reason: 'API_AUTOMATION_CLEANUP',
+  };
+}
+
+function buildPaymentDeleteRequest(paymentId: ResourceId, orderId: ResourceId): ApiRequestData {
+  return {
+    id: paymentId,
+    paymentRecordId: paymentId,
+    orderId,
+    reason: 'API_AUTOMATION_CLEANUP',
   };
 }

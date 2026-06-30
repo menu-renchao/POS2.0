@@ -1,6 +1,8 @@
 import { type APIResponse, expect, test as unitTest } from '@playwright/test';
 import type { AdminConfigApiClient } from '../../../api/clients/admin-config-api.client';
 import type { MenuApiClient } from '../../../api/clients/menu-api.client';
+import type { OrderApiClient } from '../../../api/clients/order-api.client';
+import type { PaymentApiClient } from '../../../api/clients/payment-api.client';
 import type { SaleItemApiClient } from '../../../api/clients/sale-item-api.client';
 import { ResourceRegistry } from '../../../api/core/resource-registry';
 import { createEndpointResources } from '../support/endpoint-resources';
@@ -92,6 +94,45 @@ type SaleItemApiMock = {
   };
 };
 
+type OrderApiClientLike = Pick<
+  import('../../../api/clients/order-api.client').OrderApiClient,
+  | 'saveOrder'
+  | 'listOrders'
+  | 'voidOrder'
+>;
+
+type OrderApiMock = {
+  api: OrderApiClientLike;
+  calls: {
+    saveOrder: number;
+    listOrders: number;
+    voidOrder: number;
+  };
+  payload: {
+    order?: unknown;
+    listParams?: unknown;
+    voidOrder?: unknown;
+  };
+};
+
+type PaymentApiClientLike = Pick<
+  import('../../../api/clients/payment-api.client').PaymentApiClient,
+  | 'saveRecord'
+  | 'deleteRecord'
+>;
+
+type PaymentApiMock = {
+  api: PaymentApiClientLike;
+  calls: {
+    saveRecord: number;
+    deleteRecord: number;
+  };
+  payload: {
+    payment?: unknown;
+    deletePayment?: unknown;
+  };
+};
+
 const endpointTest = endpointFixtureTest.extend({
   adminConfigApi: async ({}, use) => {
     const mock = createAdminConfigApi();
@@ -121,6 +162,8 @@ endpointTest.describe('Endpoint fixture 注入', () => {
           createMenuGroupResource: expect.any(Function),
           createCategoryResource: expect.any(Function),
           createSaleItemResource: expect.any(Function),
+          createOrderResource: expect.any(Function),
+          createPaymentRecordResource: expect.any(Function),
         }),
       );
     },
@@ -513,6 +556,96 @@ unitTest.describe('Endpoint 资源创建', () => {
     expect(resource.id).toBe(categoryId);
     expect(resourceRegistry.has('saleItem', categoryId)).toBe(true);
   });
+
+  unitTest('createOrderResource 应创建商品依赖并保存订单后登记作废清理', async () => {
+    const resourceRegistry = new ResourceRegistry();
+    const configMock = createAdminConfigApi();
+    const menuMock = createMenuApi();
+    const saleItemMock = createSaleItemApi({
+      createSaleItem: async () => createApiResponse({ code: 0, msg: 'ok', data: { id: 8801 } }),
+    });
+    const orderMock = createOrderApi({
+      saveOrder: async () => createApiResponse({ code: 0, msg: 'ok', data: { id: 8802 } }),
+    });
+
+    const endpointResources = createEndpointResources({
+      adminConfigApi: configMock.api as AdminConfigApiClient,
+      menuApi: menuMock.api as unknown as MenuApiClient,
+      saleItemApi: saleItemMock.api as unknown as SaleItemApiClient,
+      orderApi: orderMock.api as unknown as OrderApiClient,
+      resourceRegistry,
+    });
+
+    const resource = await endpointResources.createOrderResource();
+
+    expect(menuMock.calls.createMenu).toBe(1);
+    expect(saleItemMock.calls.createSaleItem).toBe(1);
+    expect(orderMock.calls.saveOrder).toBe(1);
+    expect(orderMock.payload.order).toEqual(
+      expect.objectContaining({
+        order: expect.objectContaining({
+          customerName: expect.any(String),
+          orderItems: [
+            expect.objectContaining({
+              saleItemId: 8801,
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(resource.id).toBe(8802);
+    expect(resourceRegistry.has('order', 8802)).toBe(true);
+
+    await resourceRegistry.cleanupAll();
+
+    expect(orderMock.calls.voidOrder).toBe(1);
+    expect(orderMock.payload.voidOrder).toEqual(
+      expect.objectContaining({
+        id: 8802,
+        orderId: 8802,
+      }),
+    );
+  });
+
+  unitTest('createPaymentRecordResource 应保存支付记录并登记删除清理', async () => {
+    const resourceRegistry = new ResourceRegistry();
+    const configMock = createAdminConfigApi();
+    const paymentMock = createPaymentApi({
+      saveRecord: async () => createApiResponse({ code: 0, msg: 'ok', data: { id: 9901 } }),
+    });
+
+    const endpointResources = createEndpointResources({
+      adminConfigApi: configMock.api as AdminConfigApiClient,
+      paymentApi: paymentMock.api as unknown as PaymentApiClient,
+      resourceRegistry,
+    });
+
+    const resource = await endpointResources.createPaymentRecordResource(8802);
+
+    expect(paymentMock.calls.saveRecord).toBe(1);
+    expect(paymentMock.payload.payment).toEqual(
+      expect.objectContaining({
+        orderId: 8802,
+        paymentRecord: expect.objectContaining({
+          orderId: 8802,
+          amount: 10,
+        }),
+      }),
+    );
+    expect(resource.id).toBe(9901);
+    expect(resourceRegistry.has('payment', 9901)).toBe(true);
+
+    await resourceRegistry.cleanupAll();
+
+    expect(paymentMock.calls.deleteRecord).toBe(1);
+    expect(paymentMock.payload.deletePayment).toEqual(
+      expect.objectContaining({
+        id: 9901,
+        paymentRecordId: 9901,
+        orderId: 8802,
+      }),
+    );
+  });
 });
 
 function createApiResponse<T>(body: T, status = 200): APIResponse {
@@ -723,6 +856,79 @@ function createSaleItemApi(overrides: Partial<SaleItemApiClientLike> = {}): Sale
           }))) as SaleItemApiClientLike['deleteSaleItem'];
 
       return impl(0 as any);
+    },
+  };
+
+  return mock;
+}
+
+function createOrderApi(overrides: Partial<OrderApiClientLike> = {}): OrderApiMock {
+  const mock: OrderApiMock = {
+    api: {} as OrderApiClientLike,
+    calls: {
+      saveOrder: 0,
+      listOrders: 0,
+      voidOrder: 0,
+    },
+    payload: {},
+  };
+
+  mock.api = {
+    saveOrder: async (payload: unknown) => {
+      mock.calls.saveOrder += 1;
+      mock.payload.order = payload;
+      const impl = (overrides.saveOrder ??
+        (async () => createApiResponse({ code: 0, msg: 'ok', data: { id: 1 } }))) as OrderApiClientLike['saveOrder'];
+
+      return impl(payload as any);
+    },
+    listOrders: async (params: unknown) => {
+      mock.calls.listOrders += 1;
+      mock.payload.listParams = params;
+      const impl = (overrides.listOrders ??
+        (async () => createApiResponse({ code: 0, msg: 'ok', data: { records: [] } }))) as OrderApiClientLike['listOrders'];
+
+      return impl(params as any);
+    },
+    voidOrder: async (payload: unknown) => {
+      mock.calls.voidOrder += 1;
+      mock.payload.voidOrder = payload;
+      const impl = (overrides.voidOrder ??
+        (async () => createApiResponse({ code: 0, msg: 'ok' }))) as OrderApiClientLike['voidOrder'];
+
+      return impl(payload as any);
+    },
+  };
+
+  return mock;
+}
+
+function createPaymentApi(overrides: Partial<PaymentApiClientLike> = {}): PaymentApiMock {
+  const mock: PaymentApiMock = {
+    api: {} as PaymentApiClientLike,
+    calls: {
+      saveRecord: 0,
+      deleteRecord: 0,
+    },
+    payload: {},
+  };
+
+  mock.api = {
+    saveRecord: async (payload: unknown) => {
+      mock.calls.saveRecord += 1;
+      mock.payload.payment = payload;
+      const impl = (overrides.saveRecord ??
+        (async () => createApiResponse({ code: 0, msg: 'ok', data: { id: 1 } }))) as PaymentApiClientLike['saveRecord'];
+
+      return impl(payload as any);
+    },
+    deleteRecord: async (payload: unknown) => {
+      mock.calls.deleteRecord += 1;
+      mock.payload.deletePayment = payload;
+      const impl = (overrides.deleteRecord ??
+        (async () => createApiResponse({ code: 0, msg: 'ok' }))) as PaymentApiClientLike['deleteRecord'];
+
+      return impl(payload as any);
     },
   };
 

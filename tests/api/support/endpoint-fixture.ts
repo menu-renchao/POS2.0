@@ -6,6 +6,8 @@ export const test = apiTest.extend<{ endpointResources: EndpointResources }>({
   endpointResources: async ({
     adminConfigApi,
     menuApi,
+    orderApi,
+    paymentApi,
     saleItemApi,
     resourceRegistry,
   }, use) => {
@@ -13,6 +15,8 @@ export const test = apiTest.extend<{ endpointResources: EndpointResources }>({
       createEndpointResources({
         adminConfigApi,
         menuApi,
+        orderApi,
+        paymentApi,
         saleItemApi,
         resourceRegistry,
       }),
