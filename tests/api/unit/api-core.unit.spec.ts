@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
 import http from 'node:http';
-import { buildApiAuthCookies, buildApiAuthHeaders } from '../../../api/core/api-auth';
 import { createApiRequestContext } from '../../../api/core/api-context';
 import {
   buildApiFailureMessage,
@@ -9,47 +8,6 @@ import {
 } from '../../../api/core/api-response';
 
 test.describe('API 核心工具', () => {
-  test('应能为 API Key 模式生成 Authorization header', () => {
-    expect(
-      buildApiAuthHeaders({
-        baseURL: 'http://127.0.0.1:22080/kpos',
-        auth: { mode: 'apiKey', apiKey: 'key-1' },
-        enableDestructive: false,
-        testPrefix: 'AT',
-      }),
-    ).toEqual({ Authorization: 'key-1' });
-  });
-
-  test('应能为 Cookie 模式生成 licenseAuthKey cookie', () => {
-    expect(
-      buildApiAuthCookies({
-        baseURL: 'http://127.0.0.1:22080/kpos',
-        auth: { mode: 'cookie', licenseAuthKey: 'cookie-1' },
-        enableDestructive: false,
-        testPrefix: 'AT',
-      }),
-    ).toEqual([
-      { name: 'licenseAuthKey', value: 'cookie-1', url: 'http://127.0.0.1:22080/kpos' },
-    ]);
-  });
-
-  test('应能为浏览器会话 Cookie Header 模式生成调试请求头', () => {
-    expect(
-      buildApiAuthHeaders({
-        baseURL: 'http://127.0.0.1:22080/kpos',
-        auth: {
-          mode: 'cookieHeader',
-          cookieHeader: 'KPOS_REMEMBER_USER=token; JSESSIONID=session-1',
-        },
-        enableDestructive: false,
-        testPrefix: 'AT',
-      }),
-    ).toEqual({
-      Cookie: 'KPOS_REMEMBER_USER=token; JSESSIONID=session-1',
-      'X-Direct-Req': 'true',
-    });
-  });
-
   test('应能校验 Response 包装结构', () => {
     expect(() =>
       expectResponseEnvelope({
@@ -57,6 +15,16 @@ test.describe('API 核心工具', () => {
         msg: 'OK',
         traceId: 'trace-1',
         data: { id: 1 },
+      }),
+    ).not.toThrow();
+  });
+
+  test('应允许成功 Response 包装结构省略 data 字段', () => {
+    expect(() =>
+      expectResponseEnvelope({
+        code: 0,
+        msg: 'success',
+        traceId: 'trace-1',
       }),
     ).not.toThrow();
   });
@@ -80,66 +48,21 @@ test.describe('API 核心工具', () => {
     expect(summary.endsWith('...')).toBe(true);
   });
 
-  test('应能创建带认证信息的 API 请求上下文', async () => {
-    const receivedHeaders = await withHeaderEchoServer(async (baseURL) => {
-      const apiContext = await createApiRequestContext({
-        baseURL,
-        auth: { mode: 'apiKey', apiKey: 'key-1' },
-        enableDestructive: false,
-        testPrefix: 'AT',
-      });
-
-      try {
-        const response = await apiContext.get('/headers');
-
-        return (await response.json()) as Record<string, string | undefined>;
-      } finally {
-        await apiContext.dispose();
-      }
-    });
-
-    expect(receivedHeaders.authorization).toBe('key-1');
-  });
-
-  test('应能通过 storageState 为 Cookie 模式创建请求上下文', async () => {
-    const apiContext = await createApiRequestContext({
-      baseURL: 'http://127.0.0.1:22080/kpos',
-      auth: { mode: 'cookie', licenseAuthKey: 'cookie-1' },
-      enableDestructive: false,
-      testPrefix: 'AT',
-    });
-
-    try {
-      const storageState = await apiContext.storageState();
-
-      expect(storageState.cookies).toContainEqual(
-        expect.objectContaining({
-          name: 'licenseAuthKey',
-          value: 'cookie-1',
-          domain: '127.0.0.1',
-          path: '/',
-          expires: -1,
-          httpOnly: true,
-          secure: false,
-          sameSite: 'Lax',
-        }),
-      );
-    } finally {
-      await apiContext.dispose();
-    }
-  });
-
-  test('应能在根路径 API 请求中发送 Cookie 模式认证信息', async () => {
+  test('应能为 API 登录模式固定注入测试后门请求头', async () => {
     const receivedHeaders = await withHeaderEchoServer(async (baseURL) => {
       const apiContext = await createApiRequestContext({
         baseURL: `${baseURL}/kpos`,
-        auth: { mode: 'cookie', licenseAuthKey: 'cookie-1' },
-        enableDestructive: false,
+        auth: {
+          mode: 'apiLogin',
+          clientSn: 'device001',
+          clientType: '0',
+          staffPasscode: '11',
+        },
         testPrefix: 'AT',
       });
 
       try {
-        const response = await apiContext.get('/api/check');
+        const response = await apiContext.get('api/check');
 
         return (await response.json()) as Record<string, string | undefined>;
       } finally {
@@ -147,15 +70,22 @@ test.describe('API 核心工具', () => {
       }
     });
 
-    expect(receivedHeaders.cookie).toContain('licenseAuthKey=cookie-1');
+    expect(receivedHeaders['x-client-sn']).toBe('device001');
+    expect(receivedHeaders['x-client-type']).toBe('0');
+    expect(receivedHeaders['x-direct-req']).toBe('true');
+    expect(receivedHeaders.cookie).toContain('licenseAuthKey=device001');
   });
 
   test('应能在 kpos baseURL 下把相对 API 路径请求到 kpos 目录', async () => {
     const receivedUrl = await withRequestUrlEchoServer(async (baseURL) => {
       const apiContext = await createApiRequestContext({
         baseURL: `${baseURL}/kpos`,
-        auth: { mode: 'apiKey', apiKey: 'key-1' },
-        enableDestructive: false,
+        auth: {
+          mode: 'apiLogin',
+          clientSn: 'device001',
+          clientType: '0',
+          staffPasscode: '11',
+        },
         testPrefix: 'AT',
       });
 
@@ -175,6 +105,36 @@ test.describe('API 核心工具', () => {
 
 async function withHeaderEchoServer<T>(callback: (baseURL: string) => Promise<T>): Promise<T> {
   const server = http.createServer((request, response) => {
+    if (request.url === '/kpos/api/client/session/login') {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          code: 0,
+          msg: 'success',
+          data: {
+            sessionKey: 'device001',
+          },
+        }),
+      );
+      return;
+    }
+
+    if (request.url?.startsWith('/kpos/api/login')) {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          code: 0,
+          msg: 'success',
+          data: {
+            userId: 1,
+            staffId: 1,
+            userName: 'Boss',
+          },
+        }),
+      );
+      return;
+    }
+
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify(request.headers));
   });
@@ -206,6 +166,36 @@ async function withHeaderEchoServer<T>(callback: (baseURL: string) => Promise<T>
 
 async function withRequestUrlEchoServer<T>(callback: (baseURL: string) => Promise<T>): Promise<T> {
   const server = http.createServer((request, response) => {
+    if (request.url === '/kpos/api/client/session/login') {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          code: 0,
+          msg: 'success',
+          data: {
+            sessionKey: 'device001',
+          },
+        }),
+      );
+      return;
+    }
+
+    if (request.url?.startsWith('/kpos/api/login')) {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          code: 0,
+          msg: 'success',
+          data: {
+            userId: 1,
+            staffId: 1,
+            userName: 'Boss',
+          },
+        }),
+      );
+      return;
+    }
+
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ url: request.url }));
   });

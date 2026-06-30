@@ -1,27 +1,20 @@
-export type ApiAuthMode = 'apiKey' | 'cookie' | 'cookieHeader';
+export type ApiAuthMode = 'apiLogin';
+
+const API_LOGIN_CLIENT_SN = 'device001';
+const API_LOGIN_CLIENT_TYPE = '0';
+const API_LOGIN_STAFF_PASSCODE = '11';
 
 export type ApiAuthConfig =
   | {
-      mode: 'apiKey';
-      apiKey: string;
-      licenseAuthKey?: never;
-    }
-  | {
-      mode: 'cookie';
-      licenseAuthKey: string;
-      apiKey?: never;
-    }
-  | {
-      mode: 'cookieHeader';
-      cookieHeader: string;
-      apiKey?: never;
-      licenseAuthKey?: never;
+      mode: 'apiLogin';
+      clientSn: typeof API_LOGIN_CLIENT_SN;
+      clientType: typeof API_LOGIN_CLIENT_TYPE;
+      staffPasscode: typeof API_LOGIN_STAFF_PASSCODE;
     };
 
 export type ApiConfig = {
   baseURL: string;
   auth: ApiAuthConfig;
-  enableDestructive: boolean;
   testPrefix: string;
 };
 
@@ -30,46 +23,16 @@ type EnvSource = Record<string, string | undefined>;
 export function loadApiConfig(env: EnvSource = process.env): ApiConfig {
   const baseURL = resolveApiBaseURL(env);
   const mode = resolveAuthMode(env.API_AUTH_MODE);
-  const enableDestructive = env.API_ENABLE_DESTRUCTIVE?.trim().toLowerCase() === 'true';
   const testPrefix = env.API_TEST_PREFIX?.trim() || 'AT';
-
-  if (mode === 'apiKey') {
-    const apiKey = env.API_KEY?.trim();
-    if (!apiKey) {
-      throw new Error('API_AUTH_MODE=apiKey requires API_KEY.');
-    }
-
-    return {
-      baseURL,
-      auth: { mode, apiKey },
-      enableDestructive,
-      testPrefix,
-    };
-  }
-
-  if (mode === 'cookieHeader') {
-    const cookieHeader = env.API_COOKIE_HEADER?.trim();
-    if (!cookieHeader) {
-      throw new Error('API_AUTH_MODE=cookieHeader requires API_COOKIE_HEADER.');
-    }
-
-    return {
-      baseURL,
-      auth: { mode, cookieHeader },
-      enableDestructive,
-      testPrefix,
-    };
-  }
-
-  const licenseAuthKey = env.API_COOKIE_LICENSE_AUTH_KEY?.trim();
-  if (!licenseAuthKey) {
-    throw new Error('API_AUTH_MODE=cookie requires API_COOKIE_LICENSE_AUTH_KEY.');
-  }
 
   return {
     baseURL,
-    auth: { mode, licenseAuthKey },
-    enableDestructive,
+    auth: {
+      mode,
+      clientSn: API_LOGIN_CLIENT_SN,
+      clientType: API_LOGIN_CLIENT_TYPE,
+      staffPasscode: API_LOGIN_STAFF_PASSCODE,
+    },
     testPrefix,
   };
 }
@@ -96,24 +59,14 @@ function resolveApiBaseURL(env: EnvSource): string {
 function resolveAuthMode(value: string | undefined): ApiAuthMode {
   const normalizedValue = value?.trim().toLowerCase();
   if (!normalizedValue) {
-    return 'apiKey';
+    return 'apiLogin';
   }
 
-  if (normalizedValue === 'apikey' || normalizedValue === 'api_key') {
-    return 'apiKey';
+  if (normalizedValue === 'apilogin' || normalizedValue === 'api_login') {
+    return 'apiLogin';
   }
 
-  if (normalizedValue === 'cookie') {
-    return 'cookie';
-  }
-
-  if (normalizedValue === 'cookieheader' || normalizedValue === 'cookie_header') {
-    return 'cookieHeader';
-  }
-
-  throw new Error(
-    `Unsupported API_AUTH_MODE: ${normalizedValue}. Expected apiKey, apikey, api_key, cookie, cookieHeader, or cookie_header.`,
-  );
+  throw new Error(`Unsupported API_AUTH_MODE: ${normalizedValue}. Expected apiLogin.`);
 }
 
 function stripTrailingSlash(value: string): string {

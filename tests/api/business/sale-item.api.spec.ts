@@ -137,14 +137,11 @@ test.describe('商品和 SPU 库存接口', () => {
   });
 
   test('应能创建更新查询并删除本次创建的商品和 SPU 库存映射', async ({
-    apiConfig,
     menuApi,
     resourceRegistry,
     saleItemApi,
     spuApi,
   }) => {
-    test.skip(!apiConfig.enableDestructive, '需要 API_ENABLE_DESTRUCTIVE=true 才能执行写接口测试。');
-
     const menuRequest = buildMenuRequest();
     const menuBody = await test.step('创建测试菜单并校验响应信封', async () => {
       const response = await menuApi.createMenu(menuRequest);
@@ -562,6 +559,7 @@ async function expectJsonEnvelope(
 
   const body: unknown = await response.json();
   expectResponseEnvelope(body);
+  expect(body.code, `${label} 应返回业务成功 code=0`).toBe(0);
 
   return body;
 }

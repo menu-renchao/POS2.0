@@ -4,15 +4,17 @@ import type { ApiEntityId } from './menu-api-data';
 
 export type OrderItemApiRequest = Record<string, unknown> & {
   saleItemId: ApiEntityId;
-  name: string;
+  displayName: string;
   quantity: number;
   price: number;
-  amount: number;
+  totalAmount: number;
 };
 
 export type OrderApiRequest = Record<string, unknown> & {
-  customerName: string;
-  items: OrderItemApiRequest[];
+  order: Record<string, unknown> & {
+    customerName: string;
+    orderItems: OrderItemApiRequest[];
+  };
 };
 
 export const ORDER_API_NAME_LIMITS = {
@@ -27,18 +29,67 @@ export function buildOrderRequest(saleItemId: ApiEntityId, seed?: string | numbe
   const price = 10;
 
   return {
-    customerName,
-    orderType: 'TAKE_OUT',
-    source: 'API_AUTOMATION',
-    items: [
-      {
-        saleItemId,
-        name: itemName,
-        quantity,
-        price,
-        amount: quantity * price,
-      },
-    ],
+    userAuth: {
+      userId: 1,
+      sessionKey: 'device001',
+    },
+    order: {
+      point: 0,
+      callerId: false,
+      crmMemberId: null,
+      type: 'DINE_IN',
+      status: 'ORDERED',
+      currentUserId: 1,
+      exemptAutoCharges: null,
+      userId: 1,
+      taxExempt: true,
+      numOfGuests: 1,
+      totalPrice: quantity * price,
+      totalTips: 0,
+      totalTax: 0,
+      orderTax: [],
+      roundingAmount: 0,
+      printTicketWhenVoid: true,
+      discountName: null,
+      discountID: -1,
+      discountRate: 0,
+      discountRateType: 0,
+      discountReason: null,
+      chargeName: null,
+      chargeID: -1,
+      discount: 0,
+      charge: 0,
+      rewardDiscount: 0,
+      loyaltyDiscount: false,
+      customerName,
+      orderItems: [
+        {
+          saleItemId,
+          seatId: 0,
+          displayName: itemName,
+          quantity,
+          originalSalePrice: price,
+          price,
+          totalAmount: quantity * price,
+          displayText: null,
+          status: 'ORDERED',
+          taxExempt: true,
+          rewardItem: false,
+          isGiftItem: false,
+          discount: 0,
+          discountRate: 0,
+          discountRateType: 0,
+          charge: 0,
+          taxSnapshot: true,
+          orderItemTaxes: [],
+        },
+      ],
+      subOrders: [{ seatNum: '1' }],
+    },
+    sendToKitchen: false,
+    printReceipt: false,
+    fetchOrder: true,
+    fetchPayments: true,
   };
 }
 

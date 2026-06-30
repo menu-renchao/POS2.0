@@ -2,7 +2,7 @@ export type ApiEnvelope<T> = {
   code: number;
   msg: string;
   traceId?: string;
-  data: T;
+  data?: T;
 };
 
 export type ApiFailureInfo = {
@@ -24,10 +24,6 @@ export function expectResponseEnvelope(value: unknown): asserts value is ApiEnve
 
   if (typeof value.msg !== 'string') {
     throw new Error('API response envelope requires string msg.');
-  }
-
-  if (!('data' in value)) {
-    throw new Error('API response envelope requires data field.');
   }
 
   if ('traceId' in value && typeof value.traceId !== 'string') {

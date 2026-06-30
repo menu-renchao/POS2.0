@@ -46,6 +46,7 @@ async function expectJsonEnvelope(
 
   const body: unknown = await response.json();
   expectResponseEnvelope(body);
+  expect(body.code, `${label} 应返回业务成功 code=0`).toBe(0);
 
   return body;
 }

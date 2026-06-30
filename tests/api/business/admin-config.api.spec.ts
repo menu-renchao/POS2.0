@@ -21,11 +21,8 @@ test.describe('后台配置接口', () => {
 
     test('应能保存并删除本次创建的测试税费', async ({
       adminConfigApi,
-      apiConfig,
       resourceRegistry,
     }) => {
-      test.skip(!apiConfig.enableDestructive, '需要 API_ENABLE_DESTRUCTIVE=true 才能执行写接口测试。');
-
       const name = buildAdminConfigTestName('TAX');
       const saveBody = await test.step('保存测试税费并校验响应信封', async () => {
         const response = await adminConfigApi.saveTax(buildTaxRequest(name));
@@ -57,13 +54,13 @@ test.describe('后台配置接口', () => {
         cleanupPriority: 30,
         deleteResource: async () => {
           if (!deleted) {
-            await adminConfigApi.deleteTax({ id });
+            await adminConfigApi.deleteTax({ taxId: id });
           }
         },
       });
 
       await test.step('删除本次创建的测试税费并校验响应信封', async () => {
-        const response = await adminConfigApi.deleteTax({ id });
+        const response = await adminConfigApi.deleteTax({ taxId: id });
 
         await expectJsonEnvelope(response, 'POST /api/tax/delete');
         deleted = true;
@@ -84,11 +81,8 @@ test.describe('后台配置接口', () => {
 
     test('应能保存并删除本次创建的测试折扣', async ({
       adminConfigApi,
-      apiConfig,
       resourceRegistry,
     }) => {
-      test.skip(!apiConfig.enableDestructive, '需要 API_ENABLE_DESTRUCTIVE=true 才能执行写接口测试。');
-
       const name = buildAdminConfigTestName('DSC');
       const saveBody = await test.step('保存测试折扣并校验响应信封', async () => {
         const response = await adminConfigApi.saveDiscount(buildDiscountRequest(name));
@@ -120,13 +114,13 @@ test.describe('后台配置接口', () => {
         cleanupPriority: 30,
         deleteResource: async () => {
           if (!deleted) {
-            await adminConfigApi.deleteDiscount({ id });
+            await adminConfigApi.deleteDiscount({ discountId: id });
           }
         },
       });
 
       await test.step('删除本次创建的测试折扣并校验响应信封', async () => {
-        const response = await adminConfigApi.deleteDiscount({ id });
+        const response = await adminConfigApi.deleteDiscount({ discountId: id });
 
         await expectJsonEnvelope(response, 'POST /api/discount/delete');
         deleted = true;
@@ -147,11 +141,8 @@ test.describe('后台配置接口', () => {
 
     test('应能保存并删除本次创建的测试角色', async ({
       adminConfigApi,
-      apiConfig,
       resourceRegistry,
     }) => {
-      test.skip(!apiConfig.enableDestructive, '需要 API_ENABLE_DESTRUCTIVE=true 才能执行写接口测试。');
-
       const name = buildAdminConfigTestName('ROLE');
       const saveBody = await test.step('保存测试角色并校验响应信封', async () => {
         const response = await adminConfigApi.saveRole(buildRoleRequest(name));
@@ -183,13 +174,13 @@ test.describe('后台配置接口', () => {
         cleanupPriority: 30,
         deleteResource: async () => {
           if (!deleted) {
-            await adminConfigApi.deleteRole({ id });
+            await adminConfigApi.deleteRole({ roleId: id });
           }
         },
       });
 
       await test.step('删除本次创建的测试角色并校验响应信封', async () => {
-        const response = await adminConfigApi.deleteRole({ id });
+        const response = await adminConfigApi.deleteRole({ roleId: id });
 
         await expectJsonEnvelope(response, 'POST /api/admin/role/delete');
         deleted = true;
@@ -206,6 +197,7 @@ async function expectJsonEnvelope(
 
   const body: unknown = await response.json();
   expectResponseEnvelope(body);
+  expect(body.code, `${label} 应返回业务成功 code=0`).toBe(0);
 
   return body;
 }
@@ -220,37 +212,31 @@ function buildAdminConfigTestName(domain: string): string {
 
 function buildTaxRequest(name: string): ApiRequestData {
   return {
-    name,
-    displayName: name,
-    rate: 0.01,
-    taxRate: 0.01,
-    active: true,
-    enabled: true,
+    tax: {
+      name,
+      rate: 1,
+      outRate: 1,
+      taxIncrease: 'DEFAULT',
+    },
   };
 }
 
 function buildDiscountRequest(name: string): ApiRequestData {
   return {
     name,
-    displayName: name,
-    rate: 0.1,
-    discountRate: 0.1,
-    discountType: 'PERCENTAGE',
-    active: true,
-    enabled: true,
+    rate: 10,
+    rateType: 2,
+    description: name,
   };
 }
 
 function buildRoleRequest(name: string): ApiRequestData {
   return {
-    name,
-    roleName: name,
-    displayName: name,
-    description: name,
-    permissionIds: [],
-    permissions: [],
-    active: true,
-    enabled: true,
+    role: {
+      name,
+      discountCapRate: 0,
+      function: [],
+    },
   };
 }
 

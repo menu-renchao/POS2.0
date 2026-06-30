@@ -7,15 +7,7 @@ test.describe('首批接口契约冒烟', () => {
   for (const apiCase of firstBatchApiCases.filter((entry) =>
     shouldRunContractSmokeCase(entry.coverage),
   )) {
-    test(`${apiCase.group} ${apiCase.method} ${apiCase.path} 不应返回 500`, async ({
-      apiConfig,
-      apiRequest,
-    }) => {
-      test.skip(
-        apiCase.method !== 'GET' && !apiConfig.enableDestructive,
-        '需要 API_ENABLE_DESTRUCTIVE=true 才能执行写接口契约冒烟。',
-      );
-
+    test(`${apiCase.group} ${apiCase.method} ${apiCase.path} 不应返回 500`, async ({ apiRequest }) => {
       const path = apiCase.path.replace(/\{[^}]+\}/g, '0').replace(/^\/+/, '');
       const response = await apiRequest.fetch(path, {
         method: apiCase.method,

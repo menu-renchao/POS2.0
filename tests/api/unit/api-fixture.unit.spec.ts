@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import http from 'node:http';
 import { AdminConfigApiClient } from '../../../api/clients/admin-config-api.client';
 import { MenuApiClient } from '../../../api/clients/menu-api.client';
 import { OrderApiClient } from '../../../api/clients/order-api.client';
@@ -8,13 +9,76 @@ import { SpuApiClient } from '../../../api/clients/spu-api.client';
 import { loadApiConfig } from '../../../api/core/api-config';
 import { test as apiTest } from '../../../fixtures/api.fixture';
 
-const test = apiTest.extend({
-  apiConfig: async ({}, use) => {
+type LocalApiFixtures = {
+  apiServerBaseURL: string;
+};
+
+const test = apiTest.extend<LocalApiFixtures>({
+  apiServerBaseURL: async ({}, use) => {
+    const server = http.createServer((request, response) => {
+      if (request.url === '/kpos/api/client/session/login') {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            code: 0,
+            msg: 'success',
+            data: {
+              sessionKey: 'device001',
+            },
+          }),
+        );
+        return;
+      }
+
+      if (request.url?.startsWith('/kpos/api/login')) {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            code: 0,
+            msg: 'success',
+            data: {
+              userId: 1,
+              staffId: 1,
+              userName: 'Boss',
+            },
+          }),
+        );
+        return;
+      }
+
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ code: 0, msg: 'success' }));
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve);
+    });
+
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('测试服务启动失败，无法获取监听端口。');
+    }
+
+    try {
+      await use(`http://127.0.0.1:${address.port}/kpos`);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          resolve();
+        });
+      });
+    }
+  },
+  apiConfig: async ({ apiServerBaseURL }, use) => {
     await use(
       loadApiConfig({
-        API_BASE_URL: 'http://127.0.0.1:22080/kpos',
-        API_AUTH_MODE: 'apiKey',
-        API_KEY: 'test-key',
+        API_BASE_URL: apiServerBaseURL,
+        API_AUTH_MODE: 'apiLogin',
       }),
     );
   },

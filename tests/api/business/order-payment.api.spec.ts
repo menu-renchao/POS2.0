@@ -2,7 +2,11 @@ import { expect, type APIResponse } from '@playwright/test';
 import type { ApiRequestData } from '../../../api/clients/client-path';
 import type { MenuApiClient } from '../../../api/clients/menu-api.client';
 import type { SaleItemApiClient } from '../../../api/clients/sale-item-api.client';
-import { expectResponseEnvelope, type ApiEnvelope } from '../../../api/core/api-response';
+import {
+  expectResponseEnvelope,
+  summarizeJson,
+  type ApiEnvelope,
+} from '../../../api/core/api-response';
 import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
 import { test } from '../../../fixtures/api.fixture';
 import {
@@ -49,21 +53,19 @@ test.describe('订单和支付接口', () => {
   });
 
   test('应能保存查询支付并作废本次创建的订单', async ({
-    apiConfig,
     menuApi,
     saleItemApi,
     orderApi,
     paymentApi,
     resourceRegistry,
   }) => {
-    test.skip(!apiConfig.enableDestructive, '需要 API_ENABLE_DESTRUCTIVE=true 才能执行写接口测试。');
-
     const saleItemId = await createControlledSaleItem({
       menuApi,
       saleItemApi,
       resourceRegistry,
     });
     const orderRequest = buildOrderRequest(saleItemId, 'PAY');
+    const orderCustomerName = String(orderRequest.order.customerName);
     let orderVoided = false;
     let paymentDeleted = false;
 
@@ -74,12 +76,12 @@ test.describe('订单和支付接口', () => {
     });
 
     const orderId = await resolveCreatedResourceId({
-      name: orderRequest.customerName,
+      name: orderCustomerName,
       saveBody: orderBody,
       listLabel: 'GET /api/order/list',
       listResource: async () =>
         await orderApi.listOrders(
-          buildDefaultOrderListQuery(new Date(), { customerName: orderRequest.customerName }),
+          buildDefaultOrderListQuery(new Date(), { customerName: orderCustomerName }),
         ),
     });
 
@@ -95,7 +97,7 @@ test.describe('订单和支付接口', () => {
       resourceRegistry,
       type: 'order',
       id: orderId,
-      name: orderRequest.customerName,
+      name: orderCustomerName,
       cleanupPriority: 80,
       cleanup: async () => {
         if (!orderVoided) {
@@ -117,7 +119,7 @@ test.describe('订单和支付接口', () => {
           await orderApi.listOrders(
             buildDefaultOrderListQuery(new Date(), {
               orderId,
-              customerName: orderRequest.customerName,
+              customerName: orderCustomerName,
             }),
           ),
         ],
@@ -180,16 +182,14 @@ test.describe('订单和支付接口', () => {
     });
   });
 
-  test('应能对复杂订单状态接口执行轻量契约校验', async ({ apiConfig, orderApi }) => {
-    test.skip(!apiConfig.enableDestructive, '需要 API_ENABLE_DESTRUCTIVE=true 才能执行写接口测试。');
-
+  test('应能对复杂订单状态接口执行轻量契约校验', async ({ orderApi }) => {
     await test.step('清台接口使用无效测试订单参数不应返回 500', async () => {
       const response = await orderApi.clearTable({
         orderId: 'AT_ORDER_NOT_EXISTS',
         tableId: 'AT_TABLE_NOT_EXISTS',
       });
 
-      await expectJsonEnvelope(response, 'POST /api/order/clearTable');
+      await expectJsonBusinessEnvelope(response, 'POST /api/order/clearTable');
     });
 
     await test.step('合单接口使用无效测试订单参数不应返回 500', async () => {
@@ -198,7 +198,7 @@ test.describe('订单和支付接口', () => {
         targetOrderId: 'AT_TARGET_ORDER_NOT_EXISTS',
       });
 
-      await expectJsonEnvelope(response, 'POST /api/order/combine');
+      await expectJsonBusinessEnvelope(response, 'POST /api/order/combine');
     });
 
     await test.step('移动订单商品接口使用无效测试订单参数不应返回 500', async () => {
@@ -208,7 +208,7 @@ test.describe('订单和支付接口', () => {
         orderItemId: 'AT_ORDER_ITEM_NOT_EXISTS',
       });
 
-      await expectJsonEnvelope(response, 'POST /api/order/item/move');
+      await expectJsonBusinessEnvelope(response, 'POST /api/order/item/move');
     });
 
     await test.step('重开订单接口使用无效测试订单参数不应返回 500', async () => {
@@ -216,7 +216,7 @@ test.describe('订单和支付接口', () => {
         reason: 'API_AUTOMATION_CONTRACT',
       });
 
-      await expectJsonEnvelope(response, 'POST /api/order/{id}/reopen');
+      await expectJsonBusinessEnvelope(response, 'POST /api/order/{id}/reopen');
     });
 
     await test.step('拆分订单接口使用无效测试订单参数不应返回 500', async () => {
@@ -225,7 +225,7 @@ test.describe('订单和支付接口', () => {
         reason: 'API_AUTOMATION_CONTRACT',
       });
 
-      await expectJsonEnvelope(response, 'POST /api/order/{id}/split');
+      await expectJsonBusinessEnvelope(response, 'POST /api/order/{id}/split');
     });
   });
 });
@@ -238,6 +238,7 @@ async function expectJsonEnvelope(
 
   const body: unknown = await response.json();
   expectResponseEnvelope(body);
+  expect(body.code, `${label} 应返回业务成功 code=0；响应：${summarizeJson(body, 800)}`).toBe(0);
 
   return body;
 }
@@ -265,7 +266,7 @@ async function createControlledSaleItem(options: {
   resourceRegistry: ResourceRegistry;
 }): Promise<ResourceId> {
   const { menuApi, saleItemApi, resourceRegistry } = options;
-  const menuRequest = buildMenuRequest('ORDER');
+  const menuRequest = buildMenuRequest();
   const menuBody = await test.step('创建订单测试菜单并校验响应信封', async () => {
     const response = await menuApi.createMenu(menuRequest);
 
@@ -290,7 +291,7 @@ async function createControlledSaleItem(options: {
     },
   });
 
-  const menuGroupRequest = buildMenuGroupRequest(menuId!, 'ORDER');
+  const menuGroupRequest = buildMenuGroupRequest(menuId!);
   const menuGroupBody = await test.step('创建订单测试菜单组并校验响应信封', async () => {
     const response = await menuApi.createMenuGroup(menuGroupRequest);
 
@@ -315,7 +316,7 @@ async function createControlledSaleItem(options: {
     },
   });
 
-  const categoryRequest = buildCategoryRequest(menuId!, menuGroupId!, 'ORDER');
+  const categoryRequest = buildCategoryRequest(menuId!, menuGroupId!);
   const categoryBody = await test.step('创建订单测试分类并校验响应信封', async () => {
     const response = await menuApi.createMenuCategory(categoryRequest);
 
@@ -341,7 +342,7 @@ async function createControlledSaleItem(options: {
     },
   });
 
-  const saleItemRequest = buildSaleItemRequest(categoryId!, 'ORDER');
+  const saleItemRequest = buildSaleItemRequest(categoryId!);
   const saleItemBody = await test.step('创建订单测试商品并校验响应信封', async () => {
     const response = await saleItemApi.createSaleItem(saleItemRequest);
 
@@ -411,6 +412,7 @@ function toOrderQuery(orderId: ResourceId): Record<string, ResourceId> {
 
 function buildOrderDateNumberQuery(orderId: ResourceId): ApiRequestData {
   return {
+    ...buildDefaultOrderListQuery(new Date()),
     id: orderId,
     orderId,
     dateNumber: 'AT',
@@ -448,7 +450,7 @@ function toArchivedMenuRequest(
 }
 
 function extractResourceId(envelope: ApiEnvelope<unknown>): ResourceId | undefined {
-  return extractIdFromValue(envelope.data) ?? extractIdFromValue(envelope);
+  return extractIdFromValue(envelope.data);
 }
 
 function findResourceIdByName(value: unknown, name: string): ResourceId | undefined {
@@ -509,7 +511,7 @@ function recordHasName(record: Record<string, unknown>, name: string): boolean {
   ].some((key) => record[key] === name);
 }
 
-function extractIdFromValue(value: unknown): ResourceId | undefined {
+function extractIdFromValue(value: unknown, seen = new Set<object>()): ResourceId | undefined {
   if (typeof value === 'number' || typeof value === 'string') {
     return value;
   }
@@ -518,7 +520,24 @@ function extractIdFromValue(value: unknown): ResourceId | undefined {
     return undefined;
   }
 
-  return extractIdFromRecord(value) ?? extractIdFromValue(value.data);
+  if (seen.has(value)) {
+    return undefined;
+  }
+  seen.add(value);
+
+  const directId = extractIdFromRecord(value);
+  if (directId !== undefined) {
+    return directId;
+  }
+
+  for (const item of Object.values(value)) {
+    const nestedId = extractIdFromValue(item, seen);
+    if (nestedId !== undefined) {
+      return nestedId;
+    }
+  }
+
+  return undefined;
 }
 
 function extractIdFromRecord(record: Record<string, unknown>): ResourceId | undefined {

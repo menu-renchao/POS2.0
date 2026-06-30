@@ -83,20 +83,27 @@ test.describe('API 测试数据工厂', () => {
 
   test('订单数据工厂应包含客户短名称和商品明细核心字段', () => {
     const request = buildOrderRequest(505, 'order-seed-001');
-    const [item] = request.items;
+    const [item] = request.order.orderItems;
 
-    expect(request.customerName).toMatch(/^AT_/);
-    expect(request.customerName.length).toBeLessThanOrEqual(ORDER_API_NAME_LIMITS.customer);
-    expect(item.name).toMatch(/^AT_/);
-    expect(item.name.length).toBeLessThanOrEqual(ORDER_API_NAME_LIMITS.item);
-    expect(request.items).toEqual([
+    expect(request.order.customerName).toMatch(/^AT_/);
+    expect(request.order.customerName.length).toBeLessThanOrEqual(ORDER_API_NAME_LIMITS.customer);
+    expect(item.displayName).toMatch(/^AT_/);
+    expect(item.displayName.length).toBeLessThanOrEqual(ORDER_API_NAME_LIMITS.item);
+    expect(request.order.orderItems).toEqual([
       expect.objectContaining({
         saleItemId: 505,
         quantity: 1,
         price: 10,
-        amount: 10,
+        totalAmount: 10,
       }),
     ]);
+    expect(request).toEqual(
+      expect.objectContaining({
+        sendToKitchen: false,
+        printReceipt: false,
+        fetchOrder: true,
+      }),
+    );
   });
 
   test('订单列表默认查询应生成后端可解析的时间范围', () => {
@@ -111,7 +118,15 @@ test.describe('API 测试数据工厂', () => {
   test('支付数据工厂应包含订单 ID 和小费金额字段', () => {
     expect(buildPaymentRecordRequest(606)).toMatchObject({
       orderId: 606,
-      amount: 10,
+      paymentRecord: {
+        orderId: 606,
+        amount: 10,
+        paymentType: 'CASH',
+      },
+      userAuth: {
+        userId: 1,
+        userPasscode: '11',
+      },
     });
     expect(buildTipRequest(3.5)).toMatchObject({
       amount: 3.5,
