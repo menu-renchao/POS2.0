@@ -27,6 +27,10 @@ test.describe('首批接口覆盖矩阵', () => {
       expect(ALLOWED_API_GROUPS).toContain(apiCase.group);
       expect(apiCase.coverage).toMatch(/^(positive-crud|positive-business|contract-only|deferred-external|blocked-missing-data)$/);
       expect(allowedSpecFiles).toContain(apiCase.specFile);
+      expect(apiCase.endpointStatus).toMatch(/^(covered|planned|blocked)$/);
+      if (apiCase.endpointSpecFile !== undefined) {
+        expect(allowedSpecFiles).toContain(apiCase.endpointSpecFile);
+      }
 
       if (NON_POSITIVE_COVERAGE_LEVELS.includes(apiCase.coverage)) {
         expect(apiCase.specFile).toBe(API_SPEC_FILES.contractSmoke);
@@ -46,6 +50,26 @@ test.describe('首批接口覆盖矩阵', () => {
     const apiCaseKeys = firstBatchApiCases.map((apiCase) => `${apiCase.method} ${apiCase.path}`);
 
     expect(new Set(apiCaseKeys).size).toBe(firstBatchApiCases.length);
+  });
+
+  test('endpoint 覆盖状态应和覆盖等级保持一致', () => {
+    for (const apiCase of firstBatchApiCases) {
+      if (apiCase.coverage === 'positive-business' || apiCase.coverage === 'positive-crud') {
+        expect(['covered', 'planned']).toContain(apiCase.endpointStatus);
+      } else {
+        expect(['blocked', 'planned']).toContain(apiCase.endpointStatus);
+      }
+    }
+  });
+
+  test('已覆盖 endpoint 应声明存在的 endpoint spec 文件', () => {
+    const coveredCases = firstBatchApiCases.filter((apiCase) => apiCase.endpointStatus === 'covered');
+
+    expect(coveredCases).toHaveLength(35);
+    for (const apiCase of coveredCases) {
+      expect(apiCase.endpointSpecFile, `${apiCase.method} ${apiCase.path}`).toBeDefined();
+      expect(existsSync(apiCase.endpointSpecFile!), `${apiCase.endpointSpecFile} 应存在`).toBe(true);
+    }
   });
 
   test('首批抓包接口应按真实业务可执行性更新覆盖等级', () => {
@@ -68,6 +92,14 @@ test.describe('首批接口覆盖矩阵', () => {
     expect(findApiCase('POST', '/api/payment/record/save/batch')).toMatchObject({
       coverage: 'contract-only',
       specFile: API_SPEC_FILES.contractSmoke,
+    });
+    expect(findApiCase('POST', '/api/order/save')).toMatchObject({
+      endpointStatus: 'covered',
+      endpointSpecFile: API_SPEC_FILES.endpointOrder,
+    });
+    expect(findApiCase('POST', '/api/payment/record/save')).toMatchObject({
+      endpointStatus: 'covered',
+      endpointSpecFile: API_SPEC_FILES.endpointPayment,
     });
   });
 });
