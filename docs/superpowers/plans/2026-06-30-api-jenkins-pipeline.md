@@ -21,7 +21,7 @@ Add helper functions for IPv4, hostname, port, context path, branch, and test-sc
 
 - [x] **Step 2: Define Jenkins parameters**
 
-Add `API_HOST`, `API_PORT`, `API_CONTEXT_PATH`, `API_TEST_SCOPE`, and `GIT_BRANCH`. Use `192.168.0` as the host prefill, not as a runnable default.
+Add `API_HOST`, `API_PORT`, `API_CONTEXT_PATH`, `API_TEST_SCOPE`, and dynamic `GIT_BRANCH`. Use `192.168.0` as the host prefill, not as a runnable default. Load `GIT_BRANCH` from remote branches with Active Choices and fall back to `main`.
 
 - [x] **Step 3: Add validation and checkout stages**
 

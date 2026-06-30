@@ -87,36 +87,115 @@ String apiTestCommand(String scope) {
     return commands[scope]
 }
 
-pipeline {
-    agent any
-
-    parameters {
+properties([
+    parameters([
         string(
             name: 'API_HOST',
             defaultValue: '192.168.0',
             description: '(required) Target API host. Complete it before running, e.g. 192.168.0.182'
-        )
+        ),
         string(
             name: 'API_PORT',
             defaultValue: '22080',
             description: '(required) Target API port.'
-        )
+        ),
         string(
             name: 'API_CONTEXT_PATH',
             defaultValue: 'kpos',
             description: '(required) API context path without leading slash.'
-        )
+        ),
         choice(
             name: 'API_TEST_SCOPE',
             choices: ['all', 'endpoints', 'business', 'contracts', 'unit', 'cleanup'],
             description: '(required) API test scope to run.'
-        )
-        string(
+        ),
+        [
+            $class: 'ChoiceParameter',
+            choiceType: 'PT_SINGLE_SELECT',
+            description: '(required) Git branch to checkout. Loaded dynamically from git fetch origin results.',
+            filterLength: 1,
+            filterable: false,
             name: 'GIT_BRANCH',
-            defaultValue: 'main',
-            description: '(required) Git branch to checkout.'
-        )
-    }
+            randomName: 'choice-parameter-api-git-branch',
+            script: [
+                $class: 'GroovyScript',
+                fallbackScript: [
+                    classpath: [],
+                    sandbox: true,
+                    script: 'return ["main:selected"]'
+                ],
+                script: [
+                    classpath: [],
+                    sandbox: false,
+                    script: '''
+                        try {
+                            def workspaceCandidates = []
+
+                            def envWorkspace = System.getenv('WORKSPACE')
+                            if (envWorkspace) {
+                                workspaceCandidates << envWorkspace
+                            }
+
+                            def jenkinsHome = System.getenv('JENKINS_HOME')
+                            def jobName = System.getenv('JOB_NAME')
+                            if (jenkinsHome && jobName) {
+                                workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
+                            }
+
+                            workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+
+                            for (workspacePath in workspaceCandidates.unique()) {
+                                def workspaceDir = new File(workspacePath)
+                                def gitDir = new File(workspaceDir, '.git')
+                                if (!workspaceDir.isDirectory() || !gitDir.exists()) {
+                                    continue
+                                }
+
+                                def fetchCommand = ['cmd', '/c', 'git fetch --prune origin +refs/heads/*:refs/remotes/origin/*']
+                                def fetchProcess = fetchCommand.execute(null, workspaceDir)
+                                fetchProcess.waitFor()
+
+                                def listCommand = ['cmd', '/c', 'git for-each-ref --format=%(refname:short) refs/remotes/origin']
+                                def listProcess = listCommand.execute(null, workspaceDir)
+                                def output = new StringBuffer()
+                                def errorOutput = new StringBuffer()
+                                listProcess.consumeProcessOutput(output, errorOutput)
+                                listProcess.waitFor()
+
+                                if (listProcess.exitValue() != 0) {
+                                    continue
+                                }
+
+                                def branches = output.toString()
+                                    .readLines()
+                                    .collect { it.trim() }
+                                    .findAll { it && it != 'origin/HEAD' }
+                                    .collect { it.startsWith('origin/') ? it.substring('origin/'.length()) : it }
+                                    .findAll { it }
+                                    .unique()
+                                    .sort()
+
+                                if (branches) {
+                                    if (!branches.contains('main')) {
+                                        branches = ['main'] + branches
+                                    }
+                                    return branches.collect { it == 'main' ? "${it}:selected" : it }
+                                }
+                            }
+
+                            return ['main:selected']
+                        } catch (Throwable error) {
+                            return ['main:selected']
+                        }
+                    '''
+                ]
+            ]
+        ],
+    ])
+])
+
+pipeline {
+    agent any
 
     environment {
         API_AUTH_MODE = 'apiLogin'

@@ -46,6 +46,6 @@ Jenkins 参数：
 - `API_PORT`：默认 `22080`。
 - `API_CONTEXT_PATH`：默认 `kpos`。
 - `API_TEST_SCOPE`：可选 `all`、`endpoints`、`business`、`contracts`、`unit`、`cleanup`。
-- `GIT_BRANCH`：要 checkout 的代码分支，默认 `main`。
+- `GIT_BRANCH`：从远端分支动态加载的下拉选项，取不到分支列表时回退 `main`。
 
 流水线会拼出 `API_BASE_URL=http://${API_HOST}:${API_PORT}/${API_CONTEXT_PATH}` 并注入 Playwright API 测试进程。`API_HOST=192.168.0` 只是输入提示，不是可执行默认值；如果没有补完整，流水线会在参数校验阶段失败。

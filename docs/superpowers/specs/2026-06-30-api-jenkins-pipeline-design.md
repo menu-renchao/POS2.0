@@ -14,7 +14,7 @@
 - `API_PORT`：预填 `22080`。
 - `API_CONTEXT_PATH`：预填 `kpos`。
 - `API_TEST_SCOPE`：支持 `all`、`endpoints`、`business`、`contracts`、`unit`、`cleanup`。
-- `GIT_BRANCH`：默认 `main`。
+- `GIT_BRANCH`：从远端分支动态加载的下拉选项，取不到分支列表时回退 `main`。
 
 最终由流水线拼出 `API_BASE_URL=http://${API_HOST}:${API_PORT}/${API_CONTEXT_PATH}`，并注入 Playwright API 测试进程。
 
@@ -48,4 +48,5 @@
 
 - 不默认打到某个完整 IP，避免误跑真实环境。
 - 参数阶段先失败，避免依赖安装和测试阶段才暴露配置错误。
+- 分支参数使用 Active Choices 动态加载远端分支，并保留 `main` 兜底。
 - `API_TEST_SCOPE=cleanup` 单独保留，便于需要时清理自动化残留数据。
