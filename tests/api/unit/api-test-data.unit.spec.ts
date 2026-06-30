@@ -8,13 +8,13 @@ import {
   buildMenuGroupRequest,
   buildMenuRequest,
   buildSaleItemRequest,
-} from '../../test-data/api/menu-api-data';
+} from '../../../test-data/api/menu-api-data';
 import {
   ORDER_API_NAME_LIMITS,
   buildDefaultOrderListQuery,
   buildOrderRequest,
-} from '../../test-data/api/order-api-data';
-import { buildPaymentRecordRequest, buildTipRequest } from '../../test-data/api/payment-api-data';
+} from '../../../test-data/api/order-api-data';
+import { buildPaymentRecordRequest, buildTipRequest } from '../../../test-data/api/payment-api-data';
 
 test.describe('API 测试数据工厂', () => {
   test('菜单数据工厂应生成短名称并保留自动化前缀', () => {

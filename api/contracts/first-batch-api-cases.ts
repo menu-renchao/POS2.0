@@ -22,11 +22,11 @@ export const ALLOWED_API_GROUPS = [
 ] as const;
 
 export const API_SPEC_FILES = {
-  menuCatalog: 'tests/api/menu-catalog.api.spec.ts',
-  saleItem: 'tests/api/sale-item.api.spec.ts',
-  orderPayment: 'tests/api/order-payment.api.spec.ts',
-  adminConfig: 'tests/api/admin-config.api.spec.ts',
-  contractSmoke: 'tests/api/contract-smoke.api.spec.ts',
+  menuCatalog: 'tests/api/business/menu-catalog.api.spec.ts',
+  saleItem: 'tests/api/business/sale-item.api.spec.ts',
+  orderPayment: 'tests/api/business/order-payment.api.spec.ts',
+  adminConfig: 'tests/api/business/admin-config.api.spec.ts',
+  contractSmoke: 'tests/api/contracts/contract-smoke.api.spec.ts',
 } as const;
 
 export type ApiBatchGroup = (typeof ALLOWED_API_GROUPS)[number];

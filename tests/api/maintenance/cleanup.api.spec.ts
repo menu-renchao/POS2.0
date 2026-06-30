@@ -1,6 +1,6 @@
 import { expect, type APIResponse } from '@playwright/test';
-import { expectResponseEnvelope, type ApiEnvelope } from '../../api/core/api-response';
-import { test } from '../../fixtures/api.fixture';
+import { expectResponseEnvelope, type ApiEnvelope } from '../../../api/core/api-response';
+import { test } from '../../../fixtures/api.fixture';
 
 test.describe('API 测试数据清理', () => {
   test('应能扫描 AT_ 前缀测试数据入口并校验响应信封', async ({

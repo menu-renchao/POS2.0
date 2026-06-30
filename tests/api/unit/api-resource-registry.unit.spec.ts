@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { createShortTestName } from '../../api/core/test-data-id';
-import { ResourceRegistry } from '../../api/core/resource-registry';
+import { createShortTestName } from '../../../api/core/test-data-id';
+import { ResourceRegistry } from '../../../api/core/resource-registry';
 
 test.describe('API 测试资源登记', () => {
   test('应生成保留 AT_ 前缀且不超过最大长度的测试名称', () => {

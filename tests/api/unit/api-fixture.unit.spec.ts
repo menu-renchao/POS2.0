@@ -1,12 +1,12 @@
 import { expect } from '@playwright/test';
-import { AdminConfigApiClient } from '../../api/clients/admin-config-api.client';
-import { MenuApiClient } from '../../api/clients/menu-api.client';
-import { OrderApiClient } from '../../api/clients/order-api.client';
-import { PaymentApiClient } from '../../api/clients/payment-api.client';
-import { SaleItemApiClient } from '../../api/clients/sale-item-api.client';
-import { SpuApiClient } from '../../api/clients/spu-api.client';
-import { loadApiConfig } from '../../api/core/api-config';
-import { test as apiTest } from '../../fixtures/api.fixture';
+import { AdminConfigApiClient } from '../../../api/clients/admin-config-api.client';
+import { MenuApiClient } from '../../../api/clients/menu-api.client';
+import { OrderApiClient } from '../../../api/clients/order-api.client';
+import { PaymentApiClient } from '../../../api/clients/payment-api.client';
+import { SaleItemApiClient } from '../../../api/clients/sale-item-api.client';
+import { SpuApiClient } from '../../../api/clients/spu-api.client';
+import { loadApiConfig } from '../../../api/core/api-config';
+import { test as apiTest } from '../../../fixtures/api.fixture';
 
 const test = apiTest.extend({
   apiConfig: async ({}, use) => {

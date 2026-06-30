@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { loadApiConfig } from '../../api/core/api-config';
+import { loadApiConfig } from '../../../api/core/api-config';
 
 test.describe('API 配置', () => {
   test('应能从显式 API_BASE_URL 和 API Key 读取接口配置', () => {

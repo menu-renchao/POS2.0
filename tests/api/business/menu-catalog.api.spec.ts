@@ -1,7 +1,7 @@
 import { expect, type APIResponse } from '@playwright/test';
-import { expectResponseEnvelope, type ApiEnvelope } from '../../api/core/api-response';
-import type { ResourceId, ResourceRegistry } from '../../api/core/resource-registry';
-import { test } from '../../fixtures/api.fixture';
+import { expectResponseEnvelope, type ApiEnvelope } from '../../../api/core/api-response';
+import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
+import { test } from '../../../fixtures/api.fixture';
 import {
   DEFAULT_MENU_PRODUCT,
   buildCategoryRequest,
@@ -9,7 +9,7 @@ import {
   buildGlobalOptionRequest,
   buildMenuGroupRequest,
   buildMenuRequest,
-} from '../../test-data/api/menu-api-data';
+} from '../../../test-data/api/menu-api-data';
 
 type MenuCatalogResourceType =
   | 'menu'

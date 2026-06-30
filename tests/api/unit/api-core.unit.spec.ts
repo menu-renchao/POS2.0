@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
 import http from 'node:http';
-import { buildApiAuthCookies, buildApiAuthHeaders } from '../../api/core/api-auth';
-import { createApiRequestContext } from '../../api/core/api-context';
+import { buildApiAuthCookies, buildApiAuthHeaders } from '../../../api/core/api-auth';
+import { createApiRequestContext } from '../../../api/core/api-context';
 import {
   buildApiFailureMessage,
   expectResponseEnvelope,
   summarizeJson,
-} from '../../api/core/api-response';
+} from '../../../api/core/api-response';
 
 test.describe('API 核心工具', () => {
   test('应能为 API Key 模式生成 Authorization header', () => {

@@ -1,17 +1,17 @@
 import { expect, type APIResponse } from '@playwright/test';
-import type { ApiRequestData } from '../../api/clients/client-path';
-import { API_SPEC_FILES, firstBatchApiCases } from '../../api/contracts/first-batch-api-cases';
-import { expectResponseEnvelope, type ApiEnvelope } from '../../api/core/api-response';
-import type { ResourceId, ResourceRegistry } from '../../api/core/resource-registry';
-import { createShortTestName } from '../../api/core/test-data-id';
-import { test } from '../../fixtures/api.fixture';
+import type { ApiRequestData } from '../../../api/clients/client-path';
+import { API_SPEC_FILES, firstBatchApiCases } from '../../../api/contracts/first-batch-api-cases';
+import { expectResponseEnvelope, type ApiEnvelope } from '../../../api/core/api-response';
+import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
+import { createShortTestName } from '../../../api/core/test-data-id';
+import { test } from '../../../fixtures/api.fixture';
 import {
   DEFAULT_MENU_PRODUCT,
   buildCategoryRequest,
   buildMenuGroupRequest,
   buildMenuRequest,
   buildSaleItemRequest,
-} from '../../test-data/api/menu-api-data';
+} from '../../../test-data/api/menu-api-data';
 
 type SaleItemResourceType = 'menu' | 'menuGroup' | 'menuCategory' | 'saleItem';
 

@@ -13,12 +13,12 @@
 ### Task 1: Menu Group Batch Copy And Delete
 
 **Files:**
-- Modify: `tests/api/menu-catalog.api.spec.ts`
+- Modify: `tests/api/business/menu-catalog.api.spec.ts`
 - Modify: `api/contracts/first-batch-api-cases.ts`
 - Modify: `docs/api/112接口覆盖映射.md`
 
 - [x] Write failing coverage test expectation by updating matrix status for `POST /api/menu/menuGroup/batch/copy` and `DELETE /api/menu/menuGroup/batch/delete` from `contract-only` to `positive-business`.
-- [x] Run `npx playwright test tests/api/api-contract-matrix.unit.spec.ts --project=api --reporter=line` and confirm it still validates the matrix.
+- [x] Run `npx playwright test tests/api/contracts/api-contract-matrix.unit.spec.ts --project=api --reporter=line` and confirm it still validates the matrix.
 - [x] In the destructive menu catalog scenario, after creating a controlled menu group, call `copyMenuGroups({ menuId, groupIds: [menuGroupId] })`.
 - [x] Create a second controlled menu group and delete it with `deleteMenuGroups({ groupIds: [batchDeleteGroupId] })` so no captured ID is hard-coded.
 - [x] Ensure cleanup skips resources already deleted and still cleans any remaining resources.
@@ -26,7 +26,7 @@
 ### Task 2: Sale Item Batch Sequence And Update From Captured Request
 
 **Files:**
-- Modify: `tests/api/sale-item.api.spec.ts`
+- Modify: `tests/api/business/sale-item.api.spec.ts`
 - Modify: `api/contracts/first-batch-api-cases.ts`
 - Modify: `docs/api/112接口覆盖映射.md`
 
@@ -39,7 +39,7 @@
 ### Task 3: Order Batch Save And Delivery Track Preparation
 
 **Files:**
-- Modify: `tests/api/order-payment.api.spec.ts`
+- Modify: `tests/api/business/order-payment.api.spec.ts`
 - Modify: `api/contracts/first-batch-api-cases.ts`
 - Optionally create: `api/core/api-db-config.ts` only if database lookup is implemented.
 
@@ -63,7 +63,7 @@
 - All modified files.
 
 - [x] Run `npx tsc --noEmit`.
-- [x] Run `API_KEY=test-key npx playwright test tests/api/api-contract-matrix.unit.spec.ts tests/api/api-test-data.unit.spec.ts --project=api --reporter=line`.
+- [x] Run `API_KEY=test-key npx playwright test tests/api/contracts/api-contract-matrix.unit.spec.ts tests/api/unit/api-test-data.unit.spec.ts --project=api --reporter=line`.
 - [x] With cookie auth and destructive mode only if approved for the dedicated environment, run targeted specs for the upgraded batch endpoints.
 - [x] Scan for captured cookie/session/password strings before committing.
 - [ ] Commit the batch with a message describing the upgraded real-business coverage.

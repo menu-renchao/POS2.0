@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { shouldRunContractSmokeCase } from '../../api/contracts/contract-smoke-coverage';
+import { shouldRunContractSmokeCase } from '../../../api/contracts/contract-smoke-coverage';
 
 test.describe('首批接口契约冒烟策略', () => {
   test('缺少稳定测试数据的接口不应执行契约冒烟请求', () => {

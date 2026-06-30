@@ -1,9 +1,9 @@
 import { expect, type APIResponse } from '@playwright/test';
-import type { ApiRequestData } from '../../api/clients/client-path';
-import { expectResponseEnvelope, type ApiEnvelope } from '../../api/core/api-response';
-import type { ResourceId, ResourceRegistry } from '../../api/core/resource-registry';
-import { createShortTestName } from '../../api/core/test-data-id';
-import { test } from '../../fixtures/api.fixture';
+import type { ApiRequestData } from '../../../api/clients/client-path';
+import { expectResponseEnvelope, type ApiEnvelope } from '../../../api/core/api-response';
+import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
+import { createShortTestName } from '../../../api/core/test-data-id';
+import { test } from '../../../fixtures/api.fixture';
 
 type AdminConfigResourceType = 'tax' | 'discount' | 'role';
 

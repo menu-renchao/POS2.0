@@ -1,21 +1,21 @@
 import { expect, type APIResponse } from '@playwright/test';
-import type { ApiRequestData } from '../../api/clients/client-path';
-import type { MenuApiClient } from '../../api/clients/menu-api.client';
-import type { SaleItemApiClient } from '../../api/clients/sale-item-api.client';
-import { expectResponseEnvelope, type ApiEnvelope } from '../../api/core/api-response';
-import type { ResourceId, ResourceRegistry } from '../../api/core/resource-registry';
-import { test } from '../../fixtures/api.fixture';
+import type { ApiRequestData } from '../../../api/clients/client-path';
+import type { MenuApiClient } from '../../../api/clients/menu-api.client';
+import type { SaleItemApiClient } from '../../../api/clients/sale-item-api.client';
+import { expectResponseEnvelope, type ApiEnvelope } from '../../../api/core/api-response';
+import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
+import { test } from '../../../fixtures/api.fixture';
 import {
   buildCategoryRequest,
   buildMenuGroupRequest,
   buildMenuRequest,
   buildSaleItemRequest,
-} from '../../test-data/api/menu-api-data';
+} from '../../../test-data/api/menu-api-data';
 import {
   buildDefaultOrderListQuery,
   buildOrderRequest,
-} from '../../test-data/api/order-api-data';
-import { buildPaymentRecordRequest } from '../../test-data/api/payment-api-data';
+} from '../../../test-data/api/order-api-data';
+import { buildPaymentRecordRequest } from '../../../test-data/api/payment-api-data';
 
 type OrderPaymentResourceType = 'menu' | 'menuGroup' | 'menuCategory' | 'saleItem' | 'order' | 'payment';
 

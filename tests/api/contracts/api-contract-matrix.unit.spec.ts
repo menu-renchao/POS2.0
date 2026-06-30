@@ -5,7 +5,7 @@ import {
   API_SPEC_FILES,
   firstBatchApiCases,
   type ApiCoverageLevel,
-} from '../../api/contracts/first-batch-api-cases';
+} from '../../../api/contracts/first-batch-api-cases';
 
 const NON_POSITIVE_COVERAGE_LEVELS: readonly ApiCoverageLevel[] = [
   'contract-only',

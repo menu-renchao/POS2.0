@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
-import { shouldRunContractSmokeCase } from '../../api/contracts/contract-smoke-coverage';
-import { firstBatchApiCases } from '../../api/contracts/first-batch-api-cases';
-import { test } from '../../fixtures/api.fixture';
+import { shouldRunContractSmokeCase } from '../../../api/contracts/contract-smoke-coverage';
+import { firstBatchApiCases } from '../../../api/contracts/first-batch-api-cases';
+import { test } from '../../../fixtures/api.fixture';
 
 test.describe('首批接口契约冒烟', () => {
   for (const apiCase of firstBatchApiCases.filter((entry) =>
