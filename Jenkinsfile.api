@@ -92,7 +92,7 @@ properties([
     parameters([
         string(
             name: 'API_HOST',
-            defaultValue: '192.168.0',
+            defaultValue: '192.168.0.',
             description: '(required) Target API host. Complete it before running, e.g. 192.168.0.182'
         ),
         string(

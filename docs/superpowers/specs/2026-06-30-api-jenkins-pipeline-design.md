@@ -10,7 +10,7 @@
 
 流水线参数：
 
-- `API_HOST`：预填 `192.168.0`，运行前必须补成完整 IPv4 或合法 hostname。
+- `API_HOST`：预填 `192.168.0.`，运行前必须补成完整 IPv4 或合法 hostname。
 - `API_PORT`：预填 `22080`。
 - `API_CONTEXT_PATH`：预填 `kpos`。
 - `API_TEST_SCOPE`：支持 `all`、`endpoints`、`business`、`contracts`、`unit`、`cleanup`。
@@ -20,7 +20,7 @@
 
 ## 参数校验
 
-`API_HOST` 不提供完整默认 IP。预填值 `192.168.0` 仅用于方便输入，如果用户没有补全，流水线会在 `Validate Parameters` 阶段失败。
+`API_HOST` 不提供完整默认 IP。预填值 `192.168.0.` 仅用于方便输入，如果用户没有补全，流水线会在 `Validate Parameters` 阶段失败。
 
 校验规则：
 
