@@ -6,6 +6,7 @@ import {
   expectResourceId,
   parseApiJson,
 } from '../support/endpoint-assertions';
+import { extractEndpointListData } from '../support/endpoint-list-data';
 import {
   extractFirstResourceId,
   findResourceIdByName,
@@ -88,6 +89,57 @@ test.describe('Endpoint 测试支撑工具', () => {
     expect(() =>
       expectArrayData({ code: 0, msg: 'success', data: { records: 'not-array' as any } }, identity),
     ).toThrow('GET /api/tax/list 未能从响应中提取数组数据');
+  });
+
+  test('应按固定优先级从响应 data 中提取列表数组', () => {
+    const identity: EndpointIdentity = { method: 'GET', path: '/api/tax/list' };
+
+    expect(extractEndpointListData([{ id: 1, name: 'AT_FIRST' }], identity)).toEqual([
+      { id: 1, name: 'AT_FIRST' },
+    ]);
+    expect(extractEndpointListData({ rows: [{ discountId: 2, discountName: 'AT_ROWS' }] }, identity)).toEqual([
+      { discountId: 2, discountName: 'AT_ROWS' },
+    ]);
+    expect(
+      extractEndpointListData(
+        {
+          records: [{ id: 3 }],
+          list: [{ id: 4 }],
+          items: [{ id: 5 }],
+          rows: [{ id: 6 }],
+        },
+        identity,
+      ),
+    ).toEqual([{ id: 3 }]);
+    expect(
+      extractEndpointListData({ taxes: [{ id: 11, name: 'AT_TAX' }] }, {
+        method: 'GET',
+        path: '/api/tax/list',
+      }),
+    ).toEqual([{ id: 11, name: 'AT_TAX' }]);
+    expect(
+      extractEndpointListData({ discounts: [{ id: 22, name: 'AT_DISC' }] }, {
+        method: 'GET',
+        path: '/api/discount/list',
+      }),
+    ).toEqual([{ id: 22, name: 'AT_DISC' }]);
+  });
+
+  test('列表提取失败时应保留 endpoint 上下文并避免递归匹配非目标数组', () => {
+    const identity: EndpointIdentity = { method: 'GET', path: '/api/tax/list' };
+
+    expect(() =>
+      extractEndpointListData({ wrapper: { records: [{ id: 1, name: 'AT_NESTED' }] } }, identity),
+    ).toThrow('GET /api/tax/list 未能从响应 data 中提取列表数组（支持 data、taxes、discounts、records、list、items、rows）');
+  });
+
+  test('列表项缺少对象或标识字段时应抛错', () => {
+    const identity: EndpointIdentity = { method: 'GET', path: '/api/tax/list' };
+
+    expect(() => extractEndpointListData([1, 2, 3], identity)).toThrow('GET /api/tax/list 列表数组应为对象数组');
+    expect(() =>
+      extractEndpointListData([{ status: 'ok' }], identity),
+    ).toThrow('GET /api/tax/list 列表数组应至少包含一个包含 id/name 相关字段的对象');
   });
 
   test('支持更多资源 ID 键，避免误提取 envelope code', () => {

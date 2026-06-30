@@ -136,7 +136,8 @@ test.describe('API 测试资源登记', () => {
       cleanup: async () => cleaned.push('discount'),
     });
 
-    registry.markCleaned('discount', 3);
+    expect(registry.markCleaned('discount', 3)).toBe(true);
+    expect(registry.markCleaned('discount', 3)).toBe(false);
     const result = await registry.cleanupAll();
 
     expect(cleaned).toHaveLength(0);
