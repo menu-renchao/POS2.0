@@ -1,5 +1,6 @@
 import { type APIResponse, expect, test as unitTest } from '@playwright/test';
 import type { AdminConfigApiClient } from '../../../api/clients/admin-config-api.client';
+import type { MenuApiClient } from '../../../api/clients/menu-api.client';
 import { ResourceRegistry } from '../../../api/core/resource-registry';
 import { createEndpointResources } from '../support/endpoint-resources';
 import { test as endpointFixtureTest } from '../support/endpoint-fixture';
@@ -15,6 +16,19 @@ type AdminConfigApiClientLike = Pick<
   | 'listDiscounts'
   | 'saveDiscount'
   | 'deleteDiscount'
+>;
+
+type MenuApiClientLike = Pick<
+  import('../../../api/clients/menu-api.client').MenuApiClient,
+  | 'createMenu'
+  | 'listMenus'
+  | 'updateMenu'
+  | 'createMenuGroup'
+  | 'listMenuGroups'
+  | 'deleteMenuGroup'
+  | 'createMenuCategory'
+  | 'listCategories'
+  | 'deleteMenuCategory'
 >;
 
 type AdminConfigApiMock = {
@@ -37,11 +51,36 @@ type AdminConfigApiMock = {
   };
 };
 
+type MenuApiMock = {
+  api: MenuApiClientLike;
+  calls: {
+    createMenu: number;
+    listMenus: number;
+    updateMenu: number;
+    createMenuGroup: number;
+    listMenuGroups: number;
+    deleteMenuGroup: number;
+    createMenuCategory: number;
+    listCategories: number;
+    deleteMenuCategory: number;
+  };
+  payload: {
+    menu?: unknown;
+    menuGroup?: unknown;
+    menuCategory?: unknown;
+  };
+};
+
 const endpointTest = endpointFixtureTest.extend({
   adminConfigApi: async ({}, use) => {
     const mock = createAdminConfigApi();
 
     await use(mock.api as unknown as AdminConfigApiClient);
+  },
+  menuApi: async ({}, use) => {
+    const mock = createMenuApi();
+
+    await use(mock.api as unknown as MenuApiClient);
   },
   resourceRegistry: async ({}, use) => {
     await use(new ResourceRegistry());
@@ -50,13 +89,16 @@ const endpointTest = endpointFixtureTest.extend({
 
 endpointTest.describe('Endpoint fixture 注入', () => {
   endpointTest(
-    '应在测试参数中注入 endpointResources 且包含三类资源创建方法',
+    '应在测试参数中注入 endpointResources 且包含菜单与配置类资源创建方法',
     async ({ endpointResources }) => {
       expect(endpointResources).toEqual(
         expect.objectContaining({
           createTaxResource: expect.any(Function),
           createDiscountResource: expect.any(Function),
           createRoleResource: expect.any(Function),
+          createMenuResource: expect.any(Function),
+          createMenuGroupResource: expect.any(Function),
+          createCategoryResource: expect.any(Function),
         }),
       );
     },
@@ -180,6 +222,123 @@ unitTest.describe('Endpoint 资源创建', () => {
     expect(resourceRegistry.has('role', 4004)).toBe(true);
   });
 
+  unitTest('createMenuResource 应调用菜单 API 创建并登记清理（归档）', async () => {
+    const resourceRegistry = new ResourceRegistry();
+    const menuMock = createMenuApi({
+      createMenu: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: { id: 5005 },
+        }),
+    });
+    const configMock = createAdminConfigApi();
+
+    const endpointResources = createEndpointResources({
+      adminConfigApi: configMock.api as AdminConfigApiClient,
+      menuApi: menuMock.api as unknown as MenuApiClient,
+      resourceRegistry,
+    });
+
+    const resource = await endpointResources.createMenuResource();
+
+    expect(menuMock.calls.createMenu).toBe(1);
+    expect(menuMock.calls.updateMenu).toBe(0);
+    expect(menuMock.payload.menu).toEqual(expect.objectContaining({ name: resource.name }));
+    expect(resource.id).toBe(5005);
+    expect(resourceRegistry.has('menu', 5005)).toBe(true);
+  });
+
+  unitTest('createMenuResource 在保存响应缺失 id 时应改从列表按名称定位 id', async () => {
+    const resourceRegistry = new ResourceRegistry();
+    let createMenuName: string | undefined;
+
+    const menuMock = createMenuApi({
+      createMenu: async (payload) => {
+        createMenuName = (payload as { name?: string }).name;
+
+        return createApiResponse({ code: 0, msg: 'ok', data: { code: 0 } });
+      },
+      listMenus: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: [{ menuId: 5006, menuName: createMenuName }],
+        }),
+    });
+    const configMock = createAdminConfigApi();
+
+    const endpointResources = createEndpointResources({
+      adminConfigApi: configMock.api as AdminConfigApiClient,
+      menuApi: menuMock.api as unknown as MenuApiClient,
+      resourceRegistry,
+    });
+
+    const resource = await endpointResources.createMenuResource();
+
+    expect(menuMock.calls.createMenu).toBe(1);
+    expect(menuMock.calls.listMenus).toBe(1);
+    expect(resource.name).toBe(createMenuName);
+    expect(resource.id).toBe(5006);
+    expect(resourceRegistry.has('menu', 5006)).toBe(true);
+  });
+
+  unitTest('createMenuGroupResource 应调用菜单 API 创建菜单组并登记清理', async () => {
+    const resourceRegistry = new ResourceRegistry();
+    const menuMock = createMenuApi({
+      createMenuGroup: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: { id: 6006 },
+        }),
+    });
+    const configMock = createAdminConfigApi();
+
+    const endpointResources = createEndpointResources({
+      adminConfigApi: configMock.api as AdminConfigApiClient,
+      menuApi: menuMock.api as unknown as MenuApiClient,
+      resourceRegistry,
+    });
+
+    const resource = await endpointResources.createMenuGroupResource('menu-1');
+
+    expect(menuMock.calls.createMenuGroup).toBe(1);
+    expect(menuMock.payload.menuGroup, '菜单组入参应携带 menuId 和 name').toEqual(
+      expect.objectContaining({ menuId: 'menu-1', name: resource.name }),
+    );
+    expect(resource.id).toBe(6006);
+    expect(resourceRegistry.has('menuGroup', 6006)).toBe(true);
+  });
+
+  unitTest('createCategoryResource 应调用菜单 API 创建分类并登记清理', async () => {
+    const resourceRegistry = new ResourceRegistry();
+    const menuMock = createMenuApi({
+      createMenuCategory: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: { id: 7007 },
+        }),
+    });
+    const configMock = createAdminConfigApi();
+
+    const endpointResources = createEndpointResources({
+      adminConfigApi: configMock.api as AdminConfigApiClient,
+      menuApi: menuMock.api as unknown as MenuApiClient,
+      resourceRegistry,
+    });
+
+    const resource = await endpointResources.createCategoryResource('menu-1', 'group-1');
+
+    expect(menuMock.calls.createMenuCategory).toBe(1);
+    expect(menuMock.payload.menuCategory, '分类入参应携带 menuId 与 menuGroupId').toEqual(
+      expect.objectContaining({ menuId: 'menu-1', menuGroupId: 'group-1', name: resource.name }),
+    );
+    expect(resource.id).toBe(7007);
+    expect(resourceRegistry.has('menuCategory', 7007)).toBe(true);
+  });
+
   unitTest('创建和解析失败时不应登记清理任务', async () => {
     const resourceRegistry = new ResourceRegistry();
     const mock = createAdminConfigApi({
@@ -287,6 +446,77 @@ function createAdminConfigApi(
       return impl({ id: 0 } as any);
     },
   } as AdminConfigApiClientLike;
+
+  return mock;
+}
+
+function createMenuApi(overrides: Partial<MenuApiClientLike> = {}): MenuApiMock {
+  const mock: MenuApiMock = {
+    api: {} as MenuApiClientLike,
+    calls: {
+      createMenu: 0,
+      listMenus: 0,
+      updateMenu: 0,
+      createMenuGroup: 0,
+      listMenuGroups: 0,
+      deleteMenuGroup: 0,
+      createMenuCategory: 0,
+      listCategories: 0,
+      deleteMenuCategory: 0,
+    },
+    payload: {},
+  };
+
+  mock.api = {
+    createMenu: async (payload: unknown) => {
+      mock.calls.createMenu += 1;
+      mock.payload.menu = payload;
+      const impl = (overrides.createMenu ?? (async () => createApiResponse({ code: 0, msg: 'ok', data: { id: 1 } }))) as MenuApiClientLike['createMenu'];
+      return impl(payload as any);
+    },
+    listMenus: async (...args: unknown[]) => {
+      mock.calls.listMenus += 1;
+      const impl = (overrides.listMenus ?? (async () => createApiResponse({ code: 0, msg: 'ok', data: { records: [] } }))) as MenuApiClientLike['listMenus'];
+      return impl(args[0] as any);
+    },
+    updateMenu: async (payload: unknown) => {
+      mock.calls.updateMenu += 1;
+      const impl = (overrides.updateMenu ?? (async () => createApiResponse({ code: 0, msg: 'ok' }))) as MenuApiClientLike['updateMenu'];
+      return impl(payload as any);
+    },
+    createMenuGroup: async (payload: unknown) => {
+      mock.calls.createMenuGroup += 1;
+      mock.payload.menuGroup = payload;
+      const impl = (overrides.createMenuGroup ?? (async () => createApiResponse({ code: 0, msg: 'ok', data: { id: 2 } }))) as MenuApiClientLike['createMenuGroup'];
+      return impl(payload as any);
+    },
+    listMenuGroups: async (...args: unknown[]) => {
+      mock.calls.listMenuGroups += 1;
+      const impl = (overrides.listMenuGroups ?? (async () => createApiResponse({ code: 0, msg: 'ok', data: { records: [] } }))) as MenuApiClientLike['listMenuGroups'];
+      return impl(args[0] as any);
+    },
+    deleteMenuGroup: async () => {
+      mock.calls.deleteMenuGroup += 1;
+      const impl = (overrides.deleteMenuGroup ?? (async () => createApiResponse({ code: 0, msg: 'ok' }))) as MenuApiClientLike['deleteMenuGroup'];
+      return impl({ menuGroupId: 0 } as any);
+    },
+    createMenuCategory: async (payload: unknown) => {
+      mock.calls.createMenuCategory += 1;
+      mock.payload.menuCategory = payload;
+      const impl = (overrides.createMenuCategory ?? (async () => createApiResponse({ code: 0, msg: 'ok', data: { id: 3 } }))) as MenuApiClientLike['createMenuCategory'];
+      return impl(payload as any);
+    },
+    listCategories: async (...args: unknown[]) => {
+      mock.calls.listCategories += 1;
+      const impl = (overrides.listCategories ?? (async () => createApiResponse({ code: 0, msg: 'ok', data: { records: [] } }))) as MenuApiClientLike['listCategories'];
+      return impl(args[0] as any);
+    },
+    deleteMenuCategory: async () => {
+      mock.calls.deleteMenuCategory += 1;
+      const impl = (overrides.deleteMenuCategory ?? (async () => createApiResponse({ code: 0, msg: 'ok' }))) as MenuApiClientLike['deleteMenuCategory'];
+      return impl({ menuCategoryId: 0 } as any);
+    },
+  } as MenuApiClientLike;
 
   return mock;
 }

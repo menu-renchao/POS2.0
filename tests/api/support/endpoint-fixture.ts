@@ -3,10 +3,11 @@ import type { EndpointResources } from './endpoint-resources';
 import { createEndpointResources } from './endpoint-resources';
 
 export const test = apiTest.extend<{ endpointResources: EndpointResources }>({
-  endpointResources: async ({ adminConfigApi, resourceRegistry }, use) => {
+  endpointResources: async ({ adminConfigApi, menuApi, resourceRegistry }, use) => {
     await use(
       createEndpointResources({
         adminConfigApi,
+        menuApi,
         resourceRegistry,
       }),
     );

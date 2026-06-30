@@ -132,6 +132,18 @@ test.describe('Endpoint 测试支撑工具', () => {
         path: '/api/discount/list',
       }),
     ).toEqual([{ id: 22, name: 'AT_DISC' }]);
+    expect(
+      extractEndpointListData({ menus: [{ id: 33, name: 'AT_MENU' }] }, {
+        method: 'GET',
+        path: '/api/menu/menus',
+      }),
+    ).toEqual([{ id: 33, name: 'AT_MENU' }]);
+    expect(
+      extractEndpointListData({ menuGroups: [{ id: 44, name: 'AT_MENU_GROUP' }] }, {
+        method: 'GET',
+        path: '/api/menu/menuGroups',
+      }),
+    ).toEqual([{ id: 44, name: 'AT_MENU_GROUP' }]);
   });
 
   test('列表提取失败时应保留 endpoint 上下文并避免递归匹配非目标数组', () => {
@@ -139,7 +151,7 @@ test.describe('Endpoint 测试支撑工具', () => {
 
     expect(() =>
       extractEndpointListData({ wrapper: { records: [{ id: 1, name: 'AT_NESTED' }] } }, identity),
-    ).toThrow('GET /api/tax/list 未能从响应 data 中提取列表数组（支持 data、taxes、discounts、records、list、items、rows）');
+    ).toThrow('GET /api/tax/list 未能从响应 data 中提取列表数组（支持 data、taxes、discounts、menus、menuGroups、records、list、items、rows）');
   });
 
   test('列表项缺少对象或标识字段时应抛错', () => {

@@ -2,7 +2,13 @@ import type { APIResponse } from '@playwright/test';
 import type { ApiRequestData } from '../../../api/clients/client-path';
 import { createShortTestName } from '../../../api/core/test-data-id';
 import type { AdminConfigApiClient } from '../../../api/clients/admin-config-api.client';
+import type { MenuApiClient } from '../../../api/clients/menu-api.client';
 import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
+import {
+  buildCategoryRequest,
+  buildMenuGroupRequest,
+  buildMenuRequest,
+} from '../../../test-data/api/menu-api-data';
 import {
   expectApiOk,
 } from './endpoint-assertions';
@@ -17,6 +23,7 @@ export type EndpointResource = {
 
 export type EndpointResourceFactoryOptions = {
   adminConfigApi: AdminConfigApiClient;
+  menuApi?: MenuApiClient;
   resourceRegistry: ResourceRegistry;
 };
 
@@ -24,6 +31,9 @@ export type EndpointResources = {
   createTaxResource: () => Promise<EndpointResource>;
   createDiscountResource: () => Promise<EndpointResource>;
   createRoleResource: () => Promise<EndpointResource>;
+  createMenuResource: () => Promise<EndpointResource>;
+  createMenuGroupResource: (menuId: ResourceId) => Promise<EndpointResource>;
+  createCategoryResource: (menuId: ResourceId, menuGroupId: ResourceId) => Promise<EndpointResource>;
 };
 
 const ENDPOINT_RESOURCE_CLEANUP_PRIORITY = 30;
@@ -126,6 +136,88 @@ export function createEndpointResources(
 
       return resolvedResource;
     },
+    createMenuResource: async () => {
+      const menuApi = getMenuApi(options);
+      const request = buildMenuRequest();
+      const resolvedResource = await createEndpointResource({
+        name: request.name,
+        adminConfigApi: options.adminConfigApi,
+        resourceRegistry: options.resourceRegistry,
+        request,
+        saveIdentity: {
+          method: 'POST',
+          path: '/api/menu/menu',
+        },
+        saveResource: () => menuApi.createMenu(request),
+        listIdentity: {
+          method: 'GET',
+          path: '/api/menu/menus',
+        },
+        listResource: () => menuApi.listMenus({ name: request.name }),
+        resolveResourceType: 'menu',
+        cleanupPriority: 10,
+        cleanup: (id) => menuApi.updateMenu(archiveMenuRequest(request, id)),
+      });
+
+      return resolvedResource;
+    },
+    createMenuGroupResource: async (menuId: ResourceId) => {
+      const menuApi = getMenuApi(options);
+      const request = buildMenuGroupRequest(menuId);
+
+      const resolvedResource = await createEndpointResource({
+        name: request.name,
+        adminConfigApi: options.adminConfigApi,
+        resourceRegistry: options.resourceRegistry,
+        request,
+        saveIdentity: {
+          method: 'POST',
+          path: '/api/menu/menuGroup',
+        },
+        saveResource: () => menuApi.createMenuGroup(request),
+        listIdentity: {
+          method: 'GET',
+          path: '/api/menu/menuGroups',
+        },
+        listResource: () => menuApi.listMenuGroups({ menuId: menuId, name: request.name }),
+        resolveResourceType: 'menuGroup',
+        cleanupPriority: 30,
+        cleanup: (id) => menuApi.deleteMenuGroup(id),
+      });
+
+      return resolvedResource;
+    },
+    createCategoryResource: async (menuId: ResourceId, menuGroupId: ResourceId) => {
+      const menuApi = getMenuApi(options);
+      const request = buildCategoryRequest(menuId, menuGroupId);
+
+      const resolvedResource = await createEndpointResource({
+        name: request.name,
+        adminConfigApi: options.adminConfigApi,
+        resourceRegistry: options.resourceRegistry,
+        request,
+        saveIdentity: {
+          method: 'POST',
+          path: '/api/menu/menuCategory',
+        },
+        saveResource: () => menuApi.createMenuCategory(request),
+        listIdentity: {
+          method: 'GET',
+          path: '/api/menu/category/list',
+        },
+        listResource: () =>
+          menuApi.listCategories({
+            menuId: menuId,
+            menuGroupId: menuGroupId,
+            name: request.name,
+          }),
+        resolveResourceType: 'menuCategory',
+        cleanupPriority: 40,
+        cleanup: (id) => menuApi.deleteMenuCategory(id),
+      });
+
+      return resolvedResource;
+    },
   };
 }
 
@@ -147,6 +239,7 @@ async function createEndpointResource(options: {
   listIdentity: { method: 'GET'; path: string };
   listResource: () => Promise<APIResponse>;
   resolveResourceType: string;
+  cleanupPriority?: number;
   cleanup: (id: ResourceId) => Promise<unknown>;
 }): Promise<EndpointResource> {
   const saveBody = await expectApiOk(await options.saveResource(), options.saveIdentity);
@@ -167,7 +260,7 @@ async function createEndpointResource(options: {
     type: options.resolveResourceType,
     id,
     name: options.name,
-    cleanupPriority: ENDPOINT_RESOURCE_CLEANUP_PRIORITY,
+    cleanupPriority: options.cleanupPriority ?? ENDPOINT_RESOURCE_CLEANUP_PRIORITY,
     cleanup: () => options.cleanup(id),
   });
 
@@ -176,5 +269,23 @@ async function createEndpointResource(options: {
     name: options.name,
     request: options.request,
     body: saveBody,
+  };
+}
+
+function getMenuApi(options: EndpointResourceFactoryOptions): MenuApiClient {
+  if (options.menuApi === undefined) {
+    throw new Error('createMenuResource/createMenuGroupResource/createCategoryResource 需要 menuApi 入参。');
+  }
+
+  return options.menuApi;
+}
+
+function archiveMenuRequest(request: ApiRequestData, menuId: ResourceId): ApiRequestData {
+  return {
+    ...request,
+    id: menuId,
+    enabled: false,
+    active: false,
+    deleted: true,
   };
 }

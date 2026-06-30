@@ -3,6 +3,8 @@ import { toEndpointTitle, type EndpointIdentity } from './endpoint-case';
 const LIST_DATA_KEYS = ['records', 'list', 'items', 'rows'] as const;
 const TAX_LIST_DATA_KEY = 'taxes';
 const DISCOUNT_LIST_DATA_KEY = 'discounts';
+const MENU_LIST_DATA_KEY = 'menus';
+const MENU_GROUP_LIST_DATA_KEY = 'menuGroups';
 
 export function extractEndpointListData(
   data: unknown,
@@ -15,7 +17,7 @@ export function extractEndpointListData(
       toEndpointTitle(
         identity.method,
         identity.path,
-        '未能从响应 data 中提取列表数组（支持 data、taxes、discounts、records、list、items、rows）',
+        '未能从响应 data 中提取列表数组（支持 data、taxes、discounts、menus、menuGroups、records、list、items、rows）',
       ),
     );
   }
@@ -71,6 +73,14 @@ function resolveListDataKeys(path: string): readonly string[] {
 
   if (path === '/api/discount/list') {
     return [DISCOUNT_LIST_DATA_KEY];
+  }
+
+  if (path === '/api/menu/menus') {
+    return [MENU_LIST_DATA_KEY];
+  }
+
+  if (path === '/api/menu/menuGroups') {
+    return [MENU_GROUP_LIST_DATA_KEY];
   }
 
   return [];
