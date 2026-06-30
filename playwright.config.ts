@@ -34,7 +34,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chrome',
-      testIgnore: /py-migrate|api/,
+      testIgnore: /(?:^|[\\/])(?:api|py-migrate)(?:[\\/]|$)/,
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chrome',
@@ -44,14 +44,14 @@ export default defineConfig({
     },
     {
       name: 'api',
-      testMatch: /api/,
+      testMatch: /(?:^|[\\/])api[\\/].*\.(?:api|unit)\.spec\.ts$/,
       use: {
         viewport: null,
       },
     },
     {
       name: 'py-migrate',
-      testMatch: /py-migrate/,
+      testMatch: /(?:^|[\\/])py-migrate[\\/].*\.spec\.ts$/,
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chrome',
