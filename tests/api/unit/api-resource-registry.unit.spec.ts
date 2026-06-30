@@ -125,6 +125,26 @@ test.describe('API 测试资源登记', () => {
     expect(registry.has('saleItem', 2)).toBe(false);
   });
 
+  test('手工标记清理后应跳过对应资源的后置清理', async () => {
+    const cleaned: string[] = [];
+    const registry = new ResourceRegistry();
+
+    registry.register({
+      type: 'discount',
+      id: 3,
+      cleanupPriority: 20,
+      cleanup: async () => cleaned.push('discount'),
+    });
+
+    registry.markCleaned('discount', 3);
+    const result = await registry.cleanupAll();
+
+    expect(cleaned).toHaveLength(0);
+    expect(result.cleaned).toHaveLength(0);
+    expect(result.errors).toHaveLength(0);
+    expect(registry.has('discount', 3)).toBe(false);
+  });
+
   test('未登记资源断言应抛出明确错误', () => {
     const registry = new ResourceRegistry();
 

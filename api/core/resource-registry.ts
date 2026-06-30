@@ -51,6 +51,14 @@ export class ResourceRegistry {
     return resource;
   }
 
+  markCleaned(type: string, id: ResourceId): void {
+    for (let index = this.resources.length - 1; index >= 0; index -= 1) {
+      if (isSameResource(this.resources[index], type, id)) {
+        this.resources.splice(index, 1);
+      }
+    }
+  }
+
   async cleanupAll(): Promise<CleanupResult> {
     const cleaned: RegisteredResourceSnapshot[] = [];
     const errors: CleanupError[] = [];
