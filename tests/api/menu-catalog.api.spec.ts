@@ -242,6 +242,75 @@ test.describe('菜单目录接口', () => {
       },
     });
 
+    await test.step('POST /api/menu/menuGroup/batch/copy 应能复制运行时创建的菜单组', async () => {
+      const response = await menuApi.copyMenuGroups({ menuId, groupIds: [menuGroupId] });
+
+      await expectJsonEnvelope(response, 'POST /api/menu/menuGroup/batch/copy');
+
+      const listBody = await expectJsonEnvelope(
+        await menuApi.listMenuGroups({ menuId }),
+        'GET /api/menu/menuGroups',
+      );
+      const copiedGroupIds = findResourceIdsByName(listBody.data, menuGroupRequest.name).filter(
+        (id) => id !== menuGroupId,
+      );
+      if (copiedGroupIds.length === 0) {
+        test.info().annotations.push({
+          type: '说明',
+          description: '批量复制响应未返回新菜单组 id，列表中也未定位到同名复制组，无法执行复制组清理。',
+        });
+        return;
+      }
+
+      await expectJsonEnvelope(
+        await menuApi.deleteMenuGroups({ groupIds: copiedGroupIds }),
+        'DELETE /api/menu/menuGroup/batch/delete',
+      );
+    });
+
+    const batchDeleteGroupRequest = buildMenuGroupRequest(menuId, 'BATCH_DELETE');
+    const batchDeleteGroupBody = await test.step('创建批量删除测试菜单组并校验响应信封', async () => {
+      const response = await menuApi.createMenuGroup(batchDeleteGroupRequest);
+
+      return await expectJsonEnvelope(response, 'POST /api/menu/menuGroup');
+    });
+
+    const batchDeleteGroupId = await resolveCreatedResourceId({
+      name: batchDeleteGroupRequest.name,
+      saveBody: batchDeleteGroupBody,
+      listLabel: 'GET /api/menu/menuGroups',
+      listResource: async () =>
+        await menuApi.listMenuGroups({ menuId, name: batchDeleteGroupRequest.name }),
+    });
+
+    if (batchDeleteGroupId === undefined) {
+      test.info().annotations.push({
+        type: '说明',
+        description: '创建批量删除菜单组响应和菜单组列表均未返回 id，跳过批量删除接口。',
+      });
+    } else {
+      let batchDeleteGroupDeleted = false;
+      registerCleanup({
+        resourceRegistry,
+        type: 'menuGroup',
+        id: batchDeleteGroupId,
+        name: batchDeleteGroupRequest.name,
+        cleanupPriority: 31,
+        deleteResource: async () => {
+          if (!batchDeleteGroupDeleted) {
+            await menuApi.deleteMenuGroup(batchDeleteGroupId);
+          }
+        },
+      });
+
+      await test.step('DELETE /api/menu/menuGroup/batch/delete 应能删除运行时创建的菜单组', async () => {
+        const response = await menuApi.deleteMenuGroups({ groupIds: [batchDeleteGroupId] });
+
+        await expectJsonEnvelope(response, 'DELETE /api/menu/menuGroup/batch/delete');
+        batchDeleteGroupDeleted = true;
+      });
+    }
+
     await test.step('更新并查询测试菜单组入口', async () => {
       const updatedGroup = buildMenuGroupRequest(menuId);
       const responses = [
@@ -605,6 +674,13 @@ function findResourceIdByName(value: unknown, name: string): ResourceId | undefi
   return findResourceIdByNameValue(value, name, new Set<object>());
 }
 
+function findResourceIdsByName(value: unknown, name: string): ResourceId[] {
+  const ids: ResourceId[] = [];
+  collectResourceIdsByNameValue(value, name, new Set<object>(), ids);
+
+  return ids;
+}
+
 function findResourceIdByNameValue(
   value: unknown,
   name: string,
@@ -644,6 +720,42 @@ function findResourceIdByNameValue(
   }
 
   return undefined;
+}
+
+function collectResourceIdsByNameValue(
+  value: unknown,
+  name: string,
+  seen: Set<object>,
+  ids: ResourceId[],
+): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectResourceIdsByNameValue(item, name, seen, ids);
+    }
+
+    return;
+  }
+
+  if (!isRecord(value)) {
+    return;
+  }
+
+  if (seen.has(value)) {
+    return;
+  }
+  seen.add(value);
+
+  if (recordHasName(value, name)) {
+    const id = extractIdFromRecord(value);
+
+    if (id !== undefined) {
+      ids.push(id);
+    }
+  }
+
+  for (const item of Object.values(value)) {
+    collectResourceIdsByNameValue(item, name, seen, ids);
+  }
 }
 
 function recordHasName(record: Record<string, unknown>, name: string): boolean {

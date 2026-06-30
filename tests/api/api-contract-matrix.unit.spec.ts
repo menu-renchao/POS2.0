@@ -47,4 +47,35 @@ test.describe('首批接口覆盖矩阵', () => {
 
     expect(new Set(apiCaseKeys).size).toBe(firstBatchApiCases.length);
   });
+
+  test('首批抓包接口应按真实业务可执行性更新覆盖等级', () => {
+    expect(findApiCase('POST', '/api/menu/menuGroup/batch/copy')).toMatchObject({
+      coverage: 'positive-business',
+      specFile: API_SPEC_FILES.menuCatalog,
+    });
+    expect(findApiCase('DELETE', '/api/menu/menuGroup/batch/delete')).toMatchObject({
+      coverage: 'positive-business',
+      specFile: API_SPEC_FILES.menuCatalog,
+    });
+    expect(findApiCase('PUT', '/api/menu/menuSaleItem/batch/sequence')).toMatchObject({
+      coverage: 'positive-business',
+      specFile: API_SPEC_FILES.saleItem,
+    });
+    expect(findApiCase('PUT', '/api/menu/menuSaleItem/batch/update')).toMatchObject({
+      coverage: 'positive-business',
+      specFile: API_SPEC_FILES.saleItem,
+    });
+    expect(findApiCase('POST', '/api/payment/record/save/batch')).toMatchObject({
+      coverage: 'contract-only',
+      specFile: API_SPEC_FILES.contractSmoke,
+    });
+  });
 });
+
+function findApiCase(method: string, path: string) {
+  const apiCase = firstBatchApiCases.find((entry) => entry.method === method && entry.path === path);
+
+  expect(apiCase, `${method} ${path} 应存在于首批接口矩阵`).toBeDefined();
+
+  return apiCase;
+}

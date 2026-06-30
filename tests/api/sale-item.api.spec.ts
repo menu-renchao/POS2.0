@@ -301,6 +301,68 @@ test.describe('商品和 SPU 库存接口', () => {
       },
     });
 
+    const batchSaleItemRequest = {
+      ...buildSaleItemRequest(categoryId, 'BATCH'),
+      menuId,
+      menuGroupId,
+      categoryId,
+    };
+    const batchSaleItemBody = await test.step('创建批量操作测试商品并校验响应信封', async () => {
+      const response = await saleItemApi.createSaleItem(batchSaleItemRequest);
+
+      return await expectJsonEnvelope(response, 'POST /api/menu/menuSaleItem');
+    });
+
+    const batchSaleItemId = await resolveCreatedResourceId({
+      name: batchSaleItemRequest.name,
+      saveBody: batchSaleItemBody,
+      listLabel: 'GET /api/menu/menuSaleItems/search',
+      listResource: async () =>
+        await saleItemApi.searchSaleItems({
+          menuIds: menuId,
+          categoryIds: categoryId,
+          name: batchSaleItemRequest.name,
+        }),
+    });
+
+    let batchSaleItemDeleted = false;
+    if (batchSaleItemId === undefined) {
+      test.info().annotations.push({
+        type: '说明',
+        description: '创建批量操作商品响应和商品搜索响应均未返回商品 id，跳过商品批量排序和批量更新接口。',
+      });
+    } else {
+      registerCleanup({
+        resourceRegistry,
+        type: 'saleItem',
+        id: batchSaleItemId,
+        name: batchSaleItemRequest.name,
+        cleanupPriority: 51,
+        cleanupResource: async () => {
+          if (!batchSaleItemDeleted) {
+            await saleItemApi.deleteSaleItem(batchSaleItemId);
+          }
+        },
+      });
+
+      await test.step('PUT /api/menu/menuSaleItem/batch/sequence 应能排序运行时创建的商品', async () => {
+        const response = await saleItemApi.sequenceSaleItems({
+          saleItemIds: [batchSaleItemId, saleItemId],
+        });
+
+        await expectJsonEnvelope(response, 'PUT /api/menu/menuSaleItem/batch/sequence');
+      });
+
+      await test.step('PUT /api/menu/menuSaleItem/batch/update 应能批量更新运行时创建的商品', async () => {
+        const response = await saleItemApi.updateSaleItems({
+          saleItemIds: [saleItemId, batchSaleItemId],
+          price: 8.88,
+        });
+
+        await expectJsonEnvelope(response, 'PUT /api/menu/menuSaleItem/batch/update');
+      });
+    }
+
     await test.step('更新并查询测试商品入口', async () => {
       const updatedSaleItem = {
         ...saleItemRequest,
@@ -322,15 +384,21 @@ test.describe('商品和 SPU 库存接口', () => {
         [
           'GET /api/menu/item/fetchSaleItem',
           await saleItemApi.fetchSaleItem({
-            menuId,
-            id: saleItemId,
-            menuSaleItemId: saleItemId,
-            saleItemId,
+            itemId: saleItemId,
+            fetchOptions: true,
+            includeCategoryAttributesAndOptions: true,
           }),
         ],
         [
           'GET /api/menu/item/listByCategory',
-          await saleItemApi.listByCategory({ menuId, menuCategoryId: categoryId, categoryId }),
+          await saleItemApi.listByCategory({
+            categoryId,
+            showOffMenuItems: true,
+            nameIdOnly: false,
+            fetchOptions: true,
+            includeCategoryAttributesAndOptions: true,
+            showNonCombo: false,
+          }),
         ],
         [
           'GET /api/menu/item/listComboSaleItem',
@@ -339,10 +407,9 @@ test.describe('商品和 SPU 库存接口', () => {
         [
           'GET /api/menu/menuSaleItems/search',
           await saleItemApi.searchSaleItems({
-            menuId,
-            menuCategoryId: categoryId,
-            categoryId,
-            keyword: saleItemRequest.name,
+            menuIds: menuId,
+            categoryIds: categoryId,
+            name: saleItemRequest.name,
           }),
         ],
         [
@@ -379,21 +446,25 @@ test.describe('商品和 SPU 库存接口', () => {
     });
 
     await test.step('查询测试商品选项入口并校验响应信封', async () => {
+      const optionListResponse = await saleItemApi.listItemOptions({ saleItemId });
+      const optionListBody = await expectJsonEnvelope(
+        optionListResponse,
+        'GET /api/menu/item/listItemOptions',
+      );
+      const optionId = extractFirstResourceId(optionListBody.data);
+      if (optionId === undefined) {
+        test.info().annotations.push({
+          type: '说明',
+          description: '当前运行时商品未返回 optionId，需现场抓取带选项商品请求。',
+        });
+        return;
+      }
+
       const responses = [
         [
           'GET /api/menu/item/fetchItemOption',
           await saleItemApi.fetchItemOption({
-            menuId,
-            menuSaleItemId: saleItemId,
-            saleItemId,
-          }),
-        ],
-        [
-          'GET /api/menu/item/listItemOptions',
-          await saleItemApi.listItemOptions({
-            menuId,
-            menuSaleItemId: saleItemId,
-            saleItemId,
+            optionId,
           }),
         ],
       ] as const;
@@ -448,6 +519,14 @@ test.describe('商品和 SPU 库存接口', () => {
     });
 
     await test.step('按依赖倒序清理本次创建的商品和菜单前置数据', async () => {
+      if (batchSaleItemId !== undefined) {
+        await expectJsonEnvelope(
+          await saleItemApi.deleteSaleItem(batchSaleItemId),
+          'DELETE /api/menu/menuSaleItem/{id}',
+        );
+        batchSaleItemDeleted = true;
+      }
+
       await expectJsonEnvelope(
         await saleItemApi.deleteSaleItem(saleItemId),
         'DELETE /api/menu/menuSaleItem/{id}',

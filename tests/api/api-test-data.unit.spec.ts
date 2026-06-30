@@ -19,6 +19,10 @@ import { buildPaymentRecordRequest, buildTipRequest } from '../../test-data/api/
 test.describe('API 测试数据工厂', () => {
   test('菜单数据工厂应生成短名称并保留自动化前缀', () => {
     expect(DEFAULT_MENU_PRODUCT).toBe('POS');
+    expect(buildMenuRequest('menu-seed-001')).toMatchObject({
+      active: false,
+      productLine: DEFAULT_MENU_PRODUCT,
+    });
 
     const namedRequests = [
       { request: buildMenuRequest('menu-seed-001'), key: 'name', maxLength: MENU_API_NAME_LIMITS.menu },

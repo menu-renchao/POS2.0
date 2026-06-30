@@ -46,8 +46,10 @@ export function buildMenuRequest(seed?: string | number): MenuApiRequest {
     name,
     displayName: name,
     description: name,
+    productLine: DEFAULT_MENU_PRODUCT,
     sequence: 1,
     enabled: true,
+    active: false,
   };
 }
 
