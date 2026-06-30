@@ -29,7 +29,7 @@ Add `Validate Parameters` to build `API_BASE_URL`, then `Checkout` to switch to 
 
 - [x] **Step 4: Add dependency, cleanup, test, and publish stages**
 
-Run `npm ci`, remove previous report folders, run the selected API command, publish Allure results, and archive Playwright artifacts.
+Run `npm ci`, print Playwright module resolution diagnostics, remove previous report folders, run the selected API command through the local `node_modules/@playwright/test/cli.js`, publish Allure results, and archive Playwright artifacts.
 
 ### Task 2: Document Jenkins Usage
 

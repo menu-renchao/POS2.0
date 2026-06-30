@@ -71,13 +71,14 @@ String resolveGitBranch(Object rawBranch) {
 }
 
 String apiTestCommand(String scope) {
+    def playwrightCli = 'node node_modules\\@playwright\\test\\cli.js test'
     def commands = [
-        all      : 'npm run test:api',
-        endpoints: 'npx playwright test tests/api/endpoints --project=api',
-        business : 'npm run test:api:business',
-        contracts: 'npm run test:api:contract',
-        unit     : 'npm run test:api:unit',
-        cleanup  : 'npm run test:api:cleanup',
+        all      : "${playwrightCli} tests/api --project=api",
+        endpoints: "${playwrightCli} tests/api/endpoints --project=api",
+        business : "${playwrightCli} tests/api/business --project=api",
+        contracts: "${playwrightCli} tests/api/contracts --project=api",
+        unit     : "${playwrightCli} tests/api/unit --project=api",
+        cleanup  : "${playwrightCli} tests/api/maintenance --project=api",
     ]
 
     if (!commands.containsKey(scope)) {
@@ -247,6 +248,15 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 bat 'npm ci'
+            }
+        }
+
+        stage('Check Playwright Installation') {
+            steps {
+                bat '''
+                    node -e "console.log('node=' + process.version); console.log('execPath=' + process.execPath); console.log('@playwright/test=' + require.resolve('@playwright/test')); console.log('playwright=' + require.resolve('playwright')); console.log('@playwright/test version=' + require('@playwright/test/package.json').version); console.log('playwright version=' + require('playwright/package.json').version); console.log('NODE_PATH=' + (process.env.NODE_PATH || '')); console.log('NODE_OPTIONS=' + (process.env.NODE_OPTIONS || ''));"
+                    npm ls @playwright/test playwright
+                '''
             }
         }
 

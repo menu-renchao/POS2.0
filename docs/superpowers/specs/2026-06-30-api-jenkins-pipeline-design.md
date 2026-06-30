@@ -36,9 +36,10 @@
 2. `Checkout`：拉取并切换到 `GIT_BRANCH`。
 3. `Check Environment`：打印 Node.js 和 npm 版本。
 4. `Install Dependencies`：执行 `npm ci`。
-5. `Clean Test Reports`：清理本次构建前的测试产物。
-6. `Run API Tests`：按 `API_TEST_SCOPE` 执行对应 Playwright API 测试。
-7. `post`：发布 Allure 原始结果并归档 `test-results`。
+5. `Check Playwright Installation`：打印本地 Playwright CLI、package 版本和关键 Node 环境变量。
+6. `Clean Test Reports`：清理本次构建前的测试产物。
+7. `Run API Tests`：按 `API_TEST_SCOPE` 使用仓库内 `node_modules/@playwright/test/cli.js` 执行对应 Playwright API 测试。
+8. `post`：发布 Allure 原始结果并归档 `test-results`。
 
 ## 鉴权
 
@@ -49,4 +50,5 @@
 - 不默认打到某个完整 IP，避免误跑真实环境。
 - 参数阶段先失败，避免依赖安装和测试阶段才暴露配置错误。
 - 分支参数使用 Active Choices 动态加载远端分支，并保留 `main` 兜底。
+- 测试阶段显式调用仓库内 Playwright Test CLI，避免 Jenkins Agent 的全局 `playwright`、`npx` 或 npm shim 影响 runner 实例。
 - `API_TEST_SCOPE=cleanup` 单独保留，便于需要时清理自动化残留数据。
