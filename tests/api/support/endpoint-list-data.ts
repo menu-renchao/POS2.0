@@ -47,14 +47,14 @@ function resolveListData(data: unknown, path: string): unknown[] | undefined {
   }
 
   const keyOrder = resolveListDataKeys(path);
-  for (const key of LIST_DATA_KEYS) {
+  for (const key of keyOrder) {
     const candidate = data[key];
     if (Array.isArray(candidate)) {
       return candidate;
     }
   }
 
-  for (const key of keyOrder) {
+  for (const key of LIST_DATA_KEYS) {
     const candidate = data[key];
     if (Array.isArray(candidate)) {
       return candidate;

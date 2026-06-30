@@ -112,6 +112,15 @@ test.describe('Endpoint 测试支撑工具', () => {
       ),
     ).toEqual([{ id: 3 }]);
     expect(
+      extractEndpointListData(
+        {
+          taxes: [{ id: 7, name: 'AT_SPECIFIC_TAX' }],
+          records: [{ id: 8, name: 'AT_RECORDS_TAX' }],
+        },
+        identity,
+      ),
+    ).toEqual([{ id: 7, name: 'AT_SPECIFIC_TAX' }]);
+    expect(
       extractEndpointListData({ taxes: [{ id: 11, name: 'AT_TAX' }] }, {
         method: 'GET',
         path: '/api/tax/list',

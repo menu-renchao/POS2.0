@@ -20,7 +20,6 @@ test.describe('折扣 endpoint', () => {
         },
       );
 
-      expect(data.length).toBeGreaterThanOrEqual(0);
       expect(
         data.length === 0 ||
           data.some((item) => 'id' in item || 'name' in item || 'displayName' in item),
@@ -56,7 +55,7 @@ test.describe('折扣 endpoint', () => {
         },
       );
 
-      resourceRegistry.markCleaned('discount', resource.id);
+      expect(resourceRegistry.markCleaned('discount', resource.id)).toBe(true);
     },
   );
 });

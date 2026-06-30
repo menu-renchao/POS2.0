@@ -20,7 +20,6 @@ test.describe('税费 endpoint', () => {
         },
       );
 
-      expect(data.length).toBeGreaterThanOrEqual(0);
       expect(data.length === 0 || data.some((item) => 'id' in item || 'name' in item || 'displayName' in item)).toBe(true);
     },
   );
@@ -53,7 +52,7 @@ test.describe('税费 endpoint', () => {
         },
       );
 
-      resourceRegistry.markCleaned('tax', resource.id);
+      expect(resourceRegistry.markCleaned('tax', resource.id)).toBe(true);
     },
   );
 });
