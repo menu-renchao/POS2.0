@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import http from 'node:http';
 import { createApiRequestContext } from '../../../api/core/api-context';
 import {
   buildApiFailureMessage,
   expectResponseEnvelope,
   summarizeJson,
 } from '../../../api/core/api-response';
+import { createLocalHttpServer } from './local-http-server';
 
 test.describe('API 核心工具', () => {
   test('应能校验 Response 包装结构', () => {
@@ -104,7 +104,7 @@ test.describe('API 核心工具', () => {
 });
 
 async function withHeaderEchoServer<T>(callback: (baseURL: string) => Promise<T>): Promise<T> {
-  const server = http.createServer((request, response) => {
+  const server = createLocalHttpServer((request, response) => {
     if (request.url === '/kpos/api/client/session/login') {
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end(
@@ -165,7 +165,7 @@ async function withHeaderEchoServer<T>(callback: (baseURL: string) => Promise<T>
 }
 
 async function withRequestUrlEchoServer<T>(callback: (baseURL: string) => Promise<T>): Promise<T> {
-  const server = http.createServer((request, response) => {
+  const server = createLocalHttpServer((request, response) => {
     if (request.url === '/kpos/api/client/session/login') {
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end(

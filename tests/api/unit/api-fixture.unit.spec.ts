@@ -1,5 +1,4 @@
 import { expect } from '@playwright/test';
-import http from 'node:http';
 import { AdminConfigApiClient } from '../../../api/clients/admin-config-api.client';
 import { MenuApiClient } from '../../../api/clients/menu-api.client';
 import { OrderApiClient } from '../../../api/clients/order-api.client';
@@ -8,6 +7,7 @@ import { SaleItemApiClient } from '../../../api/clients/sale-item-api.client';
 import { SpuApiClient } from '../../../api/clients/spu-api.client';
 import { loadApiConfig } from '../../../api/core/api-config';
 import { test as apiTest } from '../../../fixtures/api.fixture';
+import { createLocalHttpServer } from './local-http-server';
 
 type LocalApiFixtures = {
   apiServerBaseURL: string;
@@ -15,7 +15,7 @@ type LocalApiFixtures = {
 
 const test = apiTest.extend<LocalApiFixtures>({
   apiServerBaseURL: async ({}, use) => {
-    const server = http.createServer((request, response) => {
+    const server = createLocalHttpServer((request, response) => {
       if (request.url === '/kpos/api/client/session/login') {
         response.writeHead(200, { 'content-type': 'application/json' });
         response.end(
