@@ -3,11 +3,13 @@ import type { ApiRequestData } from '../../../api/clients/client-path';
 import { createShortTestName } from '../../../api/core/test-data-id';
 import type { AdminConfigApiClient } from '../../../api/clients/admin-config-api.client';
 import type { MenuApiClient } from '../../../api/clients/menu-api.client';
+import type { SaleItemApiClient } from '../../../api/clients/sale-item-api.client';
 import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
 import {
   buildCategoryRequest,
   buildMenuGroupRequest,
   buildMenuRequest,
+  buildSaleItemRequest,
 } from '../../../test-data/api/menu-api-data';
 import {
   expectApiOk,
@@ -24,6 +26,7 @@ export type EndpointResource = {
 export type EndpointResourceFactoryOptions = {
   adminConfigApi: AdminConfigApiClient;
   menuApi?: MenuApiClient;
+  saleItemApi?: SaleItemApiClient;
   resourceRegistry: ResourceRegistry;
 };
 
@@ -34,6 +37,11 @@ export type EndpointResources = {
   createMenuResource: () => Promise<EndpointResource>;
   createMenuGroupResource: (menuId: ResourceId) => Promise<EndpointResource>;
   createCategoryResource: (menuId: ResourceId, menuGroupId: ResourceId) => Promise<EndpointResource>;
+  createSaleItemResource: (
+    menuId: ResourceId,
+    menuGroupId: ResourceId,
+    categoryId: ResourceId,
+  ) => Promise<EndpointResource>;
 };
 
 const ENDPOINT_RESOURCE_CLEANUP_PRIORITY = 30;
@@ -218,6 +226,47 @@ export function createEndpointResources(
 
       return resolvedResource;
     },
+    createSaleItemResource: async (
+      menuId: ResourceId,
+      menuGroupId: ResourceId,
+      categoryId: ResourceId,
+    ) => {
+      const saleItemApi = getSaleItemApi(options);
+      const request = {
+        ...buildSaleItemRequest(categoryId),
+        menuId,
+        menuGroupId,
+        categoryId,
+      };
+
+      const resolvedResource = await createEndpointResource({
+        name: request.name,
+        adminConfigApi: options.adminConfigApi,
+        resourceRegistry: options.resourceRegistry,
+        request,
+        saveIdentity: {
+          method: 'POST',
+          path: '/api/menu/menuSaleItem',
+        },
+        saveResource: () => saleItemApi.createSaleItem(request),
+        listIdentity: {
+          method: 'GET',
+          path: '/api/menu/menuSaleItems/search',
+        },
+        listResource: () =>
+          saleItemApi.searchSaleItems({
+            menuId,
+            menuCategoryId: categoryId,
+            categoryId,
+            keyword: request.name,
+          }),
+        resolveResourceType: 'saleItem',
+        cleanupPriority: 50,
+        cleanup: (id) => saleItemApi.deleteSaleItem(id),
+      });
+
+      return resolvedResource;
+    },
   };
 }
 
@@ -278,6 +327,14 @@ function getMenuApi(options: EndpointResourceFactoryOptions): MenuApiClient {
   }
 
   return options.menuApi;
+}
+
+function getSaleItemApi(options: EndpointResourceFactoryOptions): SaleItemApiClient {
+  if (options.saleItemApi === undefined) {
+    throw new Error('createSaleItemResource 需要 saleItemApi 入参。');
+  }
+
+  return options.saleItemApi;
 }
 
 function archiveMenuRequest(request: ApiRequestData, menuId: ResourceId): ApiRequestData {

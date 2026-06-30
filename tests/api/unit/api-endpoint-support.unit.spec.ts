@@ -11,6 +11,7 @@ import {
   extractFirstResourceId,
   findResourceIdByName,
 } from '../support/endpoint-read-model';
+import { parseSpuCodeFromAssignResponse } from '../support/spu-code';
 
 test.describe('Endpoint 测试支撑工具', () => {
   test('应能生成包含方法和路径的 endpoint 标题', () => {
@@ -29,6 +30,27 @@ test.describe('Endpoint 测试支撑工具', () => {
     const body = await parseApiJson(response, identity);
 
     expect(body).toEqual({ code: 0, msg: 'success', data: [{ id: 1 }] });
+  });
+
+  test('应从 SPU assign 响应中解析明确的正整数 code', () => {
+    expect(parseSpuCodeFromAssignResponse({ code: 0, msg: 'ok', data: 12345 })).toBe('12345');
+    expect(parseSpuCodeFromAssignResponse({ code: 0, msg: 'ok', data: { spuCode: '23456' } })).toBe('23456');
+    expect(parseSpuCodeFromAssignResponse({ code: 0, msg: 'ok', data: { result: 'OK', data: 's00359' } })).toBe('s00359');
+    expect(parseSpuCodeFromAssignResponse({ code: 0, msg: 'ok', data: { '9001': '34567' } })).toBe('34567');
+  });
+
+  test('SPU assign 响应解析不应误取业务 code、商品名或非数字 code', () => {
+    expect(() =>
+      parseSpuCodeFromAssignResponse({
+        code: 0,
+        msg: 'ok',
+        data: {
+          code: 0,
+          name: 'AT_SPU_BAD',
+          itemId: 9001,
+        },
+      }),
+    ).toThrow('POST /api/spu/menuSaleItem/assign 响应未返回可用于库存操作的 SPU code。');
   });
 
   test('应能从列表或分页容器中读取数组数据', () => {
@@ -77,7 +99,8 @@ test.describe('Endpoint 测试支撑工具', () => {
     };
 
     await expect(expectHttpStatus(response, identity)).rejects.toThrow('GET /api/tax/list -> 500');
-    await expect(expectHttpStatus(response, identity)).rejects.toThrow('期望值: 200');
+    await expect(expectHttpStatus(response, identity)).rejects.toThrow('"expectedStatus":200');
+    await expect(expectHttpStatus(response, identity)).rejects.toThrow('"body":{"code":0');
   });
 
   test('数组数据提取失败时应抛错并携带 endpoint 上下文', () => {

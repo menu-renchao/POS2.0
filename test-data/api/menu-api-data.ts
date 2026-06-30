@@ -25,6 +25,7 @@ export type GlobalOptionApiRequest = MenuApiRequest & {
 
 export type SaleItemApiRequest = MenuApiRequest & {
   menuCategoryId: ApiEntityId;
+  posName: string;
   price: number;
 };
 
@@ -126,6 +127,7 @@ export function buildSaleItemRequest(
     menuCategoryId,
     name,
     displayName: name,
+    posName: name,
     price: 10,
     sequence: 1,
     enabled: true,

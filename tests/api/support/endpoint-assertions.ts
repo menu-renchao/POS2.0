@@ -52,6 +52,10 @@ export async function expectHttpStatus(
   expectedStatus = 200,
 ): Promise<void> {
   const actualStatus = response.status();
+  const responseSummary =
+    actualStatus === expectedStatus
+      ? `期望值: ${expectedStatus}`
+      : await summarizeStatusMismatchResponse(response, expectedStatus);
 
   expect(
     actualStatus,
@@ -59,7 +63,7 @@ export async function expectHttpStatus(
       method: identity.method,
       path: identity.path,
       status: actualStatus,
-      responseSummary: `期望值: ${expectedStatus}`,
+      responseSummary,
     }),
   ).toBe(expectedStatus);
 }
@@ -128,4 +132,21 @@ export function expectResourceId(body: unknown, identity: EndpointIdentity): str
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function summarizeStatusMismatchResponse(
+  response: ApiResponseLike,
+  expectedStatus: number,
+): Promise<string> {
+  try {
+    return summarizeJson({
+      expectedStatus,
+      body: await response.json(),
+    });
+  } catch (error) {
+    return summarizeJson({
+      expectedStatus,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

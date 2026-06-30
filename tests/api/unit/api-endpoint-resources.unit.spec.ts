@@ -1,6 +1,7 @@
 import { type APIResponse, expect, test as unitTest } from '@playwright/test';
 import type { AdminConfigApiClient } from '../../../api/clients/admin-config-api.client';
 import type { MenuApiClient } from '../../../api/clients/menu-api.client';
+import type { SaleItemApiClient } from '../../../api/clients/sale-item-api.client';
 import { ResourceRegistry } from '../../../api/core/resource-registry';
 import { createEndpointResources } from '../support/endpoint-resources';
 import { test as endpointFixtureTest } from '../support/endpoint-fixture';
@@ -71,6 +72,26 @@ type MenuApiMock = {
   };
 };
 
+type SaleItemApiClientLike = Pick<
+  import('../../../api/clients/sale-item-api.client').SaleItemApiClient,
+  | 'createSaleItem'
+  | 'searchSaleItems'
+  | 'deleteSaleItem'
+>;
+
+type SaleItemApiMock = {
+  api: SaleItemApiClientLike;
+  calls: {
+    createSaleItem: number;
+    searchSaleItems: number;
+    deleteSaleItem: number;
+  };
+  payload: {
+    saleItem?: unknown;
+    searchParams?: unknown;
+  };
+};
+
 const endpointTest = endpointFixtureTest.extend({
   adminConfigApi: async ({}, use) => {
     const mock = createAdminConfigApi();
@@ -99,6 +120,7 @@ endpointTest.describe('Endpoint fixture 注入', () => {
           createMenuResource: expect.any(Function),
           createMenuGroupResource: expect.any(Function),
           createCategoryResource: expect.any(Function),
+          createSaleItemResource: expect.any(Function),
         }),
       );
     },
@@ -359,6 +381,138 @@ unitTest.describe('Endpoint 资源创建', () => {
     expect(cleanupResult.cleaned).toHaveLength(0);
     expect(cleanupResult.errors).toHaveLength(0);
   });
+
+  unitTest('createSaleItemResource 应调用销售商品接口并在返回 id 时登记清理', async () => {
+    const resourceRegistry = new ResourceRegistry();
+    const saleItemMock = createSaleItemApi({
+      createSaleItem: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: { id: 8008 },
+        }),
+    });
+    const configMock = createAdminConfigApi();
+    const menuMock = createMenuApi({
+      listMenus: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+      data: [{ menuId: 1, menuName: 'AT' }],
+    }),
+    });
+
+    const endpointResources = createEndpointResources({
+      adminConfigApi: configMock.api as AdminConfigApiClient,
+      menuApi: menuMock.api as unknown as MenuApiClient,
+      saleItemApi: saleItemMock.api as unknown as SaleItemApiClient,
+      resourceRegistry,
+    });
+
+    const menuResource = await endpointResources.createMenuResource();
+    const menuGroupResource = await endpointResources.createMenuGroupResource(menuResource.id);
+    const categoryResource = await endpointResources.createCategoryResource(menuResource.id, menuGroupResource.id);
+    const resource = await endpointResources.createSaleItemResource(
+      menuResource.id,
+      menuGroupResource.id,
+      categoryResource.id,
+    );
+
+    expect(saleItemMock.calls.createSaleItem).toBe(1);
+    expect(saleItemMock.payload.saleItem).toEqual(
+      expect.objectContaining({
+        menuId: menuResource.id,
+        menuGroupId: menuGroupResource.id,
+        categoryId: categoryResource.id,
+        menuCategoryId: categoryResource.id,
+        posName: expect.any(String),
+      }),
+    );
+    expect(resource.id).toBe(8008);
+    expect(resourceRegistry.has('saleItem', 8008)).toBe(true);
+  });
+
+  unitTest('createSaleItemResource 在创建响应缺失 id 时应通过搜索按名称定位 id', async () => {
+    const resourceRegistry = new ResourceRegistry();
+    const categoryId = 9009;
+    let createMenuName: string | undefined;
+    const saleItemMock = createSaleItemApi({
+      createSaleItem: async (payload) => {
+        createMenuName = (payload as { name?: string }).name;
+
+        return createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: { code: 0 },
+        });
+      },
+      searchSaleItems: async (params) => {
+        const queryName = (params as { keyword?: string; name?: string })?.keyword;
+
+        if (queryName === createMenuName) {
+          return createApiResponse({
+            code: 0,
+            msg: 'ok',
+            data: [{ id: categoryId, name: createMenuName }],
+          });
+        }
+
+        return createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: [{ id: 9010, name: 'OTHER' }],
+        });
+      },
+    });
+    const configMock = createAdminConfigApi();
+    const menuMock = createMenuApi({
+      listMenus: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: [{ menuId: 11, menuName: 'AT' }],
+        }),
+      createMenuGroup: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: { id: 12 },
+        }),
+      createMenuCategory: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: { id: categoryId },
+        }),
+    });
+
+    const endpointResources = createEndpointResources({
+      adminConfigApi: configMock.api as AdminConfigApiClient,
+      menuApi: menuMock.api as unknown as MenuApiClient,
+      saleItemApi: saleItemMock.api as unknown as SaleItemApiClient,
+      resourceRegistry,
+    });
+
+    const menuResource = await endpointResources.createMenuResource();
+    const menuGroupResource = await endpointResources.createMenuGroupResource(menuResource.id);
+    const categoryResource = await endpointResources.createCategoryResource(menuResource.id, menuGroupResource.id);
+    const resource = await endpointResources.createSaleItemResource(
+      menuResource.id,
+      menuGroupResource.id,
+      categoryResource.id,
+    );
+
+    expect(saleItemMock.calls.createSaleItem).toBe(1);
+    expect(saleItemMock.calls.searchSaleItems).toBe(1);
+    expect(saleItemMock.payload.searchParams).toEqual(
+      expect.objectContaining({
+        menuId: menuResource.id,
+        menuCategoryId: categoryResource.id,
+      }),
+    );
+    expect(resource.id).toBe(categoryId);
+    expect(resourceRegistry.has('saleItem', categoryId)).toBe(true);
+  });
 });
 
 function createApiResponse<T>(body: T, status = 200): APIResponse {
@@ -517,6 +671,60 @@ function createMenuApi(overrides: Partial<MenuApiClientLike> = {}): MenuApiMock 
       return impl({ menuCategoryId: 0 } as any);
     },
   } as MenuApiClientLike;
+
+  return mock;
+}
+
+function createSaleItemApi(overrides: Partial<SaleItemApiClientLike> = {}): SaleItemApiMock {
+  const mock: SaleItemApiMock = {
+    api: {} as SaleItemApiClientLike,
+    calls: {
+      createSaleItem: 0,
+      searchSaleItems: 0,
+      deleteSaleItem: 0,
+    },
+    payload: {},
+  };
+
+  mock.api = {
+    createSaleItem: async (payload: unknown) => {
+      mock.calls.createSaleItem += 1;
+      mock.payload.saleItem = payload;
+      const impl = (overrides.createSaleItem ??
+        (async () =>
+          createApiResponse({
+            code: 0,
+            msg: 'ok',
+            data: { id: 1 },
+          }))) as SaleItemApiClientLike['createSaleItem'];
+
+      return impl(payload as any);
+    },
+    searchSaleItems: async (params: unknown) => {
+      mock.calls.searchSaleItems += 1;
+      mock.payload.searchParams = params;
+      const impl = (overrides.searchSaleItems ??
+        (async () =>
+          createApiResponse({
+            code: 0,
+            msg: 'ok',
+            data: [{ id: 2 }],
+          }))) as SaleItemApiClientLike['searchSaleItems'];
+
+      return impl(params as any);
+    },
+    deleteSaleItem: async () => {
+      mock.calls.deleteSaleItem += 1;
+      const impl = (overrides.deleteSaleItem ??
+        (async () =>
+          createApiResponse({
+            code: 0,
+            msg: 'ok',
+          }))) as SaleItemApiClientLike['deleteSaleItem'];
+
+      return impl(0 as any);
+    },
+  };
 
   return mock;
 }
