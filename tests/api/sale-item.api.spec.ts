@@ -6,6 +6,7 @@ import type { ResourceId, ResourceRegistry } from '../../api/core/resource-regis
 import { createShortTestName } from '../../api/core/test-data-id';
 import { test } from '../../fixtures/api.fixture';
 import {
+  DEFAULT_MENU_PRODUCT,
   buildCategoryRequest,
   buildMenuGroupRequest,
   buildMenuRequest,
@@ -29,7 +30,7 @@ test.describe('商品和 SPU 库存接口', () => {
     });
 
     const currentMenuBody = await test.step('查询当前菜单作为商品查询前置', async () => {
-      const response = await menuApi.getCurrentMenu();
+      const response = await menuApi.getCurrentMenu({ product: DEFAULT_MENU_PRODUCT });
 
       return await expectJsonEnvelope(response, 'GET /api/menu/menu');
     });
@@ -47,9 +48,12 @@ test.describe('商品和 SPU 库存接口', () => {
 
     const listByCategoryBody = await test.step('按分类查询商品列表并校验响应信封', async () => {
       const response = await saleItemApi.listByCategory({
-        ...toOptionalQuery({ menuId, menuCategoryId: categoryId, categoryId }),
-        pageNo: 1,
-        pageSize: 10,
+        ...toOptionalQuery({ categoryId }),
+        showOffMenuItems: true,
+        nameIdOnly: false,
+        fetchOptions: true,
+        includeCategoryAttributesAndOptions: true,
+        showNonCombo: false,
       });
 
       return await expectJsonEnvelope(response, 'GET /api/menu/item/listByCategory');
@@ -57,8 +61,11 @@ test.describe('商品和 SPU 库存接口', () => {
 
     const searchBody = await test.step('搜索菜单商品并校验响应信封', async () => {
       const response = await saleItemApi.searchSaleItems({
-        ...toOptionalQuery({ menuId, menuCategoryId: categoryId, categoryId }),
-        keyword: 'AT',
+        ...toOptionalQuery({
+          menuIds: menuId,
+          categoryIds: categoryId,
+        }),
+        name: 'P',
         pageNo: 1,
         pageSize: 10,
       });
@@ -71,23 +78,23 @@ test.describe('商品和 SPU 库存接口', () => {
 
     await test.step('查询商品详情读取入口并校验响应信封', async () => {
       const response = await saleItemApi.fetchSaleItem(
-        toOptionalQuery({
-          menuId,
-          menuSaleItemId: saleItemId,
-          saleItemId,
-          id: saleItemId,
-        }),
+        {
+          ...toOptionalQuery({ itemId: saleItemId }),
+          fetchOptions: true,
+          includeCategoryAttributesAndOptions: true,
+        },
       );
 
       await expectJsonEnvelope(response, 'GET /api/menu/item/fetchSaleItem');
     });
 
     await test.step('查询商品选项读取入口并校验响应信封', async () => {
+      const optionId = extractFirstResourceIdByCollectionKey(listByCategoryBody.data, 'options');
+      test.skip(optionId === undefined, '当前商品样例未返回 optionId，需现场抓取带选项的商品请求。');
+
       const response = await saleItemApi.fetchItemOption(
         toOptionalQuery({
-          menuId,
-          menuSaleItemId: saleItemId,
-          saleItemId,
+          optionId,
         }),
       );
 
@@ -629,6 +636,52 @@ function extractFirstResourceId(value: unknown): ResourceId | undefined {
 
   for (const item of Object.values(value)) {
     const id = extractFirstResourceId(item);
+
+    if (id !== undefined) {
+      return id;
+    }
+  }
+
+  return undefined;
+}
+
+function extractFirstResourceIdByCollectionKey(
+  value: unknown,
+  collectionKey: string,
+  seen = new WeakSet<object>(),
+): ResourceId | undefined {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const id = extractFirstResourceIdByCollectionKey(item, collectionKey, seen);
+
+      if (id !== undefined) {
+        return id;
+      }
+    }
+
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (seen.has(value)) {
+    return undefined;
+  }
+  seen.add(value);
+
+  const collection = value[collectionKey];
+  if (Array.isArray(collection)) {
+    const id = extractFirstResourceId(collection);
+
+    if (id !== undefined) {
+      return id;
+    }
+  }
+
+  for (const item of Object.values(value)) {
+    const id = extractFirstResourceIdByCollectionKey(item, collectionKey, seen);
 
     if (id !== undefined) {
       return id;

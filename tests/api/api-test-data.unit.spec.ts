@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  DEFAULT_MENU_PRODUCT,
   MENU_API_NAME_LIMITS,
   buildCategoryRequest,
   buildGlobalOptionCategoryRequest,
@@ -8,11 +9,17 @@ import {
   buildMenuRequest,
   buildSaleItemRequest,
 } from '../../test-data/api/menu-api-data';
-import { ORDER_API_NAME_LIMITS, buildOrderRequest } from '../../test-data/api/order-api-data';
+import {
+  ORDER_API_NAME_LIMITS,
+  buildDefaultOrderListQuery,
+  buildOrderRequest,
+} from '../../test-data/api/order-api-data';
 import { buildPaymentRecordRequest, buildTipRequest } from '../../test-data/api/payment-api-data';
 
 test.describe('API 测试数据工厂', () => {
   test('菜单数据工厂应生成短名称并保留自动化前缀', () => {
+    expect(DEFAULT_MENU_PRODUCT).toBe('POS');
+
     const namedRequests = [
       { request: buildMenuRequest('menu-seed-001'), key: 'name', maxLength: MENU_API_NAME_LIMITS.menu },
       {
@@ -86,6 +93,15 @@ test.describe('API 测试数据工厂', () => {
         amount: 10,
       }),
     ]);
+  });
+
+  test('订单列表默认查询应生成后端可解析的时间范围', () => {
+    expect(buildDefaultOrderListQuery(new Date('2026-06-30T08:30:00Z'))).toEqual({
+      startTime: '2026-06-30 00:00:00',
+      endTime: '2026-06-30 23:59:59',
+      pageNum: 1,
+      pageSize: 10,
+    });
   });
 
   test('支付数据工厂应包含订单 ID 和小费金额字段', () => {

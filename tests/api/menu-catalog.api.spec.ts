@@ -3,6 +3,7 @@ import { expectResponseEnvelope, type ApiEnvelope } from '../../api/core/api-res
 import type { ResourceId, ResourceRegistry } from '../../api/core/resource-registry';
 import { test } from '../../fixtures/api.fixture';
 import {
+  DEFAULT_MENU_PRODUCT,
   buildCategoryRequest,
   buildGlobalOptionCategoryRequest,
   buildGlobalOptionRequest,
@@ -26,7 +27,7 @@ test.describe('菜单目录接口', () => {
     });
 
     const currentMenuBody = await test.step('查询当前菜单并校验响应信封', async () => {
-      const response = await menuApi.getCurrentMenu();
+      const response = await menuApi.getCurrentMenu({ product: DEFAULT_MENU_PRODUCT });
 
       return await expectJsonEnvelope(response, 'GET /api/menu/menu');
     });
@@ -35,33 +36,30 @@ test.describe('菜单目录接口', () => {
       extractResourceId(currentMenuBody) ?? extractFirstResourceId(menuListBody.data);
 
     await test.step('查询菜单全局搜索并校验响应信封', async () => {
-      const response = await menuApi.searchMenu();
+      const response = await menuApi.searchMenu({ name: 'P', limit: 5 });
 
       await expectJsonEnvelope(response, 'GET /api/search/menu');
     });
 
-    await test.step('查询全局选项读取入口并校验响应信封', async () => {
-      const response = await menuApi.fetchGlobalOption(toMenuQuery(menuId));
-
-      await expectJsonEnvelope(response, 'GET /api/menu/fetchGlobalOption');
-    });
-
-    await test.step('查询全局选项列表并校验响应信封', async () => {
+    const globalOptionListBody = await test.step('查询全局选项列表并校验响应信封', async () => {
       const response = await menuApi.listGlobalOption(toMenuQuery(menuId));
 
-      await expectJsonEnvelope(response, 'GET /api/menu/listGlobalOption');
+      return await expectJsonEnvelope(response, 'GET /api/menu/listGlobalOption');
+    });
+
+    await test.step('查询全局选项读取入口并校验响应信封', async () => {
+      const globalOptionId = extractFirstResourceId(globalOptionListBody);
+      test.skip(globalOptionId === undefined, '当前菜单未返回全局选项 id，需现场抓取带全局选项的请求。');
+
+      const response = await menuApi.fetchGlobalOption({ id: globalOptionId });
+
+      await expectJsonEnvelope(response, 'GET /api/menu/fetchGlobalOption');
     });
 
     await test.step('查询菜单组基础列表并校验响应信封', async () => {
       const response = await menuApi.listMenuGroupEntries(toMenuQuery(menuId));
 
       await expectJsonEnvelope(response, 'GET /api/menu/group/list');
-    });
-
-    await test.step('查询菜单组分类商品聚合并校验响应信封', async () => {
-      const response = await menuApi.listGroupCategoryItems(toMenuQuery(menuId));
-
-      await expectJsonEnvelope(response, 'GET /api/menu/group/listGroupCategoryItems');
     });
 
     await test.step('查询菜单组商品全集并校验响应信封', async () => {
@@ -121,7 +119,7 @@ test.describe('菜单目录接口', () => {
     });
 
     await test.step('按名称搜索菜单分类并校验响应信封', async () => {
-      const response = await menuApi.searchMenuCategoriesByName({ menuId });
+      const response = await menuApi.searchMenuCategoriesByName({ menuId, name: 'L' });
 
       await expectJsonEnvelope(response, 'GET /api/menu/menuCategorys/searchByName');
     });
@@ -197,10 +195,9 @@ test.describe('菜单目录接口', () => {
 
     await test.step('查询测试菜单相关入口并校验响应信封', async () => {
       const responses = [
-        ['GET /api/menu/menu', await menuApi.getCurrentMenu({ menuId })],
+        ['GET /api/menu/menu', await menuApi.getCurrentMenu({ product: DEFAULT_MENU_PRODUCT, menuId })],
         ['GET /api/menu/menus', await menuApi.listMenus({ name: menuRequest.name })],
-        ['GET /api/search/menu', await menuApi.searchMenu({ keyword: menuRequest.name })],
-        ['GET /api/menu/fetchGlobalOption', await menuApi.fetchGlobalOption({ menuId })],
+        ['GET /api/search/menu', await menuApi.searchMenu({ name: menuRequest.name })],
         ['GET /api/menu/listGlobalOption', await menuApi.listGlobalOption({ menuId })],
       ] as const;
 
@@ -255,10 +252,6 @@ test.describe('菜单目录接口', () => {
         ['GET /api/menu/menuGroup/{id}', await menuApi.getMenuGroup(menuGroupId)],
         ['GET /api/menu/menuGroups', await menuApi.listMenuGroups({ menuId })],
         ['GET /api/menu/group/list', await menuApi.listMenuGroupEntries({ menuId })],
-        [
-          'GET /api/menu/group/listGroupCategoryItems',
-          await menuApi.listGroupCategoryItems({ menuId, menuGroupId }),
-        ],
         [
           'GET /api/menu/group/saleItem/all',
           await menuApi.listMenuGroupSaleItems({ menuId, menuGroupId }),

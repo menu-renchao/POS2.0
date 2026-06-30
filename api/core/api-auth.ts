@@ -13,6 +13,13 @@ export function buildApiAuthHeaders(config: ApiConfig): ApiAuthHeaders {
     return { Authorization: config.auth.apiKey };
   }
 
+  if (config.auth.mode === 'cookieHeader') {
+    return {
+      Cookie: config.auth.cookieHeader,
+      'X-Direct-Req': 'true',
+    };
+  }
+
   return {};
 }
 

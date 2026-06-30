@@ -11,7 +11,10 @@ import {
   buildMenuRequest,
   buildSaleItemRequest,
 } from '../../test-data/api/menu-api-data';
-import { buildOrderRequest } from '../../test-data/api/order-api-data';
+import {
+  buildDefaultOrderListQuery,
+  buildOrderRequest,
+} from '../../test-data/api/order-api-data';
 import { buildPaymentRecordRequest } from '../../test-data/api/payment-api-data';
 
 type OrderPaymentResourceType = 'menu' | 'menuGroup' | 'menuCategory' | 'saleItem' | 'order' | 'payment';
@@ -19,30 +22,29 @@ type OrderPaymentResourceType = 'menu' | 'menuGroup' | 'menuCategory' | 'saleIte
 test.describe('订单和支付接口', () => {
   test('应能查询订单管理只读入口并校验响应信封', async ({ orderApi }) => {
     await test.step('查询订单列表并校验响应信封', async () => {
-      const response = await orderApi.listOrders();
+      const response = await orderApi.listOrders(buildDefaultOrderListQuery());
 
       await expectJsonEnvelope(response, 'GET /api/order/list');
     });
 
     await test.step('查询订单明细列表并校验响应信封', async () => {
-      const response = await orderApi.listOrderDetails();
+      const response = await orderApi.listOrderDetails(buildDefaultOrderListQuery());
 
       await expectJsonEnvelope(response, 'GET /api/order/detail/list');
     });
 
     await test.step('查询召回订单并校验响应信封', async () => {
-      const response = await orderApi.recall();
+      const response = await orderApi.recall(buildDefaultOrderListQuery());
 
       await expectJsonEnvelope(response, 'GET /api/order/recall');
     });
 
     await test.step('检查手机号会员订单存在性并校验响应信封', async () => {
       const response = await orderApi.checkOrderExistsByPhoneAndMember({
-        phone: '0000000000',
-        memberId: 'AT_MEMBER_NOT_EXISTS',
+        phoneNumber: '0000000000',
       });
 
-      await expectJsonEnvelope(response, 'GET /api/order/checkOrderExistsByPhoneAndMember');
+      await expectJsonBusinessEnvelope(response, 'GET /api/order/checkOrderExistsByPhoneAndMember');
     });
   });
 
@@ -75,7 +77,10 @@ test.describe('订单和支付接口', () => {
       name: orderRequest.customerName,
       saveBody: orderBody,
       listLabel: 'GET /api/order/list',
-      listResource: async () => await orderApi.listOrders({ customerName: orderRequest.customerName }),
+      listResource: async () =>
+        await orderApi.listOrders(
+          buildDefaultOrderListQuery(new Date(), { customerName: orderRequest.customerName }),
+        ),
     });
 
     if (orderId === undefined) {
@@ -107,9 +112,20 @@ test.describe('订单和支付接口', () => {
 
     await test.step('查询测试订单列表和明细入口并校验响应信封', async () => {
       const responses = [
-        ['GET /api/order/list', await orderApi.listOrders({ orderId, customerName: orderRequest.customerName })],
-        ['GET /api/order/detail/list', await orderApi.listOrderDetails(toOrderQuery(orderId))],
-        ['GET /api/order/recall', await orderApi.recall(toOrderQuery(orderId))],
+        [
+          'GET /api/order/list',
+          await orderApi.listOrders(
+            buildDefaultOrderListQuery(new Date(), {
+              orderId,
+              customerName: orderRequest.customerName,
+            }),
+          ),
+        ],
+        [
+          'GET /api/order/detail/list',
+          await orderApi.listOrderDetails(buildDefaultOrderListQuery(new Date(), { orderId })),
+        ],
+        ['GET /api/order/recall', await orderApi.recall(buildDefaultOrderListQuery(new Date(), { orderId }))],
         [
           'POST /api/order/listOrdersByDateNumber',
           await orderApi.listOrdersByDateNumber(buildOrderDateNumberQuery(orderId)),
@@ -222,6 +238,23 @@ async function expectJsonEnvelope(
 
   const body: unknown = await response.json();
   expectResponseEnvelope(body);
+
+  return body;
+}
+
+async function expectJsonBusinessEnvelope(
+  response: APIResponse,
+  label: string,
+): Promise<Record<string, unknown>> {
+  expect(response.status(), `${label} 不应返回 500`).not.toBe(500);
+
+  const body: unknown = await response.json();
+  expect(isRecord(body), `${label} 应返回 JSON 对象`).toBe(true);
+  if (!isRecord(body)) {
+    throw new Error(`${label} 应返回 JSON 对象。`);
+  }
+  expect(typeof body.code, `${label} 应返回 numeric code`).toBe('number');
+  expect(typeof body.msg, `${label} 应返回 string msg`).toBe('string');
 
   return body;
 }

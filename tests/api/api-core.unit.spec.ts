@@ -33,6 +33,23 @@ test.describe('API 核心工具', () => {
     ]);
   });
 
+  test('应能为浏览器会话 Cookie Header 模式生成调试请求头', () => {
+    expect(
+      buildApiAuthHeaders({
+        baseURL: 'http://127.0.0.1:22080/kpos',
+        auth: {
+          mode: 'cookieHeader',
+          cookieHeader: 'KPOS_REMEMBER_USER=token; JSESSIONID=session-1',
+        },
+        enableDestructive: false,
+        testPrefix: 'AT',
+      }),
+    ).toEqual({
+      Cookie: 'KPOS_REMEMBER_USER=token; JSESSIONID=session-1',
+      'X-Direct-Req': 'true',
+    });
+  });
+
   test('应能校验 Response 包装结构', () => {
     expect(() =>
       expectResponseEnvelope({

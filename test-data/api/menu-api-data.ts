@@ -28,6 +28,8 @@ export type SaleItemApiRequest = MenuApiRequest & {
   price: number;
 };
 
+export const DEFAULT_MENU_PRODUCT = 'POS';
+
 export const MENU_API_NAME_LIMITS = {
   menu: 24,
   menuGroup: 24,

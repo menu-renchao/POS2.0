@@ -1,4 +1,4 @@
-export type ApiAuthMode = 'apiKey' | 'cookie';
+export type ApiAuthMode = 'apiKey' | 'cookie' | 'cookieHeader';
 
 export type ApiAuthConfig =
   | {
@@ -10,6 +10,12 @@ export type ApiAuthConfig =
       mode: 'cookie';
       licenseAuthKey: string;
       apiKey?: never;
+    }
+  | {
+      mode: 'cookieHeader';
+      cookieHeader: string;
+      apiKey?: never;
+      licenseAuthKey?: never;
     };
 
 export type ApiConfig = {
@@ -36,6 +42,20 @@ export function loadApiConfig(env: EnvSource = process.env): ApiConfig {
     return {
       baseURL,
       auth: { mode, apiKey },
+      enableDestructive,
+      testPrefix,
+    };
+  }
+
+  if (mode === 'cookieHeader') {
+    const cookieHeader = env.API_COOKIE_HEADER?.trim();
+    if (!cookieHeader) {
+      throw new Error('API_AUTH_MODE=cookieHeader requires API_COOKIE_HEADER.');
+    }
+
+    return {
+      baseURL,
+      auth: { mode, cookieHeader },
       enableDestructive,
       testPrefix,
     };
@@ -87,8 +107,12 @@ function resolveAuthMode(value: string | undefined): ApiAuthMode {
     return 'cookie';
   }
 
+  if (normalizedValue === 'cookieheader' || normalizedValue === 'cookie_header') {
+    return 'cookieHeader';
+  }
+
   throw new Error(
-    `Unsupported API_AUTH_MODE: ${normalizedValue}. Expected apiKey, apikey, api_key, or cookie.`,
+    `Unsupported API_AUTH_MODE: ${normalizedValue}. Expected apiKey, apikey, api_key, cookie, cookieHeader, or cookie_header.`,
   );
 }
 

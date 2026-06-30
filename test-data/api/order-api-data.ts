@@ -1,4 +1,5 @@
 import { createShortTestName } from '../../api/core/test-data-id';
+import type { ApiQueryParams } from '../../api/clients/client-path';
 import type { ApiEntityId } from './menu-api-data';
 
 export type OrderItemApiRequest = Record<string, unknown> & {
@@ -41,6 +42,21 @@ export function buildOrderRequest(saleItemId: ApiEntityId, seed?: string | numbe
   };
 }
 
+export function buildDefaultOrderListQuery(
+  referenceDate: Date = new Date(),
+  overrides: ApiQueryParams = {},
+): ApiQueryParams {
+  const date = formatDateOnly(referenceDate);
+
+  return {
+    startTime: `${date} 00:00:00`,
+    endTime: `${date} 23:59:59`,
+    pageNum: 1,
+    pageSize: 10,
+    ...overrides,
+  };
+}
+
 function buildApiTestName(domain: string, maxLength: number, seed?: string | number): string {
   return createShortTestName({
     prefix: 'AT',
@@ -58,4 +74,12 @@ function toShortSeed(seed: string | number | undefined, fallback: string): strin
     .slice(0, 6);
 
   return normalized || '0';
+}
+
+function formatDateOnly(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }
