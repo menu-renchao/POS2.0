@@ -35,6 +35,7 @@ export const API_SPEC_FILES = {
   endpointMenu: 'tests/api/endpoints/menu/menu.endpoint.api.spec.ts',
   endpointMenuGroup: 'tests/api/endpoints/menu/menu-group.endpoint.api.spec.ts',
   endpointCategory: 'tests/api/endpoints/menu/category.endpoint.api.spec.ts',
+  endpointGlobalOptionCategory: 'tests/api/endpoints/menu/global-option-category.endpoint.api.spec.ts',
   endpointSaleItem: 'tests/api/endpoints/sale-item/sale-item.endpoint.api.spec.ts',
   endpointSpu: 'tests/api/endpoints/sale-item/spu.endpoint.api.spec.ts',
   endpointOrder: 'tests/api/endpoints/order/order.endpoint.api.spec.ts',
@@ -996,7 +997,8 @@ const firstBatchApiCaseInputs: FirstBatchApiCaseInput[] = [
     group: 'global-option-category-controller',
     coverage: 'positive-crud',
     specFile: API_SPEC_FILES.menuCatalog,
-    endpointStatus: 'planned',
+    endpointStatus: 'covered',
+    endpointSpecFile: API_SPEC_FILES.endpointGlobalOptionCategory,
     riskNote: '全局选项分类详情用于 CRUD 回读，需要覆盖存在记录。',
   },
   {
@@ -1005,7 +1007,8 @@ const firstBatchApiCaseInputs: FirstBatchApiCaseInput[] = [
     group: 'global-option-category-controller',
     coverage: 'positive-business',
     specFile: API_SPEC_FILES.menuCatalog,
-    endpointStatus: 'planned',
+    endpointStatus: 'covered',
+    endpointSpecFile: API_SPEC_FILES.endpointGlobalOptionCategory,
     riskNote: '按菜单读取全局选项分类用于菜单配置，需要覆盖存在菜单。',
   },
   {

@@ -77,7 +77,7 @@ test.describe('首批接口覆盖矩阵', () => {
   test('已覆盖 endpoint 应声明存在的 endpoint spec 文件', () => {
     const coveredCases = firstBatchApiCases.filter((apiCase) => apiCase.endpointStatus === 'covered');
 
-    expect(coveredCases).toHaveLength(41);
+    expect(coveredCases).toHaveLength(43);
     for (const apiCase of coveredCases) {
       expect(apiCase.endpointSpecFile, `${apiCase.method} ${apiCase.path}`).toBeDefined();
       expect(existsSync(apiCase.endpointSpecFile!), `${apiCase.endpointSpecFile} 应存在`).toBe(true);
@@ -130,6 +130,22 @@ test.describe('首批接口覆盖矩阵', () => {
       ['GET', '/api/menu/menuCategorys/searchByName', API_SPEC_FILES.endpointCategory],
       ['GET', '/api/menu/item/fetchSaleItem', API_SPEC_FILES.endpointSaleItem],
       ['GET', '/api/menu/menuSaleItems/searchByName', API_SPEC_FILES.endpointSaleItem],
+    ] as const) {
+      expect(findApiCase(method, path)).toMatchObject({
+        endpointStatus: 'covered',
+        endpointSpecFile,
+      });
+    }
+  });
+
+  test('全局选项分类只读链路应拆出 endpoint 单接口用例', () => {
+    for (const [method, path, endpointSpecFile] of [
+      ['GET', '/api/menu/globalOptionCategory/{id}', API_SPEC_FILES.endpointGlobalOptionCategory],
+      [
+        'GET',
+        '/api/menu/menu/{menuId}/globalOptionCategories',
+        API_SPEC_FILES.endpointGlobalOptionCategory,
+      ],
     ] as const) {
       expect(findApiCase(method, path)).toMatchObject({
         endpointStatus: 'covered',
