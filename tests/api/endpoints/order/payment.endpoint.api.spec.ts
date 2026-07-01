@@ -1,5 +1,5 @@
 import { expect, test } from '../../support/endpoint-fixture';
-import { expectApiOk } from '../../support/endpoint-assertions';
+import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
 const ORDER_SAVE_IDENTITY = { method: 'POST', path: '/api/order/save' } as const;
@@ -20,6 +20,18 @@ test.describe('订单支付 endpoint', () => {
       );
 
       expect(payment.id).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(PAYMENT_SAVE_IDENTITY.method, PAYMENT_SAVE_IDENTITY.path, '缺少订单 ID 应返回异常'),
+    async ({ paymentApi }) => {
+      await test.step(
+        toEndpointTitle(PAYMENT_SAVE_IDENTITY.method, PAYMENT_SAVE_IDENTITY.path, '提交空支付记录并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await paymentApi.saveRecord({}), PAYMENT_SAVE_IDENTITY);
+        },
+      );
     },
   );
 

@@ -1,5 +1,5 @@
 import { expect, test } from '../../support/endpoint-fixture';
-import { expectApiOk } from '../../support/endpoint-assertions';
+import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
 const CATEGORY_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menuCategory' } as const;
@@ -26,6 +26,18 @@ test.describe('分类 endpoint', () => {
 
       expect(resource.id).not.toBeUndefined();
       expect(resource.name).toBe((resource.request as { name?: string }).name);
+    },
+  );
+
+  test(
+    toEndpointTitle(CATEGORY_CREATE_IDENTITY.method, CATEGORY_CREATE_IDENTITY.path, '缺少必填字段应返回异常'),
+    async ({ menuApi }) => {
+      await test.step(
+        toEndpointTitle(CATEGORY_CREATE_IDENTITY.method, CATEGORY_CREATE_IDENTITY.path, '提交空分类配置并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await menuApi.createMenuCategory({}), CATEGORY_CREATE_IDENTITY);
+        },
+      );
     },
   );
 
@@ -60,6 +72,18 @@ test.describe('分类 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(CATEGORY_UPDATE_IDENTITY.method, CATEGORY_UPDATE_IDENTITY.path, '缺少分类 ID 应返回异常'),
+    async ({ menuApi }) => {
+      await test.step(
+        toEndpointTitle(CATEGORY_UPDATE_IDENTITY.method, CATEGORY_UPDATE_IDENTITY.path, '提交缺少 ID 的分类更新并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await menuApi.updateMenuCategory({ name: 'AT_INVALID_CATEGORY' }), CATEGORY_UPDATE_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
     toEndpointTitle(CATEGORY_DETAIL_IDENTITY.method, CATEGORY_DETAIL_IDENTITY.path, '应能读取菜单分类详情'),
     async ({ menuApi, endpointResources }) => {
       const menuResource = await test.step(
@@ -80,6 +104,18 @@ test.describe('分类 endpoint', () => {
       );
 
       expect(body.data).toBeTruthy();
+    },
+  );
+
+  test(
+    toEndpointTitle(CATEGORY_DETAIL_IDENTITY.method, CATEGORY_DETAIL_IDENTITY.path, '读取不存在分类应返回异常'),
+    async ({ menuApi }) => {
+      await test.step(
+        toEndpointTitle(CATEGORY_DETAIL_IDENTITY.method, CATEGORY_DETAIL_IDENTITY.path, '读取不存在分类 ID 并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await menuApi.getMenuCategory(2147483647), CATEGORY_DETAIL_IDENTITY);
+        },
+      );
     },
   );
 

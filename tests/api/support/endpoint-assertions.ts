@@ -14,6 +14,11 @@ import { extractFirstResourceId } from './endpoint-read-model';
  */
 type ApiResponseLike = Pick<APIResponse, 'status' | 'json'>;
 
+export type ExpectedApiRejection = {
+  expectedStatus?: number;
+  messageIncludes?: string;
+};
+
 export async function parseApiJson<T>(response: ApiResponseLike, identity: EndpointIdentity): Promise<ApiEnvelope<T>> {
   const title = toEndpointTitle(identity.method, identity.path, '响应体应为 JSON envelope');
   let body: unknown;
@@ -95,6 +100,52 @@ export async function expectApiBusinessError(
   return body;
 }
 
+export async function expectApiRejected(
+  response: ApiResponseLike,
+  identity: EndpointIdentity,
+  expected?: ExpectedApiRejection,
+): Promise<unknown> {
+  const status = response.status();
+  const body = await parseJsonForRejection(response, identity);
+
+  if (expected?.expectedStatus !== undefined) {
+    expect(
+      status,
+      buildApiFailureMessage({
+        method: identity.method,
+        path: identity.path,
+        status,
+        responseSummary: summarizeJson({ expectedStatus: expected.expectedStatus, body }),
+      }),
+    ).toBe(expected.expectedStatus);
+  }
+
+  const isHttpRejected = status < 200 || status >= 300;
+  const isBusinessRejected = isApiEnvelope(body) && body.code !== 0;
+
+  expect(
+    isHttpRejected || isBusinessRejected,
+    buildApiFailureMessage({
+      method: identity.method,
+      path: identity.path,
+      status,
+      responseSummary: summarizeJson({
+        expected: toEndpointTitle(identity.method, identity.path, '应拒绝异常请求'),
+        body,
+      }),
+    }),
+  ).toBe(true);
+
+  if (expected?.messageIncludes) {
+    expect(
+      summarizeJson(body),
+      toEndpointTitle(identity.method, identity.path, `错误信息应包含 ${expected.messageIncludes}`),
+    ).toContain(expected.messageIncludes);
+  }
+
+  return body;
+}
+
 export function expectArrayData(
   body: unknown,
   identity: EndpointIdentity,
@@ -132,6 +183,23 @@ export function expectResourceId(body: unknown, identity: EndpointIdentity): str
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
+  return isRecord(value) && typeof value.code === 'number';
+}
+
+async function parseJsonForRejection(response: ApiResponseLike, identity: EndpointIdentity): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (error) {
+    throw new Error(
+      [
+        toEndpointTitle(identity.method, identity.path, '异常响应体应为 JSON'),
+        error instanceof Error ? error.message : String(error),
+      ].join('；'),
+    );
+  }
 }
 
 async function summarizeStatusMismatchResponse(

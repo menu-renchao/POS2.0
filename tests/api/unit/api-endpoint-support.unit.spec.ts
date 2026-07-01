@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { toEndpointTitle, type EndpointIdentity } from '../support/endpoint-case';
 import {
   expectArrayData,
+  expectApiRejected,
   expectHttpStatus,
   expectResourceId,
   parseApiJson,
@@ -101,6 +102,43 @@ test.describe('Endpoint 测试支撑工具', () => {
     await expect(expectHttpStatus(response, identity)).rejects.toThrow('GET /api/tax/list -> 500');
     await expect(expectHttpStatus(response, identity)).rejects.toThrow('"expectedStatus":200');
     await expect(expectHttpStatus(response, identity)).rejects.toThrow('"body":{"code":0');
+  });
+
+  test('异常断言应接受业务错误响应', async () => {
+    const identity: EndpointIdentity = { method: 'POST', path: '/api/tax/save' };
+    const response = {
+      status: () => 200,
+      json: async () => ({ code: 40001, msg: 'name required', data: null }),
+    };
+
+    const body = await expectApiRejected(response, identity, { messageIncludes: 'required' });
+
+    expect(body).toEqual({ code: 40001, msg: 'name required', data: null });
+  });
+
+  test('异常断言应接受 HTTP 错误响应', async () => {
+    const identity: EndpointIdentity = { method: 'GET', path: '/api/menu/menu/{id}' };
+    const response = {
+      status: () => 404,
+      json: async () => ({ error: 'not found' }),
+    };
+
+    const body = await expectApiRejected(response, identity, {
+      expectedStatus: 404,
+      messageIncludes: 'not found',
+    });
+
+    expect(body).toEqual({ error: 'not found' });
+  });
+
+  test('异常断言不应把成功响应误判为异常', async () => {
+    const identity: EndpointIdentity = { method: 'POST', path: '/api/tax/save' };
+    const response = {
+      status: () => 200,
+      json: async () => ({ code: 0, msg: 'success', data: { id: 1 } }),
+    };
+
+    await expect(expectApiRejected(response, identity)).rejects.toThrow('POST /api/tax/save 应拒绝异常请求');
   });
 
   test('数组数据提取失败时应抛错并携带 endpoint 上下文', () => {

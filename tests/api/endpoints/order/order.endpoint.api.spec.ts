@@ -1,6 +1,6 @@
 import { expect, test } from '../../support/endpoint-fixture';
 import { buildDefaultOrderListQuery } from '../../../../test-data/api/order-api-data';
-import { expectApiOk } from '../../support/endpoint-assertions';
+import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
 const ORDER_SAVE_IDENTITY = { method: 'POST', path: '/api/order/save' } as const;
@@ -22,6 +22,18 @@ test.describe('订单管理 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(ORDER_SAVE_IDENTITY.method, ORDER_SAVE_IDENTITY.path, '缺少订单体应返回异常'),
+    async ({ orderApi }) => {
+      await test.step(
+        toEndpointTitle(ORDER_SAVE_IDENTITY.method, ORDER_SAVE_IDENTITY.path, '提交空订单并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await orderApi.saveOrder({}), ORDER_SAVE_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
     toEndpointTitle(ORDER_FETCH_IDENTITY.method, ORDER_FETCH_IDENTITY.path, '应能读取订单详情'),
     async ({ endpointResources, orderApi }) => {
       const order = await test.step(
@@ -39,6 +51,18 @@ test.describe('订单管理 endpoint', () => {
       );
 
       expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(ORDER_FETCH_IDENTITY.method, ORDER_FETCH_IDENTITY.path, '读取不存在订单应返回异常'),
+    async ({ orderApi }) => {
+      await test.step(
+        toEndpointTitle(ORDER_FETCH_IDENTITY.method, ORDER_FETCH_IDENTITY.path, '读取不存在订单 ID 并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await orderApi.fetchOrder({ id: 2147483647, orderId: 2147483647 }), ORDER_FETCH_IDENTITY);
+        },
+      );
     },
   );
 

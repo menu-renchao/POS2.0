@@ -1,6 +1,6 @@
 import { expect, test } from '../../support/endpoint-fixture';
 import { buildMenuRequest } from '../../../../test-data/api/menu-api-data';
-import { expectApiOk, expectArrayData } from '../../support/endpoint-assertions';
+import { expectApiOk, expectApiRejected, expectArrayData } from '../../support/endpoint-assertions';
 import { extractEndpointListData } from '../../support/endpoint-list-data';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
@@ -45,6 +45,18 @@ test.describe('菜单 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(MENU_CREATE_IDENTITY.method, MENU_CREATE_IDENTITY.path, '缺少必填字段应返回异常'),
+    async ({ menuApi }) => {
+      await test.step(
+        toEndpointTitle(MENU_CREATE_IDENTITY.method, MENU_CREATE_IDENTITY.path, '提交空菜单配置并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await menuApi.createMenu({}), MENU_CREATE_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
     toEndpointTitle(MENU_UPDATE_IDENTITY.method, MENU_UPDATE_IDENTITY.path, '应能更新菜单'),
     async ({ menuApi, endpointResources }) => {
       const resource = await test.step(
@@ -68,6 +80,18 @@ test.describe('菜单 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(MENU_UPDATE_IDENTITY.method, MENU_UPDATE_IDENTITY.path, '缺少菜单 ID 应返回异常'),
+    async ({ menuApi }) => {
+      await test.step(
+        toEndpointTitle(MENU_UPDATE_IDENTITY.method, MENU_UPDATE_IDENTITY.path, '提交缺少 ID 的菜单更新并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await menuApi.updateMenu(buildMenuRequest()), MENU_UPDATE_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
     toEndpointTitle(MENU_DETAIL_IDENTITY.method, MENU_DETAIL_IDENTITY.path, '应能读取菜单详情'),
     async ({ menuApi, endpointResources }) => {
       const resource = await test.step(
@@ -80,6 +104,18 @@ test.describe('菜单 endpoint', () => {
       );
 
       expect(body.code).toBe(0);
+    },
+  );
+
+  test(
+    toEndpointTitle(MENU_DETAIL_IDENTITY.method, MENU_DETAIL_IDENTITY.path, '读取不存在菜单应返回异常'),
+    async ({ menuApi }) => {
+      await test.step(
+        toEndpointTitle(MENU_DETAIL_IDENTITY.method, MENU_DETAIL_IDENTITY.path, '读取不存在菜单 ID 并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await menuApi.getMenu(2147483647), MENU_DETAIL_IDENTITY);
+        },
+      );
     },
   );
 });

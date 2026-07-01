@@ -1,5 +1,5 @@
 import { expect, test } from '../../support/endpoint-fixture';
-import { expectApiOk, expectArrayData } from '../../support/endpoint-assertions';
+import { expectApiOk, expectApiRejected, expectArrayData } from '../../support/endpoint-assertions';
 import { extractEndpointListData } from '../../support/endpoint-list-data';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
@@ -39,6 +39,18 @@ test.describe('税费 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(TAX_SAVE_IDENTITY.method, TAX_SAVE_IDENTITY.path, '缺少必填字段应返回异常'),
+    async ({ adminConfigApi }) => {
+      await test.step(
+        toEndpointTitle(TAX_SAVE_IDENTITY.method, TAX_SAVE_IDENTITY.path, '提交空税费配置并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await adminConfigApi.saveTax({}), TAX_SAVE_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
     toEndpointTitle(TAX_DELETE_IDENTITY.method, TAX_DELETE_IDENTITY.path, '应能删除本次创建的税费'),
     async ({ adminConfigApi, endpointResources, resourceRegistry }) => {
       const resource = await test.step(
@@ -53,6 +65,18 @@ test.describe('税费 endpoint', () => {
       );
 
       expect(resourceRegistry.markCleaned('tax', resource.id)).toBe(true);
+    },
+  );
+
+  test(
+    toEndpointTitle(TAX_DELETE_IDENTITY.method, TAX_DELETE_IDENTITY.path, '删除不存在税费应返回异常'),
+    async ({ adminConfigApi }) => {
+      await test.step(
+        toEndpointTitle(TAX_DELETE_IDENTITY.method, TAX_DELETE_IDENTITY.path, '提交不存在税费 ID 并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await adminConfigApi.deleteTax({ taxId: 2147483647 }), TAX_DELETE_IDENTITY);
+        },
+      );
     },
   );
 });

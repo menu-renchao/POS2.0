@@ -1,5 +1,5 @@
 import { expect, test } from '../../support/endpoint-fixture';
-import { expectApiOk, expectArrayData } from '../../support/endpoint-assertions';
+import { expectApiOk, expectApiRejected, expectArrayData } from '../../support/endpoint-assertions';
 import { extractEndpointListData } from '../../support/endpoint-list-data';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
@@ -56,6 +56,18 @@ test.describe('折扣 endpoint', () => {
       );
 
       expect(resourceRegistry.markCleaned('discount', resource.id)).toBe(true);
+    },
+  );
+
+  test(
+    toEndpointTitle(DISCOUNT_DELETE_IDENTITY.method, DISCOUNT_DELETE_IDENTITY.path, '删除不存在折扣应返回异常'),
+    async ({ adminConfigApi }) => {
+      await test.step(
+        toEndpointTitle(DISCOUNT_DELETE_IDENTITY.method, DISCOUNT_DELETE_IDENTITY.path, '提交不存在折扣 ID 并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await adminConfigApi.deleteDiscount({ discountId: 2147483647 }), DISCOUNT_DELETE_IDENTITY);
+        },
+      );
     },
   );
 });

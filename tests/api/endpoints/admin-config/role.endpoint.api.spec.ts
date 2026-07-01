@@ -1,5 +1,5 @@
 import { expect, test } from '../../support/endpoint-fixture';
-import { expectApiOk, expectArrayData } from '../../support/endpoint-assertions';
+import { expectApiOk, expectApiRejected, expectArrayData } from '../../support/endpoint-assertions';
 import { extractEndpointListData } from '../../support/endpoint-list-data';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
@@ -39,6 +39,18 @@ test.describe('角色 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(ROLE_SAVE_IDENTITY.method, ROLE_SAVE_IDENTITY.path, '缺少必填字段应返回异常'),
+    async ({ adminConfigApi }) => {
+      await test.step(
+        toEndpointTitle(ROLE_SAVE_IDENTITY.method, ROLE_SAVE_IDENTITY.path, '提交空角色配置并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await adminConfigApi.saveRole({}), ROLE_SAVE_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
     toEndpointTitle(ROLE_DELETE_IDENTITY.method, ROLE_DELETE_IDENTITY.path, '应能删除本次创建的角色'),
     async ({ adminConfigApi, endpointResources, resourceRegistry }) => {
       const resource = await test.step(
@@ -53,6 +65,18 @@ test.describe('角色 endpoint', () => {
       );
 
       expect(resourceRegistry.markCleaned('role', resource.id)).toBe(true);
+    },
+  );
+
+  test(
+    toEndpointTitle(ROLE_DELETE_IDENTITY.method, ROLE_DELETE_IDENTITY.path, '删除不存在角色应返回异常'),
+    async ({ adminConfigApi }) => {
+      await test.step(
+        toEndpointTitle(ROLE_DELETE_IDENTITY.method, ROLE_DELETE_IDENTITY.path, '提交不存在角色 ID 并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await adminConfigApi.deleteRole({ roleId: 2147483647 }), ROLE_DELETE_IDENTITY);
+        },
+      );
     },
   );
 });

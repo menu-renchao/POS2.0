@@ -1,5 +1,5 @@
 import { expect, test } from '../../support/endpoint-fixture';
-import { expectApiOk } from '../../support/endpoint-assertions';
+import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
 const MENU_GROUP_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menuGroup' } as const;
@@ -23,6 +23,18 @@ test.describe('菜单组 endpoint', () => {
 
       expect(resource.id).not.toBeUndefined();
       expect(resource.name).toBe(request.name);
+    },
+  );
+
+  test(
+    toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '缺少必填字段应返回异常'),
+    async ({ menuApi }) => {
+      await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '提交空菜单组配置并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await menuApi.createMenuGroup({}), MENU_GROUP_CREATE_IDENTITY);
+        },
+      );
     },
   );
 
@@ -53,6 +65,18 @@ test.describe('菜单组 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(MENU_GROUP_UPDATE_IDENTITY.method, MENU_GROUP_UPDATE_IDENTITY.path, '缺少菜单组 ID 应返回异常'),
+    async ({ menuApi }) => {
+      await test.step(
+        toEndpointTitle(MENU_GROUP_UPDATE_IDENTITY.method, MENU_GROUP_UPDATE_IDENTITY.path, '提交缺少 ID 的菜单组更新并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await menuApi.updateMenuGroup({ name: 'AT_INVALID_MENU_GROUP' }), MENU_GROUP_UPDATE_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
     toEndpointTitle(MENU_GROUP_DETAIL_IDENTITY.method, MENU_GROUP_DETAIL_IDENTITY.path, '应能读取菜单组详情'),
     async ({ menuApi, endpointResources }) => {
       const menuResource = await test.step(
@@ -70,6 +94,18 @@ test.describe('菜单组 endpoint', () => {
 
       expect(body.code).toBe(0);
       expect(body.data).toBeTruthy();
+    },
+  );
+
+  test(
+    toEndpointTitle(MENU_GROUP_DETAIL_IDENTITY.method, MENU_GROUP_DETAIL_IDENTITY.path, '读取不存在菜单组应返回异常'),
+    async ({ menuApi }) => {
+      await test.step(
+        toEndpointTitle(MENU_GROUP_DETAIL_IDENTITY.method, MENU_GROUP_DETAIL_IDENTITY.path, '读取不存在菜单组 ID 并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await menuApi.getMenuGroup(2147483647), MENU_GROUP_DETAIL_IDENTITY);
+        },
+      );
     },
   );
 

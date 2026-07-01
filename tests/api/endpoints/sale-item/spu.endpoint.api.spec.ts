@@ -4,7 +4,7 @@ import { createShortTestName } from '../../../../api/core/test-data-id';
 import type { ResourceId } from '../../../../api/core/resource-registry';
 import { expect, test } from '../../support/endpoint-fixture';
 import type { EndpointResource, EndpointResources } from '../../support/endpoint-resources';
-import { expectApiOk } from '../../support/endpoint-assertions';
+import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
 import { parseSpuCodeFromAssignResponse } from '../../support/spu-code';
 
@@ -45,6 +45,18 @@ test.describe('SPU 商品 endpoint', () => {
       );
 
       expect(assignedCode).toBeTruthy();
+    },
+  );
+
+  test(
+    toEndpointTitle(SPU_ASSIGN_IDENTITY.method, SPU_ASSIGN_IDENTITY.path, '缺少商品 ID 应返回异常'),
+    async ({ spuApi }) => {
+      await test.step(
+        toEndpointTitle(SPU_ASSIGN_IDENTITY.method, SPU_ASSIGN_IDENTITY.path, '提交空 SPU 分配请求并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await spuApi.assignSaleItem({}), SPU_ASSIGN_IDENTITY);
+        },
+      );
     },
   );
 
@@ -130,6 +142,18 @@ test.describe('SPU 商品 endpoint', () => {
             menuId: resource.menuResource.id,
           });
           await expectApiOk(await spuApi.stockOperation(stockRequest), SPU_STOCK_OPERATION_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
+    toEndpointTitle(SPU_STOCK_OPERATION_IDENTITY.method, SPU_STOCK_OPERATION_IDENTITY.path, '缺少 SPU code 应返回异常'),
+    async ({ spuApi }) => {
+      await test.step(
+        toEndpointTitle(SPU_STOCK_OPERATION_IDENTITY.method, SPU_STOCK_OPERATION_IDENTITY.path, '提交空库存操作并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await spuApi.stockOperation({}), SPU_STOCK_OPERATION_IDENTITY);
         },
       );
     },
