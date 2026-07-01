@@ -70,4 +70,16 @@ test.describe('折扣 endpoint', () => {
       );
     },
   );
+
+  test(
+    toEndpointTitle(DISCOUNT_DELETE_IDENTITY.method, DISCOUNT_DELETE_IDENTITY.path, '缺少折扣 ID 应返回异常'),
+    async ({ adminConfigApi }) => {
+      await test.step(
+        toEndpointTitle(DISCOUNT_DELETE_IDENTITY.method, DISCOUNT_DELETE_IDENTITY.path, '提交空折扣删除请求并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await adminConfigApi.deleteDiscount({}), DISCOUNT_DELETE_IDENTITY);
+        },
+      );
+    },
+  );
 });

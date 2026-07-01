@@ -79,4 +79,16 @@ test.describe('角色 endpoint', () => {
       );
     },
   );
+
+  test(
+    toEndpointTitle(ROLE_DELETE_IDENTITY.method, ROLE_DELETE_IDENTITY.path, '缺少角色 ID 应返回异常'),
+    async ({ adminConfigApi }) => {
+      await test.step(
+        toEndpointTitle(ROLE_DELETE_IDENTITY.method, ROLE_DELETE_IDENTITY.path, '提交空角色删除请求并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await adminConfigApi.deleteRole({}), ROLE_DELETE_IDENTITY);
+        },
+      );
+    },
+  );
 });

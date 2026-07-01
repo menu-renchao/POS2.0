@@ -65,4 +65,36 @@ test.describe('订单支付 endpoint', () => {
       expect(resourceRegistry.markCleaned('payment', payment.id)).toBe(true);
     },
   );
+
+  test(
+    toEndpointTitle(PAYMENT_DELETE_IDENTITY.method, PAYMENT_DELETE_IDENTITY.path, '缺少支付记录 ID 应返回异常'),
+    async ({ paymentApi }) => {
+      await test.step(
+        toEndpointTitle(PAYMENT_DELETE_IDENTITY.method, PAYMENT_DELETE_IDENTITY.path, '提交空删除支付记录请求并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await paymentApi.deleteRecord({}), PAYMENT_DELETE_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
+    toEndpointTitle(PAYMENT_DELETE_IDENTITY.method, PAYMENT_DELETE_IDENTITY.path, '删除不存在支付记录应返回异常'),
+    async ({ paymentApi }) => {
+      await test.step(
+        toEndpointTitle(PAYMENT_DELETE_IDENTITY.method, PAYMENT_DELETE_IDENTITY.path, '提交不存在支付记录 ID 并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(
+            await paymentApi.deleteRecord({
+              id: 2147483647,
+              paymentRecordId: 2147483647,
+              orderId: 2147483647,
+              reason: 'API_AUTOMATION_INVALID_PAYMENT',
+            }),
+            PAYMENT_DELETE_IDENTITY,
+          );
+        },
+      );
+    },
+  );
 });

@@ -118,4 +118,35 @@ test.describe('订单管理 endpoint', () => {
       expect(resourceRegistry.markCleaned('order', order.id)).toBe(true);
     },
   );
+
+  test(
+    toEndpointTitle(ORDER_VOID_IDENTITY.method, ORDER_VOID_IDENTITY.path, '缺少订单 ID 应返回异常'),
+    async ({ orderApi }) => {
+      await test.step(
+        toEndpointTitle(ORDER_VOID_IDENTITY.method, ORDER_VOID_IDENTITY.path, '提交空作废请求并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await orderApi.voidOrder({}), ORDER_VOID_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
+    toEndpointTitle(ORDER_VOID_IDENTITY.method, ORDER_VOID_IDENTITY.path, '作废不存在订单应返回异常'),
+    async ({ orderApi }) => {
+      await test.step(
+        toEndpointTitle(ORDER_VOID_IDENTITY.method, ORDER_VOID_IDENTITY.path, '提交不存在订单 ID 并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(
+            await orderApi.voidOrder({
+              id: 2147483647,
+              orderId: 2147483647,
+              reason: 'API_AUTOMATION_INVALID_ORDER',
+            }),
+            ORDER_VOID_IDENTITY,
+          );
+        },
+      );
+    },
+  );
 });

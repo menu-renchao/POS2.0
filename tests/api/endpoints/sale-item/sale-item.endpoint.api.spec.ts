@@ -1,6 +1,6 @@
 import { expect, test } from '../../support/endpoint-fixture';
 import { buildSaleItemRequest } from '../../../../test-data/api/menu-api-data';
-import { expectApiOk } from '../../support/endpoint-assertions';
+import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
 const SALE_ITEM_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menuSaleItem' } as const;
@@ -107,6 +107,33 @@ test.describe('商品 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(SALE_ITEM_CREATE_IDENTITY.method, SALE_ITEM_CREATE_IDENTITY.path, '缺少必填字段应返回异常'),
+    async ({ saleItemApi }) => {
+      await test.step(
+        toEndpointTitle(SALE_ITEM_CREATE_IDENTITY.method, SALE_ITEM_CREATE_IDENTITY.path, '提交空商品配置并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await saleItemApi.createSaleItem({}), SALE_ITEM_CREATE_IDENTITY);
+        },
+      );
+    },
+  );
+
+  test(
+    toEndpointTitle(SALE_ITEM_UPDATE_IDENTITY.method, SALE_ITEM_UPDATE_IDENTITY.path, '缺少商品 ID 应返回异常'),
+    async ({ saleItemApi }) => {
+      await test.step(
+        toEndpointTitle(SALE_ITEM_UPDATE_IDENTITY.method, SALE_ITEM_UPDATE_IDENTITY.path, '提交缺少 ID 的商品更新并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(
+            await saleItemApi.updateSaleItem(buildSaleItemRequest(2147483647, 'INVALID')),
+            SALE_ITEM_UPDATE_IDENTITY,
+          );
+        },
+      );
+    },
+  );
+
+  test(
     toEndpointTitle(SALE_ITEM_DETAIL_IDENTITY.method, SALE_ITEM_DETAIL_IDENTITY.path, '应能读取商品详情'),
     async ({ endpointResources, saleItemApi }) => {
       const menuResource = await test.step(
@@ -158,6 +185,18 @@ test.describe('商品 endpoint', () => {
 
       expect(body.code).toBe(0);
       expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(SALE_ITEM_DETAIL_IDENTITY.method, SALE_ITEM_DETAIL_IDENTITY.path, '读取不存在商品应返回异常'),
+    async ({ saleItemApi }) => {
+      await test.step(
+        toEndpointTitle(SALE_ITEM_DETAIL_IDENTITY.method, SALE_ITEM_DETAIL_IDENTITY.path, '读取不存在商品 ID 并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await saleItemApi.getSaleItem(2147483647), SALE_ITEM_DETAIL_IDENTITY);
+        },
+      );
     },
   );
 

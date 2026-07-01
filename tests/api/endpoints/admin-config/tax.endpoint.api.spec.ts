@@ -79,4 +79,16 @@ test.describe('税费 endpoint', () => {
       );
     },
   );
+
+  test(
+    toEndpointTitle(TAX_DELETE_IDENTITY.method, TAX_DELETE_IDENTITY.path, '缺少税费 ID 应返回异常'),
+    async ({ adminConfigApi }) => {
+      await test.step(
+        toEndpointTitle(TAX_DELETE_IDENTITY.method, TAX_DELETE_IDENTITY.path, '提交空税费删除请求并校验拒绝响应'),
+        async () => {
+          await expectApiRejected(await adminConfigApi.deleteTax({}), TAX_DELETE_IDENTITY);
+        },
+      );
+    },
+  );
 });
