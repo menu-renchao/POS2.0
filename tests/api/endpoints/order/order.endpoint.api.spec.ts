@@ -2,10 +2,14 @@ import { expect, test } from '../../support/endpoint-fixture';
 import { buildDefaultOrderListQuery } from '../../../../test-data/api/order-api-data';
 import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
+import type { ResourceId } from '../../../../api/core/resource-registry';
 
 const ORDER_SAVE_IDENTITY = { method: 'POST', path: '/api/order/save' } as const;
 const ORDER_FETCH_IDENTITY = { method: 'GET', path: '/api/order/fetch' } as const;
+const ORDER_DETAIL_LIST_IDENTITY = { method: 'GET', path: '/api/order/detail/list' } as const;
 const ORDER_LIST_IDENTITY = { method: 'GET', path: '/api/order/list' } as const;
+const ORDER_DATE_NUMBER_LIST_IDENTITY = { method: 'POST', path: '/api/order/listOrdersByDateNumber' } as const;
+const ORDER_RECALL_IDENTITY = { method: 'GET', path: '/api/order/recall' } as const;
 const ORDER_VOID_IDENTITY = { method: 'POST', path: '/api/order/void' } as const;
 
 test.describe('订单管理 endpoint', () => {
@@ -67,6 +71,26 @@ test.describe('订单管理 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(ORDER_DETAIL_LIST_IDENTITY.method, ORDER_DETAIL_LIST_IDENTITY.path, '应能查询订单明细列表'),
+    async ({ endpointResources, orderApi }) => {
+      const order = await test.step(
+        toEndpointTitle(ORDER_SAVE_IDENTITY.method, ORDER_SAVE_IDENTITY.path, '先创建订单用于明细列表查询'),
+        async () => await endpointResources.createOrderResource(),
+      );
+      const body = await test.step(
+        toEndpointTitle(ORDER_DETAIL_LIST_IDENTITY.method, ORDER_DETAIL_LIST_IDENTITY.path, '按订单 ID 查询明细列表并校验响应'),
+        async () =>
+          await expectApiOk(
+            await orderApi.listOrderDetails(buildDefaultOrderListQuery(new Date(), { orderId: order.id })),
+            ORDER_DETAIL_LIST_IDENTITY,
+          ),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
     toEndpointTitle(ORDER_LIST_IDENTITY.method, ORDER_LIST_IDENTITY.path, '应能查询订单列表'),
     async ({ endpointResources, orderApi }) => {
       const order = await test.step(
@@ -86,6 +110,46 @@ test.describe('订单管理 endpoint', () => {
               }),
             ),
             ORDER_LIST_IDENTITY,
+          ),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(ORDER_DATE_NUMBER_LIST_IDENTITY.method, ORDER_DATE_NUMBER_LIST_IDENTITY.path, '应能按日期编号查询订单'),
+    async ({ endpointResources, orderApi }) => {
+      const order = await test.step(
+        toEndpointTitle(ORDER_SAVE_IDENTITY.method, ORDER_SAVE_IDENTITY.path, '先创建订单用于日期编号查询'),
+        async () => await endpointResources.createOrderResource(),
+      );
+      const body = await test.step(
+        toEndpointTitle(ORDER_DATE_NUMBER_LIST_IDENTITY.method, ORDER_DATE_NUMBER_LIST_IDENTITY.path, '按订单 ID 和日期编号查询并校验响应'),
+        async () =>
+          await expectApiOk(
+            await orderApi.listOrdersByDateNumber(buildOrderDateNumberQuery(order.id)),
+            ORDER_DATE_NUMBER_LIST_IDENTITY,
+          ),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(ORDER_RECALL_IDENTITY.method, ORDER_RECALL_IDENTITY.path, '应能查询召回订单列表'),
+    async ({ endpointResources, orderApi }) => {
+      const order = await test.step(
+        toEndpointTitle(ORDER_SAVE_IDENTITY.method, ORDER_SAVE_IDENTITY.path, '先创建订单用于召回列表查询'),
+        async () => await endpointResources.createOrderResource(),
+      );
+      const body = await test.step(
+        toEndpointTitle(ORDER_RECALL_IDENTITY.method, ORDER_RECALL_IDENTITY.path, '按订单 ID 查询召回列表并校验响应'),
+        async () =>
+          await expectApiOk(
+            await orderApi.recall(buildDefaultOrderListQuery(new Date(), { orderId: order.id })),
+            ORDER_RECALL_IDENTITY,
           ),
       );
 
@@ -171,3 +235,12 @@ test.describe('订单管理 endpoint', () => {
     },
   );
 });
+
+function buildOrderDateNumberQuery(orderId: ResourceId): Record<string, unknown> {
+  return {
+    ...buildDefaultOrderListQuery(new Date()),
+    id: orderId,
+    orderId,
+    dateNumber: 'AT',
+  };
+}

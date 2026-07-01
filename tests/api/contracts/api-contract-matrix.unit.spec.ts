@@ -77,7 +77,7 @@ test.describe('首批接口覆盖矩阵', () => {
   test('已覆盖 endpoint 应声明存在的 endpoint spec 文件', () => {
     const coveredCases = firstBatchApiCases.filter((apiCase) => apiCase.endpointStatus === 'covered');
 
-    expect(coveredCases).toHaveLength(43);
+    expect(coveredCases).toHaveLength(79);
     for (const apiCase of coveredCases) {
       expect(apiCase.endpointSpecFile, `${apiCase.method} ${apiCase.path}`).toBeDefined();
       expect(existsSync(apiCase.endpointSpecFile!), `${apiCase.endpointSpecFile} 应存在`).toBe(true);
@@ -125,11 +125,43 @@ test.describe('首批接口覆盖矩阵', () => {
 
   test('首批可执行查询类计划迁移接口应拆出 endpoint 单接口用例', () => {
     for (const [method, path, endpointSpecFile] of [
+      ['GET', '/api/menu/fetchGlobalOption', API_SPEC_FILES.endpointMenu],
+      ['GET', '/api/menu/listGlobalOption', API_SPEC_FILES.endpointMenu],
+      ['GET', '/api/menu/liteMenu/{id}', API_SPEC_FILES.endpointMenu],
+      ['GET', '/api/menu/menu', API_SPEC_FILES.endpointMenu],
       ['GET', '/api/search/menu', API_SPEC_FILES.endpointMenu],
       ['GET', '/api/menu/group/list', API_SPEC_FILES.endpointMenuGroup],
+      ['GET', '/api/menu/group/saleItem/all', API_SPEC_FILES.endpointMenuGroup],
+      ['POST', '/api/menu/menuGroup/batch/copy', API_SPEC_FILES.endpointMenuGroup],
+      ['DELETE', '/api/menu/menuGroup/batch/delete', API_SPEC_FILES.endpointMenuGroup],
+      ['GET', '/api/menu/menuGroups', API_SPEC_FILES.endpointMenuGroup],
+      ['GET', '/api/menu/abstractCategorys', API_SPEC_FILES.endpointCategory],
+      ['GET', '/api/menu/abstractCategorys/search', API_SPEC_FILES.endpointCategory],
+      ['GET', '/api/menu/category/list', API_SPEC_FILES.endpointCategory],
+      ['GET', '/api/menu/menu/{menuId}/menuCategories', API_SPEC_FILES.endpointCategory],
+      ['PUT', '/api/menu/menuCategory/quickEdit', API_SPEC_FILES.endpointCategory],
       ['GET', '/api/menu/menuCategorys/searchByName', API_SPEC_FILES.endpointCategory],
       ['GET', '/api/menu/item/fetchSaleItem', API_SPEC_FILES.endpointSaleItem],
+      ['GET', '/api/menu/item/listByCategory', API_SPEC_FILES.endpointSaleItem],
+      ['GET', '/api/menu/item/listComboSaleItem', API_SPEC_FILES.endpointSaleItem],
+      ['GET', '/api/menu/item/listItemOptions', API_SPEC_FILES.endpointSaleItem],
+      ['POST', '/api/menu/menuSaleItem/batch/copy', API_SPEC_FILES.endpointSaleItem],
+      [
+        'POST',
+        '/api/menu/menuSaleItem/batch/customizeMenuItemPriceAndMemberPrices',
+        API_SPEC_FILES.endpointSaleItem,
+      ],
+      ['DELETE', '/api/menu/menuSaleItem/batch/delete', API_SPEC_FILES.endpointSaleItem],
+      ['PUT', '/api/menu/menuSaleItem/batch/sequence', API_SPEC_FILES.endpointSaleItem],
+      ['PUT', '/api/menu/menuSaleItem/batch/update', API_SPEC_FILES.endpointSaleItem],
+      ['PUT', '/api/menu/menuSaleItem/batch/updateOutOfStock', API_SPEC_FILES.endpointSaleItem],
+      ['PUT', '/api/menu/menuSaleItem/quickEdit', API_SPEC_FILES.endpointSaleItem],
       ['GET', '/api/menu/menuSaleItems/searchByName', API_SPEC_FILES.endpointSaleItem],
+      ['GET', '/api/order/detail/list', API_SPEC_FILES.endpointOrder],
+      ['POST', '/api/order/listOrdersByDateNumber', API_SPEC_FILES.endpointOrder],
+      ['GET', '/api/order/recall', API_SPEC_FILES.endpointOrder],
+      ['DELETE', '/api/payment/deletePaymentRecord', API_SPEC_FILES.endpointPayment],
+      ['POST', '/api/payment/savePaymentRecord', API_SPEC_FILES.endpointPayment],
     ] as const) {
       expect(findApiCase(method, path)).toMatchObject({
         endpointStatus: 'covered',
@@ -138,14 +170,32 @@ test.describe('首批接口覆盖矩阵', () => {
     }
   });
 
-  test('全局选项分类只读链路应拆出 endpoint 单接口用例', () => {
+  test('全局选项分类 CRUD 链路应拆出 endpoint 单接口用例', () => {
     for (const [method, path, endpointSpecFile] of [
+      ['POST', '/api/menu/globalOptionCategory', API_SPEC_FILES.endpointGlobalOptionCategory],
+      ['PUT', '/api/menu/globalOptionCategory', API_SPEC_FILES.endpointGlobalOptionCategory],
+      ['DELETE', '/api/menu/globalOptionCategory/{id}', API_SPEC_FILES.endpointGlobalOptionCategory],
       ['GET', '/api/menu/globalOptionCategory/{id}', API_SPEC_FILES.endpointGlobalOptionCategory],
       [
         'GET',
         '/api/menu/menu/{menuId}/globalOptionCategories',
         API_SPEC_FILES.endpointGlobalOptionCategory,
       ],
+    ] as const) {
+      expect(findApiCase(method, path)).toMatchObject({
+        endpointStatus: 'covered',
+        endpointSpecFile,
+      });
+    }
+  });
+
+  test('全局选项 CRUD 链路应拆出 endpoint 单接口用例', () => {
+    for (const [method, path, endpointSpecFile] of [
+      ['POST', '/api/menu/menuGlobalOption', API_SPEC_FILES.endpointGlobalOption],
+      ['PUT', '/api/menu/menuGlobalOption', API_SPEC_FILES.endpointGlobalOption],
+      ['DELETE', '/api/menu/menuGlobalOption/{id}', API_SPEC_FILES.endpointGlobalOption],
+      ['GET', '/api/menu/menuGlobalOption/{id}', API_SPEC_FILES.endpointGlobalOption],
+      ['GET', '/api/menu/menuGlobalOptions/search', API_SPEC_FILES.endpointGlobalOption],
     ] as const) {
       expect(findApiCase(method, path)).toMatchObject({
         endpointStatus: 'covered',

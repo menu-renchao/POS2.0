@@ -1,11 +1,17 @@
 import { expect, test } from '../../support/endpoint-fixture';
 import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
+import type { EndpointResources } from '../../support/endpoint-resources';
 
 const CATEGORY_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menuCategory' } as const;
 const CATEGORY_UPDATE_IDENTITY = { method: 'PUT', path: '/api/menu/menuCategory' } as const;
 const CATEGORY_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menuCategory/{id}' } as const;
 const CATEGORY_DELETE_IDENTITY = { method: 'DELETE', path: '/api/menu/menuCategory/{id}' } as const;
+const ABSTRACT_CATEGORY_LIST_IDENTITY = { method: 'GET', path: '/api/menu/abstractCategorys' } as const;
+const ABSTRACT_CATEGORY_SEARCH_IDENTITY = { method: 'GET', path: '/api/menu/abstractCategorys/search' } as const;
+const CATEGORY_LIST_IDENTITY = { method: 'GET', path: '/api/menu/category/list' } as const;
+const MENU_CATEGORY_LIST_IDENTITY = { method: 'GET', path: '/api/menu/menu/{menuId}/menuCategories' } as const;
+const CATEGORY_QUICK_EDIT_IDENTITY = { method: 'PUT', path: '/api/menu/menuCategory/quickEdit' } as const;
 const CATEGORY_SEARCH_BY_NAME_IDENTITY = { method: 'GET', path: '/api/menu/menuCategorys/searchByName' } as const;
 
 test.describe('分类 endpoint', () => {
@@ -27,6 +33,117 @@ test.describe('分类 endpoint', () => {
 
       expect(resource.id).not.toBeUndefined();
       expect(resource.name).toBe((resource.request as { name?: string }).name);
+    },
+  );
+
+  test(
+    toEndpointTitle(CATEGORY_LIST_IDENTITY.method, CATEGORY_LIST_IDENTITY.path, '应能查询分类列表'),
+    async ({ menuApi, endpointResources }) => {
+      const { menuResource, menuGroupResource, categoryResource } = await createCategoryEndpointScenario(
+        endpointResources,
+        '分类列表查询',
+      );
+      const body = await test.step(
+        toEndpointTitle(CATEGORY_LIST_IDENTITY.method, CATEGORY_LIST_IDENTITY.path, '按菜单和菜单组查询分类列表并校验响应'),
+        async () =>
+          await expectApiOk(
+            await menuApi.listCategories({
+              menuId: menuResource.id,
+              menuGroupId: menuGroupResource.id,
+              name: categoryResource.name,
+            }),
+            CATEGORY_LIST_IDENTITY,
+          ),
+      );
+
+      expect(categoryResource.id).not.toBeUndefined();
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(MENU_CATEGORY_LIST_IDENTITY.method, MENU_CATEGORY_LIST_IDENTITY.path, '应能按菜单查询分类列表'),
+    async ({ menuApi, endpointResources }) => {
+      const { menuResource, categoryResource } = await createCategoryEndpointScenario(
+        endpointResources,
+        '按菜单查询分类',
+      );
+      const body = await test.step(
+        toEndpointTitle(MENU_CATEGORY_LIST_IDENTITY.method, MENU_CATEGORY_LIST_IDENTITY.path, '按菜单 ID 查询分类并校验响应'),
+        async () => await expectApiOk(await menuApi.listMenuCategories(menuResource.id), MENU_CATEGORY_LIST_IDENTITY),
+      );
+
+      expect(categoryResource.id).not.toBeUndefined();
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(ABSTRACT_CATEGORY_LIST_IDENTITY.method, ABSTRACT_CATEGORY_LIST_IDENTITY.path, '应能查询抽象分类列表'),
+    async ({ menuApi, endpointResources }) => {
+      const { menuResource } = await createCategoryEndpointScenario(
+        endpointResources,
+        '抽象分类列表查询',
+      );
+      const body = await test.step(
+        toEndpointTitle(ABSTRACT_CATEGORY_LIST_IDENTITY.method, ABSTRACT_CATEGORY_LIST_IDENTITY.path, '按菜单 ID 查询抽象分类并校验响应'),
+        async () =>
+          await expectApiOk(
+            await menuApi.listAbstractCategories({
+              menuId: menuResource.id,
+            }),
+            ABSTRACT_CATEGORY_LIST_IDENTITY,
+          ),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(ABSTRACT_CATEGORY_SEARCH_IDENTITY.method, ABSTRACT_CATEGORY_SEARCH_IDENTITY.path, '应能搜索抽象分类'),
+    async ({ menuApi, endpointResources }) => {
+      const { menuResource, categoryResource } = await createCategoryEndpointScenario(
+        endpointResources,
+        '抽象分类搜索',
+      );
+      const body = await test.step(
+        toEndpointTitle(ABSTRACT_CATEGORY_SEARCH_IDENTITY.method, ABSTRACT_CATEGORY_SEARCH_IDENTITY.path, '按关键字搜索抽象分类并校验响应'),
+        async () =>
+          await expectApiOk(
+            await menuApi.searchAbstractCategories({
+              menuId: menuResource.id,
+              keyword: categoryResource.name,
+            }),
+            ABSTRACT_CATEGORY_SEARCH_IDENTITY,
+          ),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(CATEGORY_QUICK_EDIT_IDENTITY.method, CATEGORY_QUICK_EDIT_IDENTITY.path, '应能快速编辑菜单分类'),
+    async ({ menuApi, endpointResources }) => {
+      const { categoryResource } = await createCategoryEndpointScenario(
+        endpointResources,
+        '分类快速编辑',
+      );
+
+      await test.step(
+        toEndpointTitle(CATEGORY_QUICK_EDIT_IDENTITY.method, CATEGORY_QUICK_EDIT_IDENTITY.path, '快速编辑分类并校验响应'),
+        async () => {
+          await expectApiOk(
+            await menuApi.quickEditMenuCategory({
+              ...categoryResource.request,
+              id: categoryResource.id,
+              color: '#4488ff',
+            }),
+            CATEGORY_QUICK_EDIT_IDENTITY,
+          );
+        },
+      );
     },
   );
 
@@ -178,3 +295,27 @@ test.describe('分类 endpoint', () => {
     },
   );
 });
+
+async function createCategoryEndpointScenario(
+  endpointResources: EndpointResources,
+  purpose: string,
+) {
+  const menuResource = await test.step(
+    toEndpointTitle(CATEGORY_CREATE_IDENTITY.method, CATEGORY_CREATE_IDENTITY.path, `先创建菜单用于${purpose}`),
+    async () => await endpointResources.createMenuResource(),
+  );
+  const menuGroupResource = await test.step(
+    toEndpointTitle(CATEGORY_CREATE_IDENTITY.method, CATEGORY_CREATE_IDENTITY.path, `先创建菜单组用于${purpose}`),
+    async () => await endpointResources.createMenuGroupResource(menuResource.id),
+  );
+  const categoryResource = await test.step(
+    toEndpointTitle(CATEGORY_CREATE_IDENTITY.method, CATEGORY_CREATE_IDENTITY.path, `先创建分类用于${purpose}`),
+    async () => await endpointResources.createCategoryResource(menuResource.id, menuGroupResource.id),
+  );
+
+  return {
+    menuResource,
+    menuGroupResource,
+    categoryResource,
+  };
+}

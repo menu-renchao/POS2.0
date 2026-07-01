@@ -32,6 +32,12 @@ type MenuApiClientLike = Pick<
   | 'createMenuCategory'
   | 'listCategories'
   | 'deleteMenuCategory'
+  | 'createGlobalOptionCategory'
+  | 'listGlobalOptionCategories'
+  | 'deleteGlobalOptionCategory'
+  | 'createMenuGlobalOption'
+  | 'searchMenuGlobalOptions'
+  | 'deleteMenuGlobalOption'
 >;
 
 type AdminConfigApiMock = {
@@ -66,11 +72,20 @@ type MenuApiMock = {
     createMenuCategory: number;
     listCategories: number;
     deleteMenuCategory: number;
+    createGlobalOptionCategory: number;
+    listGlobalOptionCategories: number;
+    deleteGlobalOptionCategory: number;
+    createMenuGlobalOption: number;
+    searchMenuGlobalOptions: number;
+    deleteMenuGlobalOption: number;
   };
   payload: {
     menu?: unknown;
     menuGroup?: unknown;
     menuCategory?: unknown;
+    globalOptionCategory?: unknown;
+    menuGlobalOption?: unknown;
+    globalOptionSearchParams?: unknown;
   };
 };
 
@@ -402,6 +417,68 @@ unitTest.describe('Endpoint 资源创建', () => {
     );
     expect(resource.id).toBe(7007);
     expect(resourceRegistry.has('menuCategory', 7007)).toBe(true);
+  });
+
+  unitTest('createGlobalOptionCategoryResource 应调用菜单 API 创建全局选项分类并登记清理', async () => {
+    const resourceRegistry = new ResourceRegistry();
+    const menuMock = createMenuApi({
+      createGlobalOptionCategory: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: { id: 8008 },
+        }),
+    });
+    const configMock = createAdminConfigApi();
+
+    const endpointResources = createEndpointResources({
+      adminConfigApi: configMock.api as AdminConfigApiClient,
+      menuApi: menuMock.api as unknown as MenuApiClient,
+      resourceRegistry,
+    });
+
+    const resource = await endpointResources.createGlobalOptionCategoryResource('menu-1');
+
+    expect(menuMock.calls.createGlobalOptionCategory).toBe(1);
+    expect(menuMock.payload.globalOptionCategory, '全局选项分类入参应携带 menuId、name 和 posName').toEqual(
+      expect.objectContaining({ menuId: 'menu-1', name: resource.name, posName: resource.name }),
+    );
+    expect(resource.id).toBe(8008);
+    expect(resourceRegistry.has('globalOptionCategory', 8008)).toBe(true);
+  });
+
+  unitTest('createMenuGlobalOptionResource 应调用菜单 API 创建全局选项并登记清理', async () => {
+    const resourceRegistry = new ResourceRegistry();
+    const menuMock = createMenuApi({
+      createMenuGlobalOption: async () =>
+        createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: { id: 9009 },
+        }),
+    });
+    const configMock = createAdminConfigApi();
+
+    const endpointResources = createEndpointResources({
+      adminConfigApi: configMock.api as AdminConfigApiClient,
+      menuApi: menuMock.api as unknown as MenuApiClient,
+      resourceRegistry,
+    });
+
+    const resource = await endpointResources.createMenuGlobalOptionResource('menu-1', 'option-category-1');
+
+    expect(menuMock.calls.createMenuGlobalOption).toBe(1);
+    expect(menuMock.payload.menuGlobalOption, '全局选项入参应携带 menuId、分类 ID、name 和 posName').toEqual(
+      expect.objectContaining({
+        menuId: 'menu-1',
+        globalOptionCategoryId: 'option-category-1',
+        menuCategoryId: 'option-category-1',
+        name: resource.name,
+        posName: resource.name,
+      }),
+    );
+    expect(resource.id).toBe(9009);
+    expect(resourceRegistry.has('menuGlobalOption', 9009)).toBe(true);
   });
 
   unitTest('创建和解析失败时不应登记清理任务', async () => {
@@ -750,6 +827,12 @@ function createMenuApi(overrides: Partial<MenuApiClientLike> = {}): MenuApiMock 
       createMenuCategory: 0,
       listCategories: 0,
       deleteMenuCategory: 0,
+      createGlobalOptionCategory: 0,
+      listGlobalOptionCategories: 0,
+      deleteGlobalOptionCategory: 0,
+      createMenuGlobalOption: 0,
+      searchMenuGlobalOptions: 0,
+      deleteMenuGlobalOption: 0,
     },
     payload: {},
   };
@@ -802,6 +885,39 @@ function createMenuApi(overrides: Partial<MenuApiClientLike> = {}): MenuApiMock 
       mock.calls.deleteMenuCategory += 1;
       const impl = (overrides.deleteMenuCategory ?? (async () => createApiResponse({ code: 0, msg: 'ok' }))) as MenuApiClientLike['deleteMenuCategory'];
       return impl({ menuCategoryId: 0 } as any);
+    },
+    createGlobalOptionCategory: async (payload: unknown) => {
+      mock.calls.createGlobalOptionCategory += 1;
+      mock.payload.globalOptionCategory = payload;
+      const impl = (overrides.createGlobalOptionCategory ?? (async () => createApiResponse({ code: 0, msg: 'ok', data: { id: 4 } }))) as MenuApiClientLike['createGlobalOptionCategory'];
+      return impl(payload as any);
+    },
+    listGlobalOptionCategories: async (...args: unknown[]) => {
+      mock.calls.listGlobalOptionCategories += 1;
+      const impl = (overrides.listGlobalOptionCategories ?? (async () => createApiResponse({ code: 0, msg: 'ok', data: { records: [] } }))) as MenuApiClientLike['listGlobalOptionCategories'];
+      return impl(args[0] as any);
+    },
+    deleteGlobalOptionCategory: async () => {
+      mock.calls.deleteGlobalOptionCategory += 1;
+      const impl = (overrides.deleteGlobalOptionCategory ?? (async () => createApiResponse({ code: 0, msg: 'ok' }))) as MenuApiClientLike['deleteGlobalOptionCategory'];
+      return impl({ globalOptionCategoryId: 0 } as any);
+    },
+    createMenuGlobalOption: async (payload: unknown) => {
+      mock.calls.createMenuGlobalOption += 1;
+      mock.payload.menuGlobalOption = payload;
+      const impl = (overrides.createMenuGlobalOption ?? (async () => createApiResponse({ code: 0, msg: 'ok', data: { id: 5 } }))) as MenuApiClientLike['createMenuGlobalOption'];
+      return impl(payload as any);
+    },
+    searchMenuGlobalOptions: async (...args: unknown[]) => {
+      mock.calls.searchMenuGlobalOptions += 1;
+      mock.payload.globalOptionSearchParams = args[0];
+      const impl = (overrides.searchMenuGlobalOptions ?? (async () => createApiResponse({ code: 0, msg: 'ok', data: { records: [] } }))) as MenuApiClientLike['searchMenuGlobalOptions'];
+      return impl(args[0] as any);
+    },
+    deleteMenuGlobalOption: async () => {
+      mock.calls.deleteMenuGlobalOption += 1;
+      const impl = (overrides.deleteMenuGlobalOption ?? (async () => createApiResponse({ code: 0, msg: 'ok' }))) as MenuApiClientLike['deleteMenuGlobalOption'];
+      return impl({ menuGlobalOptionId: 0 } as any);
     },
   } as MenuApiClientLike;
 

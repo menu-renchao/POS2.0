@@ -3,10 +3,14 @@ import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertion
 import { toEndpointTitle } from '../../support/endpoint-case';
 
 const MENU_GROUP_LIST_IDENTITY = { method: 'GET', path: '/api/menu/group/list' } as const;
+const MENU_GROUP_SALE_ITEM_LIST_IDENTITY = { method: 'GET', path: '/api/menu/group/saleItem/all' } as const;
 const MENU_GROUP_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menuGroup' } as const;
 const MENU_GROUP_UPDATE_IDENTITY = { method: 'PUT', path: '/api/menu/menuGroup' } as const;
+const MENU_GROUP_BATCH_COPY_IDENTITY = { method: 'POST', path: '/api/menu/menuGroup/batch/copy' } as const;
+const MENU_GROUP_BATCH_DELETE_IDENTITY = { method: 'DELETE', path: '/api/menu/menuGroup/batch/delete' } as const;
 const MENU_GROUP_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menuGroup/{id}' } as const;
 const MENU_GROUP_DELETE_IDENTITY = { method: 'DELETE', path: '/api/menu/menuGroup/{id}' } as const;
+const MENU_GROUP_PAGE_LIST_IDENTITY = { method: 'GET', path: '/api/menu/menuGroups' } as const;
 
 test.describe('菜单组 endpoint', () => {
   test(
@@ -26,6 +30,128 @@ test.describe('菜单组 endpoint', () => {
       );
 
       expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(MENU_GROUP_SALE_ITEM_LIST_IDENTITY.method, MENU_GROUP_SALE_ITEM_LIST_IDENTITY.path, '应能查询菜单组商品全集'),
+    async ({ menuApi, endpointResources }) => {
+      const menuResource = await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建菜单用于菜单组商品全集查询'),
+        async () => await endpointResources.createMenuResource(),
+      );
+      const menuGroupResource = await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建菜单组用于商品全集查询'),
+        async () => await endpointResources.createMenuGroupResource(menuResource.id),
+      );
+      const categoryResource = await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建分类用于商品全集查询'),
+        async () => await endpointResources.createCategoryResource(menuResource.id, menuGroupResource.id),
+      );
+      await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建商品用于菜单组商品全集查询'),
+        async () =>
+          await endpointResources.createSaleItemResource(
+            menuResource.id,
+            menuGroupResource.id,
+            categoryResource.id,
+          ),
+      );
+      const body = await test.step(
+        toEndpointTitle(MENU_GROUP_SALE_ITEM_LIST_IDENTITY.method, MENU_GROUP_SALE_ITEM_LIST_IDENTITY.path, '按菜单组查询商品全集并校验响应'),
+        async () =>
+          await expectApiOk(
+            await menuApi.listMenuGroupSaleItems({
+              menuId: menuResource.id,
+              menuGroupId: menuGroupResource.id,
+            }),
+            MENU_GROUP_SALE_ITEM_LIST_IDENTITY,
+          ),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(MENU_GROUP_PAGE_LIST_IDENTITY.method, MENU_GROUP_PAGE_LIST_IDENTITY.path, '应能分页查询菜单组列表'),
+    async ({ menuApi, endpointResources }) => {
+      const menuResource = await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建菜单用于菜单组分页查询'),
+        async () => await endpointResources.createMenuResource(),
+      );
+      const menuGroupResource = await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建菜单组用于分页查询'),
+        async () => await endpointResources.createMenuGroupResource(menuResource.id),
+      );
+      const body = await test.step(
+        toEndpointTitle(MENU_GROUP_PAGE_LIST_IDENTITY.method, MENU_GROUP_PAGE_LIST_IDENTITY.path, '按菜单 ID 查询菜单组分页列表并校验响应'),
+        async () =>
+          await expectApiOk(
+            await menuApi.listMenuGroups({
+              menuId: menuResource.id,
+              name: menuGroupResource.name,
+            }),
+            MENU_GROUP_PAGE_LIST_IDENTITY,
+          ),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(MENU_GROUP_BATCH_COPY_IDENTITY.method, MENU_GROUP_BATCH_COPY_IDENTITY.path, '应能批量复制菜单组'),
+    async ({ menuApi, endpointResources }) => {
+      const menuResource = await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建菜单用于菜单组批量复制'),
+        async () => await endpointResources.createMenuResource(),
+      );
+      const menuGroupResource = await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建菜单组用于批量复制'),
+        async () => await endpointResources.createMenuGroupResource(menuResource.id),
+      );
+
+      await test.step(
+        toEndpointTitle(MENU_GROUP_BATCH_COPY_IDENTITY.method, MENU_GROUP_BATCH_COPY_IDENTITY.path, '批量复制菜单组并校验响应'),
+        async () => {
+          await expectApiOk(
+            await menuApi.copyMenuGroups({
+              menuId: menuResource.id,
+              groupIds: [menuGroupResource.id],
+            }),
+            MENU_GROUP_BATCH_COPY_IDENTITY,
+          );
+        },
+      );
+    },
+  );
+
+  test(
+    toEndpointTitle(MENU_GROUP_BATCH_DELETE_IDENTITY.method, MENU_GROUP_BATCH_DELETE_IDENTITY.path, '应能批量删除菜单组'),
+    async ({ menuApi, endpointResources, resourceRegistry }) => {
+      const menuResource = await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建菜单用于菜单组批量删除'),
+        async () => await endpointResources.createMenuResource(),
+      );
+      const menuGroupResource = await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建菜单组用于批量删除'),
+        async () => await endpointResources.createMenuGroupResource(menuResource.id),
+      );
+
+      await test.step(
+        toEndpointTitle(MENU_GROUP_BATCH_DELETE_IDENTITY.method, MENU_GROUP_BATCH_DELETE_IDENTITY.path, '批量删除菜单组并校验响应'),
+        async () => {
+          await expectApiOk(
+            await menuApi.deleteMenuGroups({
+              groupIds: [menuGroupResource.id],
+            }),
+            MENU_GROUP_BATCH_DELETE_IDENTITY,
+          );
+        },
+      );
+
+      expect(resourceRegistry.markCleaned('menuGroup', menuGroupResource.id)).toBe(true);
     },
   );
 

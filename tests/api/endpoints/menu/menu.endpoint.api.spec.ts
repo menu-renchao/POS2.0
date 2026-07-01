@@ -1,9 +1,13 @@
 import { expect, test } from '../../support/endpoint-fixture';
-import { buildMenuRequest } from '../../../../test-data/api/menu-api-data';
+import { DEFAULT_MENU_PRODUCT, buildMenuRequest } from '../../../../test-data/api/menu-api-data';
 import { expectApiOk, expectApiRejected, expectArrayData } from '../../support/endpoint-assertions';
 import { extractEndpointListData } from '../../support/endpoint-list-data';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
+const GLOBAL_OPTION_FETCH_IDENTITY = { method: 'GET', path: '/api/menu/fetchGlobalOption' } as const;
+const GLOBAL_OPTION_LIST_IDENTITY = { method: 'GET', path: '/api/menu/listGlobalOption' } as const;
+const LITE_MENU_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/liteMenu/{id}' } as const;
+const CURRENT_MENU_IDENTITY = { method: 'GET', path: '/api/menu/menu' } as const;
 const MENU_LIST_IDENTITY = { method: 'GET', path: '/api/menu/menus' } as const;
 const MENU_SEARCH_IDENTITY = { method: 'GET', path: '/api/search/menu' } as const;
 const MENU_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menu' } as const;
@@ -11,6 +15,91 @@ const MENU_UPDATE_IDENTITY = { method: 'PUT', path: '/api/menu/menu' } as const;
 const MENU_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menu/{id}' } as const;
 
 test.describe('菜单 endpoint', () => {
+  test(
+    toEndpointTitle(GLOBAL_OPTION_FETCH_IDENTITY.method, GLOBAL_OPTION_FETCH_IDENTITY.path, '应能读取全局选项'),
+    async ({ menuApi, endpointResources }) => {
+      const menuResource = await test.step(
+        toEndpointTitle(GLOBAL_OPTION_FETCH_IDENTITY.method, GLOBAL_OPTION_FETCH_IDENTITY.path, '先创建菜单用于全局选项读取'),
+        async () => await endpointResources.createMenuResource(),
+      );
+      const optionCategoryResource = await test.step(
+        toEndpointTitle(GLOBAL_OPTION_FETCH_IDENTITY.method, GLOBAL_OPTION_FETCH_IDENTITY.path, '先创建全局选项分类用于全局选项读取'),
+        async () => await endpointResources.createGlobalOptionCategoryResource(menuResource.id),
+      );
+      const optionResource = await test.step(
+        toEndpointTitle(GLOBAL_OPTION_FETCH_IDENTITY.method, GLOBAL_OPTION_FETCH_IDENTITY.path, '先创建全局选项用于读取'),
+        async () =>
+          await endpointResources.createMenuGlobalOptionResource(
+            menuResource.id,
+            optionCategoryResource.id,
+          ),
+      );
+      const body = await test.step(
+        toEndpointTitle(GLOBAL_OPTION_FETCH_IDENTITY.method, GLOBAL_OPTION_FETCH_IDENTITY.path, '按全局选项 ID 读取并校验响应'),
+        async () => await expectApiOk(await menuApi.fetchGlobalOption({ id: optionResource.id }), GLOBAL_OPTION_FETCH_IDENTITY),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(GLOBAL_OPTION_LIST_IDENTITY.method, GLOBAL_OPTION_LIST_IDENTITY.path, '应能查询全局选项列表'),
+    async ({ menuApi, endpointResources }) => {
+      const menuResource = await test.step(
+        toEndpointTitle(GLOBAL_OPTION_LIST_IDENTITY.method, GLOBAL_OPTION_LIST_IDENTITY.path, '先创建菜单用于全局选项列表查询'),
+        async () => await endpointResources.createMenuResource(),
+      );
+      const optionCategoryResource = await test.step(
+        toEndpointTitle(GLOBAL_OPTION_LIST_IDENTITY.method, GLOBAL_OPTION_LIST_IDENTITY.path, '先创建全局选项分类用于全局选项列表查询'),
+        async () => await endpointResources.createGlobalOptionCategoryResource(menuResource.id),
+      );
+      const optionResource = await test.step(
+        toEndpointTitle(GLOBAL_OPTION_LIST_IDENTITY.method, GLOBAL_OPTION_LIST_IDENTITY.path, '先创建全局选项用于列表查询'),
+        async () =>
+          await endpointResources.createMenuGlobalOptionResource(
+            menuResource.id,
+            optionCategoryResource.id,
+          ),
+      );
+      const body = await test.step(
+        toEndpointTitle(GLOBAL_OPTION_LIST_IDENTITY.method, GLOBAL_OPTION_LIST_IDENTITY.path, '按菜单 ID 查询全局选项列表并校验响应'),
+        async () => await expectApiOk(await menuApi.listGlobalOption({ menuId: menuResource.id }), GLOBAL_OPTION_LIST_IDENTITY),
+      );
+
+      expect(optionResource.id).not.toBeUndefined();
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
+    toEndpointTitle(LITE_MENU_DETAIL_IDENTITY.method, LITE_MENU_DETAIL_IDENTITY.path, '应能读取轻量菜单'),
+    async ({ menuApi, endpointResources }) => {
+      const resource = await test.step(
+        toEndpointTitle(MENU_CREATE_IDENTITY.method, MENU_CREATE_IDENTITY.path, '先创建菜单用于轻量读取'),
+        async () => await endpointResources.createMenuResource(),
+      );
+      const body = await test.step(
+        toEndpointTitle(LITE_MENU_DETAIL_IDENTITY.method, LITE_MENU_DETAIL_IDENTITY.path, '读取轻量菜单并校验响应'),
+        async () => await expectApiOk(await menuApi.getLiteMenu(resource.id), LITE_MENU_DETAIL_IDENTITY),
+      );
+
+      expect(body.data).toBeTruthy();
+    },
+  );
+
+  test(
+    toEndpointTitle(CURRENT_MENU_IDENTITY.method, CURRENT_MENU_IDENTITY.path, '应能读取当前菜单'),
+    async ({ menuApi }) => {
+      const body = await test.step(
+        toEndpointTitle(CURRENT_MENU_IDENTITY.method, CURRENT_MENU_IDENTITY.path, '按 POS product 查询当前菜单并校验响应'),
+        async () => await expectApiOk(await menuApi.getCurrentMenu({ product: DEFAULT_MENU_PRODUCT }), CURRENT_MENU_IDENTITY),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
   test(
     toEndpointTitle(MENU_LIST_IDENTITY.method, MENU_LIST_IDENTITY.path, '应能查询菜单列表'),
     async ({ menuApi }) => {

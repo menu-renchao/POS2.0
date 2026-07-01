@@ -16,10 +16,13 @@ export type CategoryApiRequest = MenuApiRequest & {
 
 export type GlobalOptionCategoryApiRequest = MenuApiRequest & {
   menuId: ApiEntityId;
+  posName: string;
 };
 
 export type GlobalOptionApiRequest = MenuApiRequest & {
   globalOptionCategoryId: ApiEntityId;
+  menuCategoryId: ApiEntityId;
+  posName: string;
   price: number;
 };
 
@@ -63,6 +66,7 @@ export function buildMenuGroupRequest(
   return {
     menuId,
     name,
+    posName: name,
     displayName: name,
     sequence: 1,
     enabled: true,
@@ -95,6 +99,7 @@ export function buildGlobalOptionCategoryRequest(
   return {
     menuId,
     name,
+    posName: name,
     displayName: name,
     sequence: 1,
     enabled: true,
@@ -109,7 +114,9 @@ export function buildGlobalOptionRequest(
 
   return {
     globalOptionCategoryId,
+    menuCategoryId: globalOptionCategoryId,
     name,
+    posName: name,
     displayName: name,
     price: 1,
     sequence: 1,

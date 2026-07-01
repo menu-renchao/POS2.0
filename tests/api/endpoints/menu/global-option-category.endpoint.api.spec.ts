@@ -1,10 +1,24 @@
 import { expect, test } from '../../support/endpoint-fixture';
+import { buildGlobalOptionCategoryRequest } from '../../../../test-data/api/menu-api-data';
 import { expectApiOk } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
+import type { EndpointResources } from '../../support/endpoint-resources';
 
 const MENU_LIST_IDENTITY = { method: 'GET', path: '/api/menu/menus' } as const;
 const MENU_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menu/{id}' } as const;
 const MENU_GROUP_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menuGroup/{id}' } as const;
+const GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY = {
+  method: 'POST',
+  path: '/api/menu/globalOptionCategory',
+} as const;
+const GLOBAL_OPTION_CATEGORY_UPDATE_IDENTITY = {
+  method: 'PUT',
+  path: '/api/menu/globalOptionCategory',
+} as const;
+const GLOBAL_OPTION_CATEGORY_DELETE_IDENTITY = {
+  method: 'DELETE',
+  path: '/api/menu/globalOptionCategory/{id}',
+} as const;
 const GLOBAL_OPTION_CATEGORY_LIST_IDENTITY = {
   method: 'GET',
   path: '/api/menu/menu/{menuId}/globalOptionCategories',
@@ -15,6 +29,85 @@ const GLOBAL_OPTION_CATEGORY_DETAIL_IDENTITY = {
 } as const;
 
 test.describe('全局选项分类 endpoint', () => {
+  test(
+    toEndpointTitle(
+      GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY.method,
+      GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY.path,
+      '应能创建全局选项分类',
+    ),
+    async ({ endpointResources }) => {
+      const { optionCategoryResource } = await createGlobalOptionCategoryEndpointScenario(
+        endpointResources,
+        '全局选项分类创建',
+      );
+
+      expect(optionCategoryResource.id).not.toBeUndefined();
+      expect(optionCategoryResource.name).toBe((optionCategoryResource.request as { name?: string }).name);
+    },
+  );
+
+  test(
+    toEndpointTitle(
+      GLOBAL_OPTION_CATEGORY_UPDATE_IDENTITY.method,
+      GLOBAL_OPTION_CATEGORY_UPDATE_IDENTITY.path,
+      '应能更新全局选项分类',
+    ),
+    async ({ menuApi, endpointResources }) => {
+      const { menuResource, optionCategoryResource } = await createGlobalOptionCategoryEndpointScenario(
+        endpointResources,
+        '全局选项分类更新',
+      );
+
+      await test.step(
+        toEndpointTitle(
+          GLOBAL_OPTION_CATEGORY_UPDATE_IDENTITY.method,
+          GLOBAL_OPTION_CATEGORY_UPDATE_IDENTITY.path,
+          '更新全局选项分类并校验响应',
+        ),
+        async () => {
+          await expectApiOk(
+            await menuApi.updateGlobalOptionCategory({
+              ...optionCategoryResource.request,
+              ...buildGlobalOptionCategoryRequest(menuResource.id),
+              id: optionCategoryResource.id,
+            }),
+            GLOBAL_OPTION_CATEGORY_UPDATE_IDENTITY,
+          );
+        },
+      );
+    },
+  );
+
+  test(
+    toEndpointTitle(
+      GLOBAL_OPTION_CATEGORY_DELETE_IDENTITY.method,
+      GLOBAL_OPTION_CATEGORY_DELETE_IDENTITY.path,
+      '应能删除全局选项分类',
+    ),
+    async ({ menuApi, endpointResources, resourceRegistry }) => {
+      const { optionCategoryResource } = await createGlobalOptionCategoryEndpointScenario(
+        endpointResources,
+        '全局选项分类删除',
+      );
+
+      await test.step(
+        toEndpointTitle(
+          GLOBAL_OPTION_CATEGORY_DELETE_IDENTITY.method,
+          GLOBAL_OPTION_CATEGORY_DELETE_IDENTITY.path,
+          '删除全局选项分类并校验响应',
+        ),
+        async () => {
+          await expectApiOk(
+            await menuApi.deleteGlobalOptionCategory(optionCategoryResource.id),
+            GLOBAL_OPTION_CATEGORY_DELETE_IDENTITY,
+          );
+        },
+      );
+
+      expect(resourceRegistry.markCleaned('globalOptionCategory', optionCategoryResource.id)).toBe(true);
+    },
+  );
+
   test(
     toEndpointTitle(
       GLOBAL_OPTION_CATEGORY_DETAIL_IDENTITY.method,
@@ -119,6 +212,25 @@ test.describe('全局选项分类 endpoint', () => {
     },
   );
 });
+
+async function createGlobalOptionCategoryEndpointScenario(
+  endpointResources: EndpointResources,
+  purpose: string,
+) {
+  const menuResource = await test.step(
+    toEndpointTitle(GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY.method, GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY.path, `先创建菜单用于${purpose}`),
+    async () => await endpointResources.createMenuResource(),
+  );
+  const optionCategoryResource = await test.step(
+    toEndpointTitle(GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY.method, GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY.path, `先创建全局选项分类用于${purpose}`),
+    async () => await endpointResources.createGlobalOptionCategoryResource(menuResource.id),
+  );
+
+  return {
+    menuResource,
+    optionCategoryResource,
+  };
+}
 
 function findRecordId(
   value: unknown,

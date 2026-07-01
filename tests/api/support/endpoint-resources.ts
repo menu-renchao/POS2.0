@@ -9,6 +9,8 @@ import type { SaleItemApiClient } from '../../../api/clients/sale-item-api.clien
 import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
 import {
   buildCategoryRequest,
+  buildGlobalOptionCategoryRequest,
+  buildGlobalOptionRequest,
   buildMenuGroupRequest,
   buildMenuRequest,
   buildSaleItemRequest,
@@ -43,6 +45,11 @@ export type EndpointResources = {
   createMenuResource: () => Promise<EndpointResource>;
   createMenuGroupResource: (menuId: ResourceId) => Promise<EndpointResource>;
   createCategoryResource: (menuId: ResourceId, menuGroupId: ResourceId) => Promise<EndpointResource>;
+  createGlobalOptionCategoryResource: (menuId: ResourceId) => Promise<EndpointResource>;
+  createMenuGlobalOptionResource: (
+    menuId: ResourceId,
+    globalOptionCategoryId: ResourceId,
+  ) => Promise<EndpointResource>;
   createSaleItemResource: (
     menuId: ResourceId,
     menuGroupId: ResourceId,
@@ -234,6 +241,69 @@ export function createEndpointResources(
 
       return resolvedResource;
     },
+    createGlobalOptionCategoryResource: async (menuId: ResourceId) => {
+      const menuApi = getMenuApi(options);
+      const request = buildGlobalOptionCategoryRequest(menuId);
+
+      const resolvedResource = await createEndpointResource({
+        name: request.name,
+        adminConfigApi: options.adminConfigApi,
+        resourceRegistry: options.resourceRegistry,
+        request,
+        saveIdentity: {
+          method: 'POST',
+          path: '/api/menu/globalOptionCategory',
+        },
+        saveResource: () => menuApi.createGlobalOptionCategory(request),
+        listIdentity: {
+          method: 'GET',
+          path: '/api/menu/menu/{menuId}/globalOptionCategories',
+        },
+        listResource: () => menuApi.listGlobalOptionCategories(menuId),
+        resolveResourceType: 'globalOptionCategory',
+        cleanupPriority: 45,
+        cleanup: (id) => menuApi.deleteGlobalOptionCategory(id),
+      });
+
+      return resolvedResource;
+    },
+    createMenuGlobalOptionResource: async (
+      menuId: ResourceId,
+      globalOptionCategoryId: ResourceId,
+    ) => {
+      const menuApi = getMenuApi(options);
+      const request = {
+        ...buildGlobalOptionRequest(globalOptionCategoryId),
+        menuId,
+      };
+
+      const resolvedResource = await createEndpointResource({
+        name: request.name,
+        adminConfigApi: options.adminConfigApi,
+        resourceRegistry: options.resourceRegistry,
+        request,
+        saveIdentity: {
+          method: 'POST',
+          path: '/api/menu/menuGlobalOption',
+        },
+        saveResource: () => menuApi.createMenuGlobalOption(request),
+        listIdentity: {
+          method: 'GET',
+          path: '/api/menu/menuGlobalOptions/search',
+        },
+        listResource: () =>
+          menuApi.searchMenuGlobalOptions({
+            name: request.name,
+            menuIds: String(menuId),
+            categoryIds: String(globalOptionCategoryId),
+          }),
+        resolveResourceType: 'menuGlobalOption',
+        cleanupPriority: 50,
+        cleanup: (id) => menuApi.deleteMenuGlobalOption(id),
+      });
+
+      return resolvedResource;
+    },
     createSaleItemResource: async (
       menuId: ResourceId,
       menuGroupId: ResourceId,
@@ -393,7 +463,7 @@ async function createEndpointResource(options: {
 
 function getMenuApi(options: EndpointResourceFactoryOptions): MenuApiClient {
   if (options.menuApi === undefined) {
-    throw new Error('createMenuResource/createMenuGroupResource/createCategoryResource 需要 menuApi 入参。');
+    throw new Error('createMenuResource/createMenuGroupResource/createCategoryResource/createGlobalOptionCategoryResource/createMenuGlobalOptionResource 需要 menuApi 入参。');
   }
 
   return options.menuApi;

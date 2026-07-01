@@ -72,9 +72,12 @@ test.describe('API 测试数据工厂', () => {
     });
     expect(buildGlobalOptionCategoryRequest(101, 'option-category')).toMatchObject({
       menuId: 101,
+      posName: expect.any(String),
     });
     expect(buildGlobalOptionRequest(303, 'option')).toMatchObject({
       globalOptionCategoryId: 303,
+      menuCategoryId: 303,
+      posName: expect.any(String),
     });
     expect(buildSaleItemRequest(404, 'sale-item')).toMatchObject({
       menuCategoryId: 404,
