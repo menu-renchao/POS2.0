@@ -44,6 +44,13 @@ export const API_SPEC_FILES = {
 export type ApiBatchGroup = (typeof ALLOWED_API_GROUPS)[number];
 export type ApiSpecFile = (typeof API_SPEC_FILES)[keyof typeof API_SPEC_FILES];
 
+export type ApiCaseCoverage = {
+  positive: boolean;
+  negative: boolean;
+  boundary: boolean;
+  knownIssue?: string;
+};
+
 export type FirstBatchApiCase = {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
@@ -52,10 +59,45 @@ export type FirstBatchApiCase = {
   specFile: ApiSpecFile;
   endpointStatus: ApiEndpointStatus;
   endpointSpecFile?: ApiSpecFile;
+  caseCoverage: ApiCaseCoverage;
   riskNote: string;
 };
 
-export const firstBatchApiCases: FirstBatchApiCase[] = [
+type FirstBatchApiCaseInput = Omit<FirstBatchApiCase, 'caseCoverage'>;
+
+const NEGATIVE_CASE_KEYS = new Set<string>([
+  'POST /api/menu/menu',
+  'PUT /api/menu/menu',
+  'GET /api/menu/menu/{id}',
+  'POST /api/menu/menuGroup',
+  'PUT /api/menu/menuGroup',
+  'GET /api/menu/menuGroup/{id}',
+  'POST /api/order/save',
+  'GET /api/order/fetch',
+  'POST /api/order/void',
+  'POST /api/payment/record/delete',
+  'POST /api/payment/record/save',
+  'POST /api/menu/menuCategory',
+  'PUT /api/menu/menuCategory',
+  'GET /api/menu/menuCategory/{id}',
+  'POST /api/admin/role/delete',
+  'POST /api/admin/role/save',
+  'POST /api/menu/menuSaleItem',
+  'PUT /api/menu/menuSaleItem',
+  'GET /api/menu/menuSaleItem/{id}',
+  'POST /api/tax/delete',
+  'POST /api/tax/save',
+  'POST /api/discount/delete',
+  'POST /api/spu/menuSaleItem/assign',
+  'POST /api/spu/stockOperation',
+]);
+
+const KNOWN_ISSUES_BY_KEY = new Map<string, string>([
+  ['POST /api/discount/save', '空对象会返回 code=0 并创建折扣，暂不放入普通异常回归。'],
+  ['DELETE /api/menu/menuSaleItem/{id}', '删除不存在商品会返回 code=0 success，暂不放入普通异常回归。'],
+]);
+
+const firstBatchApiCaseInputs: FirstBatchApiCaseInput[] = [
   {
     method: 'GET',
     path: '/api/menu/checkMenuLastUpdateTime',
@@ -1100,3 +1142,24 @@ export const firstBatchApiCases: FirstBatchApiCase[] = [
     riskNote: '批量库存操作影响多条库存记录，先覆盖契约。',
   },
 ];
+
+export const firstBatchApiCases: FirstBatchApiCase[] = firstBatchApiCaseInputs.map(withCaseCoverage);
+
+function withCaseCoverage(apiCase: FirstBatchApiCaseInput): FirstBatchApiCase {
+  const key = toApiCaseKey(apiCase.method, apiCase.path);
+  const knownIssue = KNOWN_ISSUES_BY_KEY.get(key);
+
+  return {
+    ...apiCase,
+    caseCoverage: {
+      positive: apiCase.coverage === 'positive-crud' || apiCase.coverage === 'positive-business',
+      negative: NEGATIVE_CASE_KEYS.has(key),
+      boundary: false,
+      ...(knownIssue === undefined ? {} : { knownIssue }),
+    },
+  };
+}
+
+function toApiCaseKey(method: FirstBatchApiCaseInput['method'], path: string): string {
+  return `${method} ${path}`;
+}

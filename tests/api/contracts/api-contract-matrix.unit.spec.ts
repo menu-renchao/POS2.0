@@ -28,6 +28,18 @@ test.describe('首批接口覆盖矩阵', () => {
       expect(apiCase.coverage).toMatch(/^(positive-crud|positive-business|contract-only|deferred-external|blocked-missing-data)$/);
       expect(allowedSpecFiles).toContain(apiCase.specFile);
       expect(apiCase.endpointStatus).toMatch(/^(covered|planned|blocked)$/);
+      expect(typeof apiCase.caseCoverage.positive, `${apiCase.method} ${apiCase.path} 应声明正向覆盖状态`).toBe(
+        'boolean',
+      );
+      expect(typeof apiCase.caseCoverage.negative, `${apiCase.method} ${apiCase.path} 应声明异常覆盖状态`).toBe(
+        'boolean',
+      );
+      expect(typeof apiCase.caseCoverage.boundary, `${apiCase.method} ${apiCase.path} 应声明边界覆盖状态`).toBe(
+        'boolean',
+      );
+      if (apiCase.caseCoverage.knownIssue !== undefined) {
+        expect(apiCase.caseCoverage.knownIssue.trim().length, `${apiCase.method} ${apiCase.path} knownIssue 不应为空`).toBeGreaterThan(0);
+      }
       if (apiCase.endpointSpecFile !== undefined) {
         expect(allowedSpecFiles).toContain(apiCase.endpointSpecFile);
       }
@@ -70,6 +82,28 @@ test.describe('首批接口覆盖矩阵', () => {
       expect(apiCase.endpointSpecFile, `${apiCase.method} ${apiCase.path}`).toBeDefined();
       expect(existsSync(apiCase.endpointSpecFile!), `${apiCase.endpointSpecFile} 应存在`).toBe(true);
     }
+  });
+
+  test('已覆盖 endpoint 至少应声明正向或异常用例覆盖', () => {
+    for (const apiCase of firstBatchApiCases.filter((entry) => entry.endpointStatus === 'covered')) {
+      expect(
+        apiCase.caseCoverage.positive || apiCase.caseCoverage.negative,
+        `${apiCase.method} ${apiCase.path} 至少应有正向或异常覆盖`,
+      ).toBe(true);
+    }
+  });
+
+  test('已知异常缺口应沉淀到矩阵，避免误放入普通回归', () => {
+    expect(findApiCase('POST', '/api/discount/save')).toMatchObject({
+      caseCoverage: {
+        knownIssue: expect.stringContaining('空对象'),
+      },
+    });
+    expect(findApiCase('DELETE', '/api/menu/menuSaleItem/{id}')).toMatchObject({
+      caseCoverage: {
+        knownIssue: expect.stringContaining('不存在商品'),
+      },
+    });
   });
 
   test('首批抓包接口应按真实业务可执行性更新覆盖等级', () => {
