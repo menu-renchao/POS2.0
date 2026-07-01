@@ -25,6 +25,26 @@ test.describe('角色 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(ROLE_LIST_IDENTITY.method, ROLE_LIST_IDENTITY.path, '分页边界 pageSize=1 应返回可解析列表'),
+    async ({ adminConfigApi }) => {
+      const data = await test.step(
+        toEndpointTitle(ROLE_LIST_IDENTITY.method, ROLE_LIST_IDENTITY.path, '使用 pageSize=1 查询角色列表并校验响应'),
+        async () => {
+          const body = await expectApiOk(
+            await adminConfigApi.listRoles({ page: 1, pageSize: 1 }),
+            ROLE_LIST_IDENTITY,
+          );
+          const listData = extractEndpointListData(body.data, ROLE_LIST_IDENTITY);
+
+          return expectArrayData({ ...body, data: listData }, ROLE_LIST_IDENTITY);
+        },
+      );
+
+      expect(Array.isArray(data)).toBe(true);
+    },
+  );
+
+  test(
     toEndpointTitle(ROLE_SAVE_IDENTITY.method, ROLE_SAVE_IDENTITY.path, '应能保存角色'),
     async ({ endpointResources }) => {
       const resource = await test.step(

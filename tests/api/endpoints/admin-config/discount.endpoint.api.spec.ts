@@ -28,6 +28,26 @@ test.describe('折扣 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(DISCOUNT_LIST_IDENTITY.method, DISCOUNT_LIST_IDENTITY.path, '分页边界 pageSize=1 应返回可解析列表'),
+    async ({ adminConfigApi }) => {
+      const data = await test.step(
+        toEndpointTitle(DISCOUNT_LIST_IDENTITY.method, DISCOUNT_LIST_IDENTITY.path, '使用 pageSize=1 查询折扣列表并校验响应'),
+        async () => {
+          const body = await expectApiOk(
+            await adminConfigApi.listDiscounts({ page: 1, pageSize: 1 }),
+            DISCOUNT_LIST_IDENTITY,
+          );
+          const listData = extractEndpointListData(body.data, DISCOUNT_LIST_IDENTITY);
+
+          return expectArrayData({ ...body, data: listData }, DISCOUNT_LIST_IDENTITY);
+        },
+      );
+
+      expect(Array.isArray(data)).toBe(true);
+    },
+  );
+
+  test(
     toEndpointTitle(DISCOUNT_SAVE_IDENTITY.method, DISCOUNT_SAVE_IDENTITY.path, '应能保存折扣'),
     async ({ endpointResources }) => {
       const resource = await test.step(

@@ -7,6 +7,7 @@ const SALE_ITEM_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menuSaleIte
 const SALE_ITEM_UPDATE_IDENTITY = { method: 'PUT', path: '/api/menu/menuSaleItem' } as const;
 const SALE_ITEM_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menuSaleItem/{id}' } as const;
 const SALE_ITEM_DELETE_IDENTITY = { method: 'DELETE', path: '/api/menu/menuSaleItem/{id}' } as const;
+const SALE_ITEM_SEARCH_IDENTITY = { method: 'GET', path: '/api/menu/menuSaleItems/search' } as const;
 
 test.describe('商品 endpoint', () => {
   test(
@@ -250,6 +251,22 @@ test.describe('商品 endpoint', () => {
       );
 
       expect(resourceRegistry.markCleaned('saleItem', resource.id)).toBe(true);
+    },
+  );
+
+  test(
+    toEndpointTitle(SALE_ITEM_SEARCH_IDENTITY.method, SALE_ITEM_SEARCH_IDENTITY.path, '空关键字分页边界应返回稳定响应'),
+    async ({ saleItemApi }) => {
+      const body = await test.step(
+        toEndpointTitle(SALE_ITEM_SEARCH_IDENTITY.method, SALE_ITEM_SEARCH_IDENTITY.path, '使用空关键字和 pageSize=1 搜索商品并校验响应'),
+        async () =>
+          await expectApiOk(
+            await saleItemApi.searchSaleItems({ keyword: '', page: 1, pageSize: 1 }),
+            SALE_ITEM_SEARCH_IDENTITY,
+          ),
+      );
+
+      expect(body.data).not.toBeUndefined();
     },
   );
 });

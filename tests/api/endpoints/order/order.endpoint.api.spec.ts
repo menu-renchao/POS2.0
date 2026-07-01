@@ -94,6 +94,27 @@ test.describe('订单管理 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(ORDER_LIST_IDENTITY.method, ORDER_LIST_IDENTITY.path, '分页边界 pageSize=1 应返回稳定响应'),
+    async ({ orderApi }) => {
+      const body = await test.step(
+        toEndpointTitle(ORDER_LIST_IDENTITY.method, ORDER_LIST_IDENTITY.path, '使用 pageSize=1 查询订单列表并校验响应'),
+        async () =>
+          await expectApiOk(
+            await orderApi.listOrders(
+              buildDefaultOrderListQuery(new Date(), {
+                page: 1,
+                pageSize: 1,
+              }),
+            ),
+            ORDER_LIST_IDENTITY,
+          ),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
+  test(
     toEndpointTitle(ORDER_VOID_IDENTITY.method, ORDER_VOID_IDENTITY.path, '应能作废本次创建的订单'),
     async ({ endpointResources, orderApi, resourceRegistry }) => {
       const order = await test.step(

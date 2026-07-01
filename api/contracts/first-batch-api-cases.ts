@@ -92,6 +92,15 @@ const NEGATIVE_CASE_KEYS = new Set<string>([
   'POST /api/spu/stockOperation',
 ]);
 
+const BOUNDARY_CASE_KEYS = new Set<string>([
+  'GET /api/menu/menus',
+  'GET /api/order/list',
+  'GET /api/tax/list',
+  'GET /api/discount/list',
+  'GET /api/admin/role/list',
+  'GET /api/menu/menuSaleItems/search',
+]);
+
 const KNOWN_ISSUES_BY_KEY = new Map<string, string>([
   ['POST /api/discount/save', '空对象会返回 code=0 并创建折扣，暂不放入普通异常回归。'],
   ['DELETE /api/menu/menuSaleItem/{id}', '删除不存在商品会返回 code=0 success，暂不放入普通异常回归。'],
@@ -876,7 +885,8 @@ const firstBatchApiCaseInputs: FirstBatchApiCaseInput[] = [
     group: '商品管理',
     coverage: 'positive-business',
     specFile: API_SPEC_FILES.saleItem,
-    endpointStatus: 'planned',
+    endpointStatus: 'covered',
+    endpointSpecFile: API_SPEC_FILES.endpointSaleItem,
     riskNote: '商品搜索是配置入口，需要覆盖稳定搜索条件。',
   },
   {
@@ -1154,7 +1164,7 @@ function withCaseCoverage(apiCase: FirstBatchApiCaseInput): FirstBatchApiCase {
     caseCoverage: {
       positive: apiCase.coverage === 'positive-crud' || apiCase.coverage === 'positive-business',
       negative: NEGATIVE_CASE_KEYS.has(key),
-      boundary: false,
+      boundary: BOUNDARY_CASE_KEYS.has(key),
       ...(knownIssue === undefined ? {} : { knownIssue }),
     },
   };

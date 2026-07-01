@@ -77,7 +77,7 @@ test.describe('首批接口覆盖矩阵', () => {
   test('已覆盖 endpoint 应声明存在的 endpoint spec 文件', () => {
     const coveredCases = firstBatchApiCases.filter((apiCase) => apiCase.endpointStatus === 'covered');
 
-    expect(coveredCases).toHaveLength(35);
+    expect(coveredCases).toHaveLength(36);
     for (const apiCase of coveredCases) {
       expect(apiCase.endpointSpecFile, `${apiCase.method} ${apiCase.path}`).toBeDefined();
       expect(existsSync(apiCase.endpointSpecFile!), `${apiCase.endpointSpecFile} 应存在`).toBe(true);
@@ -104,6 +104,23 @@ test.describe('首批接口覆盖矩阵', () => {
         knownIssue: expect.stringContaining('不存在商品'),
       },
     });
+  });
+
+  test('首批查询类边界用例应沉淀到矩阵', () => {
+    for (const [method, path] of [
+      ['GET', '/api/menu/menus'],
+      ['GET', '/api/order/list'],
+      ['GET', '/api/tax/list'],
+      ['GET', '/api/discount/list'],
+      ['GET', '/api/admin/role/list'],
+      ['GET', '/api/menu/menuSaleItems/search'],
+    ] as const) {
+      expect(findApiCase(method, path)).toMatchObject({
+        caseCoverage: {
+          boundary: true,
+        },
+      });
+    }
   });
 
   test('首批抓包接口应按真实业务可执行性更新覆盖等级', () => {

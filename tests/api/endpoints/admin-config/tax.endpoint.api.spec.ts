@@ -25,6 +25,26 @@ test.describe('税费 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(TAX_LIST_IDENTITY.method, TAX_LIST_IDENTITY.path, '分页边界 pageSize=1 应返回可解析列表'),
+    async ({ adminConfigApi }) => {
+      const data = await test.step(
+        toEndpointTitle(TAX_LIST_IDENTITY.method, TAX_LIST_IDENTITY.path, '使用 pageSize=1 查询税费列表并校验响应'),
+        async () => {
+          const body = await expectApiOk(
+            await adminConfigApi.listTaxes({ page: 1, pageSize: 1 }),
+            TAX_LIST_IDENTITY,
+          );
+          const listData = extractEndpointListData(body.data, TAX_LIST_IDENTITY);
+
+          return expectArrayData({ ...body, data: listData }, TAX_LIST_IDENTITY);
+        },
+      );
+
+      expect(Array.isArray(data)).toBe(true);
+    },
+  );
+
+  test(
     toEndpointTitle(TAX_SAVE_IDENTITY.method, TAX_SAVE_IDENTITY.path, '应能保存税费'),
     async ({ endpointResources }) => {
       const resource = await test.step(

@@ -31,6 +31,26 @@ test.describe('菜单 endpoint', () => {
   );
 
   test(
+    toEndpointTitle(MENU_LIST_IDENTITY.method, MENU_LIST_IDENTITY.path, '分页边界 pageSize=1 应返回可解析列表'),
+    async ({ menuApi }) => {
+      const data = await test.step(
+        toEndpointTitle(MENU_LIST_IDENTITY.method, MENU_LIST_IDENTITY.path, '使用 pageSize=1 查询菜单列表并校验响应'),
+        async () => {
+          const body = await expectApiOk(
+            await menuApi.listMenus({ page: 1, pageSize: 1 }),
+            MENU_LIST_IDENTITY,
+          );
+          const listData = extractEndpointListData(body.data, MENU_LIST_IDENTITY);
+
+          return expectArrayData({ ...body, data: listData }, MENU_LIST_IDENTITY);
+        },
+      );
+
+      expect(Array.isArray(data)).toBe(true);
+    },
+  );
+
+  test(
     toEndpointTitle(MENU_CREATE_IDENTITY.method, MENU_CREATE_IDENTITY.path, '应能创建菜单'),
     async ({ endpointResources }) => {
       const resource = await test.step(
