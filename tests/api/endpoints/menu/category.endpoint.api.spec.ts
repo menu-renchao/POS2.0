@@ -6,6 +6,7 @@ const CATEGORY_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menuCategory
 const CATEGORY_UPDATE_IDENTITY = { method: 'PUT', path: '/api/menu/menuCategory' } as const;
 const CATEGORY_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menuCategory/{id}' } as const;
 const CATEGORY_DELETE_IDENTITY = { method: 'DELETE', path: '/api/menu/menuCategory/{id}' } as const;
+const CATEGORY_SEARCH_BY_NAME_IDENTITY = { method: 'GET', path: '/api/menu/menuCategorys/searchByName' } as const;
 
 test.describe('分类 endpoint', () => {
   test(
@@ -26,6 +27,37 @@ test.describe('分类 endpoint', () => {
 
       expect(resource.id).not.toBeUndefined();
       expect(resource.name).toBe((resource.request as { name?: string }).name);
+    },
+  );
+
+  test(
+    toEndpointTitle(CATEGORY_SEARCH_BY_NAME_IDENTITY.method, CATEGORY_SEARCH_BY_NAME_IDENTITY.path, '应能按名称搜索菜单分类'),
+    async ({ menuApi, endpointResources }) => {
+      const menuResource = await test.step(
+        toEndpointTitle(CATEGORY_CREATE_IDENTITY.method, CATEGORY_CREATE_IDENTITY.path, '先创建菜单用于分类搜索'),
+        async () => await endpointResources.createMenuResource(),
+      );
+      const menuGroupResource = await test.step(
+        toEndpointTitle(CATEGORY_CREATE_IDENTITY.method, CATEGORY_CREATE_IDENTITY.path, '先创建菜单组用于分类搜索'),
+        async () => await endpointResources.createMenuGroupResource(menuResource.id),
+      );
+      const categoryResource = await test.step(
+        toEndpointTitle(CATEGORY_CREATE_IDENTITY.method, CATEGORY_CREATE_IDENTITY.path, '先创建分类用于名称搜索'),
+        async () => await endpointResources.createCategoryResource(menuResource.id, menuGroupResource.id),
+      );
+      const body = await test.step(
+        toEndpointTitle(CATEGORY_SEARCH_BY_NAME_IDENTITY.method, CATEGORY_SEARCH_BY_NAME_IDENTITY.path, '按分类名称搜索并校验响应'),
+        async () =>
+          await expectApiOk(
+            await menuApi.searchMenuCategoriesByName({
+              menuId: menuResource.id,
+              name: categoryResource.name,
+            }),
+            CATEGORY_SEARCH_BY_NAME_IDENTITY,
+          ),
+      );
+
+      expect(body.data).not.toBeUndefined();
     },
   );
 

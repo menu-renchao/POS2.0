@@ -2,12 +2,33 @@ import { expect, test } from '../../support/endpoint-fixture';
 import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
+const MENU_GROUP_LIST_IDENTITY = { method: 'GET', path: '/api/menu/group/list' } as const;
 const MENU_GROUP_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menuGroup' } as const;
 const MENU_GROUP_UPDATE_IDENTITY = { method: 'PUT', path: '/api/menu/menuGroup' } as const;
 const MENU_GROUP_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menuGroup/{id}' } as const;
 const MENU_GROUP_DELETE_IDENTITY = { method: 'DELETE', path: '/api/menu/menuGroup/{id}' } as const;
 
 test.describe('菜单组 endpoint', () => {
+  test(
+    toEndpointTitle(MENU_GROUP_LIST_IDENTITY.method, MENU_GROUP_LIST_IDENTITY.path, '应能查询菜单组基础列表'),
+    async ({ menuApi, endpointResources }) => {
+      const menuResource = await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建菜单用于菜单组列表查询'),
+        async () => await endpointResources.createMenuResource(),
+      );
+      await test.step(
+        toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '先创建菜单组用于列表查询'),
+        async () => await endpointResources.createMenuGroupResource(menuResource.id),
+      );
+      const body = await test.step(
+        toEndpointTitle(MENU_GROUP_LIST_IDENTITY.method, MENU_GROUP_LIST_IDENTITY.path, '按菜单 ID 查询菜单组基础列表并校验响应'),
+        async () => await expectApiOk(await menuApi.listMenuGroupEntries({ menuId: menuResource.id }), MENU_GROUP_LIST_IDENTITY),
+      );
+
+      expect(body.data).not.toBeUndefined();
+    },
+  );
+
   test(
     toEndpointTitle(MENU_GROUP_CREATE_IDENTITY.method, MENU_GROUP_CREATE_IDENTITY.path, '应能创建菜单组'),
     async ({ endpointResources }) => {

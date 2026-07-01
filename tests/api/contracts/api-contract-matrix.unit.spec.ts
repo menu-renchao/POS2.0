@@ -77,7 +77,7 @@ test.describe('首批接口覆盖矩阵', () => {
   test('已覆盖 endpoint 应声明存在的 endpoint spec 文件', () => {
     const coveredCases = firstBatchApiCases.filter((apiCase) => apiCase.endpointStatus === 'covered');
 
-    expect(coveredCases).toHaveLength(36);
+    expect(coveredCases).toHaveLength(41);
     for (const apiCase of coveredCases) {
       expect(apiCase.endpointSpecFile, `${apiCase.method} ${apiCase.path}`).toBeDefined();
       expect(existsSync(apiCase.endpointSpecFile!), `${apiCase.endpointSpecFile} 应存在`).toBe(true);
@@ -119,6 +119,21 @@ test.describe('首批接口覆盖矩阵', () => {
         caseCoverage: {
           boundary: true,
         },
+      });
+    }
+  });
+
+  test('首批可执行查询类计划迁移接口应拆出 endpoint 单接口用例', () => {
+    for (const [method, path, endpointSpecFile] of [
+      ['GET', '/api/search/menu', API_SPEC_FILES.endpointMenu],
+      ['GET', '/api/menu/group/list', API_SPEC_FILES.endpointMenuGroup],
+      ['GET', '/api/menu/menuCategorys/searchByName', API_SPEC_FILES.endpointCategory],
+      ['GET', '/api/menu/item/fetchSaleItem', API_SPEC_FILES.endpointSaleItem],
+      ['GET', '/api/menu/menuSaleItems/searchByName', API_SPEC_FILES.endpointSaleItem],
+    ] as const) {
+      expect(findApiCase(method, path)).toMatchObject({
+        endpointStatus: 'covered',
+        endpointSpecFile,
       });
     }
   });

@@ -5,6 +5,7 @@ import { extractEndpointListData } from '../../support/endpoint-list-data';
 import { toEndpointTitle } from '../../support/endpoint-case';
 
 const MENU_LIST_IDENTITY = { method: 'GET', path: '/api/menu/menus' } as const;
+const MENU_SEARCH_IDENTITY = { method: 'GET', path: '/api/search/menu' } as const;
 const MENU_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menu' } as const;
 const MENU_UPDATE_IDENTITY = { method: 'PUT', path: '/api/menu/menu' } as const;
 const MENU_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menu/{id}' } as const;
@@ -47,6 +48,18 @@ test.describe('菜单 endpoint', () => {
       );
 
       expect(Array.isArray(data)).toBe(true);
+    },
+  );
+
+  test(
+    toEndpointTitle(MENU_SEARCH_IDENTITY.method, MENU_SEARCH_IDENTITY.path, '应能执行菜单全局搜索'),
+    async ({ menuApi }) => {
+      const body = await test.step(
+        toEndpointTitle(MENU_SEARCH_IDENTITY.method, MENU_SEARCH_IDENTITY.path, '使用稳定关键字搜索菜单并校验响应'),
+        async () => await expectApiOk(await menuApi.searchMenu({ name: 'P', limit: 5 }), MENU_SEARCH_IDENTITY),
+      );
+
+      expect(body.data).not.toBeUndefined();
     },
   );
 

@@ -207,7 +207,8 @@ const firstBatchApiCaseInputs: FirstBatchApiCaseInput[] = [
     group: '菜单全局搜索',
     coverage: 'positive-business',
     specFile: API_SPEC_FILES.menuCatalog,
-    endpointStatus: 'planned',
+    endpointStatus: 'covered',
+    endpointSpecFile: API_SPEC_FILES.endpointMenu,
     riskNote: '全局搜索依赖菜单索引数据，优先覆盖可搜索样例和响应结构。',
   },
   {
@@ -216,7 +217,8 @@ const firstBatchApiCaseInputs: FirstBatchApiCaseInput[] = [
     group: '菜单组管理',
     coverage: 'positive-business',
     specFile: API_SPEC_FILES.menuCatalog,
-    endpointStatus: 'planned',
+    endpointStatus: 'covered',
+    endpointSpecFile: API_SPEC_FILES.endpointMenuGroup,
     riskNote: '菜单组列表是菜单配置导航入口，需要覆盖查询契约。',
   },
   {
@@ -671,7 +673,8 @@ const firstBatchApiCaseInputs: FirstBatchApiCaseInput[] = [
     group: '分类管理',
     coverage: 'positive-business',
     specFile: API_SPEC_FILES.menuCatalog,
-    endpointStatus: 'planned',
+    endpointStatus: 'covered',
+    endpointSpecFile: API_SPEC_FILES.endpointCategory,
     riskNote: '按名称查分类依赖稳定样例名称，需要覆盖搜索契约。',
   },
   {
@@ -719,7 +722,8 @@ const firstBatchApiCaseInputs: FirstBatchApiCaseInput[] = [
     group: '商品管理',
     coverage: 'positive-business',
     specFile: API_SPEC_FILES.saleItem,
-    endpointStatus: 'planned',
+    endpointStatus: 'covered',
+    endpointSpecFile: API_SPEC_FILES.endpointSaleItem,
     riskNote: '商品详情读取是商品链路核心查询，需要覆盖主要字段。',
   },
   {
@@ -895,7 +899,8 @@ const firstBatchApiCaseInputs: FirstBatchApiCaseInput[] = [
     group: '商品管理',
     coverage: 'positive-business',
     specFile: API_SPEC_FILES.saleItem,
-    endpointStatus: 'planned',
+    endpointStatus: 'covered',
+    endpointSpecFile: API_SPEC_FILES.endpointSaleItem,
     riskNote: '按名称查商品依赖样例商品名称，需要覆盖返回结构。',
   },
   {
