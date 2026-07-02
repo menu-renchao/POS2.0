@@ -12,11 +12,11 @@ import {
   buildMenuRequest,
   buildSaleItemRequest,
 } from '../../../test-data/api/menu-api-data';
-import { registerMenuHardDeleteAfterEach } from '../support/menu-hard-delete-cleanup';
+import { registerMenuHardDeleteAfterAll } from '../support/menu-hard-delete-cleanup';
 
 type SaleItemResourceType = 'menu' | 'menuGroup' | 'menuCategory' | 'saleItem';
 
-registerMenuHardDeleteAfterEach(test);
+registerMenuHardDeleteAfterAll(test);
 
 test.describe('商品和 SPU 库存接口', () => {
   test('应已登记商品和 SPU 接口覆盖入口', () => {

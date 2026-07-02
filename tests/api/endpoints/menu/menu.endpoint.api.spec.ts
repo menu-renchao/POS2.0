@@ -3,7 +3,7 @@ import { DEFAULT_MENU_PRODUCT, buildMenuRequest } from '../../../../test-data/ap
 import { expectApiOk, expectApiRejected, expectArrayData } from '../../support/endpoint-assertions';
 import { extractEndpointListData } from '../../support/endpoint-list-data';
 import { toEndpointTitle } from '../../support/endpoint-case';
-import { registerMenuHardDeleteAfterEach } from '../../support/menu-hard-delete-cleanup';
+import { registerMenuHardDeleteAfterAll } from '../../support/menu-hard-delete-cleanup';
 
 const GLOBAL_OPTION_FETCH_IDENTITY = { method: 'GET', path: '/api/menu/fetchGlobalOption' } as const;
 const GLOBAL_OPTION_LIST_IDENTITY = { method: 'GET', path: '/api/menu/listGlobalOption' } as const;
@@ -15,7 +15,7 @@ const MENU_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menu' } as const
 const MENU_UPDATE_IDENTITY = { method: 'PUT', path: '/api/menu/menu' } as const;
 const MENU_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menu/{id}' } as const;
 
-registerMenuHardDeleteAfterEach(test);
+registerMenuHardDeleteAfterAll(test);
 
 test.describe('菜单 endpoint', () => {
   test(

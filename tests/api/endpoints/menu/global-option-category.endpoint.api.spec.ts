@@ -2,7 +2,7 @@ import { expect, test } from '../../support/endpoint-fixture';
 import { buildGlobalOptionCategoryRequest } from '../../../../test-data/api/menu-api-data';
 import { expectApiOk } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
-import { registerMenuHardDeleteAfterEach } from '../../support/menu-hard-delete-cleanup';
+import { registerMenuHardDeleteAfterAll } from '../../support/menu-hard-delete-cleanup';
 import type { EndpointResources } from '../../support/endpoint-resources';
 
 const MENU_LIST_IDENTITY = { method: 'GET', path: '/api/menu/menus' } as const;
@@ -29,7 +29,7 @@ const GLOBAL_OPTION_CATEGORY_DETAIL_IDENTITY = {
   path: '/api/menu/globalOptionCategory/{id}',
 } as const;
 
-registerMenuHardDeleteAfterEach(test);
+registerMenuHardDeleteAfterAll(test);
 
 test.describe('全局选项分类 endpoint', () => {
   test(

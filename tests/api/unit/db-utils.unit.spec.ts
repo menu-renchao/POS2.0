@@ -46,4 +46,19 @@ test.describe('DB 工具类', () => {
 
     expect(db.buildInvocation('SELECT 1;').command).toBe('mysql');
   });
+
+  test('MysqlCliDb 未指定 mysqlBin 时应提供 Windows mysql.exe 兜底候选', () => {
+    const db = new MysqlCliDb({
+      host: '192.168.0.182',
+      port: 22108,
+      database: 'kpos',
+      user: 'root',
+      password: 'N0mur@4$99!',
+    });
+
+    const commands = db.buildInvocationCandidates('SELECT 1;').map((invocation) => invocation.command);
+
+    expect(commands).toContain('mysql');
+    expect(commands).toContain('C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe');
+  });
 });

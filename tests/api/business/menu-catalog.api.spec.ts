@@ -10,7 +10,7 @@ import {
   buildMenuGroupRequest,
   buildMenuRequest,
 } from '../../../test-data/api/menu-api-data';
-import { registerMenuHardDeleteAfterEach } from '../support/menu-hard-delete-cleanup';
+import { registerMenuHardDeleteAfterAll } from '../support/menu-hard-delete-cleanup';
 
 type MenuCatalogResourceType =
   | 'menu'
@@ -19,7 +19,7 @@ type MenuCatalogResourceType =
   | 'globalOptionCategory'
   | 'menuGlobalOption';
 
-registerMenuHardDeleteAfterEach(test);
+registerMenuHardDeleteAfterAll(test);
 
 test.describe('菜单目录接口', () => {
   test('应能查询菜单目录只读入口并校验响应信封', async ({ menuApi }) => {

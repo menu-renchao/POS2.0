@@ -1,7 +1,7 @@
 import { expect, test } from '../../support/endpoint-fixture';
 import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
-import { registerMenuHardDeleteAfterEach } from '../../support/menu-hard-delete-cleanup';
+import { registerMenuHardDeleteAfterAll } from '../../support/menu-hard-delete-cleanup';
 import type { EndpointResources } from '../../support/endpoint-resources';
 
 const CATEGORY_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menuCategory' } as const;
@@ -15,7 +15,7 @@ const MENU_CATEGORY_LIST_IDENTITY = { method: 'GET', path: '/api/menu/menu/{menu
 const CATEGORY_QUICK_EDIT_IDENTITY = { method: 'PUT', path: '/api/menu/menuCategory/quickEdit' } as const;
 const CATEGORY_SEARCH_BY_NAME_IDENTITY = { method: 'GET', path: '/api/menu/menuCategorys/searchByName' } as const;
 
-registerMenuHardDeleteAfterEach(test);
+registerMenuHardDeleteAfterAll(test);
 
 test.describe('分类 endpoint', () => {
   test(

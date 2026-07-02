@@ -1,5 +1,4 @@
-import type { ApiConfig } from '../../../api/core/api-config';
-import type { ResourceRegistry } from '../../../api/core/resource-registry';
+import { loadApiConfig, type ApiConfig } from '../../../api/core/api-config';
 import { MysqlCliDb, type MysqlCliConfig } from '../../../utils/db';
 
 const DEFAULT_DB_PORT = 22108;
@@ -58,38 +57,21 @@ export async function hardDeleteSoftDeletedMenuData(
 }
 
 type ApiHookTest = {
-  afterEach: (hook: (args: MenuHardDeleteAfterTestArgs) => Promise<void>) => void;
+  afterAll: (hook: () => Promise<void>) => void;
   step: <T>(title: string, body: () => T | Promise<T>) => Promise<T>;
 };
 
-type MenuHardDeleteAfterTestArgs = {
-  apiConfig: ApiConfig;
-  resourceRegistry: Pick<ResourceRegistry, 'cleanupAll'>;
-};
-
-export function registerMenuHardDeleteAfterEach(testApi: ApiHookTest): void {
-  testApi.afterEach(async ({ apiConfig, resourceRegistry }) => {
-    await testApi.step('清理菜单接口测试数据', async () => {
-      await cleanupMenuResourcesAfterTest({ apiConfig, resourceRegistry });
+export function registerMenuHardDeleteAfterAll(testApi: ApiHookTest): void {
+  testApi.afterAll(async () => {
+    await testApi.step('硬删除菜单软删除测试数据', async () => {
+      await cleanupMenuResourcesAfterFlow(loadApiConfig());
     });
   });
 }
 
-export async function cleanupMenuResourcesAfterTest(
-  args: MenuHardDeleteAfterTestArgs,
+export async function cleanupMenuResourcesAfterFlow(
+  apiConfig: ApiConfig,
   hardDelete: (apiConfig: ApiConfig) => Promise<void> = hardDeleteSoftDeletedMenuData,
 ): Promise<void> {
-  const cleanupResult = await args.resourceRegistry.cleanupAll();
-
-  if (cleanupResult.errors.length > 0) {
-    const errorSummary = cleanupResult.errors
-      .map(({ resource, error }) => `${resource.type}:${String(resource.id)} ${error.message}`)
-      .join('; ');
-
-    console.warn(
-      `API resource cleanup finished with ${cleanupResult.errors.length} error(s): ${errorSummary}`,
-    );
-  }
-
-  await hardDelete(args.apiConfig);
+  await hardDelete(apiConfig);
 }

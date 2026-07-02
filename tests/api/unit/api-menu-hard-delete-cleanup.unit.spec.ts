@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { MysqlCliDb } from '../../../utils/db';
 import {
   MENU_HARD_DELETE_SQL,
-  cleanupMenuResourcesAfterTest,
+  cleanupMenuResourcesAfterFlow,
   resolveMenuHardDeleteConfig,
 } from '../support/menu-hard-delete-cleanup';
 
@@ -64,35 +64,25 @@ test.describe('菜单硬删除清理配置', () => {
     ]);
   });
 
-  test('菜单用例后置清理应先执行接口软删除再执行数据库硬删除', async () => {
+  test('菜单流程后置清理应只执行数据库硬删除一次', async () => {
     const calls: string[] = [];
-    const resourceRegistry = {
-      cleanupAll: async () => {
-        calls.push('soft-cleanup');
 
-        return { cleaned: [], errors: [] };
-      },
-    };
-
-    await cleanupMenuResourcesAfterTest(
+    await cleanupMenuResourcesAfterFlow(
       {
-        apiConfig: {
-          baseURL: 'http://192.168.0.182:22080/kpos',
-          auth: {
-            mode: 'apiLogin',
-            clientSn: 'device001',
-            clientType: '0',
-            staffPasscode: '11',
-          },
-          testPrefix: 'AT',
+        baseURL: 'http://192.168.0.182:22080/kpos',
+        auth: {
+          mode: 'apiLogin',
+          clientSn: 'device001',
+          clientType: '0',
+          staffPasscode: '11',
         },
-        resourceRegistry,
+        testPrefix: 'AT',
       },
       async () => {
         calls.push('hard-delete');
       },
     );
 
-    expect(calls).toEqual(['soft-cleanup', 'hard-delete']);
+    expect(calls).toEqual(['hard-delete']);
   });
 });
