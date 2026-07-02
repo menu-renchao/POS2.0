@@ -29,6 +29,12 @@ test.describe('API 数据预置服务', () => {
           update: expect.any(Function),
           delete: expect.any(Function),
         }),
+        charge: expect.objectContaining({
+          create: expect.any(Function),
+          read: expect.any(Function),
+          update: expect.any(Function),
+          delete: expect.any(Function),
+        }),
         menu: expect.objectContaining({
           create: expect.any(Function),
           read: expect.any(Function),
@@ -88,6 +94,54 @@ test.describe('API 数据预置服务', () => {
     });
     expect(adminConfig.payloads.deleteTax[0]).toEqual({ taxId: 1001 });
     expect(resourceRegistry.has('tax', 1001)).toBe(false);
+  });
+
+  test('加收 create/read/update/delete 应调用后台配置接口并登记清理', async () => {
+    const adminConfig = createAdminConfigApi();
+    const resourceRegistry = new ResourceRegistry();
+    const apiSetup = createApiSetup({
+      adminConfigApi: adminConfig.api as AdminConfigApiClient,
+      resourceRegistry,
+    });
+
+    const charge = await apiSetup.charge.create({
+      name: 'AT_CHG_A',
+      rate: 3.5,
+      rateType: 2,
+      type: 'SERVICE',
+      taxed: true,
+    });
+    const chargeList = await apiSetup.charge.read(charge.id);
+    await apiSetup.charge.update(charge.id, { rate: 4.5, active: false });
+    await apiSetup.charge.delete(charge.id);
+
+    expect(charge.id).toBe(1201);
+    expect(chargeList).toEqual({
+      charge: [{ id: 1201, name: 'AT_CHG_A' }],
+      count: 1,
+    });
+    expect(adminConfig.calls.saveCharge).toBe(2);
+    expect(adminConfig.calls.listCharges).toBe(1);
+    expect(adminConfig.payloads.saveCharge[0]).toEqual({
+      charge: expect.objectContaining({
+        name: 'AT_CHG_A',
+        rate: 3.5,
+        rateType: 2,
+        type: 'SERVICE',
+        taxed: true,
+        active: true,
+      }),
+    });
+    expect(adminConfig.payloads.saveCharge[1]).toEqual({
+      charge: expect.objectContaining({
+        id: 1201,
+        chargeId: 1201,
+        rate: 4.5,
+        active: false,
+      }),
+    });
+    expect(adminConfig.payloads.deleteCharge[0]).toEqual({ chargeId: 1201 });
+    expect(resourceRegistry.has('charge', 1201)).toBe(false);
   });
 
   test('菜单 create/update/delete 应调用菜单接口并按软删除策略清理', async () => {
@@ -180,12 +234,17 @@ function createAdminConfigApi() {
     saveDiscount: 0,
     listDiscounts: 0,
     deleteDiscount: 0,
+    saveCharge: 0,
+    listCharges: 0,
+    deleteCharge: 0,
   };
   const payloads = {
     saveTax: [] as unknown[],
     deleteTax: [] as unknown[],
     saveDiscount: [] as unknown[],
     deleteDiscount: [] as unknown[],
+    saveCharge: [] as unknown[],
+    deleteCharge: [] as unknown[],
   };
 
   return {
@@ -218,6 +277,24 @@ function createAdminConfigApi() {
       deleteDiscount: async (payload: unknown) => {
         calls.deleteDiscount += 1;
         payloads.deleteDiscount.push(payload);
+        return createApiResponse({ code: 0, msg: 'ok' });
+      },
+      saveCharge: async (payload: unknown) => {
+        calls.saveCharge += 1;
+        payloads.saveCharge.push(payload);
+        return createApiResponse({ code: 0, msg: 'ok', data: { id: 1201 } });
+      },
+      listCharges: async () => {
+        calls.listCharges += 1;
+        return createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: { charge: [{ id: 1201, name: 'AT_CHG_A' }], count: 1 },
+        });
+      },
+      deleteCharge: async (payload: unknown) => {
+        calls.deleteCharge += 1;
+        payloads.deleteCharge.push(payload);
         return createApiResponse({ code: 0, msg: 'ok' });
       },
     },

@@ -36,6 +36,39 @@ test.describe('API client 路径工具', () => {
     ]).toHaveLength(6);
   });
 
+  test('后台配置 API client 应使用加收管理 Swagger 路径', async () => {
+    const calls: Array<{ method: string; path: string; options?: unknown }> = [];
+    const request = {
+      get: async (pathValue: string, options?: unknown) => {
+        calls.push({ method: 'GET', path: pathValue, options });
+        return createApiResponse();
+      },
+      post: async (pathValue: string, options?: unknown) => {
+        calls.push({ method: 'POST', path: pathValue, options });
+        return createApiResponse();
+      },
+    };
+    const client = new AdminConfigApiClient(request as never);
+
+    await client.listCharges({ keyword: 'AT_CHG' });
+    await client.saveCharge({ charge: { name: 'AT_CHG' } });
+    await client.deleteCharge({ chargeId: 1201 });
+
+    expect(calls).toEqual([
+      { method: 'GET', path: 'api/charge/list', options: { params: { keyword: 'AT_CHG' } } },
+      {
+        method: 'POST',
+        path: 'api/charge/save',
+        options: { data: { charge: { name: 'AT_CHG' } } },
+      },
+      {
+        method: 'POST',
+        path: 'api/charge/delete',
+        options: { data: { chargeId: 1201 } },
+      },
+    ]);
+  });
+
   test('领域 API client 不应绕过路径转换工具直接请求绝对 API 路径', () => {
     const clientDir = path.join(process.cwd(), 'api', 'clients');
     const clientFiles = readdirSync(clientDir).filter(
@@ -52,3 +85,10 @@ test.describe('API client 路径工具', () => {
     }
   });
 });
+
+function createApiResponse() {
+  return {
+    status: () => 200,
+    json: async () => ({ code: 0, msg: 'ok' }),
+  };
+}

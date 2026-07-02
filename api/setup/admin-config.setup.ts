@@ -2,8 +2,10 @@ import type { AdminConfigApiClient } from '../clients/admin-config-api.client';
 import type { ApiRequestData } from '../clients/client-path';
 import type { ResourceId, ResourceRegistry } from '../core/resource-registry';
 import {
+  buildChargeSetupRequest,
   buildDiscountSetupRequest,
   buildTaxSetupRequest,
+  type ChargeSetupOverrides,
   type DiscountSetupOverrides,
   type TaxSetupOverrides,
 } from '../../test-data/api/admin-config-api-data';
@@ -25,6 +27,13 @@ export type DiscountSetupService = {
   create: (overrides?: DiscountSetupOverrides) => Promise<SetupResource>;
   read: (id: ResourceId) => Promise<unknown>;
   update: (id: ResourceId, overrides: DiscountSetupOverrides) => Promise<SetupResource>;
+  delete: (id: ResourceId) => Promise<void>;
+};
+
+export type ChargeSetupService = {
+  create: (overrides?: ChargeSetupOverrides) => Promise<SetupResource>;
+  read: (id: ResourceId) => Promise<unknown>;
+  update: (id: ResourceId, overrides: ChargeSetupOverrides) => Promise<SetupResource>;
   delete: (id: ResourceId) => Promise<void>;
 };
 
@@ -115,6 +124,47 @@ export function createDiscountSetupService(
   };
 }
 
+export function createChargeSetupService(options: AdminConfigSetupOptions): ChargeSetupService {
+  return {
+    create: async (overrides = {}) => {
+      const request = buildChargeSetupRequest(overrides);
+      const name = String(request.charge.name);
+
+      return await createSetupResource({
+        type: 'charge',
+        name,
+        request,
+        resourceRegistry: options.resourceRegistry,
+        save: () => options.adminConfigApi.saveCharge(request),
+        list: () => options.adminConfigApi.listCharges({ keyword: name }),
+        cleanup: (id) => options.adminConfigApi.deleteCharge({ chargeId: id }),
+      });
+    },
+    read: async (id) => {
+      const body = await expectOkEnvelope(
+        await options.adminConfigApi.listCharges({ chargeId: id, id }),
+      );
+
+      return body.data;
+    },
+    update: async (id, overrides) => {
+      const request = mergeChargeUpdateRequest(id, overrides);
+      const body = await expectOkEnvelope(await options.adminConfigApi.saveCharge(request));
+
+      return {
+        id,
+        name: String(request.charge.name ?? id),
+        request,
+        body,
+      };
+    },
+    delete: async (id) => {
+      await expectOkEnvelope(await options.adminConfigApi.deleteCharge({ chargeId: id }));
+      options.resourceRegistry.markCleaned('charge', id);
+    },
+  };
+}
+
 function mergeTaxUpdateRequest(id: ResourceId, overrides: TaxSetupOverrides): ApiRequestData & { tax: Record<string, unknown> } {
   const request = buildTaxSetupRequest(overrides);
 
@@ -124,6 +174,22 @@ function mergeTaxUpdateRequest(id: ResourceId, overrides: TaxSetupOverrides): Ap
       ...overrides,
       id,
       taxId: id,
+    },
+  };
+}
+
+function mergeChargeUpdateRequest(
+  id: ResourceId,
+  overrides: ChargeSetupOverrides,
+): ApiRequestData & { charge: Record<string, unknown> } {
+  const request = buildChargeSetupRequest(overrides);
+
+  return {
+    charge: {
+      ...request.charge,
+      ...overrides,
+      id,
+      chargeId: id,
     },
   };
 }

@@ -90,6 +90,33 @@ export class AdminConfigApiClient {
     return this.post('/api/discount/delete', data);
   }
 
+  /**
+   * HTTP method: GET；Swagger 原始 path：`/api/charge/list`。
+   * 用途：查询附加费列表。
+   * 关键参数：`params` 传递关键字或附加费过滤条件。
+   */
+  listCharges(params?: ApiQueryParams): Promise<APIResponse> {
+    return this.get('/api/charge/list', params);
+  }
+
+  /**
+   * HTTP method: POST；Swagger 原始 path：`/api/charge/save`。
+   * 用途：保存附加费配置。
+   * 关键参数：`data.charge` 传递附加费名称、费率、类型、触发方式和附加费 ID。
+   */
+  saveCharge(data: ApiRequestData): Promise<APIResponse> {
+    return this.post('/api/charge/save', data);
+  }
+
+  /**
+   * HTTP method: POST；Swagger 原始 path：`/api/charge/delete`。
+   * 用途：删除附加费配置。
+   * 关键参数：`data.chargeId` 传递附加费 ID。
+   */
+  deleteCharge(data: ApiRequestData): Promise<APIResponse> {
+    return this.post('/api/charge/delete', data);
+  }
+
   private get(swaggerPath: string, params?: ApiQueryParams): Promise<APIResponse> {
     return this.request.get(toApiClientPath(swaggerPath), { params: toRequestParams(params) });
   }

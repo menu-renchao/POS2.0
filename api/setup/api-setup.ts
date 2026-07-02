@@ -3,8 +3,10 @@ import type { MenuApiClient } from '../clients/menu-api.client';
 import type { SaleItemApiClient } from '../clients/sale-item-api.client';
 import type { ResourceRegistry } from '../core/resource-registry';
 import {
+  createChargeSetupService,
   createDiscountSetupService,
   createTaxSetupService,
+  type ChargeSetupService,
   type DiscountSetupService,
   type TaxSetupService,
 } from './admin-config.setup';
@@ -29,6 +31,7 @@ export type ApiSetupFactoryOptions = {
 export type ApiSetup = {
   tax: TaxSetupService;
   discount: DiscountSetupService;
+  charge: ChargeSetupService;
   menu: MenuSetupService;
   menuGroup: MenuGroupSetupService;
   category: CategorySetupService;
@@ -39,6 +42,7 @@ export function createApiSetup(options: ApiSetupFactoryOptions): ApiSetup {
   return {
     tax: createTaxSetupService(options),
     discount: createDiscountSetupService(options),
+    charge: createChargeSetupService(options),
     menu: createMenuSetupService(options),
     menuGroup: createMenuGroupSetupService(options),
     category: createCategorySetupService(options),
