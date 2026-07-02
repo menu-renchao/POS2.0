@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 import { appConfig } from './test-data/env';
 
+const posClientHeaders = {
+  'x-client-sn': 'device001',
+  'x-client-type': '0',
+};
+
 export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
@@ -38,6 +43,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chrome',
+        extraHTTPHeaders: posClientHeaders,
         viewport: { width: 1920, height: 1080 },
         headless: !!process.env.CI,
       },
@@ -55,6 +61,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chrome',
+        extraHTTPHeaders: posClientHeaders,
         viewport: { width: 1920, height: 1080 },
         headless: !!process.env.CI,
       },
