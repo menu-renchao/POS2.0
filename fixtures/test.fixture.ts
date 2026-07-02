@@ -1,4 +1,11 @@
 import { test as base } from '@playwright/test';
+import { AdminConfigApiClient } from '../api/clients/admin-config-api.client';
+import { MenuApiClient } from '../api/clients/menu-api.client';
+import { SaleItemApiClient } from '../api/clients/sale-item-api.client';
+import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
+import { createApiRequestContext } from '../api/core/api-context';
+import { ResourceRegistry } from '../api/core/resource-registry';
+import { createApiSetup, type ApiSetup } from '../api/setup/api-setup';
 import { EmployeeLoginPage } from '../pages/employee-login.page';
 import { HomePage } from '../pages/home.page';
 import { LicenseSelectionPage } from '../pages/license-selection.page';
@@ -15,9 +22,50 @@ type AppFixtures = {
   recallPage: RecallPage;
   paymentPage: PaymentPage;
   splitOrderPage: SplitOrderPage;
+  apiConfig: ApiConfig;
+  resourceRegistry: ResourceRegistry;
+  apiSetup: ApiSetup;
 };
 
 export const test = base.extend<AppFixtures>({
+  apiConfig: async ({}, use) => {
+    await use(loadApiConfig());
+  },
+  resourceRegistry: async ({}, use) => {
+    const resourceRegistry = new ResourceRegistry();
+
+    try {
+      await use(resourceRegistry);
+    } finally {
+      const cleanupResult = await resourceRegistry.cleanupAll();
+
+      if (cleanupResult.errors.length > 0) {
+        const errorSummary = cleanupResult.errors
+          .map(({ resource, error }) => `${resource.type}:${String(resource.id)} ${error.message}`)
+          .join('; ');
+
+        console.warn(
+          `UI API setup cleanup finished with ${cleanupResult.errors.length} error(s): ${errorSummary}`,
+        );
+      }
+    }
+  },
+  apiSetup: async ({ apiConfig, resourceRegistry }, use) => {
+    const apiRequest = await createApiRequestContext(apiConfig);
+
+    try {
+      await use(
+        createApiSetup({
+          adminConfigApi: new AdminConfigApiClient(apiRequest),
+          menuApi: new MenuApiClient(apiRequest),
+          saleItemApi: new SaleItemApiClient(apiRequest),
+          resourceRegistry,
+        }),
+      );
+    } finally {
+      await apiRequest.dispose();
+    }
+  },
   employeeLoginPage: async ({ page }, use) => {
     await use(new EmployeeLoginPage(page));
   },

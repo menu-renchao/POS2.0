@@ -8,6 +8,7 @@ import { SpuApiClient } from '../api/clients/spu-api.client';
 import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
 import { createApiRequestContext } from '../api/core/api-context';
 import { ResourceRegistry } from '../api/core/resource-registry';
+import { createApiSetup, type ApiSetup } from '../api/setup/api-setup';
 
 type ApiFixtures = {
   apiConfig: ApiConfig;
@@ -19,6 +20,7 @@ type ApiFixtures = {
   orderApi: OrderApiClient;
   paymentApi: PaymentApiClient;
   adminConfigApi: AdminConfigApiClient;
+  apiSetup: ApiSetup;
 };
 
 export const test = base.extend<ApiFixtures>({
@@ -76,5 +78,18 @@ export const test = base.extend<ApiFixtures>({
   },
   adminConfigApi: async ({ apiRequest }, use) => {
     await use(new AdminConfigApiClient(apiRequest));
+  },
+  apiSetup: async (
+    { adminConfigApi, menuApi, saleItemApi, resourceRegistry },
+    use,
+  ) => {
+    await use(
+      createApiSetup({
+        adminConfigApi,
+        menuApi,
+        saleItemApi,
+        resourceRegistry,
+      }),
+    );
   },
 });
