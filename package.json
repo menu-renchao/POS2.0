@@ -25,6 +25,7 @@
     "@types/node": "^24.6.0",
     "allure-commandline": "^2.38.1",
     "allure-playwright": "^3.6.0",
+    "mysql2": "^3.22.5",
     "typescript": "^5.9.3"
   }
 }

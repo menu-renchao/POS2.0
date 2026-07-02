@@ -1,15 +1,14 @@
 import { loadApiConfig, type ApiConfig } from '../../../api/core/api-config';
-import { MysqlCliDb, type MysqlCliConfig } from '../../../utils/db';
+import { MysqlDb, type MysqlConfig } from '../../../utils/db';
 
 const DEFAULT_DB_PORT = 22108;
 const DEFAULT_DB_NAME = 'kpos';
 const DEFAULT_DB_USER = 'root';
 const DEFAULT_DB_PASSWORD = 'N0mur@4$99!';
-const DEFAULT_MYSQL_BIN = 'mysql';
 
 type EnvSource = Record<string, string | undefined>;
 
-export type MenuHardDeleteConfig = Required<MysqlCliConfig>;
+export type MenuHardDeleteConfig = MysqlConfig;
 
 export const MENU_HARD_DELETE_SQL = [
   'START TRANSACTION;',
@@ -33,7 +32,6 @@ export function resolveMenuHardDeleteConfig(env: EnvSource = process.env): MenuH
     database: DEFAULT_DB_NAME,
     user: DEFAULT_DB_USER,
     password: DEFAULT_DB_PASSWORD,
-    mysqlBin: env.API_DB_MYSQL_BIN?.trim() || DEFAULT_MYSQL_BIN,
   };
 }
 
@@ -53,7 +51,7 @@ export async function hardDeleteSoftDeletedMenuData(
 ): Promise<void> {
   const config = resolveMenuHardDeleteConfigFromApiConfig(apiConfig, env);
 
-  await new MysqlCliDb(config).execute(MENU_HARD_DELETE_SQL, env);
+  await new MysqlDb(config).execute(MENU_HARD_DELETE_SQL);
 }
 
 type ApiHookTest = {
