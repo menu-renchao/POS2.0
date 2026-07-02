@@ -3,6 +3,7 @@ import { buildSaleItemRequest } from '../../../../test-data/api/menu-api-data';
 import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
 import { findResourceIdByName } from '../../support/endpoint-read-model';
+import { registerMenuHardDeleteAfterEach } from '../../support/menu-hard-delete-cleanup';
 import type { EndpointResources } from '../../support/endpoint-resources';
 
 const SALE_ITEM_CREATE_IDENTITY = { method: 'POST', path: '/api/menu/menuSaleItem' } as const;
@@ -25,6 +26,8 @@ const COMBO_SALE_ITEM_LIST_IDENTITY = { method: 'GET', path: '/api/menu/item/lis
 const SALE_ITEM_OPTION_LIST_IDENTITY = { method: 'GET', path: '/api/menu/item/listItemOptions' } as const;
 const SALE_ITEM_SEARCH_IDENTITY = { method: 'GET', path: '/api/menu/menuSaleItems/search' } as const;
 const SALE_ITEM_SEARCH_BY_NAME_IDENTITY = { method: 'GET', path: '/api/menu/menuSaleItems/searchByName' } as const;
+
+registerMenuHardDeleteAfterEach(test);
 
 test.describe('商品 endpoint', () => {
   test(

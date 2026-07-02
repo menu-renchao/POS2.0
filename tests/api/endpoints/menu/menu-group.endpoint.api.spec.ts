@@ -1,6 +1,7 @@
 import { expect, test } from '../../support/endpoint-fixture';
 import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
+import { registerMenuHardDeleteAfterEach } from '../../support/menu-hard-delete-cleanup';
 
 const MENU_GROUP_LIST_IDENTITY = { method: 'GET', path: '/api/menu/group/list' } as const;
 const MENU_GROUP_SALE_ITEM_LIST_IDENTITY = { method: 'GET', path: '/api/menu/group/saleItem/all' } as const;
@@ -11,6 +12,8 @@ const MENU_GROUP_BATCH_DELETE_IDENTITY = { method: 'DELETE', path: '/api/menu/me
 const MENU_GROUP_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menuGroup/{id}' } as const;
 const MENU_GROUP_DELETE_IDENTITY = { method: 'DELETE', path: '/api/menu/menuGroup/{id}' } as const;
 const MENU_GROUP_PAGE_LIST_IDENTITY = { method: 'GET', path: '/api/menu/menuGroups' } as const;
+
+registerMenuHardDeleteAfterEach(test);
 
 test.describe('菜单组 endpoint', () => {
   test(

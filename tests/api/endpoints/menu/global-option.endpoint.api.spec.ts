@@ -2,6 +2,7 @@ import { expect, test } from '../../support/endpoint-fixture';
 import { buildGlobalOptionRequest } from '../../../../test-data/api/menu-api-data';
 import { expectApiOk } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
+import { registerMenuHardDeleteAfterEach } from '../../support/menu-hard-delete-cleanup';
 import type { EndpointResources } from '../../support/endpoint-resources';
 
 const GLOBAL_OPTION_CREATE_IDENTITY = {
@@ -24,6 +25,8 @@ const GLOBAL_OPTION_SEARCH_IDENTITY = {
   method: 'GET',
   path: '/api/menu/menuGlobalOptions/search',
 } as const;
+
+registerMenuHardDeleteAfterEach(test);
 
 test.describe('全局选项 endpoint', () => {
   test(

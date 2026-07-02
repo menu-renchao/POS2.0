@@ -6,6 +6,7 @@ import { expect, test } from '../../support/endpoint-fixture';
 import type { EndpointResource, EndpointResources } from '../../support/endpoint-resources';
 import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
+import { registerMenuHardDeleteAfterEach } from '../../support/menu-hard-delete-cleanup';
 import { parseSpuCodeFromAssignResponse } from '../../support/spu-code';
 
 const SPU_ASSIGN_IDENTITY = { method: 'POST', path: '/api/spu/menuSaleItem/assign' } as const;
@@ -25,6 +26,8 @@ type ResourceIdPair = {
   categoryResource: EndpointResource;
   saleItemResource: EndpointResource;
 };
+
+registerMenuHardDeleteAfterEach(test);
 
 test.describe('SPU 商品 endpoint', () => {
   test(
