@@ -587,7 +587,7 @@ async selectAnyAvailableTable() {
 
 正确方向：
 
-- 统一从 `http://192.168.0.72:22080/kpos/front2/myhome.html` 进入
+- 统一从 `http://192.168.0.72:22080/kpos/front/myhome.html` 进入
 - 通过 UI flow 导航到目标页面
 
 ---

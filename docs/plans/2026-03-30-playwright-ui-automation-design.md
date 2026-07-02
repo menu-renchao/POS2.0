@@ -35,6 +35,6 @@ The target homepage currently exposes stable signals through the document title 
 
 1. The page opens successfully.
 2. The title resolves to `8Pos`.
-3. The URL matches `/kpos/front2/myhome.html`.
+3. The URL matches `/kpos/front/myhome.html`.
 
 This creates a runnable baseline without hardcoding fragile UI selectors before the product exposes stronger semantic hooks.
