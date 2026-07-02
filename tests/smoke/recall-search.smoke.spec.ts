@@ -1,10 +1,8 @@
 import { expect } from '@playwright/test';
-import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import {
   RecallFlow,
 } from '../../flows/recall.flow';
 import { HomeFlow } from '../../flows/home.flow';
-import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { test } from '../../fixtures/test.fixture';
 import { RecallManualSearchTags } from '../../test-data/recall-search-options';
 import { waitUntil } from '../../utils/wait';
@@ -21,14 +19,8 @@ test.describe('Recall 搜索冒烟', () => {
         },
       ],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await new HomeFlow().openHome(homePage);
-
-      if (await licenseSelectionPage.isVisible(10_000)) {
-        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-      }
-
-      const loggedInHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
+    async ({ homePage, employeeLoginPage }) => {
+      const loggedInHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
       const recallPage = await new RecallFlow().openRecallFromHome(loggedInHomePage);
 
       const visibleOrderNumbers = await waitUntil(

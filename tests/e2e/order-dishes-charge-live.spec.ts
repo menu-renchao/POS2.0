@@ -1,7 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { HomeFlow } from '../../flows/home.flow';
-import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
 import { SelectTableFlow } from '../../flows/select-table.flow';
 import { test as appTest } from '../../fixtures/test.fixture';
@@ -10,21 +8,11 @@ appTest.describe('点单加收真实验证', () => {
   appTest(
     '应能在真实环境中执行整单自定义固定金额加收',
     {},
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage }) => {
       const orderDishesFlow = new OrderDishesFlow();
 
       await test.step('从首页正常进入点单页', async () => {
-        await new HomeFlow().openHome(homePage);
-
-        if (await licenseSelectionPage.isVisible(10_000)) {
-          await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-        }
-
-        const readyHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
-          employeeLoginPage,
-          homePage,
-          '11',
-        );
+        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
 
         const selectTablePage = await readyHomePage.clickDineIn();
         const orderDishesPage = await new SelectTableFlow().skipTableSelectionAndEnterOrderDishes(selectTablePage);

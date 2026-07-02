@@ -1,11 +1,9 @@
-import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { HomeFlow } from '../../flows/home.flow';
-import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { test } from '../../fixtures/test.fixture';
 
-test.describe('授权选择与员工登录冒烟', () => {
+test.describe('员工上下文入口冒烟', () => {
   test(
-    '应能通过 License 选择和员工口令登录进入 POS 主页',
+    '应能通过员工口令登录进入 POS 主页',
     {
       tag: ['@smoke'],
       annotation: [
@@ -19,18 +17,8 @@ test.describe('授权选择与员工登录冒烟', () => {
         },
       ],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await new HomeFlow().openHome(homePage);
-
-      if (await licenseSelectionPage.isVisible(10_000)) {
-        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-      }
-
-      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
-        employeeLoginPage,
-        homePage,
-        '11',
-      );
+    async ({ homePage, employeeLoginPage }) => {
+      const loggedInHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
 
       await loggedInHomePage.expectEmployeeReady();
     },

@@ -1,7 +1,5 @@
-import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { HomeFlow } from '../../flows/home.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
-import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { SelectTableFlow } from '../../flows/select-table.flow';
 import { test } from '../../fixtures/test.fixture';
 
@@ -18,18 +16,8 @@ test.describe('点餐冒烟测试', () => {
     {
       tag: ['@smoke'],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await new HomeFlow().openHome(homePage);
-
-      if (await licenseSelectionPage.isVisible(30_000)) {
-        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-      }
-
-      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
-        employeeLoginPage,
-        homePage,
-        '11',
-      );
+    async ({ homePage, employeeLoginPage }) => {
+      const loggedInHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
 
       await loggedInHomePage.expectPrimaryFunctionCardsVisible();
       const selectTablePage = await loggedInHomePage.clickDineIn();

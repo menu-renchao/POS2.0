@@ -1,7 +1,5 @@
 import { expect } from '@playwright/test';
-import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { HomeFlow } from '../../flows/home.flow';
-import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { RecallFlow } from '../../flows/recall.flow';
 import { test } from '../../fixtures/test.fixture';
 
@@ -17,14 +15,8 @@ test.describe('Recall 订单详情冒烟', () => {
         },
       ],
     },
-    async ({ page, homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await new HomeFlow().openHome(homePage);
-
-      if (await licenseSelectionPage.isVisible(10_000)) {
-        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-      }
-
-      const loggedInHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
+    async ({ page, homePage, employeeLoginPage }) => {
+      const loggedInHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
       const recallPage = await new RecallFlow().openRecallFromHome(loggedInHomePage);
 
       const details = await new RecallFlow().viewOrderDetails(recallPage, '1');

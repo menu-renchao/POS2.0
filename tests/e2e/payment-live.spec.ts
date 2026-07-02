@@ -1,8 +1,6 @@
 import { expect } from '@playwright/test';
-import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { PaymentFlow } from '../../flows/payment.flow';
 import { HomeFlow } from '../../flows/home.flow';
-import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
 import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
@@ -11,16 +9,9 @@ import { waitUntil } from '../../utils/wait';
 
 async function enterReadyHomePage(
   homePage: Parameters<typeof test>[0] extends never ? never : any,
-  licenseSelectionPage: any,
   employeeLoginPage: any,
 ) {
-  await new HomeFlow().openHome(homePage);
-
-  if (await licenseSelectionPage.isVisible(10_000)) {
-    await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-  }
-
-  const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
+  const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
   await readyHomePage.expectPrimaryFunctionCardsVisible();
   return readyHomePage;
 }
@@ -48,10 +39,9 @@ test.describe('支付功能验证', () => {
   test(
     '应能从 To Go 进入点单页后完成现金支付',
     {},
-    async ({ page, homePage, licenseSelectionPage, employeeLoginPage }) => {
+    async ({ page, homePage, employeeLoginPage }) => {
       const readyHomePage = await enterReadyHomePage(
         homePage,
-        licenseSelectionPage,
         employeeLoginPage,
       );
       const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
@@ -82,10 +72,9 @@ test.describe('支付功能验证', () => {
   test(
     '应能从 To Go 进入点单页后完成信用卡支付',
     {},
-    async ({ page, homePage, licenseSelectionPage, employeeLoginPage }) => {
+    async ({ page, homePage, employeeLoginPage }) => {
       const readyHomePage = await enterReadyHomePage(
         homePage,
-        licenseSelectionPage,
         employeeLoginPage,
       );
       const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);

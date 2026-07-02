@@ -1,15 +1,12 @@
 import { expect } from '@playwright/test';
-import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { InventoryFlow } from '../../flows/inventory.flow';
 import { HomeFlow } from '../../flows/home.flow';
-import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
 import { RecallFlow } from '../../flows/recall.flow';
 import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import { EmployeeLoginPage } from '../../pages/employee-login.page';
 import { HomePage } from '../../pages/home.page';
-import { LicenseSelectionPage } from '../../pages/license-selection.page';
 import { OrderDishesPage } from '../../pages/order-dishes.page';
 import {
   inventoryDishes,
@@ -21,7 +18,6 @@ import { jiraIssueAnnotation, jiraIssueAnnotations } from '../../utils/jira';
 type AppEntryPages = {
   employeeLoginPage: EmployeeLoginPage;
   homePage: HomePage;
-  licenseSelectionPage: LicenseSelectionPage;
 };
 
 const dish = inventoryDishes.supermanItem4;
@@ -29,15 +25,8 @@ const dish = inventoryDishes.supermanItem4;
 async function enterReadyHome({
   employeeLoginPage,
   homePage,
-  licenseSelectionPage,
 }: AppEntryPages): Promise<HomePage> {
-  await new HomeFlow().openHome(homePage);
-
-  if (await licenseSelectionPage.isVisible(30_000)) {
-    await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-  }
-
-  const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
+  const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
   await readyHomePage.expectPrimaryFunctionCardsVisible();
   return readyHomePage;
 }
@@ -74,9 +63,9 @@ test.describe('库存管理', { tag: ['@py-migrate'] }, () => {
     {
       annotation: jiraIssueAnnotations(['POS-43898', 'POS-43890', 'POS-43889']),
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage }) => {
       let trackedOrderNumber: string | null = null;
-      let currentHomePage = await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      let currentHomePage = await enterReadyHome({ employeeLoginPage, homePage });
       let orderDishesPage = await startInventoryToGoOrder(currentHomePage);
 
       orderDishesPage = await test.step('配置 superman item4 为有限库存 20', async () => {
@@ -136,9 +125,9 @@ test.describe('库存管理', { tag: ['@py-migrate'] }, () => {
     {
       annotation: jiraIssueAnnotations(['POS-43898', 'POS-43890', 'POS-43889']),
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage }) => {
       let trackedOrderNumber: string | null = null;
-      let currentHomePage = await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      let currentHomePage = await enterReadyHome({ employeeLoginPage, homePage });
       let orderDishesPage = await startInventoryToGoOrder(currentHomePage);
 
       orderDishesPage = await test.step('配置 superman item4 为有限库存 20', async () => {
@@ -208,9 +197,9 @@ test.describe('库存管理', { tag: ['@py-migrate'] }, () => {
     {
       annotation: [jiraIssueAnnotation('POS-43891')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage }) => {
       let trackedOrderNumber: string | null = null;
-      let currentHomePage = await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      let currentHomePage = await enterReadyHome({ employeeLoginPage, homePage });
       let orderDishesPage = await startInventoryToGoOrder(currentHomePage);
 
       orderDishesPage = await new InventoryFlow().configureLimitedStock(orderDishesPage, dish.name, 10);
@@ -252,8 +241,8 @@ test.describe('库存管理', { tag: ['@py-migrate'] }, () => {
     {
       annotation: [jiraIssueAnnotation('POS-43892')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await enterReadyHome({ employeeLoginPage, homePage });
       let orderDishesPage = await startInventoryToGoOrder(readyHomePage);
 
       orderDishesPage = await new InventoryFlow().configureLimitedStock(orderDishesPage, dish.name, 2);

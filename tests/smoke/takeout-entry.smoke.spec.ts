@@ -1,6 +1,4 @@
-import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { HomeFlow } from '../../flows/home.flow';
-import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import {
   TakeoutFlow,
 } from '../../flows/takeout.flow';
@@ -18,18 +16,8 @@ test.describe('外带入口跳转冒烟', () => {
         },
       ],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await new HomeFlow().openHome(homePage);
-
-      if (await licenseSelectionPage.isVisible(10_000)) {
-        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-      }
-
-      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
-        employeeLoginPage,
-        homePage,
-        '11',
-      );
+    async ({ homePage, employeeLoginPage }) => {
+      const loggedInHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
 
       await new TakeoutFlow().startToGoOrder(loggedInHomePage);
     },
@@ -46,18 +34,8 @@ test.describe('外带入口跳转冒烟', () => {
         },
       ],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await new HomeFlow().openHome(homePage);
-
-      if (await licenseSelectionPage.isVisible(10_000)) {
-        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-      }
-
-      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
-        employeeLoginPage,
-        homePage,
-        '11',
-      );
+    async ({ homePage, employeeLoginPage }) => {
+      const loggedInHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
 
       await new TakeoutFlow().startPickUpOrder(loggedInHomePage, {
         phoneNumber: '9342219929',
@@ -78,18 +56,8 @@ test.describe('外带入口跳转冒烟', () => {
         },
       ],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await new HomeFlow().openHome(homePage);
-
-      if (await licenseSelectionPage.isVisible(10_000)) {
-        await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-      }
-
-      const loggedInHomePage = await new EmployeeLoginFlow().enterWithEmployeePassword(
-        employeeLoginPage,
-        homePage,
-        '11',
-      );
+    async ({ homePage, employeeLoginPage }) => {
+      const loggedInHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
 
       await new TakeoutFlow().startDeliveryOrder(loggedInHomePage, {
         phoneNumber: '1934221992',

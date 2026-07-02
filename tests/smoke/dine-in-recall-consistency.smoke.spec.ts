@@ -5,7 +5,6 @@ import { OrderDishesFlow } from '../../flows/order-dishes.flow';
 import {
   RecallFlow,
 } from '../../flows/recall.flow';
-import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { SelectTableFlow } from '../../flows/select-table.flow';
 import { SplitOrderFlow } from '../../flows/split-order.flow';
 import { test } from '../../fixtures/test.fixture';
@@ -222,17 +221,9 @@ test.describe('堂食点单后 Recall 校验', () => {
         },
       ],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      await test.step('从首页进入系统并完成堂食点单前置操作', async () => {
-        await new HomeFlow().openHome(homePage);
-
-        if (await licenseSelectionPage.isVisible(30_000)) {
-          await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-        }
-      });
-
+    async ({ homePage, employeeLoginPage }) => {
       const dineInOrderContext = await test.step('使用员工口令进入系统并选择任意空桌的 3 人堂食点单页', async () => {
-        const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
+        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
 
         await readyHomePage.expectPrimaryFunctionCardsVisible();
         const selectTablePage = await readyHomePage.clickDineIn();
@@ -300,19 +291,11 @@ test.describe('堂食点单后 Recall 校验', () => {
         },
       ],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage }) => {
       const splitOrderFlow = new SplitOrderFlow();
 
-      await test.step('从首页进入系统并完成堂食点单前置操作', async () => {
-        await new HomeFlow().openHome(homePage);
-
-        if (await licenseSelectionPage.isVisible(30_000)) {
-          await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-        }
-      });
-
       const dineInOrderContext = await test.step('使用员工口令进入系统并选择任意空桌的 3 人堂食点单页', async () => {
-        const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
+        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
 
         await readyHomePage.expectPrimaryFunctionCardsVisible();
         const selectTablePage = await readyHomePage.clickDineIn();

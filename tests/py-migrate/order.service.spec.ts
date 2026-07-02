@@ -1,7 +1,6 @@
 import { expect } from '@playwright/test';
 import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { HomeFlow } from '../../flows/home.flow';
-import { LicenseSelectionFlow } from '../../flows/license-selection.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
 import { PaymentFlow } from '../../flows/payment.flow';
 import { RecallFlow } from '../../flows/recall.flow';
@@ -12,7 +11,6 @@ import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import { EmployeeLoginPage } from '../../pages/employee-login.page';
 import { HomePage } from '../../pages/home.page';
-import { LicenseSelectionPage } from '../../pages/license-selection.page';
 import { OrderDishesPage } from '../../pages/order-dishes.page';
 import { RecallPage } from '../../pages/recall.page';
 import {
@@ -38,7 +36,6 @@ import { waitUntil } from '../../utils/wait';
 type AppEntryPages = {
   employeeLoginPage: EmployeeLoginPage;
   homePage: HomePage;
-  licenseSelectionPage: LicenseSelectionPage;
 };
 
 const recallDishRoundTripCases = [
@@ -101,15 +98,8 @@ function countSplitDishRows(
 async function enterReadyHome({
   employeeLoginPage,
   homePage,
-  licenseSelectionPage,
 }: AppEntryPages): Promise<HomePage> {
-  await new HomeFlow().openHome(homePage);
-
-  if (await licenseSelectionPage.isVisible(30_000)) {
-    await new LicenseSelectionFlow().enterWithAvailableLicense(licenseSelectionPage, homePage);
-  }
-
-  const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage);
+  const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
   await readyHomePage.expectPrimaryFunctionCardsVisible();
   return readyHomePage;
 }
@@ -189,9 +179,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
       tag: ['@smoke'],
       annotation: [jiraIssueAnnotation('POS-30543')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('从首页进入系统并完成授权与员工口令前置条件', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('从首页进入系统并建立员工上下文前置条件', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
       const savedOrderContext = await test.step('通过 New Order 不选桌完成堂食点单并保存', async () => {
@@ -307,9 +297,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
       {
         annotation: [jiraIssueAnnotation(testCase.issue)],
       },
-      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      async ({ homePage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
         });
 
         await test.step(testCase.stepTitle, async () => {
@@ -327,9 +317,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
     {
       annotation: [jiraIssueAnnotation('POS-32905')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
       const orderDishesPage = await test.step(
@@ -381,9 +371,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
     {
       annotation: [jiraIssueAnnotation('POS-30575')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
       const orderDishesPage = await test.step('填写 Delivery 客户信息并进入点单页', async () => {
@@ -419,9 +409,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
       tag: ['@smoke'],
       annotation: [jiraIssueAnnotation('POS-31409')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
       });
       const customer = buildOrderServicePickupCustomer();
 
@@ -448,9 +438,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
     {
       annotation: [jiraIssueAnnotation('POS-16303')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
       await test.step(
@@ -500,9 +490,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
     test(
       '应能在 Recall 为最新 To Go 订单完成现金支付后看到 Success 状态',
       {},
-      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      async ({ homePage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
         });
 
         const paymentFlow = new PaymentFlow();
@@ -545,9 +535,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
     test(
       '应能在 Recall 为最新 To Go 订单完成信用卡支付后看到 Success 状态',
       {},
-      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      async ({ homePage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
         });
 
         const paymentFlow = new PaymentFlow();
@@ -594,9 +584,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
       {
         annotation: [jiraIssueAnnotation('POS-33110')],
       },
-      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      async ({ homePage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
         });
 
         await test.step('从 To Go 进入点单页，添加菜品并输入超过 50% 的小费', async () => {
@@ -637,9 +627,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
       {
         annotation: [jiraIssueAnnotation('POS-33122')],
       },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
       const paymentFlow = new PaymentFlow();
@@ -725,9 +715,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
       {
         annotation: [jiraIssueAnnotation('POS-24394')],
       },
-      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      async ({ homePage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
         });
 
         await test.step('从 To Go 进入点单页，选择有价格 option 并校验总额变化', async () => {
@@ -773,9 +763,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
       {
         annotation: jiraIssueAnnotations(['POS-15643', 'POS-15758', 'POS-15759']),
       },
-      async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-        const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-          return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+      async ({ homePage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
         });
 
         await test.step(
@@ -804,9 +794,9 @@ test.describe('分单按菜回归', { tag: ['@py-migrate'] }, () => {
     {
       annotation: [jiraIssueAnnotation('POS-16325')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
       await test.step(
@@ -848,9 +838,9 @@ test.describe('分单按菜回归', { tag: ['@py-migrate'] }, () => {
     {
       annotation: [jiraIssueAnnotation('POS-16314')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
       await test.step('点两个菜、平分三份并在子单间移动菜品', async () => {
@@ -932,9 +922,9 @@ test.describe('分单扩展回归', { tag: ['@py-migrate'] }, () => {
     {
       annotation: [jiraIssueAnnotation('POS-16316')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
       await test.step('点单后按金额分单并校验两个子单金额', async () => {
@@ -982,9 +972,9 @@ test.describe('分单扩展回归', { tag: ['@py-migrate'] }, () => {
     {
       annotation: [jiraIssueAnnotation('POS-16318')],
     },
-    async ({ homePage, licenseSelectionPage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并完成授权与员工口令', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage, licenseSelectionPage });
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
       await test.step('平分两份后撤销分单并校验总额恢复', async () => {
