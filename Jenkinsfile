@@ -41,7 +41,7 @@ properties([
                                 workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
                             }
 
-                            workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+                            workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
 
                             for (workspacePath in workspaceCandidates.unique()) {
                                 def workspaceDir = new File(workspacePath)
@@ -138,7 +138,7 @@ properties([
                                 workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
                             }
 
-                            workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+                            workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
 
                             def runGit = { File workspaceDir, String command ->
                                 def process = ['cmd', '/c', command].execute(null, workspaceDir)
@@ -286,7 +286,7 @@ properties([
                                 workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
                             }
 
-                            workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+                            workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
 
                             selectedSuite = selectedSuite ?: 'all'
                             def checkedPaths = []
@@ -444,7 +444,7 @@ properties([
                                 workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
                             }
 
-                            workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+                            workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
 
                             selectedSuite = selectedSuite ?: 'all'
                             def checkedPaths = []
