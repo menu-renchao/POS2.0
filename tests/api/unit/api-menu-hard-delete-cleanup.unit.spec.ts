@@ -1,8 +1,13 @@
 import { expect, test } from '@playwright/test';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { MysqlDb } from '../../../utils/db';
 import {
   MENU_HARD_DELETE_SQL,
+  cleanupMenuResourcesAfterSession,
   cleanupMenuResourcesAfterFlow,
+  registerMenuHardDeleteAfterAll,
   resolveMenuHardDeleteConfig,
 } from '../support/menu-hard-delete-cleanup';
 
@@ -45,6 +50,7 @@ test.describe('菜单硬删除清理配置', () => {
 
     expect(statements).toEqual([
       'DELETE FROM order_item WHERE item_id IN (SELECT id FROM menu_item WHERE category_id IN (SELECT id FROM menu_category WHERE group_id IN (SELECT id FROM menu_group WHERE deleted = 1)));',
+      'DELETE FROM saleitem_rule_assoc WHERE sale_item_id IN (SELECT id FROM menu_item WHERE category_id IN (SELECT id FROM menu_category WHERE group_id IN (SELECT id FROM menu_group WHERE deleted = 1)));',
       'DELETE FROM menu_item WHERE category_id IN (SELECT id FROM menu_category WHERE group_id IN (SELECT id FROM menu_group WHERE deleted = 1));',
       'DELETE FROM menu_category WHERE group_id IN (SELECT id FROM menu_group WHERE deleted = 1);',
       'DELETE FROM menu_group WHERE deleted = 1;',
@@ -72,5 +78,71 @@ test.describe('菜单硬删除清理配置', () => {
     );
 
     expect(calls).toEqual(['hard-delete']);
+  });
+
+  test('菜单硬删除注册应只标记 session 清理请求且不注册文件级 afterAll', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'menu-hard-delete-'));
+    const markerFile = join(tempDir, 'requested');
+    let afterAllCalls = 0;
+
+    try {
+      registerMenuHardDeleteAfterAll(
+        {
+          afterAll: () => {
+            afterAllCalls += 1;
+          },
+          step: async (_title, body) => await body(),
+        },
+        { markerFile },
+      );
+
+      expect(afterAllCalls).toBe(0);
+      expect(existsSync(markerFile)).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('session 结束清理应在存在请求标记时只执行一次硬删除', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'menu-hard-delete-'));
+    const markerFile = join(tempDir, 'requested');
+    const calls: string[] = [];
+    writeFileSync(markerFile, 'requested');
+
+    try {
+      await cleanupMenuResourcesAfterSession({
+        markerFile,
+        hardDelete: async () => {
+          calls.push('hard-delete');
+        },
+        env: {
+          API_BASE_URL: 'http://192.168.0.182:22080/kpos',
+        },
+      });
+
+      expect(calls).toEqual(['hard-delete']);
+      expect(existsSync(markerFile)).toBe(false);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('session 结束清理在没有请求标记时不应连接数据库', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'menu-hard-delete-'));
+    const markerFile = join(tempDir, 'requested');
+    const calls: string[] = [];
+
+    try {
+      await cleanupMenuResourcesAfterSession({
+        markerFile,
+        hardDelete: async () => {
+          calls.push('hard-delete');
+        },
+      });
+
+      expect(calls).toEqual([]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

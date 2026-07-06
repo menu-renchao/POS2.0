@@ -1,6 +1,14 @@
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { loadApiConfig, type ApiConfig } from '../../../api/core/api-config';
 import { MysqlDb, type MysqlConfig } from '../../../utils/db';
 
+const PROJECT_ROOT = resolve(__dirname, '..', '..', '..');
+const DEFAULT_REQUEST_MARKER_FILE = resolve(
+  PROJECT_ROOT,
+  'test-results',
+  'menu-hard-delete-requested',
+);
 const DEFAULT_DB_PORT = 22108;
 const DEFAULT_DB_NAME = 'kpos';
 const DEFAULT_DB_USER = 'root';
@@ -13,6 +21,7 @@ export type MenuHardDeleteConfig = MysqlConfig;
 export const MENU_HARD_DELETE_SQL = [
   'START TRANSACTION;',
   'DELETE FROM order_item WHERE item_id IN (SELECT id FROM menu_item WHERE category_id IN (SELECT id FROM menu_category WHERE group_id IN (SELECT id FROM menu_group WHERE deleted = 1)));',
+  'DELETE FROM saleitem_rule_assoc WHERE sale_item_id IN (SELECT id FROM menu_item WHERE category_id IN (SELECT id FROM menu_category WHERE group_id IN (SELECT id FROM menu_group WHERE deleted = 1)));',
   'DELETE FROM menu_item WHERE category_id IN (SELECT id FROM menu_category WHERE group_id IN (SELECT id FROM menu_group WHERE deleted = 1));',
   'DELETE FROM menu_category WHERE group_id IN (SELECT id FROM menu_group WHERE deleted = 1);',
   'DELETE FROM menu_group WHERE deleted = 1;',
@@ -59,12 +68,16 @@ type ApiHookTest = {
   step: <T>(title: string, body: () => T | Promise<T>) => Promise<T>;
 };
 
-export function registerMenuHardDeleteAfterAll(testApi: ApiHookTest): void {
-  testApi.afterAll(async () => {
-    await testApi.step('硬删除菜单软删除测试数据', async () => {
-      await cleanupMenuResourcesAfterFlow(loadApiConfig());
-    });
-  });
+type MenuHardDeleteRequestOptions = {
+  markerFile?: string;
+};
+
+export function registerMenuHardDeleteAfterAll(
+  testApi: ApiHookTest,
+  options: MenuHardDeleteRequestOptions = {},
+): void {
+  void testApi;
+  markMenuHardDeleteRequested(options.markerFile);
 }
 
 export async function cleanupMenuResourcesAfterFlow(
@@ -72,4 +85,34 @@ export async function cleanupMenuResourcesAfterFlow(
   hardDelete: (apiConfig: ApiConfig) => Promise<void> = hardDeleteSoftDeletedMenuData,
 ): Promise<void> {
   await hardDelete(apiConfig);
+}
+
+type MenuHardDeleteSessionOptions = {
+  markerFile?: string;
+  hardDelete?: (apiConfig: ApiConfig) => Promise<void>;
+  env?: EnvSource;
+};
+
+export function markMenuHardDeleteRequested(
+  markerFile: string = DEFAULT_REQUEST_MARKER_FILE,
+): void {
+  mkdirSync(dirname(markerFile), { recursive: true });
+  writeFileSync(markerFile, 'requested');
+}
+
+export async function cleanupMenuResourcesAfterSession(
+  options: MenuHardDeleteSessionOptions = {},
+): Promise<void> {
+  const markerFile = options.markerFile ?? DEFAULT_REQUEST_MARKER_FILE;
+
+  if (!existsSync(markerFile)) {
+    return;
+  }
+
+  await cleanupMenuResourcesAfterFlow(
+    loadApiConfig(options.env),
+    options.hardDelete ?? hardDeleteSoftDeletedMenuData,
+  );
+
+  rmSync(markerFile, { force: true });
 }
