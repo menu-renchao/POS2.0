@@ -143,7 +143,7 @@ properties([
                                 workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
                             }
 
-                            workspaceCandidates << 'C:/Users/administrator/Jenkins/.jenkins/workspace/POS2.0 UI'
+                            workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
 
                             for (workspacePath in workspaceCandidates.unique()) {
                                 def workspaceDir = new File(workspacePath)
@@ -242,6 +242,8 @@ pipeline {
             steps {
                 bat 'node --version'
                 bat 'npm --version'
+                bat 'where allure'
+                bat 'allure --version'
             }
         }
 
@@ -280,7 +282,8 @@ pipeline {
                 always {
                     script {
                         if (fileExists('allure-results')) {
-                            allure includeProperties: false,
+                            allure allureVersion: '3',
+                                   includeProperties: false,
                                    jdk: '',
                                    results: [[path: 'allure-results']]
                         }
