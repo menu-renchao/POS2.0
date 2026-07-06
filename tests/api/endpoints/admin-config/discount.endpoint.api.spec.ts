@@ -2,6 +2,8 @@ import { expect, test } from '../../support/endpoint-fixture';
 import { expectApiOk, expectApiRejected, expectArrayData } from '../../support/endpoint-assertions';
 import { extractEndpointListData } from '../../support/endpoint-list-data';
 import { toEndpointTitle } from '../../support/endpoint-case';
+import discountListResponseSchema from '../../schemas/admin-config/discount-list-response.schema.json';
+import { expectJsonSchema } from '../../support/json-schema';
 
 const DISCOUNT_LIST_IDENTITY = { method: 'GET', path: '/api/discount/list' } as const;
 const DISCOUNT_SAVE_IDENTITY = { method: 'POST', path: '/api/discount/save' } as const;
@@ -15,6 +17,7 @@ test.describe('折扣 endpoint', () => {
         toEndpointTitle(DISCOUNT_LIST_IDENTITY.method, DISCOUNT_LIST_IDENTITY.path, '请求折扣列表并校验响应'),
         async () => {
           const body = await expectApiOk(await adminConfigApi.listDiscounts(), DISCOUNT_LIST_IDENTITY);
+          expectJsonSchema(body, discountListResponseSchema, `${DISCOUNT_LIST_IDENTITY.method} ${DISCOUNT_LIST_IDENTITY.path}`);
           const listData = extractEndpointListData(body.data, DISCOUNT_LIST_IDENTITY);
           return expectArrayData({ ...body, data: listData }, DISCOUNT_LIST_IDENTITY);
         },
@@ -37,6 +40,7 @@ test.describe('折扣 endpoint', () => {
             await adminConfigApi.listDiscounts({ page: 1, pageSize: 1 }),
             DISCOUNT_LIST_IDENTITY,
           );
+          expectJsonSchema(body, discountListResponseSchema, `${DISCOUNT_LIST_IDENTITY.method} ${DISCOUNT_LIST_IDENTITY.path}`);
           const listData = extractEndpointListData(body.data, DISCOUNT_LIST_IDENTITY);
 
           return expectArrayData({ ...body, data: listData }, DISCOUNT_LIST_IDENTITY);

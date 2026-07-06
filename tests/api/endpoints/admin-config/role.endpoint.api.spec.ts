@@ -2,6 +2,8 @@ import { expect, test } from '../../support/endpoint-fixture';
 import { expectApiOk, expectApiRejected, expectArrayData } from '../../support/endpoint-assertions';
 import { extractEndpointListData } from '../../support/endpoint-list-data';
 import { toEndpointTitle } from '../../support/endpoint-case';
+import roleListResponseSchema from '../../schemas/admin-config/role-list-response.schema.json';
+import { expectJsonSchema } from '../../support/json-schema';
 
 const ROLE_LIST_IDENTITY = { method: 'GET', path: '/api/admin/role/list' } as const;
 const ROLE_SAVE_IDENTITY = { method: 'POST', path: '/api/admin/role/save' } as const;
@@ -15,6 +17,7 @@ test.describe('角色 endpoint', () => {
         toEndpointTitle(ROLE_LIST_IDENTITY.method, ROLE_LIST_IDENTITY.path, '请求角色列表并校验响应'),
         async () => {
           const body = await expectApiOk(await adminConfigApi.listRoles(), ROLE_LIST_IDENTITY);
+          expectJsonSchema(body, roleListResponseSchema, `${ROLE_LIST_IDENTITY.method} ${ROLE_LIST_IDENTITY.path}`);
           const listData = extractEndpointListData(body.data, ROLE_LIST_IDENTITY);
           return expectArrayData({ ...body, data: listData }, ROLE_LIST_IDENTITY);
         },
@@ -34,6 +37,7 @@ test.describe('角色 endpoint', () => {
             await adminConfigApi.listRoles({ page: 1, pageSize: 1 }),
             ROLE_LIST_IDENTITY,
           );
+          expectJsonSchema(body, roleListResponseSchema, `${ROLE_LIST_IDENTITY.method} ${ROLE_LIST_IDENTITY.path}`);
           const listData = extractEndpointListData(body.data, ROLE_LIST_IDENTITY);
 
           return expectArrayData({ ...body, data: listData }, ROLE_LIST_IDENTITY);

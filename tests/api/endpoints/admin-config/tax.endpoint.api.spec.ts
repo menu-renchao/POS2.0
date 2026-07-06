@@ -2,6 +2,8 @@ import { expect, test } from '../../support/endpoint-fixture';
 import { expectApiOk, expectApiRejected, expectArrayData } from '../../support/endpoint-assertions';
 import { extractEndpointListData } from '../../support/endpoint-list-data';
 import { toEndpointTitle } from '../../support/endpoint-case';
+import taxListResponseSchema from '../../schemas/admin-config/tax-list-response.schema.json';
+import { expectJsonSchema } from '../../support/json-schema';
 
 const TAX_LIST_IDENTITY = { method: 'GET', path: '/api/tax/list' } as const;
 const TAX_SAVE_IDENTITY = { method: 'POST', path: '/api/tax/save' } as const;
@@ -15,6 +17,7 @@ test.describe('税费 endpoint', () => {
         toEndpointTitle(TAX_LIST_IDENTITY.method, TAX_LIST_IDENTITY.path, '请求税费列表并校验响应'),
         async () => {
           const body = await expectApiOk(await adminConfigApi.listTaxes(), TAX_LIST_IDENTITY);
+          expectJsonSchema(body, taxListResponseSchema, `${TAX_LIST_IDENTITY.method} ${TAX_LIST_IDENTITY.path}`);
           const listData = extractEndpointListData(body.data, TAX_LIST_IDENTITY);
           return expectArrayData({ ...body, data: listData }, TAX_LIST_IDENTITY);
         },
@@ -34,6 +37,7 @@ test.describe('税费 endpoint', () => {
             await adminConfigApi.listTaxes({ page: 1, pageSize: 1 }),
             TAX_LIST_IDENTITY,
           );
+          expectJsonSchema(body, taxListResponseSchema, `${TAX_LIST_IDENTITY.method} ${TAX_LIST_IDENTITY.path}`);
           const listData = extractEndpointListData(body.data, TAX_LIST_IDENTITY);
 
           return expectArrayData({ ...body, data: listData }, TAX_LIST_IDENTITY);

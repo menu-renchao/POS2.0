@@ -14,6 +14,8 @@ import {
 } from '../support/endpoint-read-model';
 import { expectJsonSchema } from '../support/json-schema';
 import { parseSpuCodeFromAssignResponse } from '../support/spu-code';
+import discountListResponseSchema from '../schemas/admin-config/discount-list-response.schema.json';
+import roleListResponseSchema from '../schemas/admin-config/role-list-response.schema.json';
 
 test.describe('Endpoint 测试支撑工具', () => {
   test('应能生成包含方法和路径的 endpoint 标题', () => {
@@ -261,6 +263,34 @@ test.describe('Endpoint 测试支撑工具', () => {
     expect(() =>
       expectJsonSchema(0, { type: 'number', minimum: 1 }, 'GET /api/tax/list'),
     ).toThrow('GET /api/tax/list JSON schema 定义不受支持：schema $.minimum 使用了暂不支持的 JSON schema 关键字');
+  });
+
+  test('后台配置列表 schema 应校验业务关键字段', () => {
+    expectJsonSchema(
+      { code: 0, msg: 'ok', data: { discounts: [{ id: 1, name: 'AT_DISC', rate: 10, rateType: 2 }] } },
+      discountListResponseSchema,
+      'GET /api/discount/list',
+    );
+    expectJsonSchema(
+      { code: 0, msg: 'ok', data: [{ id: 1, name: 'AT_ROLE', discountCapRate: 0, function: [] }] },
+      roleListResponseSchema,
+      'GET /api/admin/role/list',
+    );
+
+    expect(() =>
+      expectJsonSchema(
+        { code: 0, msg: 'ok', data: { discounts: [{ id: 1, name: 'AT_DISC' }] } },
+        discountListResponseSchema,
+        'GET /api/discount/list',
+      ),
+    ).toThrow('GET /api/discount/list JSON schema 校验失败：$.data.discounts[0].rate 缺少必须字段');
+    expect(() =>
+      expectJsonSchema(
+        { code: 0, msg: 'ok', data: [{ id: 1, discountCapRate: 0, function: [] }] },
+        roleListResponseSchema,
+        'GET /api/admin/role/list',
+      ),
+    ).toThrow('GET /api/admin/role/list JSON schema 校验失败：$.data[0].name 缺少必须字段');
   });
 
   test('支持更多资源 ID 键，避免误提取 envelope code', () => {

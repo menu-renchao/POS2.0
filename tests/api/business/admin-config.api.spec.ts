@@ -4,12 +4,16 @@ import { expectResponseEnvelope, type ApiEnvelope } from '../../../api/core/api-
 import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
 import { createShortTestName } from '../../../api/core/test-data-id';
 import { test } from '../../../fixtures/api.fixture';
+import discountListResponseSchema from '../schemas/admin-config/discount-list-response.schema.json';
+import roleListResponseSchema from '../schemas/admin-config/role-list-response.schema.json';
 import taxListResponseSchema from '../schemas/admin-config/tax-list-response.schema.json';
 import { expectJsonSchema } from '../support/json-schema';
 
 type AdminConfigResourceType = 'tax' | 'discount' | 'role';
 
 const TAX_LIST_IDENTITY = { method: 'GET', path: '/api/tax/list' } as const;
+const DISCOUNT_LIST_IDENTITY = { method: 'GET', path: '/api/discount/list' } as const;
+const ROLE_LIST_IDENTITY = { method: 'GET', path: '/api/admin/role/list' } as const;
 
 test.describe('后台配置接口', () => {
   test.describe('税费管理', () => {
@@ -79,10 +83,12 @@ test.describe('后台配置接口', () => {
       const body = await test.step('请求折扣列表并校验响应信封', async () => {
         const response = await adminConfigApi.listDiscounts();
 
-        return await expectJsonEnvelope(response, 'GET /api/discount/list');
+        return await expectJsonEnvelope(response, `${DISCOUNT_LIST_IDENTITY.method} ${DISCOUNT_LIST_IDENTITY.path}`);
       });
 
-      expect(body.data, '折扣列表响应应包含 data 字段').toBeDefined();
+      await test.step('校验折扣列表响应 JSON schema', async () => {
+        expectJsonSchema(body, discountListResponseSchema, `${DISCOUNT_LIST_IDENTITY.method} ${DISCOUNT_LIST_IDENTITY.path}`);
+      });
     });
 
     test('应能保存并删除本次创建的测试折扣', async ({
@@ -139,10 +145,12 @@ test.describe('后台配置接口', () => {
       const body = await test.step('请求角色列表并校验响应信封', async () => {
         const response = await adminConfigApi.listRoles();
 
-        return await expectJsonEnvelope(response, 'GET /api/admin/role/list');
+        return await expectJsonEnvelope(response, `${ROLE_LIST_IDENTITY.method} ${ROLE_LIST_IDENTITY.path}`);
       });
 
-      expect(body.data, '角色列表响应应包含 data 字段').toBeDefined();
+      await test.step('校验角色列表响应 JSON schema', async () => {
+        expectJsonSchema(body, roleListResponseSchema, `${ROLE_LIST_IDENTITY.method} ${ROLE_LIST_IDENTITY.path}`);
+      });
     });
 
     test('应能保存并删除本次创建的测试角色', async ({

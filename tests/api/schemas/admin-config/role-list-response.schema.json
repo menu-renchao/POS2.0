@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResponseListRoleResponse",
+  "description": "自动化业务契约：用于校验 GET /api/admin/role/list 当前应稳定返回的关键字段；required 不等同于 OpenAPI 文档中的必填标记。",
+  "type": "object",
+  "required": ["code", "msg", "data"],
+  "properties": {
+    "code": {
+      "type": "integer"
+    },
+    "msg": {
+      "type": "string"
+    },
+    "traceId": {
+      "type": "string"
+    },
+    "data": {
+      "type": "array",
+      "items": {
+        "title": "RoleResponse",
+        "description": "自动化业务契约要求非空角色记录返回这些关键字段，便于后续业务链路读取。",
+        "type": "object",
+        "required": ["id", "name", "discountCapRate", "function"],
+        "properties": {
+          "id": {
+            "type": ["integer", "string"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "discountCapRate": {
+            "type": "number"
+          },
+          "function": {
+            "type": ["array", "null"]
+          }
+        }
+      }
+    }
+  }
+}
