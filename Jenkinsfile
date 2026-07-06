@@ -248,7 +248,8 @@ properties([
                     sandbox: true,
                     script: '''
                         def activeChoicesError = binding.hasVariable('error') ? binding.getVariable('error') : null
-                        return ["TEST_FILE fallback: ${activeChoicesError?.getClass()?.getSimpleName() ?: 'Unknown'}: ${activeChoicesError?.getMessage() ?: 'no error message'}"]
+                        def message = "TEST_FILE fallback: ${activeChoicesError?.getClass()?.getSimpleName() ?: 'Unknown'}: ${activeChoicesError?.getMessage() ?: 'no error message'}"
+                        return [(message): message]
                     '''
                 ],
                 script: [
@@ -289,6 +290,13 @@ properties([
 
                             selectedSuite = selectedSuite ?: 'all'
                             def checkedPaths = []
+                            def toChoiceMap = { items ->
+                                def choices = new LinkedHashMap()
+                                items.collect { it.toString() }.findAll { it }.unique().sort().each { choice ->
+                                    choices[choice] = choice
+                                }
+                                return choices
+                            }
 
                             def runGit = { File workspaceDir, String command ->
                                 def process = ['cmd', '/c', command].execute(null, workspaceDir)
@@ -327,7 +335,7 @@ properties([
                                     .sort()
                                 def mergedFiles = (filesFromTree + remoteFiles).unique().sort()
                                 if (mergedFiles) {
-                                    return mergedFiles
+                                    return toChoiceMap(mergedFiles)
                                 }
                             }
 
@@ -338,7 +346,7 @@ properties([
                                     def tree = new groovy.json.JsonSlurperClassic().parseText(treeFile.getText('UTF-8'))
                                     def files = tree.files instanceof Map ? tree.files[selectedSuite] : []
                                     if (files) {
-                                        return files.collect { it.toString() }.sort().unique()
+                                        return toChoiceMap(files)
                                     }
                                 }
                             }
@@ -366,13 +374,14 @@ properties([
                                 }
 
                                 if (!files.isEmpty()) {
-                                    return files.sort().unique()
+                                    return toChoiceMap(files)
                                 }
                             }
 
-                            return ["未找到用例文件: ${checkedPaths.join(' ; ')}"]
+                            return toChoiceMap(["未找到用例文件: ${checkedPaths.join(' ; ')}"])
                         } catch (Throwable error) {
-                            return ["文件加载失败: ${error.getClass().getSimpleName()}: ${error.getMessage()}"]
+                            def message = "文件加载失败: ${error.getClass().getSimpleName()}: ${error.getMessage()}"
+                            return [(message): message]
                         }
                     '''
                 ]
@@ -393,7 +402,10 @@ properties([
                 fallbackScript: [
                     classpath: [],
                     sandbox: true,
-                    script: 'return ["Active Choices 脚本执行失败，请检查 In-process Script Approval 或 Jenkins 日志"]'
+                    script: '''
+                        def message = "Active Choices 脚本执行失败，请检查 In-process Script Approval 或 Jenkins 日志"
+                        return [(message): message]
+                    '''
                 ],
                 script: [
                     classpath: [],
@@ -436,6 +448,13 @@ properties([
 
                             selectedSuite = selectedSuite ?: 'all'
                             def checkedPaths = []
+                            def toChoiceMap = { items ->
+                                def choices = new LinkedHashMap()
+                                items.collect { it.toString() }.findAll { it }.unique().sort().each { choice ->
+                                    choices[choice] = choice
+                                }
+                                return choices
+                            }
                             def selectedFiles = selectedFilesValue instanceof Collection
                                 ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
                                 : selectedFilesValue.toString().split(',').collect { it.trim() }.findAll { it }
@@ -531,7 +550,7 @@ properties([
                                 }
 
                                 if (!cases.isEmpty()) {
-                                    return cases.unique()
+                                    return toChoiceMap(cases)
                                 }
                             }
 
@@ -555,7 +574,7 @@ properties([
                                 }
 
                                 if (!cases.isEmpty()) {
-                                    return cases.unique()
+                                    return toChoiceMap(cases)
                                 }
                             }
 
@@ -627,13 +646,14 @@ properties([
                                 }
 
                                 if (!cases.isEmpty()) {
-                                    return cases.unique()
+                                    return toChoiceMap(cases)
                                 }
                             }
 
-                            return ["未找到用例目录: ${checkedPaths.join(' ; ')}"]
+                            return toChoiceMap(["未找到用例目录: ${checkedPaths.join(' ; ')}"])
                         } catch (Throwable error) {
-                            return ["用例加载失败: ${error.getClass().getSimpleName()}: ${error.getMessage()}"]
+                            def message = "用例加载失败: ${error.getClass().getSimpleName()}: ${error.getMessage()}"
+                            return [(message): message]
                         }
                     '''
                 ]
