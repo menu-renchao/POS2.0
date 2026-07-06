@@ -707,6 +707,8 @@ pipeline {
             steps {
                 bat 'node --version'
                 bat 'npm --version'
+                bat 'where allure'
+                bat 'allure --version'
             }
         }
 
@@ -818,7 +820,8 @@ pipeline {
             post {
                 always {
                     // 发布 Allure：无论测试成功失败，都基于本次 allure-results 生成报告。
-                    allure includeProperties: false,
+                    allure allureVersion: '3',
+                           includeProperties: false,
                            jdk: '',
                            results: [[path: 'allure-results']]
                 }
