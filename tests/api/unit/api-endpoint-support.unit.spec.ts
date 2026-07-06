@@ -12,6 +12,7 @@ import {
   extractFirstResourceId,
   findResourceIdByName,
 } from '../support/endpoint-read-model';
+import { expectJsonSchema } from '../support/json-schema';
 import { parseSpuCodeFromAssignResponse } from '../support/spu-code';
 
 test.describe('Endpoint 测试支撑工具', () => {
@@ -222,6 +223,44 @@ test.describe('Endpoint 测试支撑工具', () => {
     expect(() =>
       extractEndpointListData([{ status: 'ok' }], identity),
     ).toThrow('GET /api/tax/list 列表数组应至少包含一个包含 id/name 相关字段的对象');
+  });
+
+  test('应能用 JSON schema 校验必须返回字段', () => {
+    const schema = {
+      type: 'object',
+      required: ['data'],
+      properties: {
+        data: {
+          type: 'object',
+          required: ['taxes'],
+          properties: {
+            taxes: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['id', 'name'],
+                properties: {
+                  id: { type: 'integer' },
+                  name: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    expectJsonSchema({ data: { taxes: [{ id: 1, name: 'State Tax' }] } }, schema, 'GET /api/tax/list');
+
+    expect(() =>
+      expectJsonSchema({ data: { taxes: [{ id: 1 }] } }, schema, 'GET /api/tax/list'),
+    ).toThrow('GET /api/tax/list JSON schema 校验失败：$.data.taxes[0].name 缺少必须字段');
+  });
+
+  test('JSON schema 校验器不应静默忽略暂不支持的关键字', () => {
+    expect(() =>
+      expectJsonSchema(0, { type: 'number', minimum: 1 }, 'GET /api/tax/list'),
+    ).toThrow('GET /api/tax/list JSON schema 定义不受支持：schema $.minimum 使用了暂不支持的 JSON schema 关键字');
   });
 
   test('支持更多资源 ID 键，避免误提取 envelope code', () => {

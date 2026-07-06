@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResponseListTaxesResponse",
+  "description": "自动化业务契约：用于校验 GET /api/tax/list 当前应稳定返回的关键字段；required 不等同于 OpenAPI 文档中的必填标记。",
+  "type": "object",
+  "required": ["code", "msg", "data"],
+  "properties": {
+    "code": {
+      "type": "integer"
+    },
+    "msg": {
+      "type": "string"
+    },
+    "traceId": {
+      "type": "string"
+    },
+    "data": {
+      "type": "object",
+      "required": ["taxes"],
+      "properties": {
+        "taxes": {
+          "type": "array",
+          "items": {
+            "title": "TaxResponse",
+            "description": "自动化业务契约要求非空税费记录返回这些关键字段，便于后续业务链路读取。",
+            "type": "object",
+            "required": ["id", "name", "rate", "outRate", "taxIncrease"],
+            "properties": {
+              "id": {
+                "type": ["integer", "string"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "rate": {
+                "type": "number"
+              },
+              "outRate": {
+                "type": "number"
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "taxFileNumber": {
+                "type": ["string", "null"]
+              },
+              "taxIncrease": {
+                "type": "string"
+              },
+              "priceLimit": {
+                "type": ["number", "null"]
+              },
+              "taxIncreaseName": {
+                "type": ["string", "null"]
+              },
+              "taxIncreaseRate": {
+                "type": ["number", "null"]
+              },
+              "deleted": {
+                "type": "boolean"
+              },
+              "systemGenerated": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

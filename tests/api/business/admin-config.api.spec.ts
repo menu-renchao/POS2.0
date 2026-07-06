@@ -4,8 +4,12 @@ import { expectResponseEnvelope, type ApiEnvelope } from '../../../api/core/api-
 import type { ResourceId, ResourceRegistry } from '../../../api/core/resource-registry';
 import { createShortTestName } from '../../../api/core/test-data-id';
 import { test } from '../../../fixtures/api.fixture';
+import taxListResponseSchema from '../schemas/admin-config/tax-list-response.schema.json';
+import { expectJsonSchema } from '../support/json-schema';
 
 type AdminConfigResourceType = 'tax' | 'discount' | 'role';
+
+const TAX_LIST_IDENTITY = { method: 'GET', path: '/api/tax/list' } as const;
 
 test.describe('后台配置接口', () => {
   test.describe('税费管理', () => {
@@ -13,10 +17,12 @@ test.describe('后台配置接口', () => {
       const body = await test.step('请求税费列表并校验响应信封', async () => {
         const response = await adminConfigApi.listTaxes();
 
-        return await expectJsonEnvelope(response, 'GET /api/tax/list');
+        return await expectJsonEnvelope(response, `${TAX_LIST_IDENTITY.method} ${TAX_LIST_IDENTITY.path}`);
       });
 
-      expect(body.data, '税费列表响应应包含 data 字段').toBeDefined();
+      await test.step('校验税费列表响应 JSON schema', async () => {
+        expectJsonSchema(body, taxListResponseSchema, `${TAX_LIST_IDENTITY.method} ${TAX_LIST_IDENTITY.path}`);
+      });
     });
 
     test('应能保存并删除本次创建的测试税费', async ({
