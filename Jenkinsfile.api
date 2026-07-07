@@ -201,7 +201,7 @@ pipeline {
     environment {
         API_AUTH_MODE = 'apiLogin'
         CI = 'true'
-        PATH = "C:\\Program Files\\nodejs;${env.PATH}"
+        PATH = "C:\\Program Files\\nodejs;C:\\Users\\nhqrt\\AppData\\Roaming\\npm;${env.PATH}"
     }
 
     options {
@@ -242,8 +242,8 @@ pipeline {
             steps {
                 bat 'node --version'
                 bat 'npm --version'
-                bat 'where allure'
-                bat 'allure --version'
+                bat 'where allure.cmd'
+                bat 'allure.cmd --version'
             }
         }
 

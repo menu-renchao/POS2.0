@@ -681,7 +681,7 @@ pipeline {
     environment {
         PLAYWRIGHT_BASE_URL = "${params.PLAYWRIGHT_BASE_URL}"
         CI = 'true'
-        PATH = "C:\\Program Files\\nodejs;${env.PATH}"
+        PATH = "C:\\Program Files\\nodejs;C:\\Users\\nhqrt\\AppData\\Roaming\\npm;${env.PATH}"
     }
 
     // 流水线约束：限制总耗时、防止并发构建、保留最近构建记录。
@@ -727,8 +727,8 @@ pipeline {
             steps {
                 bat 'node --version'
                 bat 'npm --version'
-                bat 'where allure'
-                bat 'allure --version'
+                bat 'where allure.cmd'
+                bat 'allure.cmd --version'
             }
         }
 
