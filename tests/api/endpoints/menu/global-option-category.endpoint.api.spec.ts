@@ -4,10 +4,11 @@ import { expectApiOk } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
 import { registerMenuHardDeleteAfterAll } from '../../support/menu-hard-delete-cleanup';
 import type { EndpointResources } from '../../support/endpoint-resources';
+import type { MenuApiClient } from '../../../../api/clients/menu-api.client';
+import type { ResourceId, ResourceRegistry } from '../../../../api/core/resource-registry';
 
 const MENU_LIST_IDENTITY = { method: 'GET', path: '/api/menu/menus' } as const;
 const MENU_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menu/{id}' } as const;
-const MENU_GROUP_DETAIL_IDENTITY = { method: 'GET', path: '/api/menu/menuGroup/{id}' } as const;
 const GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY = {
   method: 'POST',
   path: '/api/menu/globalOptionCategory',
@@ -115,58 +116,27 @@ test.describe('全局选项分类 endpoint', () => {
     toEndpointTitle(
       GLOBAL_OPTION_CATEGORY_DETAIL_IDENTITY.method,
       GLOBAL_OPTION_CATEGORY_DETAIL_IDENTITY.path,
-      '应能沿真实菜单链路读取全局选项分类详情',
+      '应能读取本次创建的全局选项分类详情',
     ),
-    async ({ menuApi }) => {
-      const menuId = await test.step('从菜单列表定位 POS 菜单 ID', async () => {
-        const body = await expectApiOk(
-          await menuApi.listMenus({
-            expandMenuLevel: 0,
-            showInactive: true,
-            showOption: false,
-          }),
-          MENU_LIST_IDENTITY,
-        );
-
-        return findRecordId(body.data, (record) => record.name === 'POS Menu' || record.productLine === 'POS');
-      });
-
-      expect(menuId, '菜单列表应返回 POS 菜单 ID').not.toBeUndefined();
-
-      const menuGroupId = await test.step('从菜单详情定位全局选项菜单组 ID', async () => {
-        const body = await expectApiOk(
-          await menuApi.getMenu(menuId!, {
-            expandMenuLevel: 1,
-            showInactive: true,
-            showOption: false,
-          }),
-          MENU_DETAIL_IDENTITY,
-        );
-
-        return findRecordId(body.data, (record) => record.name === 'Global Option Group' || record.global === true);
-      });
-
-      expect(menuGroupId, '菜单详情应返回 Global Option Group ID').not.toBeUndefined();
-
-      const categoryId = await test.step('从菜单组详情定位全局选项分类 ID', async () => {
-        const body = await expectApiOk(
-          await menuApi.getMenuGroup(menuGroupId!, {
-            expandMenuLevel: 1,
-            showInactive: true,
-            showOption: false,
-          }),
-          MENU_GROUP_DETAIL_IDENTITY,
-        );
-
-        return findRecordId(body.data, (record) => record.groupId === menuGroupId);
-      });
-
-      expect(categoryId, '菜单组详情应返回全局选项分类 ID').not.toBeUndefined();
+    async ({ menuApi, endpointResources, resourceRegistry }) => {
+      const { menuId, optionCategoryResource } = await createGlobalOptionCategoryInGlobalGroup(
+        menuApi,
+        resourceRegistry,
+        '详情读取',
+      );
+      await test.step(
+        toEndpointTitle(
+          GLOBAL_OPTION_CATEGORY_DETAIL_IDENTITY.method,
+          GLOBAL_OPTION_CATEGORY_DETAIL_IDENTITY.path,
+          '先创建全局选项用于详情读取',
+        ),
+        async () => await endpointResources.createMenuGlobalOptionResource(menuId, optionCategoryResource.id),
+      );
 
       const detailBody = await test.step('读取全局选项分类详情并校验全局选项 ID', async () =>
         await expectApiOk(
-          await menuApi.getGlobalOptionCategory(categoryId!, {
-            id: categoryId!,
+          await menuApi.getGlobalOptionCategory(optionCategoryResource.id, {
+            id: optionCategoryResource.id,
             showReportItem: false,
           }),
           GLOBAL_OPTION_CATEGORY_DETAIL_IDENTITY,
@@ -184,25 +154,16 @@ test.describe('全局选项分类 endpoint', () => {
       GLOBAL_OPTION_CATEGORY_LIST_IDENTITY.path,
       '应能按菜单读取全局选项分类列表',
     ),
-    async ({ menuApi }) => {
-      const menuId = await test.step('从菜单列表定位 POS 菜单 ID', async () => {
-        const body = await expectApiOk(
-          await menuApi.listMenus({
-            expandMenuLevel: 0,
-            showInactive: true,
-            showOption: false,
-          }),
-          MENU_LIST_IDENTITY,
-        );
-
-        return findRecordId(body.data, (record) => record.name === 'POS Menu' || record.productLine === 'POS');
-      });
-
-      expect(menuId, '菜单列表应返回 POS 菜单 ID').not.toBeUndefined();
+    async ({ menuApi, resourceRegistry }) => {
+      const { menuId, optionCategoryResource } = await createGlobalOptionCategoryInGlobalGroup(
+        menuApi,
+        resourceRegistry,
+        '列表读取',
+      );
 
       const body = await test.step('按菜单 ID 查询全局选项分类列表并校验响应', async () =>
         await expectApiOk(
-          await menuApi.listGlobalOptionCategories(menuId!, {
+          await menuApi.listGlobalOptionCategories(menuId, {
             showInactive: true,
             showOption: false,
           }),
@@ -210,8 +171,8 @@ test.describe('全局选项分类 endpoint', () => {
         ),
       );
 
-      const categoryId = findRecordId(body.data, (record) => record.productLine === 'POS' || 'groupId' in record);
-      expect(categoryId, '按菜单读取全局选项分类应返回分类 ID').not.toBeUndefined();
+      const categoryId = findRecordId(body.data, (record) => isSameId(record.id, optionCategoryResource.id));
+      expect(categoryId, '按菜单读取全局选项分类应返回本次创建的分类 ID').not.toBeUndefined();
     },
   );
 });
@@ -232,6 +193,89 @@ async function createGlobalOptionCategoryEndpointScenario(
   return {
     menuResource,
     optionCategoryResource,
+  };
+}
+
+async function createGlobalOptionCategoryInGlobalGroup(
+  menuApi: MenuApiClient,
+  resourceRegistry: ResourceRegistry,
+  purpose: string,
+): Promise<{
+  menuId: ResourceId;
+  optionCategoryResource: { id: ResourceId; name: string; request: Record<string, unknown> };
+}> {
+  const { menuId, menuGroupId } = await resolveGlobalOptionMenuContext(menuApi);
+  const request = {
+    ...buildGlobalOptionCategoryRequest(menuId),
+    groupId: menuGroupId,
+  };
+  const body = await test.step(
+    toEndpointTitle(
+      GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY.method,
+      GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY.path,
+      `先创建全局选项分类用于${purpose}`,
+    ),
+    async () => await expectApiOk(await menuApi.createGlobalOptionCategory(request), GLOBAL_OPTION_CATEGORY_CREATE_IDENTITY),
+  );
+  const id = findRecordId(body.data, (record) => isSameId(record.menuId, menuId) || record.name === request.name);
+
+  expect(id, '创建全局选项分类响应应返回分类 ID').not.toBeUndefined();
+
+  resourceRegistry.register({
+    type: 'globalOptionCategory',
+    id: id!,
+    name: request.name,
+    cleanupPriority: 45,
+    cleanup: () => menuApi.deleteGlobalOptionCategory(id!),
+  });
+
+  return {
+    menuId,
+    optionCategoryResource: {
+      id: id!,
+      name: request.name,
+      request,
+    },
+  };
+}
+
+async function resolveGlobalOptionMenuContext(menuApi: MenuApiClient): Promise<{
+  menuId: ResourceId;
+  menuGroupId: ResourceId;
+}> {
+  const menuId = await test.step('从菜单列表定位 POS 菜单 ID', async () => {
+    const body = await expectApiOk(
+      await menuApi.listMenus({
+        expandMenuLevel: 0,
+        showInactive: true,
+        showOption: false,
+      }),
+      MENU_LIST_IDENTITY,
+    );
+
+    return findRecordId(body.data, (record) => record.name === 'POS Menu' || record.productLine === 'POS');
+  });
+
+  expect(menuId, '菜单列表应返回 POS 菜单 ID').not.toBeUndefined();
+
+  const menuGroupId = await test.step('从菜单详情定位全局选项菜单组 ID', async () => {
+    const body = await expectApiOk(
+      await menuApi.getMenu(menuId!, {
+        expandMenuLevel: 1,
+        showInactive: true,
+        showOption: false,
+      }),
+      MENU_DETAIL_IDENTITY,
+    );
+
+    return findRecordId(body.data, (record) => record.name === 'Global Option Group' || record.global === true);
+  });
+
+  expect(menuGroupId, '菜单详情应返回 Global Option Group ID').not.toBeUndefined();
+
+  return {
+    menuId: menuId!,
+    menuGroupId: menuGroupId!,
   };
 }
 
@@ -298,4 +342,8 @@ function extractId(record: Record<string, unknown>): string | number | undefined
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSameId(value: unknown, expected: string | number): boolean {
+  return (typeof value === 'number' || typeof value === 'string') && String(value) === String(expected);
 }

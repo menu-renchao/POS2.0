@@ -2,6 +2,8 @@ import { expect, test } from '../../support/endpoint-fixture';
 import { buildDefaultOrderListQuery } from '../../../../test-data/api/order-api-data';
 import { expectApiOk, expectApiRejected } from '../../support/endpoint-assertions';
 import { toEndpointTitle } from '../../support/endpoint-case';
+import { waitUntil } from '../../../../utils/wait';
+import type { OrderApiClient } from '../../../../api/clients/order-api.client';
 import type { ResourceId } from '../../../../api/core/resource-registry';
 
 const ORDER_SAVE_IDENTITY = { method: 'POST', path: '/api/order/save' } as const;
@@ -185,16 +187,15 @@ test.describe('订单管理 endpoint', () => {
         toEndpointTitle(ORDER_SAVE_IDENTITY.method, ORDER_SAVE_IDENTITY.path, '先创建订单用于作废'),
         async () => await endpointResources.createOrderResource(),
       );
+      await test.step('等待订单详情可读取后再作废', async () => {
+        await waitForOrderReadable(orderApi, order.id);
+      });
 
       await test.step(
         toEndpointTitle(ORDER_VOID_IDENTITY.method, ORDER_VOID_IDENTITY.path, '作废订单并校验响应'),
         async () => {
           await expectApiOk(
-            await orderApi.voidOrder({
-              id: order.id,
-              orderId: order.id,
-              reason: 'API_AUTOMATION_ENDPOINT',
-            }),
+            await orderApi.voidOrder(buildOrderVoidRequest(order.id, 'API_AUTOMATION_ENDPOINT')),
             ORDER_VOID_IDENTITY,
           );
         },
@@ -223,11 +224,7 @@ test.describe('订单管理 endpoint', () => {
         toEndpointTitle(ORDER_VOID_IDENTITY.method, ORDER_VOID_IDENTITY.path, '提交不存在订单 ID 并校验拒绝响应'),
         async () => {
           await expectApiRejected(
-            await orderApi.voidOrder({
-              id: 2147483647,
-              orderId: 2147483647,
-              reason: 'API_AUTOMATION_INVALID_ORDER',
-            }),
+            await orderApi.voidOrder(buildOrderVoidRequest(2147483647, 'API_AUTOMATION_INVALID_ORDER')),
             ORDER_VOID_IDENTITY,
           );
         },
@@ -243,4 +240,32 @@ function buildOrderDateNumberQuery(orderId: ResourceId): Record<string, unknown>
     orderId,
     dateNumber: 'AT',
   };
+}
+
+function buildOrderVoidRequest(orderId: ResourceId, reason: string): Record<string, unknown> {
+  return {
+    id: orderId,
+    orderId,
+    reason,
+  };
+}
+
+async function waitForOrderReadable(orderApi: OrderApiClient, orderId: ResourceId): Promise<void> {
+  await waitUntil(
+    async () => {
+      const response = await orderApi.fetchOrder({ id: orderId, orderId, fetchPayments: true });
+      const body = await response.json().catch(() => undefined) as { code?: unknown } | undefined;
+
+      return {
+        status: response.status(),
+        code: body?.code,
+      };
+    },
+    (result) => result.status === 200 && result.code === 0,
+    {
+      timeout: 5_000,
+      interval: 200,
+      message: '订单创建后应能读取详情。',
+    },
+  );
 }
