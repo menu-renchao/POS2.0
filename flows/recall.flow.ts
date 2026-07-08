@@ -336,6 +336,22 @@ export class RecallFlow {
     return recallPage;
   }
 
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber: string, amountInCents: number) =>
+    `业务步骤：为订单 ${orderNumber} 的子单 ${targetOrderNumber} 添加 ${amountInCents} 分 tips`,
+  )
+  async addOrderDetailsTip(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber: string,
+    amountInCents: number,
+  ): Promise<string | null> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    const message = await recallPage.addOrderDetailsTip(amountInCents);
+    await recallPage.closeOrderDetailsDialog();
+    return message;
+  }
+
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
     targetOrderNumber
       ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Paging`
