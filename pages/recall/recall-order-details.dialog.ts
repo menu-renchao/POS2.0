@@ -1962,11 +1962,14 @@ export class RecallOrderDetailsDialog {
           this.page.getByTestId('tip-input-dialog').first(),
           this.page.getByRole('dialog', { name: /^Tips$/i }).first(),
           this.page
-            .getByRole('dialog')
+            .locator('[role="dialog"]:visible')
             .filter({
               has: this.page.getByRole('heading', { name: /^Tips$/i }),
             })
-            .last(),
+            .filter({
+              has: this.page.getByRole('button', { name: /^(Confirm|确认)$/ }),
+            })
+            .first(),
         ];
 
     for (const candidate of candidates) {
