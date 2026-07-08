@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { HomePage } from './home.page';
 import { OrderDishesPage } from './order-dishes.page';
 import { RecallPage } from './recall.page';
+import { readVisiblePosAlertText } from './shared/pos-alert';
 import { waitForInputSettled } from '../utils/input-stability';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
@@ -122,6 +123,11 @@ export class SplitOrderPage {
     if (orderNumber) {
       await expect(this.title).toContainText(orderNumber);
     }
+  }
+
+  @step('页面读取：读取分单操作阻断提示')
+  async readBlockingMessage(): Promise<string> {
+    return await readVisiblePosAlertText(this.page);
   }
 
   @step('页面操作：点击平分订单按钮')

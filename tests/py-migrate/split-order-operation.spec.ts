@@ -66,11 +66,7 @@ async function enterRecallFromReturnedPage(
     return returnedPage;
   }
 
-  if ('clickRecall' in returnedPage) {
-    return await returnedPage.clickRecall();
-  }
-
-  return await returnedPage.enterRecall();
+  return await returnedPage.clickRecall();
 }
 
 async function readTargetTips(

@@ -177,6 +177,11 @@ export class SplitOrderFlow {
     await splitOrderPage.clickCancelSplit();
   }
 
+  @step('业务步骤：读取分单操作阻断提示')
+  async readBlockingMessage(splitOrderPage: SplitOrderPage): Promise<string> {
+    return await splitOrderPage.readBlockingMessage();
+  }
+
   @step('业务步骤：提交分单并根据当前地址返回对应页面对象')
   async submitAndReturnPage(
     splitOrderPage: SplitOrderPage,
