@@ -201,6 +201,7 @@ pipeline {
     environment {
         API_AUTH_MODE = 'apiLogin'
         CI = 'true'
+        PLAYWRIGHT_BROWSERS_PATH = 'C:\\ProgramData\\Jenkins\\ms-playwright'
         PATH = "C:\\Program Files\\nodejs;C:\\Users\\nhqrt\\AppData\\Roaming\\npm;${env.PATH}"
     }
 

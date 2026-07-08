@@ -4,7 +4,7 @@ properties([
         // 目标 POS 前端地址，会注入到 Playwright 的 baseURL 配置中。
         string(
             name: 'PLAYWRIGHT_BASE_URL',
-            defaultValue: 'http://192.168.0.72:22080',
+            defaultValue: 'http://192.168.0.247:22080',
             description: '(required) Target server URL, e.g. http://IP:PORT'
         ),
         // Git 分支：参数页打开时在现有 workspace 执行 git fetch，并从 origin 远端分支生成选项。
@@ -681,6 +681,7 @@ pipeline {
     environment {
         PLAYWRIGHT_BASE_URL = "${params.PLAYWRIGHT_BASE_URL}"
         CI = 'true'
+        PLAYWRIGHT_BROWSERS_PATH = 'C:\\ProgramData\\Jenkins\\ms-playwright'
         PATH = "C:\\Program Files\\nodejs;C:\\Users\\nhqrt\\AppData\\Roaming\\npm;${env.PATH}"
     }
 
