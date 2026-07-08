@@ -4,7 +4,7 @@ import { MysqlDb } from '../../../utils/db';
 test.describe('DB 工具类', () => {
   test('MysqlDb 应能构造不依赖 mysql CLI 的连接配置', () => {
     const db = new MysqlDb({
-      host: '192.168.0.182',
+      host: '192.168.0.247',
       port: 22108,
       database: 'kpos',
       user: 'root',
@@ -12,7 +12,7 @@ test.describe('DB 工具类', () => {
     });
 
     expect(db.connectionOptions()).toEqual({
-      host: '192.168.0.182',
+      host: '192.168.0.247',
       port: 22108,
       database: 'kpos',
       user: 'root',
@@ -25,7 +25,7 @@ test.describe('DB 工具类', () => {
     const calls: string[] = [];
     const db = new MysqlDb(
       {
-        host: '192.168.0.182',
+        host: '192.168.0.247',
         port: 22108,
         database: 'kpos',
         user: 'root',
@@ -50,7 +50,7 @@ test.describe('DB 工具类', () => {
     const calls: string[] = [];
     const db = new MysqlDb(
       {
-        host: '192.168.0.182',
+        host: '192.168.0.247',
         port: 22108,
         database: 'kpos',
         user: 'root',
@@ -73,7 +73,7 @@ test.describe('DB 工具类', () => {
 
   test('MysqlDb 默认连接工厂应来自 mysql2 驱动', () => {
     const db = new MysqlDb({
-      host: '192.168.0.182',
+      host: '192.168.0.247',
       port: 22108,
       database: 'kpos',
       user: 'root',

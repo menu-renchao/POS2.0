@@ -53,7 +53,7 @@ function resolveApiBaseURL(env: EnvSource): string {
     return `${normalizedPlaywrightBaseURL}/kpos`;
   }
 
-  return 'http://192.168.0.182:22080/kpos';
+  return 'http://192.168.0.247:22080/kpos';
 }
 
 function resolveAuthMode(value: string | undefined): ApiAuthMode {

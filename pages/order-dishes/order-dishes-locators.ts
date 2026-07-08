@@ -23,7 +23,10 @@ export class OrderDishesLocators {
   readonly headerRecallButton: Locator;
   readonly sendButton: Locator;
   readonly payButton: Locator;
+  readonly addLineButton: Locator;
   readonly selectedDishAddButton: Locator;
+  readonly changePriceButton: Locator;
+  readonly changePriceConfirmButton: Locator;
   readonly countButton: Locator;
   readonly firstAvailableDishButton: Locator;
   readonly menuGroupCards: Locator;
@@ -109,6 +112,12 @@ export class OrderDishesLocators {
     this.payButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
       appFrame.getByRole('button', { name: 'Pay' }).or(hostPage.getByRole('button', { name: 'Pay' })).first(),
     );
+    this.addLineButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
+      appFrame
+        .getByTestId('action-rail-button-addline')
+        .or(hostPage.getByTestId('action-rail-button-addline'))
+        .first(),
+    );
     this.selectedDishAddButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
       appFrame
         .locator('[data-testid="action-rail-button-add1"], [data-test-id="action-rail-button-add1"]')
@@ -127,6 +136,18 @@ export class OrderDishesLocators {
             .locator('aside, [role="complementary"]')
             .getByRole('button', { name: /^(Add|加)$/ }),
         )
+        .first(),
+    );
+    this.changePriceButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
+      appFrame
+        .getByTestId('action-rail-button-chgPrc')
+        .or(hostPage.getByTestId('action-rail-button-chgPrc'))
+        .first(),
+    );
+    this.changePriceConfirmButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
+      appFrame
+        .getByTestId('preset-currency-keypad-input-confirm-button')
+        .or(hostPage.getByTestId('preset-currency-keypad-input-confirm-button'))
         .first(),
     );
     this.countButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>

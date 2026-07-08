@@ -1165,8 +1165,8 @@ This task must not guess endpoint paths. Before implementing it, obtain one succ
 Current evidence:
 
 - Repository search found no existing charge management API client.
-- `http://192.168.0.182:22080/kpos/swagger-ui/index.html` returned 404 during plan writing.
-- `http://192.168.0.182:22080/kpos/v3/api-docs`, `/kpos/v2/api-docs`, `/swagger-ui/index.html`, and `/v3/api-docs` did not expose reachable docs in the current session.
+- `http://192.168.0.247:22080/kpos/swagger-ui/index.html` returned 404 during plan writing.
+- `http://192.168.0.247:22080/kpos/v3/api-docs`, `/kpos/v2/api-docs`, `/swagger-ui/index.html`, and `/v3/api-docs` did not expose reachable docs in the current session.
 
 - [ ] **Step 1: Capture charge API contract**
 

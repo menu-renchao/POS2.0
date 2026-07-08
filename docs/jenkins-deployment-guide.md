@@ -54,7 +54,7 @@ git config --global https.proxy http://127.0.0.1:7897
 
 | 参数类型 | Name | Default Value | Description |
 |---------|------|---------------|-------------|
-| String Parameter | `PLAYWRIGHT_BASE_URL` | `http://192.168.0.72:22080` | Target server URL |
+| String Parameter | `PLAYWRIGHT_BASE_URL` | `http://192.168.247:22080` | Target server URL |
 | Choice Parameter | `TEST_SUITE` | `smoke` | Options: `all`, `smoke`, `e2e`, `py-migrate` |
 | Boolean Parameter | `HEADED` | `false` | Run in headed mode (for debugging) |
 
@@ -79,7 +79,7 @@ git config --global https.proxy http://127.0.0.1:7897
 | 文件 | 作用 |
 |------|------|
 | `Jenkinsfile` | 流水线定义，包含参数化构建、依赖安装、测试执行、报告生成 |
-| `test-data/env.ts` | 读取 `PLAYWRIGHT_BASE_URL` 环境变量，默认 `http://192.168.0.72:22080` |
+| `test-data/env.ts` | 读取 `PLAYWRIGHT_BASE_URL` 环境变量，默认 `http://192.168.247:22080` |
 | `playwright.config.ts` | CI 环境下自动切换 headless 模式 |
 
 ### 环境变量传递链路
@@ -123,7 +123,7 @@ Checkout → Check Environment → Install Dependencies → Run Tests → Genera
 
 | 环境 | 地址示例 |
 |------|---------|
-| 测试环境 | `http://192.168.0.72:22080` |
+| 测试环境 | `http://192.168.247:22080` |
 | 预发布环境 | `http://192.168.0.100:22080` |
 | 本地开发 | `http://localhost:22080` |
 

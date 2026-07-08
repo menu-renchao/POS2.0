@@ -84,7 +84,7 @@ test(
 ## Navigation Rules
 
 - Do not open POS inner pages by direct URL, hash, or deep link such as `#orderDishes`.
-- Always enter the app from `http://192.168.0.72:22080/kpos/front/myhome.html`, then navigate through the UI flow to the target page.
+- Always enter the app from `http://192.168.247:22080/kpos/front/myhome.html`, then navigate through the UI flow to the target page.
 - Apply the same rule to every in-app page, not only the order-dishes page.
 
 ## Test Design

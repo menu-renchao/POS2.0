@@ -1,5 +1,6 @@
 import { expect, type Locator } from '@playwright/test';
 import { step } from '../../utils/step';
+import { waitUntil } from '../../utils/wait';
 import { HomePage } from '../home.page';
 import { InventoryPage } from '../inventory.page';
 import type { RecallPage } from '../recall.page';
@@ -121,6 +122,7 @@ export class OrderDishesPageNavigation {
       await (await this.resolveSplitButton()).evaluate((buttonElement) => {
         (buttonElement as HTMLElement).click();
       });
+      await this.clickKeepSplitOrderIfVisible();
 
       const splitOrderPage = new SplitOrderPage(this.page);
       await splitOrderPage.expectLoaded();
@@ -258,5 +260,28 @@ export class OrderDishesPageNavigation {
         ],
         'Unable to find visible Split button on the order page.',
       );
+    }
+
+    private async clickKeepSplitOrderIfVisible(): Promise<void> {
+      const keepButtonCandidates = [
+        this.page.locator('[data-testid="button-keep"], [data-test-id="button-keep"]').first(),
+        this.locators.appFrame.locator('[data-testid="button-keep"], [data-test-id="button-keep"]').first(),
+        this.page.getByRole('button', { name: /^Keep$/ }).first(),
+        this.locators.appFrame.getByRole('button', { name: /^Keep$/ }).first(),
+      ];
+      const keepButton = await waitUntil(
+        async () => await this.ctx.findVisibleLocator(keepButtonCandidates),
+        (button): button is Locator => button !== null,
+        {
+          timeout: 2_000,
+          message: 'Split order keep button did not appear.',
+        },
+      ).catch(() => null);
+
+      if (keepButton) {
+        await keepButton.evaluate((buttonElement) => {
+          (buttonElement as HTMLElement).click();
+        });
+      }
     }
 }

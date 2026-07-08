@@ -27,6 +27,7 @@ export class PaymentPage {
   private readonly printReceiptDialog: Locator;
   private readonly printReceiptCancelButton: Locator;
   private readonly printReceiptConfirmButton: Locator;
+  private readonly paymentSuccessConfirmButton: Locator;
 
   constructor(private readonly page: Page) {
     this.contractRoot = this.page.getByTestId('payment-page');
@@ -35,6 +36,7 @@ export class PaymentPage {
     this.printReceiptDialog = this.page.locator('#print-customer-dialog');
     this.printReceiptCancelButton = this.printReceiptDialog.locator('#print-customer-cancel');
     this.printReceiptConfirmButton = this.printReceiptDialog.locator('#print-customer-submit');
+    this.paymentSuccessConfirmButton = this.paymentFrame.getByTestId('pay-success-status-button-1');
   }
 
   @step('页面操作：确认支付页面已经加载完成')
@@ -126,6 +128,23 @@ export class PaymentPage {
     await this.page.keyboard.press('Escape').catch(() => undefined);
   }
 
+  @step('页面操作：如支付成功页仍显示，则确认并关闭')
+  async confirmPaymentSuccessIfVisible(): Promise<void> {
+    if (!(await this.isPaymentSuccessConfirmVisible())) {
+      return;
+    }
+
+    await this.paymentSuccessConfirmButton.click();
+    await waitUntil(
+      async () => await this.isPaymentPanelVisible(),
+      (paymentPanelVisible) => !paymentPanelVisible,
+      {
+        timeout: 10_000,
+        message: 'Payment success panel did not close after confirmation.',
+      },
+    ).catch(() => undefined);
+  }
+
   @step('页面读取：读取左侧支付详情_summaryContent')
   async readSummaryContent(): Promise<PaymentSummarySnapshot> {
     const summaryContent = await this.resolveSummaryContent();
@@ -206,6 +225,11 @@ export class PaymentPage {
     }
 
     return await this.paymentFrame.locator('body').isVisible().catch(() => false);
+  }
+
+  @step('页面读取：确认支付成功确认按钮当前是否可见')
+  async isPaymentSuccessConfirmVisible(): Promise<boolean> {
+    return await this.paymentSuccessConfirmButton.isVisible().catch(() => false);
   }
 
   private async resolvePaymentSurface(): Promise<Locator> {

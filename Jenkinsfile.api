@@ -10,7 +10,7 @@ boolean isValidHostname(String host) {
 String resolveApiHost(Object rawHost) {
     def host = rawHost?.toString()?.trim() ?: ''
     if (!host) {
-        error 'API_HOST is required. Example: 192.168.0.182'
+        error 'API_HOST is required. Example: 192.168.0.247'
     }
 
     if (isValidIpv4(host)) {
@@ -18,7 +18,7 @@ String resolveApiHost(Object rawHost) {
     }
 
     if (host ==~ /^[0-9.]+$/) {
-        error "API_HOST must be a complete IPv4 address. Example: 192.168.0.182, actual: ${host}"
+        error "API_HOST must be a complete IPv4 address. Example: 192.168.0.247, actual: ${host}"
     }
 
     if (!isValidHostname(host)) {
@@ -93,7 +93,7 @@ properties([
         string(
             name: 'API_HOST',
             defaultValue: '192.168.0.',
-            description: '(required) Target API host. Complete it before running, e.g. 192.168.0.182'
+            description: '(required) Target API host. Complete it before running, e.g. 192.168.0.247'
         ),
         string(
             name: 'API_PORT',

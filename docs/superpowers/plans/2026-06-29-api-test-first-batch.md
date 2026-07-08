@@ -203,7 +203,7 @@ function resolveApiBaseURL(env: EnvSource): string {
     return `${stripTrailingSlash(playwrightBaseURL)}/kpos`;
   }
 
-  return 'http://192.168.0.182:22080/kpos';
+  return 'http://192.168.0.247:22080/kpos';
 }
 
 function resolveAuthMode(value: string | undefined): ApiAuthMode {
@@ -1814,7 +1814,7 @@ Expected: unit-level API tests pass under the `api` project.
 Run:
 
 ```powershell
-$env:API_BASE_URL='http://192.168.0.182:22080/kpos'
+$env:API_BASE_URL='http://192.168.0.247:22080/kpos'
 $env:API_AUTH_MODE='apiKey'
 if (-not $env:API_KEY) { throw 'Set API_KEY before running the full API suite.' }
 $env:API_ENABLE_DESTRUCTIVE='true'

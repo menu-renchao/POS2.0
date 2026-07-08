@@ -7,8 +7,10 @@ import { recallScopedTestId } from './recall-reads.section';
 
 export class RecallVoidDialog {
   private readonly voidOrderButton: Locator;
+  private readonly unifiedVoidMoreButton: Locator;
   private readonly voidAllMoreButton: Locator;
   private readonly legacyVoidAllMoreButton: Locator;
+  private readonly namedVoidMoreButton: Locator;
   private readonly namedVoidAllMoreButton: Locator;
   private readonly voidDialog: Locator;
   private readonly voidRestoreInventoryCheckbox: Locator;
@@ -21,8 +23,13 @@ export class RecallVoidDialog {
     private readonly orderDetails: RecallOrderDetailsDialog,
   ) {
     this.voidOrderButton = recallScopedTestId(this.page, 'recall2-order-detail-void');
+    this.unifiedVoidMoreButton = recallScopedTestId(
+      this.page,
+      'shared-order-detail-unified-more-action-void',
+    );
     this.voidAllMoreButton = recallScopedTestId(this.page, 'recall2-order-detail-void-all');
     this.legacyVoidAllMoreButton = this.page.locator('#pvoidod');
+    this.namedVoidMoreButton = this.page.getByRole('button', { name: /^Void$/i }).last();
     this.namedVoidAllMoreButton = this.page.getByRole('button', { name: /^Void All$/i });
     this.voidDialog = this.page
       .locator('[role="dialog"]:visible')
@@ -41,6 +48,17 @@ export class RecallVoidDialog {
 
   @step('页面操作：对当前 Recall 订单详情执行 Void')
   async voidCurrentOrder(options: { restoreInventory?: boolean; reason?: string } = {}): Promise<void> {
+    await this.submitCurrentOrderVoid(options);
+    await this.orderDetails.dismissOrderDetailsDialogIfNeeded();
+    await expect(this.orderDetails.orderDetailsDialog).toBeHidden({ timeout: 15_000 }).catch(() => undefined);
+  }
+
+  @step('页面操作：对当前 Recall 子单执行 Void 并保留订单详情上下文')
+  async voidCurrentOrderKeepingDetails(options: { restoreInventory?: boolean; reason?: string } = {}): Promise<void> {
+    await this.submitCurrentOrderVoid(options);
+  }
+
+  private async submitCurrentOrderVoid(options: { restoreInventory?: boolean; reason?: string } = {}): Promise<void> {
     const { restoreInventory = true, reason = 'test' } = options;
 
     await this.orderDetails.waitForOrderDetailsDialogReady();
@@ -58,8 +76,6 @@ export class RecallVoidDialog {
     await waitForInputSettled(this.voidNoteInput);
     await this.voidSubmitButton.click();
     await expect(this.voidSubmitButton).toBeHidden({ timeout: 15_000 }).catch(() => undefined);
-    await this.orderDetails.dismissOrderDetailsDialogIfNeeded();
-    await expect(this.orderDetails.orderDetailsDialog).toBeHidden({ timeout: 15_000 }).catch(() => undefined);
   }
 
   @step('页面操作：Void Recall 列表第一张可见订单')
@@ -147,8 +163,18 @@ export class RecallVoidDialog {
       return;
     }
 
+    if (await this.unifiedVoidMoreButton.isVisible().catch(() => false)) {
+      await this.unifiedVoidMoreButton.click();
+      return;
+    }
+
     if (await this.legacyVoidAllMoreButton.isVisible().catch(() => false)) {
       await this.legacyVoidAllMoreButton.click();
+      return;
+    }
+
+    if (await this.namedVoidMoreButton.isVisible().catch(() => false)) {
+      await this.namedVoidMoreButton.click();
       return;
     }
 
@@ -169,8 +195,16 @@ export class RecallVoidDialog {
           return 'void-all';
         }
 
+        if (await this.unifiedVoidMoreButton.isVisible().catch(() => false)) {
+          return 'void';
+        }
+
         if (await this.legacyVoidAllMoreButton.isVisible().catch(() => false)) {
           return 'void-all';
+        }
+
+        if (await this.namedVoidMoreButton.isVisible().catch(() => false)) {
+          return 'void';
         }
 
         if (await this.namedVoidAllMoreButton.isVisible().catch(() => false)) {
@@ -188,6 +222,16 @@ export class RecallVoidDialog {
     ).catch(() => null);
 
     if (visibleAction === 'void') {
+      if (await this.unifiedVoidMoreButton.isVisible().catch(() => false)) {
+        await this.unifiedVoidMoreButton.click();
+        return;
+      }
+
+      if (await this.namedVoidMoreButton.isVisible().catch(() => false)) {
+        await this.namedVoidMoreButton.click();
+        return;
+      }
+
       await this.voidOrderButton.click();
       return;
     }

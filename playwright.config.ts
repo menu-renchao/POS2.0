@@ -65,7 +65,7 @@ export default defineConfig({
         ...desktopChromeChannel,
         extraHTTPHeaders: posClientHeaders,
         viewport: { width: 1920, height: 1080 },
-        headless: !!process.env.CI,
+        headless: false,
       },
     },
   ],

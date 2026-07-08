@@ -62,7 +62,7 @@ export class SplitOrderPage {
   private readonly combineConfirmButton: Locator;
 
   constructor(private readonly page: Page) {
-    this.splitFrame = this.page.frameLocator('iframe[data-wujie-id="splitPanel"]');
+    this.splitFrame = this.page.frameLocator('iframe[data-wujie-id="splitPanel"], #splitPanelContainer iframe');
 
     this.modal = this.splitFrame.getByRole('dialog').first();
     this.title = this.modal.getByRole('heading').first();
@@ -451,6 +451,7 @@ export class SplitOrderPage {
       },
     ).catch(() => null);
 
+    await this.waitForReturnPageState(previousUrl);
     return this.resolveReturnPage();
   }
 
@@ -1062,6 +1063,43 @@ export class SplitOrderPage {
     }
 
     return new HomePage(this.page);
+  }
+
+  private async waitForReturnPageState(previousUrl: string): Promise<void> {
+    const startedAt = Date.now();
+
+    await waitUntil(
+      async () => {
+        const currentUrl = this.page.url();
+        const elapsed = Date.now() - startedAt;
+
+        return {
+          currentUrl,
+          elapsed,
+          isHome: this.isHomeUrl(currentUrl),
+          isOrderDishes: /#orderDishes\b/i.test(currentUrl),
+          isRecall: /#recall\b/i.test(currentUrl),
+        };
+      },
+      (state) =>
+        state.isHome ||
+        state.isRecall ||
+        (state.isOrderDishes && (state.currentUrl !== previousUrl || state.elapsed >= 750)),
+      {
+        timeout: 5_000,
+        interval: 100,
+        message: 'Split order return page did not settle in time.',
+      },
+    ).catch(() => undefined);
+  }
+
+  private isHomeUrl(urlText: string): boolean {
+    try {
+      const url = new URL(urlText);
+      return url.pathname.endsWith('/kpos/front/myhome.html') && url.hash === '';
+    } catch {
+      return false;
+    }
   }
 
   private parseSplitDishProportionFromText(text: string): string | null {

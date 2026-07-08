@@ -135,6 +135,16 @@ export class RecallPage {
     return this.orderDetails.openOrderDetails(...args);
   }
 
+  async readTargetOrderNumbers(
+    ...args: Parameters<RecallOrderDetailsDialog['readTargetOrderNumbers']>
+  ): Promise<string[]> {
+    return this.orderDetails.readTargetOrderNumbers(...args);
+  }
+
+  async selectTargetOrder(...args: Parameters<RecallOrderDetailsDialog['selectTargetOrder']>): Promise<void> {
+    return this.orderDetails.selectTargetOrder(...args);
+  }
+
   async openFirstVisibleOrderDetails(): Promise<void> {
     return this.orderDetails.openFirstVisibleOrderDetails();
   }
@@ -296,6 +306,12 @@ export class RecallPage {
 
   async voidCurrentOrder(...args: Parameters<RecallVoidDialog['voidCurrentOrder']>): Promise<void> {
     return this.voidDialog.voidCurrentOrder(...args);
+  }
+
+  async voidCurrentOrderKeepingDetails(
+    ...args: Parameters<RecallVoidDialog['voidCurrentOrderKeepingDetails']>
+  ): Promise<void> {
+    return this.voidDialog.voidCurrentOrderKeepingDetails(...args);
   }
 
   async voidFirstVisibleOrder(...args: Parameters<RecallVoidDialog['voidFirstVisibleOrder']>): Promise<void> {

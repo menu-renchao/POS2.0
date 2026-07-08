@@ -14,11 +14,11 @@ import {
 test.describe('菜单硬删除清理配置', () => {
   test('应能从 API_BASE_URL 解析数据库地址并固定使用菜单清理端口和账号', () => {
     const config = resolveMenuHardDeleteConfig({
-      API_BASE_URL: 'http://192.168.0.182:22080/kpos',
+      API_BASE_URL: 'http://192.168.0.247:22080/kpos',
     });
 
     expect(config).toEqual({
-      host: '192.168.0.182',
+      host: '192.168.0.247',
       port: 22108,
       database: 'kpos',
       user: 'root',
@@ -29,12 +29,12 @@ test.describe('菜单硬删除清理配置', () => {
   test('应能构造菜单硬删除数据库连接配置', () => {
     const options = new MysqlDb(
       resolveMenuHardDeleteConfig({
-        API_BASE_URL: 'http://192.168.0.182:22080/kpos',
+        API_BASE_URL: 'http://192.168.0.247:22080/kpos',
       }),
     ).connectionOptions();
 
     expect(options).toEqual({
-      host: '192.168.0.182',
+      host: '192.168.0.247',
       port: 22108,
       database: 'kpos',
       user: 'root',
@@ -63,7 +63,7 @@ test.describe('菜单硬删除清理配置', () => {
 
     await cleanupMenuResourcesAfterFlow(
       {
-        baseURL: 'http://192.168.0.182:22080/kpos',
+        baseURL: 'http://192.168.0.247:22080/kpos',
         auth: {
           mode: 'apiLogin',
           clientSn: 'device001',
@@ -116,7 +116,7 @@ test.describe('菜单硬删除清理配置', () => {
           calls.push('hard-delete');
         },
         env: {
-          API_BASE_URL: 'http://192.168.0.182:22080/kpos',
+          API_BASE_URL: 'http://192.168.0.247:22080/kpos',
         },
       });
 

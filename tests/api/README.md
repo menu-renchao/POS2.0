@@ -33,7 +33,7 @@
 
 常用环境变量：
 
-- `API_BASE_URL`：接口根地址，默认 `http://192.168.0.182:22080/kpos`。
+- `API_BASE_URL`：接口根地址，默认 `http://192.168.0.247:22080/kpos`。
 - `API_AUTH_MODE`：可省略；如显式配置，只允许 `apiLogin` 或 `api_login`。
 
 ## Jenkins 独立流水线
@@ -42,7 +42,7 @@ API 测试使用根目录 `Jenkinsfile.api` 作为独立 Jenkins Pipeline 入口
 
 Jenkins 参数：
 
-- `API_HOST`：预填 `192.168.0.`，运行前必须补成完整 IPv4 或合法 hostname，例如 `192.168.0.182`。
+- `API_HOST`：预填 `192.168.0.`，运行前必须补成完整 IPv4 或合法 hostname，例如 `192.168.0.247`。
 - `API_PORT`：默认 `22080`。
 - `API_CONTEXT_PATH`：默认 `kpos`。
 - `API_TEST_SCOPE`：可选 `all`、`endpoints`、`business`、`contracts`、`unit`、`cleanup`。

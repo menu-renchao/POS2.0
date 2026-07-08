@@ -72,6 +72,13 @@ export const orderServiceCancelSplitCase = {
   splitSuborderCount: 2,
 } as const;
 
+export const orderServiceSplitTipsCase = {
+  changedDishPrice: 5,
+  expectedTipAmount: 3,
+  tipAmountInCents: 300,
+  voidReason: 'POS-19362 子单删除后保留其他子单 tips',
+} as const;
+
 export const orderServiceCustomers = {
   delivery: {
     address: 'menusifu-test',

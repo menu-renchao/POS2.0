@@ -59,8 +59,9 @@ export class PaymentFlow {
       async () => ({
         paymentPanelVisible: await paymentPage.isPaymentPanelVisible(),
         printReceiptVisible: await paymentPage.isPrintReceiptDialogVisible(),
+        successConfirmVisible: await paymentPage.isPaymentSuccessConfirmVisible(),
       }),
-      (state) => state.printReceiptVisible || !state.paymentPanelVisible,
+      (state) => state.printReceiptVisible || state.successConfirmVisible || !state.paymentPanelVisible,
       {
         timeout: 20_000,
         message: 'Payment did not reach a settled completion state in time.',
@@ -68,6 +69,11 @@ export class PaymentFlow {
     );
 
     if (!completionState.paymentPanelVisible) {
+      return;
+    }
+
+    if (completionState.successConfirmVisible) {
+      await paymentPage.confirmPaymentSuccessIfVisible();
       return;
     }
 

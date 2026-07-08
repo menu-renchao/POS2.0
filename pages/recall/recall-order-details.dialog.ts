@@ -113,6 +113,61 @@ export class RecallOrderDetailsDialog {
     await this.selectSplitTargetOrderIfNeeded(normalizedOrderNumber, targetOrderNumber);
   }
 
+  @step('页面读取：读取当前 Recall 订单详情中的可选子单号')
+  async readTargetOrderNumbers(orderNumber?: string): Promise<string[]> {
+    await this.waitForOrderDetailsDialogReady();
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+    const dialogText = (await orderDetailsDialog.textContent().catch(() => '')) ?? '';
+    const parentOrderNumber = orderNumber
+      ? normalizeOrderNumber(orderNumber).replace(/^#/, '')
+      : dialogText.match(/#(\d+)-\d+/)?.[1];
+
+    if (parentOrderNumber) {
+      const visibleChildOrderNumbers = await this.readVisibleChildOrderNumbers(parentOrderNumber);
+
+      if (visibleChildOrderNumbers.length > 0) {
+        return visibleChildOrderNumbers;
+      }
+    }
+
+    const targetOrderButtons = this.resolveSplitTargetOrderButtons(orderDetailsDialog);
+
+    const targetOrderNumbers = await targetOrderButtons.evaluateAll((buttonElements) => {
+      const normalizeText = (value: string | null | undefined): string =>
+        String(value ?? '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+      return [...new Set(
+        buttonElements
+          .map((buttonElement) => {
+            const visibleOrderNumber = normalizeText(buttonElement.textContent).match(/#\d+-\d+\b/)?.[0];
+
+            return visibleOrderNumber ?? null;
+          })
+          .filter((orderNumber): orderNumber is string => Boolean(orderNumber)),
+      )];
+    });
+
+    if (targetOrderNumbers.length > 0) {
+      return targetOrderNumbers;
+    }
+
+    if (!parentOrderNumber) {
+      return [];
+    }
+
+    const splitCount = await this.readVisibleSplitCount(parentOrderNumber);
+
+    return Array.from({ length: splitCount }, (_, index) => `#${parentOrderNumber}-${index + 1}`);
+  }
+
+  @step((targetOrderNumber: string) => `页面操作：在当前 Recall 订单详情中切换到子单 ${targetOrderNumber}`)
+  async selectTargetOrder(targetOrderNumber: string): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    await this.selectSplitTargetOrderIfNeeded('', targetOrderNumber);
+  }
+
   @step('页面操作：打开 Recall 列表第一张可见订单卡片的详情弹窗')
   async openFirstVisibleOrderDetails(): Promise<void> {
     if (await this.orderDetailsDialog.isVisible().catch(() => false)) {
@@ -1392,6 +1447,7 @@ export class RecallOrderDetailsDialog {
   @step((orderNumber: string) => `页面操作：点击 Recall 列表中的订单 ${orderNumber}`)
   private async clickVisibleOrderNumber(orderNumber: string): Promise<void> {
     const normalizedOrderNumber = orderNumber.replace(/^#/, '');
+    const visibleOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
     const orderCardTrigger = this.filterBar.orderListContainer
       .locator(
         [
@@ -1410,14 +1466,16 @@ export class RecallOrderDetailsDialog {
       return;
     }
 
-    const orderInContainer = this.filterBar.orderListContainer.getByText(orderNumber, { exact: true }).first();
+    const orderInContainer = this.filterBar.orderListContainer
+      .getByText(visibleOrderNumber, { exact: true })
+      .first();
 
     if (await orderInContainer.isVisible().catch(() => false)) {
       await orderInContainer.click();
       return;
     }
 
-    await this.page.getByText(orderNumber, { exact: true }).first().click();
+    await this.page.getByText(visibleOrderNumber, { exact: true }).first().click();
   }
 
   @step('页面操作：点击 Recall 列表第一张可见订单卡片')
@@ -1478,8 +1536,16 @@ export class RecallOrderDetailsDialog {
     const splitOrderNumberText = targetOrderNumber
       ? normalizeOrderNumber(targetOrderNumber)
       : null;
+
+    if (
+      splitOrderNumberText &&
+      (await this.isActiveOrderDetailsHeader(splitOrderNumberText))
+    ) {
+      return;
+    }
+
     const splitOrderTargetLabel = splitOrderNumberText
-      ? this.orderDetailsDialog.getByText(splitOrderNumberText, { exact: true }).first()
+      ? await this.resolveSplitOrderTargetLabel(splitOrderNumberText)
       : this.orderDetailsDialog
           .getByText(new RegExp(`^${escapeRegExp(orderNumber)}-\\d+$`))
           .first();
@@ -1495,8 +1561,111 @@ export class RecallOrderDetailsDialog {
         (targetLabelElement as HTMLElement);
       clickableElement.click();
     });
-    await this.waitForVisibleOrderDialogCount(visibleDialogCount + 1);
+    if (splitOrderNumberText) {
+      await waitUntil(
+        async () => await this.isActiveOrderDetailsHeader(splitOrderNumberText),
+        (isTargetOrderVisible) => isTargetOrderVisible,
+        {
+          timeout: 5_000,
+          message: `Recall 子单 ${splitOrderNumberText} 未在点击后打开。`,
+        },
+      );
+    } else {
+      await this.waitForVisibleOrderDialogCount(visibleDialogCount + 1);
+    }
     await this.waitForOrderDetailsDialogReady();
+  }
+
+  private async isActiveOrderDetailsHeader(orderNumber: string): Promise<boolean> {
+    const visibleOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
+    const visibleDialogCount = await this.readVisibleOrderDialogCount();
+
+    for (let index = 0; index < visibleDialogCount; index += 1) {
+      const candidate = this.visibleOrderDetailsDialogs.nth(index);
+      const isTargetDetailsDialog = await candidate.evaluate((dialogElement, targetOrderNumber) => {
+        const cleanText = (value: string | null | undefined): string =>
+          String(value ?? '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const visibleElements = Array.from(dialogElement.querySelectorAll<HTMLElement>('*')).filter(
+          (element) => {
+            const computedStyle = window.getComputedStyle(element);
+            const rect = element.getBoundingClientRect();
+
+            return (
+              computedStyle.display !== 'none' &&
+              computedStyle.visibility !== 'hidden' &&
+              rect.width > 0 &&
+              rect.height > 0
+            );
+          },
+        );
+        const hasTargetOrderNumber = visibleElements.some(
+          (element) => cleanText(element.textContent) === targetOrderNumber,
+        );
+        const actionButtons = Array.from(dialogElement.querySelectorAll<HTMLButtonElement>('button'));
+        const hasDetailsAction = actionButtons.some((buttonElement) =>
+          /^(Edit|Pay|MoreIcon More|More)$/i.test(cleanText(buttonElement.textContent)),
+        );
+
+        return hasTargetOrderNumber && hasDetailsAction;
+      }, visibleOrderNumber);
+
+      if (isTargetDetailsDialog) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private resolveSplitTargetOrderButtons(orderDetailsDialog: Locator): Locator {
+    return orderDetailsDialog.locator(
+      '[data-test-id^="shared-order-detail-select-target-order-"], [data-testid^="shared-order-detail-select-target-order-"]',
+    );
+  }
+
+  private async resolveSplitOrderTargetLabel(splitOrderNumberText: string): Promise<Locator> {
+    const visibleOrderNumber = splitOrderNumberText.startsWith('#')
+      ? splitOrderNumberText
+      : `#${splitOrderNumberText}`;
+
+    return await resolveFirstVisibleLocator(
+      [
+        this.orderDetailsDialog
+          .getByRole('button', { name: new RegExp(`^${escapeRegExp(visibleOrderNumber)}\\b`) })
+          .first(),
+        this.orderDetailsDialog.getByText(visibleOrderNumber, { exact: true }).first(),
+        this.filterBar.orderListContainer.getByText(visibleOrderNumber, { exact: true }).first(),
+      ],
+      `Recall 子单 ${visibleOrderNumber} 未在当前订单详情中显示。`,
+    );
+  }
+
+  private async readVisibleSplitCount(parentOrderNumber: string): Promise<number> {
+    return await this.filterBar.orderListContainer.evaluate((orderListElement, orderNumber) => {
+      const normalizeText = (value: string | null | undefined): string =>
+        String(value ?? '')
+          .replace(/\s+/g, ' ')
+          .trim();
+      const orderLabelText = `#${orderNumber}`;
+      const orderLabel = Array.from(orderListElement.querySelectorAll<HTMLElement>('*')).find(
+        (element) => normalizeText(element.textContent) === orderLabelText,
+      );
+      const orderCard = orderLabel?.closest<HTMLElement>('button, [role="button"]');
+      const orderCardText = orderCard?.innerText ?? '';
+      const splitCountMatch = orderCardText.match(new RegExp(`^(\\d+)\\s+${orderLabelText.replace('#', '\\#')}\\b`));
+
+      return Number(splitCountMatch?.[1] ?? 2);
+    }, parentOrderNumber);
+  }
+
+  private async readVisibleChildOrderNumbers(parentOrderNumber: string): Promise<string[]> {
+    return await this.page.evaluate((parentOrderNumberText) => {
+      const matchedOrderNumbers =
+        document.body.innerText.match(new RegExp(`#${parentOrderNumberText}-\\d+`, 'g')) ?? [];
+      return [...new Set(matchedOrderNumbers)];
+    }, parentOrderNumber);
   }
 
   private async readVisibleOrderDialogCount(): Promise<number> {

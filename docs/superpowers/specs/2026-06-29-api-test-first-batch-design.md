@@ -12,8 +12,8 @@
 
 接口文档来自：
 
-- Swagger UI：`http://192.168.0.182:22080/kpos/swagger-ui/index.html`
-- OpenAPI JSON：`http://192.168.0.182:22080/kpos/v3/api-docs`
+- Swagger UI：`http://192.168.0.247:22080/kpos/swagger-ui/index.html`
+- OpenAPI JSON：`http://192.168.0.247:22080/kpos/v3/api-docs`
 - 本地文档：`接口文档.md`
 
 Swagger 当前包含 77 个分组、484 个 path、517 个 operation、795 个 schema。首批接口测试不做全量 517 个 operation，而是先覆盖用户指定的核心领域。
@@ -135,7 +135,7 @@ test-data/api/
 环境变量：
 
 ```text
-API_BASE_URL=http://192.168.0.182:22080/kpos
+API_BASE_URL=http://192.168.0.247:22080/kpos
 API_AUTH_MODE=apiKey
 API_KEY=<固定 API Key>
 API_COOKIE_LICENSE_AUTH_KEY=<cookie 模式时使用>

@@ -181,7 +181,7 @@ repo/
 
 仓库 `AGENTS.md` 已明确要求：
 
-- 只能从 `http://192.168.0.72:22080/kpos/front/myhome.html` 进入系统
+- 只能从 `http://192.168.247:22080/kpos/front/myhome.html` 进入系统
 - 不允许通过 hash 或深链接直接打开内部页面
 
 因此本仓库的 `seed.spec.ts` 必须体现真实入口流程，而不是直接跳到点餐页或 Recall 页。

@@ -94,6 +94,14 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.menu.increaseOrderedDishQuantityByOne(...args);
   }
 
+  clickAddLine(...args: Parameters<OrderDishesMenuSection['clickAddLine']>): ReturnType<OrderDishesMenuSection['clickAddLine']> {
+    return this.menu.clickAddLine(...args);
+  }
+
+  changeOrderedDishPrice(...args: Parameters<OrderDishesMenuSection['changeOrderedDishPrice']>): ReturnType<OrderDishesMenuSection['changeOrderedDishPrice']> {
+    return this.menu.changeOrderedDishPrice(...args);
+  }
+
   openModifyForOrderedDish(...args: Parameters<OrderDishesModifierSection['openModifyForOrderedDish']>): ReturnType<OrderDishesModifierSection['openModifyForOrderedDish']> {
     return this.modifier.openModifyForOrderedDish(...args);
   }

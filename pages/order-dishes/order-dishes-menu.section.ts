@@ -164,6 +164,54 @@ export class OrderDishesMenuSection {
       await this.clickSelectedDishAdd();
     }
 
+    @step('页面操作：在点餐页新增一条菜品分线')
+    async clickAddLine(): Promise<void> {
+      await this.host.expectLoaded();
+      const addLineButton = await this.ctx.resolveVisibleLocator(
+        [
+          this.locators.appFrame.getByTestId('action-rail-button-addline').first(),
+          this.page.getByTestId('action-rail-button-addline').first(),
+        ],
+        'Unable to find order-dishes Add Line button.',
+      );
+
+      await addLineButton.evaluate((buttonElement) => {
+        (buttonElement as HTMLElement).click();
+      });
+    }
+
+    @step((dishName: string, price: number) => `页面操作：将已点菜品 ${dishName} 的价格修改为 ${price}`)
+    async changeOrderedDishPrice(dishName: string, price: number): Promise<void> {
+      await this.selectOrderedDish(dishName);
+      const changePriceButton = await this.resolveChangePriceButton();
+
+      await changePriceButton.evaluate((buttonElement) => {
+        (buttonElement as HTMLElement).click();
+      });
+      await this.expectCurrencyKeypadVisible();
+      await this.enterCurrencyKeypadAmount(price);
+      await waitForInputSettled(undefined, 250);
+      const confirmButton = await this.resolveCurrencyKeypadConfirmButton();
+      await confirmButton.evaluate((buttonElement) => {
+        (buttonElement as HTMLElement).click();
+      });
+      await expect(confirmButton).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
+    }
+
+    private async resolveChangePriceButton(): Promise<Locator> {
+      return await this.ctx.resolveVisibleLocator(
+        [
+          this.locators.appFrame.getByTestId('action-rail-button-chgPrc').first(),
+          this.page.getByTestId('action-rail-button-chgPrc').first(),
+        ],
+        'Unable to find order-dishes Change Price button.',
+      );
+    }
+
+    private async expectCurrencyKeypadVisible(): Promise<void> {
+      await this.resolveCurrencyKeypadConfirmButton();
+    }
+
     @step('页面操作：确认重量输入弹窗可见')
     async expectWeightDialogVisible(): Promise<void> {
       await expect(this.locators.weightDialog).toBeVisible({ timeout: 10_000 });
@@ -417,6 +465,52 @@ export class OrderDishesMenuSection {
           this.locators.countDialog,
         ],
         'Unable to find visible Count dialog on the order page.',
+      );
+    }
+
+    private async enterCurrencyKeypadAmount(amount: number): Promise<void> {
+      if (!Number.isFinite(amount) || amount < 0) {
+        throw new Error(`Invalid currency amount: ${amount}`);
+      }
+
+      const centsText = String(Math.round(amount * 100)).replace(/^0+(?=\d)/, '');
+      const keypadInputs =
+        centsText.endsWith('00') && centsText.length > 2
+          ? [...centsText.slice(0, -2), 'double-zero']
+          : [...centsText];
+
+      for (const keypadInput of keypadInputs) {
+        await (await this.resolveCurrencyKeypadButton(keypadInput)).click();
+      }
+    }
+
+    private async resolveCurrencyKeypadButton(keypadInput: string): Promise<Locator> {
+      if (keypadInput === 'double-zero') {
+        return await this.ctx.resolveVisibleLocator(
+          [
+            this.locators.appFrame.getByTestId('preset-currency-keypad-input-double-zero').first(),
+            this.page.getByTestId('preset-currency-keypad-input-double-zero').first(),
+          ],
+          'Unable to find currency keypad double-zero button.',
+        );
+      }
+
+      return await this.ctx.resolveVisibleLocator(
+        [
+          this.locators.appFrame.getByTestId(`preset-currency-keypad-input-number-${keypadInput}`).first(),
+          this.page.getByTestId(`preset-currency-keypad-input-number-${keypadInput}`).first(),
+        ],
+        `Unable to find currency keypad number button: ${keypadInput}.`,
+      );
+    }
+
+    private async resolveCurrencyKeypadConfirmButton(): Promise<Locator> {
+      return await this.ctx.resolveVisibleLocator(
+        [
+          this.locators.appFrame.getByTestId('preset-currency-keypad-input-confirm-button').first(),
+          this.page.getByTestId('preset-currency-keypad-input-confirm-button').first(),
+        ],
+        'Unable to find currency keypad confirm button.',
       );
     }
 
