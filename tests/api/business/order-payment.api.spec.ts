@@ -234,9 +234,11 @@ async function expectJsonEnvelope(
   response: APIResponse,
   label: string,
 ): Promise<ApiEnvelope<unknown>> {
-  expect(response.status(), `${label} 不应返回 500`).not.toBe(500);
+  const responseText = await response.text();
 
-  const body: unknown = await response.json();
+  expect(response.status(), `${label} 不应返回 500；响应：${summarizeJson(responseText, 800)}`).not.toBe(500);
+
+  const body = parseJsonResponseText(responseText, label);
   expectResponseEnvelope(body);
   expect(body.code, `${label} 应返回业务成功 code=0；响应：${summarizeJson(body, 800)}`).toBe(0);
 
@@ -247,9 +249,11 @@ async function expectJsonBusinessEnvelope(
   response: APIResponse,
   label: string,
 ): Promise<Record<string, unknown>> {
-  expect(response.status(), `${label} 不应返回 500`).not.toBe(500);
+  const responseText = await response.text();
 
-  const body: unknown = await response.json();
+  expect(response.status(), `${label} 不应返回 500；响应：${summarizeJson(responseText, 800)}`).not.toBe(500);
+
+  const body = parseJsonResponseText(responseText, label);
   expect(isRecord(body), `${label} 应返回 JSON 对象`).toBe(true);
   if (!isRecord(body)) {
     throw new Error(`${label} 应返回 JSON 对象。`);
@@ -258,6 +262,18 @@ async function expectJsonBusinessEnvelope(
   expect(typeof body.msg, `${label} 应返回 string msg`).toBe('string');
 
   return body;
+}
+
+function parseJsonResponseText(responseText: string, label: string): unknown {
+  try {
+    return JSON.parse(responseText);
+  } catch (error) {
+    throw new Error(
+      `${label} 应返回 JSON；响应：${summarizeJson(responseText, 800)}；错误：${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 }
 
 async function createControlledSaleItem(options: {
