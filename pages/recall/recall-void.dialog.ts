@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { step } from '../../utils/step';
 import { waitForInputSettled } from '../../utils/input-stability';
 import { waitUntil } from '../../utils/wait';
+import { readVisiblePosAlertText } from '../shared/pos-alert';
 import type { RecallOrderDetailsDialog } from './recall-order-details.dialog';
 import { recallScopedTestId } from './recall-reads.section';
 
@@ -268,6 +269,22 @@ export class RecallVoidDialog {
         message: 'Recall Void 弹窗未完成展示。',
       },
     );
+  }
+
+  @step('页面操作：尝试对当前 Recall 订单详情执行 Void 并读取阻断提示')
+  async attemptVoidCurrentOrder(
+    options: { restoreInventory?: boolean; reason?: string } = {},
+  ): Promise<string | null> {
+    await this.submitCurrentOrderVoid(options);
+
+    const blockingMessage = await readVisiblePosAlertText(this.page, 5_000).catch(() => null);
+
+    if (blockingMessage) {
+      return blockingMessage;
+    }
+
+    await expect(this.orderDetails.orderDetailsDialog).toBeHidden({ timeout: 15_000 }).catch(() => undefined);
+    return null;
   }
 
   private async resolveRestoreInventoryCheckbox(): Promise<Locator | null> {

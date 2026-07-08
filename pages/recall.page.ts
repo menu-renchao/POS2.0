@@ -308,6 +308,13 @@ export class RecallPage {
     return this.voidDialog.voidCurrentOrder(...args);
   }
 
+  @step('页面操作：尝试作废当前 Recall 订单详情并读取阻断提示')
+  async attemptVoidCurrentOrder(
+    ...args: Parameters<RecallVoidDialog['attemptVoidCurrentOrder']>
+  ): Promise<string | null> {
+    return this.voidDialog.attemptVoidCurrentOrder(...args);
+  }
+
   async voidCurrentOrderKeepingDetails(
     ...args: Parameters<RecallVoidDialog['voidCurrentOrderKeepingDetails']>
   ): Promise<void> {

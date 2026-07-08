@@ -32,6 +32,11 @@ export type RecallSearchParams = {
   clearFirst?: boolean;
 };
 
+export type RecallVoidOptions = {
+  reason?: string;
+  restoreInventory?: boolean;
+};
+
 export class RecallFlow {
   @step('业务步骤：从首页进入 Recall 页面')
   async openRecallFromHome(homePage: HomePage): Promise<RecallPage> {
@@ -393,6 +398,22 @@ export class RecallFlow {
     await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
     await recallPage.clickVoidInMoreMenu();
     return recallPage;
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：尝试作废订单 ${orderNumber} 的子单 ${targetOrderNumber} 并读取阻断提示`
+      : `业务步骤：尝试作废订单 ${orderNumber} 并读取阻断提示`,
+  )
+  async attemptVoidOrder(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+    options: RecallVoidOptions = {},
+  ): Promise<string | null> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.attemptVoidCurrentOrder(options);
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
