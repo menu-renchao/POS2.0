@@ -253,6 +253,12 @@ pipeline {
             }
         }
 
+        stage('Install Playwright Browsers') {
+            steps {
+                bat 'node node_modules\\@playwright\\test\\cli.js install chromium'
+            }
+        }
+
         stage('Check Playwright Installation') {
             steps {
                 bat '''

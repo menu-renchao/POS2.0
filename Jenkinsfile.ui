@@ -739,6 +739,12 @@ pipeline {
             }
         }
 
+        stage('Install Playwright Browsers') {
+            steps {
+                bat 'node node_modules\\@playwright\\test\\cli.js install chromium'
+            }
+        }
+
         // 生成用例树：用 Playwright 自己的 --list 结果产出 suite/file/case 联动数据。
         stage('Generate Test Tree') {
             steps {

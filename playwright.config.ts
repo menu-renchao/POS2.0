@@ -6,6 +6,8 @@ const posClientHeaders = {
   'x-client-type': '0',
 };
 
+const desktopChromeChannel = process.env.CI ? {} : { channel: 'chrome' as const };
+
 export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
@@ -42,7 +44,7 @@ export default defineConfig({
       testIgnore: /(?:^|[\\/])(?:api|py-migrate)(?:[\\/]|$)/,
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'chrome',
+        ...desktopChromeChannel,
         extraHTTPHeaders: posClientHeaders,
         viewport: { width: 1920, height: 1080 },
         headless: !!process.env.CI,
@@ -60,7 +62,7 @@ export default defineConfig({
       testMatch: /(?:^|[\\/])py-migrate[\\/].*\.spec\.ts$/,
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'chrome',
+        ...desktopChromeChannel,
         extraHTTPHeaders: posClientHeaders,
         viewport: { width: 1920, height: 1080 },
         headless: !!process.env.CI,
