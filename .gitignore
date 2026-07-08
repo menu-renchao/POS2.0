@@ -8,5 +8,6 @@ playwright/.auth/*.json
 !playwright/.auth/.gitkeep
 /.playwright-mcp
 /.worktrees/
+.superpowers/
 .codex/agents/playwright-test-generator.toml
 /.codex
