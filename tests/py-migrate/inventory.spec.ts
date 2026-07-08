@@ -55,7 +55,7 @@ async function recallRecentOrderFromHome(homePage: HomePage, orderDishesPage: Or
   return await new RecallFlow().openRecallFromHome(homePage);
 }
 
-test.describe('库存管理', { tag: ['@py-migrate'] }, () => {
+test.describe('库存管理', { tag: ['@库存', '@点单'] }, () => {
   test.describe.configure({ timeout: 120_000 });
 
   test(

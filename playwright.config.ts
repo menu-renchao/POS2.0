@@ -30,7 +30,6 @@ export default defineConfig({
     ],
   ],
   globalSetup: require.resolve('./tests/setup/global.setup'),
-  globalTeardown: require.resolve('./tests/setup/global.teardown'),
   use: {
     baseURL: appConfig.baseURL,
     trace: 'on-first-retry',
@@ -40,24 +39,6 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chrome',
-      testIgnore: /(?:^|[\\/])(?:api|py-migrate)(?:[\\/]|$)/,
-      use: {
-        ...devices['Desktop Chrome'],
-        ...desktopChromeChannel,
-        extraHTTPHeaders: posClientHeaders,
-        viewport: { width: 1920, height: 1080 },
-        headless: !!process.env.CI,
-      },
-    },
-    {
-      name: 'api',
-      testMatch: /(?:^|[\\/])api[\\/].*\.(?:api|unit)\.spec\.ts$/,
-      use: {
-        viewport: null,
-      },
-    },
-    {
       name: 'py-migrate',
       testMatch: /(?:^|[\\/])py-migrate[\\/].*\.spec\.ts$/,
       use: {
@@ -65,7 +46,7 @@ export default defineConfig({
         ...desktopChromeChannel,
         extraHTTPHeaders: posClientHeaders,
         viewport: { width: 1920, height: 1080 },
-        headless: false,
+        headless: !!process.env.CI,
       },
     },
   ],

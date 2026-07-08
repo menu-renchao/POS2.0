@@ -37,6 +37,7 @@ This repository is a maintainable Playwright + TypeScript UI automation project 
 - Do not scatter raw `getByRole(...)`, `getByText(...)`, `locator(...)`, or selector strings throughout page action/read methods when those selectors belong to the page structure.
 - If a selector is reused, semantically important, or represents a stable page element such as a button, dialog, input, tab, list, or summary area, define it once and consume it through the centralized page locator API.
 - Do not create a separate page object for a strongly coupled transient dialog or popup that only exists as one immediate step of its parent page flow, such as a guest-count dialog opened from table selection. Keep that dialog on the owning page object unless it can be entered, reused, and reasoned about independently.
+- When a dialog does not expose a close or exit button, treat clicking the blank/backdrop area as the designed exit path instead of inventing a close-button locator; this is especially relevant on Recall pages.
 - `pages/` must not contain business selection strategy or cross-step intent such as “select any available table”, “pick the first usable license”, “enter the system with employee context”, or other business-level decisions.
 - `flows/` only holds business intent, multi-step orchestration, and selection strategy.
 - `flows/` can combine multiple page actions, decide which record to pick, decide fallback order, and return business-level results.
@@ -74,12 +75,24 @@ test(
 );
 ```
 
+## Test Tagging Rules
+
+- Use Playwright native `tag` metadata for test tags.
+- Tags should describe the business scope covered by the test, not the source directory, migration batch, or implementation origin.
+- Do not use migration-only tags such as `@py-migrate`; the `tests/py-migrate` path and Playwright project name already provide that grouping.
+- A test may have multiple business tags when it spans multiple areas.
+- Prefer these current business tags where applicable: `@库存`, `@点单`, `@分单`, `@小费`, `@加收`, `@现金支付`, `@信用卡支付`.
+- Payment tests must use the specific payment method tag, such as `@现金支付` or `@信用卡支付`, instead of a generic payment tag.
+- Broad tags may be placed on `test.describe(...)` when every nested test shares that scope; add narrower tags on individual tests only for extra business coverage.
+- Keep stable suite-purpose tags such as `@smoke` when they express execution intent rather than business scope.
+
 ## POS Domain Guidance
 
 - Do not model the system like a SaaS app with one global login session.
 - Treat "login" as employee context entry or employee switching during operations.
 - Prefer expressing employee context through flows and fixtures.
 - Keep room for optional API-assisted setup or `storageState`, but do not make that the default strategy.
+- For configuration that belongs to the admin entry, prefer API-based setup and avoid UI configuration unless the admin UI behavior itself is under test or no API is available.
 
 ## Navigation Rules
 

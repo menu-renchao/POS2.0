@@ -1605,7 +1605,7 @@ export class RecallOrderDetailsDialog {
         );
         const actionButtons = Array.from(dialogElement.querySelectorAll<HTMLButtonElement>('button'));
         const hasDetailsAction = actionButtons.some((buttonElement) =>
-          /^(Edit|Pay|MoreIcon More|More)$/i.test(cleanText(buttonElement.textContent)),
+          /^(Edit|Pay|Reopen|MoreIcon More|More)$/i.test(cleanText(buttonElement.textContent)),
         );
 
         return hasTargetOrderNumber && hasDetailsAction;

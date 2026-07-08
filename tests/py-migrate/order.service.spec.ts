@@ -24,6 +24,7 @@ import {
   orderServiceSplitByAmountCase,
   orderServiceSplitByDishCase,
   orderServiceSplitEvenlyCase,
+  orderServiceSplitTipsCase,
 } from '../../test-data/order-service';
 import {
   RecallManualSearchTags,
@@ -104,6 +105,20 @@ async function enterReadyHome({
   return readyHomePage;
 }
 
+async function enterRecallFromReturnedPage(
+  returnedPage: HomePage | OrderDishesPage | RecallPage,
+): Promise<RecallPage> {
+  if (returnedPage instanceof RecallPage) {
+    return returnedPage;
+  }
+
+  if (returnedPage instanceof OrderDishesPage) {
+    return await returnedPage.clickRecall();
+  }
+
+  return await returnedPage.enterRecall();
+}
+
 async function saveOrderAndOpenLatestRecallDetails(
   orderDishesPage: OrderDishesPage,
 ): Promise<Awaited<ReturnType<RecallFlow['viewFirstVisibleOrderDetails']>>> {
@@ -120,6 +135,17 @@ async function saveOrderAndOpenRecallPage(
   const savedHomePage = await orderDishesPage.saveOrder();
   await savedHomePage.expectPrimaryFunctionCardsVisible();
   return await new RecallFlow().openRecallFromHome(savedHomePage);
+}
+
+async function readTargetTips(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber: string,
+): Promise<number> {
+  await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+  const priceSummary = await recallPage.readDisplayedOrderPriceSummary();
+
+  return priceSummary.Tips ?? 0;
 }
 
 async function assertCategoryOptionOrderRoundTrip(
@@ -170,7 +196,7 @@ async function expectLatestRecallDishMatches(
   expect(recallDish?.price).toBe(orderedDish?.price);
 }
 
-test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'] }, () => {
+test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
   test(
@@ -436,6 +462,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
   test(
     '[POS-16303] 应能在点单页将订单平分为两份并校验子单金额',
     {
+      tag: ['@分单'],
       annotation: [jiraIssueAnnotation('POS-16303')],
     },
     async ({ homePage, employeeLoginPage }) => {
@@ -489,7 +516,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
   test.describe('支付回归', () => {
     test(
       '应能在 Recall 为最新 To Go 订单完成现金支付后看到 Success 状态',
-      {},
+      {
+        tag: ['@现金支付'],
+      },
       async ({ homePage, employeeLoginPage }) => {
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
           return await enterReadyHome({ employeeLoginPage, homePage });
@@ -534,7 +563,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
 
     test(
       '应能在 Recall 为最新 To Go 订单完成信用卡支付后看到 Success 状态',
-      {},
+      {
+        tag: ['@信用卡支付'],
+      },
       async ({ homePage, employeeLoginPage }) => {
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
           return await enterReadyHome({ employeeLoginPage, homePage });
@@ -578,7 +609,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
     );
   });
 
-  test.describe('小费回归', () => {
+  test.describe('小费回归', { tag: ['@小费'] }, () => {
     test(
       '[POS-33110] 应能在点单页添加超过餐费 50% 的小费并完成确认',
       {
@@ -625,6 +656,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
     test(
       '[POS-33122] 应能在信用卡支付后追加超过餐费 50% 的小费并完成确认',
       {
+        tag: ['@信用卡支付'],
         annotation: [jiraIssueAnnotation('POS-33122')],
       },
     async ({ homePage, employeeLoginPage }) => {
@@ -707,12 +739,119 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
         });
       },
     );
+
+    test(
+      '[POS-19362] 应能在支付一个子单并删除另一个子单后保持已支付子单 tips 不变',
+      {
+        tag: ['@分单', '@现金支付'],
+        annotation: [jiraIssueAnnotation('POS-19362')],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        const orderDishesFlow = new OrderDishesFlow();
+        const splitOrderFlow = new SplitOrderFlow();
+        const recallFlow = new RecallFlow();
+        const paymentFlow = new PaymentFlow();
+
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
+        });
+
+        const orderDishesPage = await test.step('从堂食 New Order 进入点餐页', async () => {
+          const selectTablePage = await readyHomePage.enterDineIn();
+          const page = await selectTablePage.clickNewOrder();
+          await page.expectLoaded();
+          return page;
+        });
+
+        await test.step('添加两道菜并分别改价后添加母单 tips', async () => {
+          await orderDishesFlow.addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          await orderDishesPage.clickAddLine();
+          await orderDishesFlow.addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.test.name,
+            orderServiceDishes.test.menu,
+          );
+          await orderDishesPage.changeOrderedDishPrice(
+            orderServiceDishes.regular.name,
+            orderServiceSplitTipsCase.changedDishPrice,
+          );
+          await orderDishesPage.changeOrderedDishPrice(
+            orderServiceDishes.test.name,
+            orderServiceSplitTipsCase.changedDishPrice,
+          );
+          await orderDishesPage.addTip(orderServiceSplitTipsCase.tipAmountInCents);
+
+          const priceSummary = await orderDishesPage.readPriceSummary();
+          expect(priceSummary.Tips).toBe(orderServiceSplitTipsCase.expectedTipAmount);
+        });
+
+        const recallPage = await test.step('按座位分单并进入 Recall', async () => {
+          const splitOrderPage = await orderDishesPage.openSplitOrder();
+          await splitOrderFlow.splitOrderBySeats(splitOrderPage);
+          const returnedPage = await splitOrderFlow.submitAndReturnPage(splitOrderPage);
+          return await enterRecallFromReturnedPage(returnedPage);
+        });
+
+        const { orderNumber, paidTargetOrderNumber, voidTargetOrderNumber, originalTip } =
+          await test.step('读取分单后的两个子单号并确认第一个子单 tips', async () => {
+            const latestOrderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
+            await recallPage.openOrderDetails(latestOrderNumber);
+            const targetOrderNumbers = await recallPage.readTargetOrderNumbers(latestOrderNumber);
+            expect(targetOrderNumbers.length).toBeGreaterThanOrEqual(2);
+
+            const [firstTargetOrderNumber, secondTargetOrderNumber] = targetOrderNumbers;
+            expect(firstTargetOrderNumber).toBeTruthy();
+            expect(secondTargetOrderNumber).toBeTruthy();
+
+            const targetTip = await readTargetTips(
+              recallPage,
+              latestOrderNumber,
+              firstTargetOrderNumber,
+            );
+            expect(targetTip).toBeGreaterThan(0);
+
+            return {
+              orderNumber: latestOrderNumber,
+              paidTargetOrderNumber: firstTargetOrderNumber,
+              voidTargetOrderNumber: secondTargetOrderNumber,
+              originalTip: targetTip,
+            };
+          });
+
+        await test.step('支付第一个子单并回到 Recall 详情上下文', async () => {
+          await recallPage.openOrderDetails(orderNumber, paidTargetOrderNumber);
+          const paymentPage = await recallPage.openPayment();
+          await paymentFlow.payByCash(paymentPage, { printReceipt: false });
+          await recallPage.closeOrderDetailsDialog();
+        });
+
+        await test.step('删除另一个子单后回到已支付子单', async () => {
+          await recallPage.openOrderDetails(orderNumber, voidTargetOrderNumber);
+          await recallPage.voidCurrentOrderKeepingDetails({
+            reason: orderServiceSplitTipsCase.voidReason,
+            restoreInventory: true,
+          });
+          await recallPage.openOrderDetails(orderNumber, paidTargetOrderNumber);
+        });
+
+        await test.step('确认已支付子单 tips 未被删除子单影响', async () => {
+          const finalSummary = await recallPage.readDisplayedOrderPriceSummary();
+          expect(finalSummary.Tips).toBe(originalTip);
+          await recallPage.closeOrderDetailsDialog();
+        });
+      },
+    );
   });
 
   test.describe('option 选择回显', () => {
     test(
       '[POS-24394] 应能在分类菜品上选择有价格 option 并正确计算总额',
       {
+        tag: ['@加收'],
         annotation: [jiraIssueAnnotation('POS-24394')],
       },
       async ({ homePage, employeeLoginPage }) => {
@@ -786,7 +925,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@py-migrate'
   });
 });
 
-test.describe('分单按菜回归', { tag: ['@py-migrate'] }, () => {
+test.describe('分单按菜回归', { tag: ['@点单', '@分单'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
   test(
@@ -914,7 +1053,7 @@ test.describe('分单按菜回归', { tag: ['@py-migrate'] }, () => {
   );
 });
 
-test.describe('分单扩展回归', { tag: ['@py-migrate'] }, () => {
+test.describe('分单扩展回归', { tag: ['@点单', '@分单'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
   test(
