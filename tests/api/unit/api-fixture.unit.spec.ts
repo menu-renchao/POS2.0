@@ -5,6 +5,7 @@ import { OrderApiClient } from '../../../api/clients/order-api.client';
 import { PaymentApiClient } from '../../../api/clients/payment-api.client';
 import { SaleItemApiClient } from '../../../api/clients/sale-item-api.client';
 import { SpuApiClient } from '../../../api/clients/spu-api.client';
+import { SystemConfigurationApiClient } from '../../../api/clients/system-configuration-api.client';
 import { loadApiConfig } from '../../../api/core/api-config';
 import { test as apiTest } from '../../../fixtures/api.fixture';
 import { createLocalHttpServer } from './local-http-server';
@@ -95,6 +96,7 @@ test.describe('API 测试夹具', () => {
     orderApi,
     paymentApi,
     adminConfigApi,
+    systemConfigurationApi,
   }) => {
     await test.step('应注入 API 配置、请求上下文和资源登记器', async () => {
       expect(apiConfig.baseURL).toContain('/kpos');
@@ -115,6 +117,7 @@ test.describe('API 测试夹具', () => {
         [orderApi, OrderApiClient],
         [paymentApi, PaymentApiClient],
         [adminConfigApi, AdminConfigApiClient],
+        [systemConfigurationApi, SystemConfigurationApiClient],
       ] as const;
 
       for (const [client, ClientClass] of clients) {

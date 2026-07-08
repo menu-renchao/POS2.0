@@ -5,6 +5,7 @@ import { OrderApiClient } from '../api/clients/order-api.client';
 import { PaymentApiClient } from '../api/clients/payment-api.client';
 import { SaleItemApiClient } from '../api/clients/sale-item-api.client';
 import { SpuApiClient } from '../api/clients/spu-api.client';
+import { SystemConfigurationApiClient } from '../api/clients/system-configuration-api.client';
 import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
 import { createApiRequestContext } from '../api/core/api-context';
 import { ResourceRegistry } from '../api/core/resource-registry';
@@ -20,6 +21,7 @@ type ApiFixtures = {
   orderApi: OrderApiClient;
   paymentApi: PaymentApiClient;
   adminConfigApi: AdminConfigApiClient;
+  systemConfigurationApi: SystemConfigurationApiClient;
   apiSetup: ApiSetup;
 };
 
@@ -79,13 +81,17 @@ export const test = base.extend<ApiFixtures>({
   adminConfigApi: async ({ apiRequest }, use) => {
     await use(new AdminConfigApiClient(apiRequest));
   },
+  systemConfigurationApi: async ({ apiRequest }, use) => {
+    await use(new SystemConfigurationApiClient(apiRequest));
+  },
   apiSetup: async (
-    { adminConfigApi, menuApi, saleItemApi, resourceRegistry },
+    { adminConfigApi, systemConfigurationApi, menuApi, saleItemApi, resourceRegistry },
     use,
   ) => {
     await use(
       createApiSetup({
         adminConfigApi,
+        systemConfigurationApi,
         menuApi,
         saleItemApi,
         resourceRegistry,

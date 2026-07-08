@@ -4,12 +4,15 @@ import { createApiSetup } from '../../../api/setup/api-setup';
 import type { AdminConfigApiClient } from '../../../api/clients/admin-config-api.client';
 import type { MenuApiClient } from '../../../api/clients/menu-api.client';
 import type { SaleItemApiClient } from '../../../api/clients/sale-item-api.client';
+import type { SystemConfigurationApiClient } from '../../../api/clients/system-configuration-api.client';
 import { test as apiFixtureTest } from '../../../fixtures/api.fixture';
 
 test.describe('API 数据预置服务', () => {
   test('应提供 UI 和 API 可复用的配置与菜单 CRUD 入口', () => {
     const apiSetup = createApiSetup({
       adminConfigApi: createAdminConfigApi().api as AdminConfigApiClient,
+      systemConfigurationApi:
+        createSystemConfigurationApi().api as unknown as SystemConfigurationApiClient,
       menuApi: createMenuApi().api as unknown as MenuApiClient,
       saleItemApi: createSaleItemApi().api as unknown as SaleItemApiClient,
       resourceRegistry: new ResourceRegistry(),
@@ -59,8 +62,107 @@ test.describe('API 数据预置服务', () => {
           update: expect.any(Function),
           delete: expect.any(Function),
         }),
+        systemConfiguration: expect.objectContaining({
+          listIndex: expect.any(Function),
+          updateByName: expect.any(Function),
+          updateManyByName: expect.any(Function),
+        }),
       }),
     );
+  });
+
+  test('系统配置 updateManyByName 应按名称解析 ID 和类型后批量更新', async () => {
+    const systemConfigurationApi = createSystemConfigurationApi();
+    const apiSetup = createApiSetup({
+      adminConfigApi: createAdminConfigApi().api as AdminConfigApiClient,
+      systemConfigurationApi:
+        systemConfigurationApi.api as unknown as SystemConfigurationApiClient,
+      resourceRegistry: new ResourceRegistry(),
+    });
+
+    await apiSetup.systemConfiguration.updateManyByName({
+      IS_SKIP_TABLE: false,
+      OVERTIME_WORNING: 120,
+    });
+
+    expect(systemConfigurationApi.payloads.listSystemConfigurations[0]).toEqual({
+      fetchDetails: true,
+      adminRequest: true,
+    });
+    expect(systemConfigurationApi.payloads.updateSystemConfigurations[0]).toEqual({
+      systemConfiguration: [
+        {
+          id: 125,
+          name: 'IS_SKIP_TABLE',
+          value: 'false',
+          dataType: 'Boolean',
+        },
+        {
+          id: 417,
+          name: 'OVERTIME_WORNING',
+          value: 120,
+          dataType: 'Integer',
+        },
+      ],
+      userAuth: {
+        userId: 1,
+      },
+    });
+  });
+
+  test('系统配置 updateManyByName 返回的恢复函数应写回旧值', async () => {
+    const systemConfigurationApi = createSystemConfigurationApi();
+    const apiSetup = createApiSetup({
+      adminConfigApi: createAdminConfigApi().api as AdminConfigApiClient,
+      systemConfigurationApi:
+        systemConfigurationApi.api as unknown as SystemConfigurationApiClient,
+      resourceRegistry: new ResourceRegistry(),
+    });
+
+    const restore = await apiSetup.systemConfiguration.updateManyByName({
+      IS_SKIP_TABLE: false,
+      OVERTIME_WORNING: 120,
+    });
+
+    await restore();
+
+    expect(systemConfigurationApi.payloads.updateSystemConfigurations[1]).toEqual({
+      systemConfiguration: [
+        {
+          id: 125,
+          name: 'IS_SKIP_TABLE',
+          value: 'true',
+          dataType: 'Boolean',
+        },
+        {
+          id: 417,
+          name: 'OVERTIME_WORNING',
+          value: 90,
+          dataType: 'Integer',
+        },
+      ],
+      userAuth: {
+        userId: 1,
+      },
+    });
+  });
+
+  test('系统配置更新响应包含失败 ID 时应抛出明确错误', async () => {
+    const systemConfigurationApi = createSystemConfigurationApi({
+      failedSystemConfigurationIds: [417],
+    });
+    const apiSetup = createApiSetup({
+      adminConfigApi: createAdminConfigApi().api as AdminConfigApiClient,
+      systemConfigurationApi:
+        systemConfigurationApi.api as unknown as SystemConfigurationApiClient,
+      resourceRegistry: new ResourceRegistry(),
+    });
+
+    await expect(
+      apiSetup.systemConfiguration.updateManyByName({
+        OVERTIME_WORNING: 120,
+      }),
+    ).rejects.toThrow('系统配置更新失败: 417');
   });
 
   test('税费 create/update/delete 应调用后台配置接口并登记清理', async () => {
@@ -223,6 +325,7 @@ apiFixtureTest.describe('API 数据预置 fixture', () => {
     expect(apiSetup.tax.create).toEqual(expect.any(Function));
     expect(apiSetup.menu.create).toEqual(expect.any(Function));
     expect(apiSetup.saleItem.create).toEqual(expect.any(Function));
+    expect(apiSetup.systemConfiguration.updateManyByName).toEqual(expect.any(Function));
   });
 });
 
@@ -296,6 +399,68 @@ function createAdminConfigApi() {
         calls.deleteCharge += 1;
         payloads.deleteCharge.push(payload);
         return createApiResponse({ code: 0, msg: 'ok' });
+      },
+    },
+  };
+}
+
+function createSystemConfigurationApi(
+  options: { failedSystemConfigurationIds?: number[] } = {},
+) {
+  const calls = {
+    listSystemConfigurations: 0,
+    fetchSystemConfiguration: 0,
+    updateSystemConfigurations: 0,
+  };
+  const payloads = {
+    listSystemConfigurations: [] as unknown[],
+    fetchSystemConfiguration: [] as unknown[],
+    updateSystemConfigurations: [] as unknown[],
+  };
+
+  return {
+    calls,
+    payloads,
+    api: {
+      listSystemConfigurations: async (payload: unknown) => {
+        calls.listSystemConfigurations += 1;
+        payloads.listSystemConfigurations.push(payload);
+        return createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: {
+            systemConfiguration: [
+              {
+                id: 125,
+                name: 'IS_SKIP_TABLE',
+                value: 'true',
+                dataType: 'Boolean',
+              },
+              {
+                id: 417,
+                name: 'OVERTIME_WORNING',
+                value: '90',
+                dataType: 'Integer',
+              },
+            ],
+          },
+        });
+      },
+      fetchSystemConfiguration: async (payload: unknown) => {
+        calls.fetchSystemConfiguration += 1;
+        payloads.fetchSystemConfiguration.push(payload);
+        return createApiResponse({ code: 0, msg: 'ok', data: {} });
+      },
+      updateSystemConfigurations: async (payload: unknown) => {
+        calls.updateSystemConfigurations += 1;
+        payloads.updateSystemConfigurations.push(payload);
+        return createApiResponse({
+          code: 0,
+          msg: 'ok',
+          data: {
+            failedSystemConfigurationIds: options.failedSystemConfigurationIds ?? [],
+          },
+        });
       },
     },
   };

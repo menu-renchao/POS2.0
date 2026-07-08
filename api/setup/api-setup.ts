@@ -1,6 +1,7 @@
 import type { AdminConfigApiClient } from '../clients/admin-config-api.client';
 import type { MenuApiClient } from '../clients/menu-api.client';
 import type { SaleItemApiClient } from '../clients/sale-item-api.client';
+import type { SystemConfigurationApiClient } from '../clients/system-configuration-api.client';
 import type { ResourceRegistry } from '../core/resource-registry';
 import {
   createChargeSetupService,
@@ -20,9 +21,14 @@ import {
   type MenuSetupService,
   type SaleItemSetupService,
 } from './menu.setup';
+import {
+  createSystemConfigurationSetupService,
+  type SystemConfigurationSetupService,
+} from './system-configuration.setup';
 
 export type ApiSetupFactoryOptions = {
   adminConfigApi: AdminConfigApiClient;
+  systemConfigurationApi?: SystemConfigurationApiClient;
   menuApi?: MenuApiClient;
   saleItemApi?: SaleItemApiClient;
   resourceRegistry: ResourceRegistry;
@@ -36,6 +42,7 @@ export type ApiSetup = {
   menuGroup: MenuGroupSetupService;
   category: CategorySetupService;
   saleItem: SaleItemSetupService;
+  systemConfiguration: SystemConfigurationSetupService;
 };
 
 export function createApiSetup(options: ApiSetupFactoryOptions): ApiSetup {
@@ -47,5 +54,6 @@ export function createApiSetup(options: ApiSetupFactoryOptions): ApiSetup {
     menuGroup: createMenuGroupSetupService(options),
     category: createCategorySetupService(options),
     saleItem: createSaleItemSetupService(options),
+    systemConfiguration: createSystemConfigurationSetupService(options),
   };
 }
