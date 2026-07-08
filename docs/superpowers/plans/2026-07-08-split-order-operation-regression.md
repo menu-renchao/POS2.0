@@ -190,73 +190,13 @@ async function payTargetOrderByCash(
 test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
-  test(
-    '[POS-19362] 应能在支付一个子单并删除另一个子单后保持已支付子单 tips 不变',
-    {
-      tag: ['@现金支付'],
-      annotation: [jiraIssueAnnotation('POS-19362')],
-    },
-    async ({ homePage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
-      });
-
-      const orderDishesPage = await test.step('从堂食无桌路径进入点单页并添加两道菜和小费', async () => {
-        const page = await enterDineInNoTableOrder(readyHomePage);
-        await addTwoRegularDishes(page);
-        await page.addTip(orderServiceSplitOperationCase.tipAmountInCents);
-        const priceSummary = await page.readPriceSummary();
-        expect(priceSummary.Tips).toBe(orderServiceSplitOperationCase.tipAmount);
-        return page;
-      });
-
-      const recallPage = await test.step('按座位分单并进入 Recall', async () => {
-        const splitOrderPage = await orderDishesPage.openSplitOrder();
-        await new SplitOrderFlow().splitOrderBySeats(splitOrderPage);
-        const returnedPage = await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
-        return await enterRecallFromReturnedPage(returnedPage);
-      });
-
-      const targets = await test.step('记录两个子单号和已支付子单初始 tips', async () => {
-        const splitTargets = await openLatestSplitOrderTargets(recallPage);
-        const originalTip = await readTargetTips(
-          recallPage,
-          splitTargets.orderNumber,
-          splitTargets.firstTargetOrderNumber,
-        );
-        expect(originalTip).toBeGreaterThan(0);
-        return { ...splitTargets, originalTip };
-      });
-
-      await test.step('支付第一个子单并作废第二个子单', async () => {
-        await payTargetOrderByCash(recallPage, targets.orderNumber, targets.firstTargetOrderNumber);
-        await recallPage.openOrderDetails(targets.orderNumber, targets.secondTargetOrderNumber);
-        await recallPage.voidCurrentOrderKeepingDetails({
-          reason: orderServiceSplitOperationCase.voidReason,
-          restoreInventory: true,
-        });
-      });
-
-      await test.step('重新打开已支付子单并确认 tips 未变化', async () => {
-        await recallPage.openOrderDetails(targets.orderNumber, targets.firstTargetOrderNumber);
-        const finalSummary = await recallPage.readDisplayedOrderPriceSummary();
-        expect(finalSummary.Tips).toBe(targets.originalTip);
-        await recallPage.closeOrderDetailsDialog();
-      });
-    },
-  );
+  // POS-19362 is intentionally kept in tests/py-migrate/order.service.spec.ts for this batch.
 });
 ```
 
-- [ ] **Step 3: Run the first test and capture the expected compile/runtime failures**
+- [ ] **Step 3: Leave the scaffold ready for later split-order cases**
 
-Run:
-
-```bash
-npm test -- tests/py-migrate/split-order-operation.spec.ts -g "POS-19362"
-```
-
-Expected at this point: the test either passes by reusing existing capabilities, or fails with a concrete selector/runtime issue to address. It must not fail TypeScript compilation because all referenced functions already exist.
+The file should now contain only the shared helper surface and an empty `test.describe(...)` shell for later split-order cases. `POS-19362` remains owned by `tests/py-migrate/order.service.spec.ts` in this batch.
 
 - [ ] **Step 4: Commit Task 1**
 
@@ -1104,10 +1044,9 @@ git commit -m "test: cover split tip recalculation operations"
 
 ---
 
-### Task 9: Full First-Batch Verification And Duplicate Cleanup
+### Task 9: Full First-Batch Verification And Duplicate Confirmation
 
 **Files:**
-- Modify: `tests/py-migrate/order.service.spec.ts` only if `POS-19362` is duplicated after the new spec passes.
 - Modify: `tests/py-migrate/split-order-operation.spec.ts`
 
 **Interfaces:**
@@ -1122,17 +1061,11 @@ Run:
 rg "POS-19362" tests/py-migrate
 ```
 
-Expected before cleanup: two hits are possible, one in `order.service.spec.ts` and one in `split-order-operation.spec.ts`.
+Expected after Task 1: only one hit should remain, in `order.service.spec.ts`.
 
-- [ ] **Step 2: Remove the older duplicate if both tests cover the same assertions**
+- [ ] **Step 2: Confirm the new spec does not repeat `POS-19362`**
 
-If both `POS-19362` tests assert the same paid-suborder tips preservation after voiding another suborder, delete the older test block from `tests/py-migrate/order.service.spec.ts`. Keep helper functions there only if still used by other tests.
-
-Delete exactly the block whose title is:
-
-```ts
-'[POS-19362] 应能在支付一个子单并删除另一个子单后保持已支付子单 tips 不变'
-```
+If the search still finds `POS-19362` in `tests/py-migrate/split-order-operation.spec.ts`, remove that duplicate block and keep the original `order.service.spec.ts` case. For this batch, the old use case remains in place.
 
 - [ ] **Step 3: Run the new first-batch spec**
 
@@ -1152,7 +1085,7 @@ Run:
 npm test -- tests/py-migrate/order.service.spec.ts -g "分单"
 ```
 
-Expected: PASS, or failures unrelated to deleted duplicate must be recorded with exact failing titles.
+Expected: PASS, or any unrelated failures must be recorded with exact failing titles.
 
 - [ ] **Step 5: Run typecheck**
 
