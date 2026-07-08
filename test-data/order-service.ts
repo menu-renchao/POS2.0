@@ -97,3 +97,17 @@ export function buildOrderServicePickupCustomer(): PickUpOrderParams {
     phoneNumber: orderServiceCustomers.pickupPhoneNumber,
   };
 }
+
+export const orderServiceSplitOperationCase = {
+  amountSplitFirstAmount: 2,
+  changedDishPrice: 5,
+  expectedModifiedTipAmount: 6,
+  sharedItemVoidBlockingMessage: 'The order has paid dishes and can not be voided!',
+  splitHalfPaidBlockingMessage:
+    'The operation can not be done due to partial payment! Please revoke the payment before preceeding.',
+  tipAmountInCents: 500,
+  tipAmount: 5,
+  updatedTipAmountInCents: 600,
+  updatedTipAmount: 6,
+  voidReason: '分单操作回归子单作废',
+} as const;
