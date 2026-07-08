@@ -1747,20 +1747,15 @@ export class RecallOrderDetailsDialog {
 
   private async resolveOrderDetailsTipsButton(): Promise<Locator> {
     const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
-    const candidates = [
-      recallScopedTestId(orderDetailsDialog, 'recall2-order-detail-tips'),
-      this.orderDetailsTipsButton,
-      orderDetailsDialog.getByRole('button', { name: /^(Tips|小费)$/ }).first(),
-      this.page.getByRole('button', { name: /^(Tips|小费)$/ }).first(),
-    ];
-
-    for (const candidate of candidates) {
-      if (await candidate.isVisible().catch(() => false)) {
-        return candidate;
-      }
-    }
-
-    throw new Error('Recall 订单详情 More 菜单未出现 Tips 入口。');
+    return await resolveFirstVisibleLocator(
+      [
+        recallScopedTestId(orderDetailsDialog, 'recall2-order-detail-tips'),
+        this.orderDetailsTipsButton,
+        orderDetailsDialog.getByRole('button', { name: /^(Tips|小费)$/ }).first(),
+        this.page.getByRole('button', { name: /^(Tips|小费)$/ }).first(),
+      ],
+      'Recall 订单详情 More 菜单未出现 Tips 入口。',
+    );
   }
 
   private resolvePaymentSection(orderDetailsDialog: Locator): Locator {
@@ -1966,6 +1961,12 @@ export class RecallOrderDetailsDialog {
       : [
           this.page.getByTestId('tip-input-dialog').first(),
           this.page.getByRole('dialog', { name: /^Tips$/i }).first(),
+          this.page
+            .getByRole('dialog')
+            .filter({
+              has: this.page.getByRole('heading', { name: /^Tips$/i }),
+            })
+            .last(),
         ];
 
     for (const candidate of candidates) {

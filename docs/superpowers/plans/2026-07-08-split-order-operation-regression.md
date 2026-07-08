@@ -437,8 +437,11 @@ Keep `tests/py-migrate/split-order-operation.spec.ts` as a shared scaffold for s
 
 ### Task 5: POS-19368 Modify One Suborder Tip Scenario
 
+**Status note:** Use even split for this task. Do not use seat split while the seat display/setup bug is out of scope.
+
 **Files:**
 - Modify: `flows/recall.flow.ts`
+- Modify: `pages/recall/recall-order-details.dialog.ts`
 - Modify: `tests/py-migrate/split-order-operation.spec.ts`
 
 **Interfaces:**
@@ -490,10 +493,11 @@ Append this test inside the same spec:
         return page;
       });
 
-      const recallPage = await test.step('按座位分单保存后进入 Recall', async () => {
+      const recallPage = await test.step('平分订单保存后进入 Recall', async () => {
         const splitOrderPage = await orderDishesPage.openSplitOrder();
-        await new SplitOrderFlow().splitOrderBySeats(splitOrderPage);
-        const returnedPage = await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
+        const splitOrderFlow = new SplitOrderFlow();
+        await splitOrderFlow.splitOrderEvenly(splitOrderPage, 2);
+        const returnedPage = await splitOrderFlow.submitAndReturnPage(splitOrderPage);
         return await enterRecallFromReturnedPage(returnedPage);
       });
 
