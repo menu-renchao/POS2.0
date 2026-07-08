@@ -1,19 +1,15 @@
-状态：DONE_WITH_CONCERNS
+状态：DEFERRED
 
-改动文件：
-- `tests/py-migrate/split-order-operation.spec.ts`
-- `.superpowers/sdd/task-4-report.md`
+范围：
+- POS-19365 暂缓迁移。
 
-提交 hash：
-- `92ac297`
+原因：
+- 该用例需要在不选桌路径下稳定展示并使用多个座位，以便构造“共享菜品 + 座位菜品 + 已支付子单”的前置。
+- 诊断确认共享菜品可被分单页识别为 `Shared`，人数调整为 2 后也可出现 `Seat 2`，但座位显示/座位设置属于当前已知产品 bug，用户已确认暂时不处理。
 
-运行命令与结果：
-1. `npx.cmd tsc --noEmit`
-   - 结果：通过。
-2. `npm.cmd test -- tests/py-migrate/split-order-operation.spec.ts -g "POS-19365"`
-   - 结果：失败，耗时约 45.2 秒，未触发 180 秒超时。
-   - 失败摘要：`blockingMessage` 为 `null`，断言 `toContain(orderServiceSplitOperationCase.sharedItemVoidBlockingMessage)` 失败。
-   - 观察：失败截图与页面快照显示在支付第一个子单后，尝试作废 `secondTargetOrderNumber` 时页面进入了 `#98-2 Void` 状态，未出现预期阻断提示。
+处理：
+- 移除 `tests/py-migrate/split-order-operation.spec.ts` 中 POS-19365 的可执行用例，避免留下会误作废子单或误报失败的测试。
+- 保留 Task 3 的 Recall Void 阻断提示读取能力，供后续不依赖座位显示的用例复用。
 
-担忧：
-- 当前环境下，按用户纠偏后的 `POS-19365` 流程没有复现预期阻断行为；我已移除 `RecallVoidDialog` 中新增的通用 `Yes` 点击逻辑，因为它是为误作废已支付子单路径补的推进逻辑，继续保留存在误点普通 `Yes` 按钮的风险，且对当前正确目标子单路径无帮助。
+后续：
+- 等座位显示 bug 修复后，再恢复 POS-19365 的可执行覆盖。

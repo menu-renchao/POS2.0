@@ -421,95 +421,17 @@ git commit -m "feat: capture recall void blocking messages"
 
 ### Task 4: POS-19365 Shared-Item Void Blocking Scenario
 
-**Files:**
-- Modify: `tests/py-migrate/split-order-operation.spec.ts`
+**Status:** Deferred.
 
-**Interfaces:**
-- Consumes: `RecallFlow.attemptVoidOrder(...)`
-- Consumes: `orderServiceSplitOperationCase.sharedItemVoidBlockingMessage`
+This case depends on creating a no-table order with multiple visible seats so the test can add one shared dish and one seat-specific dish before splitting. Diagnostic runs showed the path is currently affected by a product bug: seat display/seat setup is not reliable enough for this migration. Per user direction, do not implement or keep an executable Playwright case for this scenario in this batch.
 
-- [ ] **Step 1: Add the failing test**
+- [x] **Step 1: Confirm current blocker**
 
-Append this test inside `test.describe('分单操作回归第一批', ...)`:
+Confirmed with a temporary diagnostic that selecting guest count `2` can expose `Seat 2`, and a shared dish can split as `1/2`, but this path is covered by the known seat-display bug and is temporarily out of scope.
 
-```ts
-  test(
-    '[POS-19365] 应能在含共享菜品且存在已支付子单时阻止作废订单',
-    {
-      tag: ['@现金支付'],
-      annotation: [jiraIssueAnnotation('POS-19365')],
-    },
-    async ({ homePage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
-      });
+- [x] **Step 2: Remove executable coverage from the batch**
 
-      const orderDishesPage = await test.step('添加共享菜品和座位菜品并添加小费', async () => {
-        const page = await enterDineInNoTableOrder(readyHomePage);
-        const orderDishesFlow = new OrderDishesFlow();
-        await orderDishesFlow.addRegularDish(
-          page,
-          orderServiceDishes.regular.name,
-          orderServiceDishes.regular.menu,
-        );
-        await page.clickAddLine();
-        await orderDishesFlow.addRegularDish(
-          page,
-          orderServiceDishes.test.name,
-          orderServiceDishes.test.menu,
-        );
-        await page.addTip(orderServiceSplitOperationCase.tipAmountInCents);
-        return page;
-      });
-
-      const recallPage = await test.step('按座位分单并进入 Recall', async () => {
-        const splitOrderPage = await orderDishesPage.openSplitOrder();
-        await new SplitOrderFlow().splitOrderBySeats(splitOrderPage);
-        const returnedPage = await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
-        return await enterRecallFromReturnedPage(returnedPage);
-      });
-
-      const targets = await test.step('读取子单号并支付第一个子单', async () => {
-        const splitTargets = await openLatestSplitOrderTargets(recallPage);
-        await payTargetOrderByCash(recallPage, splitTargets.orderNumber, splitTargets.firstTargetOrderNumber);
-        return splitTargets;
-      });
-
-      await test.step('尝试作废另一个子单并校验阻断提示', async () => {
-        const blockingMessage = await new RecallFlow().attemptVoidOrder(
-          recallPage,
-          targets.orderNumber,
-          targets.secondTargetOrderNumber,
-          {
-            reason: orderServiceSplitOperationCase.voidReason,
-            restoreInventory: true,
-          },
-        );
-
-        expect(blockingMessage).toContain(
-          orderServiceSplitOperationCase.sharedItemVoidBlockingMessage,
-        );
-      });
-    },
-  );
-```
-
-- [ ] **Step 2: Run the single test**
-
-Run:
-
-```bash
-npm test -- tests/py-migrate/split-order-operation.spec.ts -g "POS-19365"
-```
-
-Expected: PASS after Task 3 support exists. If the app text omits the space in `can not`, update only `sharedItemVoidBlockingMessage` to the exact product text observed.
-
-- [ ] **Step 3: Commit Task 4**
-
-```bash
-git add tests/py-migrate/split-order-operation.spec.ts test-data/order-service.ts
-git commit -m "test: cover shared item split void blocking"
-```
+Keep `tests/py-migrate/split-order-operation.spec.ts` as a shared scaffold for subsequent scenarios, but do not add the POS-19365 test until the seat-display issue is fixed.
 
 ---
 
