@@ -101,7 +101,19 @@ export function buildOrderServicePickupCustomer(): PickUpOrderParams {
 export const orderServiceSplitOperationCase = {
   amountSplitFirstAmount: 2,
   changedDishPrice: 5,
+  evenSplitUnsplitExpectedTip: 8.5,
   expectedModifiedTipAmount: 6,
+  itemDiscountAmount: 5,
+  multiAmountExpectedTotal: 20,
+  multiAmountFirstSplitAmount: 10,
+  multiAmountSecondSplitAmount: 10,
+  multiAmountSplitChangedDishPrice: 18.18,
+  multiPaymentAmountInCents: 1000,
+  multiPaymentChangedDishPrice: 20,
+  partialPaymentAmountInCents: 1,
+  redistributedFirstTipBefore: 4,
+  redistributedTipAfter: 3,
+  redistributedTipAmountInCents: 600,
   sharedItemVoidBlockingMessage: 'The order has paid dishes and can not be voided!',
   splitHalfPaidBlockingMessage:
     'The operation can not be done due to partial payment! Please revoke the payment before preceeding.',
@@ -109,5 +121,20 @@ export const orderServiceSplitOperationCase = {
   tipAmount: 5,
   updatedTipAmountInCents: 600,
   updatedTipAmount: 6,
+  voidReasonCount: 7,
   voidReason: '分单操作回归子单作废',
+} as const;
+
+export const orderServiceSeatDisplayConfigurationUpdate = {
+  systemConfiguration: [
+    {
+      id: 294,
+      name: 'IS_SHOW_SEATS',
+      value: '0',
+      dataType: 'String',
+    },
+  ],
+  userAuth: {
+    userId: 1,
+  },
 } as const;

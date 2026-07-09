@@ -432,6 +432,16 @@ export class RecallFlow {
     return await recallPage.attemptVoidCurrentOrder(options);
   }
 
+  @step('业务步骤：对当前 Recall 订单详情中的所有正向支付流水发起退款')
+  async refundAllPaymentRecords(recallPage: RecallPage): Promise<void> {
+    await recallPage.expectLoaded();
+    const paymentAmounts = (await recallPage.readOrderPaymentAmounts()).filter((amount) => amount > 0);
+
+    for (let index = 0; index < paymentAmounts.length; index += 1) {
+      await recallPage.refundPaymentRecord(index);
+    }
+  }
+
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
     targetOrderNumber
       ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Sort`

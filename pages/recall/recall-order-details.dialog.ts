@@ -656,6 +656,28 @@ export class RecallOrderDetailsDialog {
     return (await this.readOrderDetailsSnapshot()).payments;
   }
 
+  @step('页面读取：读取订单详情中的支付流水金额数值')
+  async readOrderPaymentAmounts(): Promise<number[]> {
+    return (await this.readOrderPayments())
+      .map((payment) => payment.amount)
+      .filter((amount): amount is string => Boolean(amount))
+      .map((amount) => this.parseMoneyAmount(amount));
+  }
+
+  @step((paymentIndex: number) => `页面操作：对 Recall 订单详情第 ${paymentIndex + 1} 笔支付流水发起退款`)
+  async refundPaymentRecord(paymentIndex: number): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    const paymentSection = this.resolvePaymentSection(await this.resolveActiveOrderDetailsDialog());
+    const refundableCards = await this.resolveRefundablePaymentCards(paymentSection);
+    const paymentCard = refundableCards.nth(paymentIndex);
+
+    await expect(paymentCard).toBeVisible({ timeout: 10_000 });
+    await paymentCard.scrollIntoViewIfNeeded();
+    await this.clickPaymentCardRefundButton(paymentCard);
+    await this.confirmPaymentRefundDialog();
+    await this.waitForGlobalLoadingOverlayHidden();
+  }
+
   @step((amountInCents: number) => `页面操作：在 Recall 订单详情中添加 Tips ${amountInCents} 分`)
   async addOrderDetailsTip(amountInCents: number): Promise<string | null> {
     await this.waitForOrderDetailsDialogReady();
@@ -1428,6 +1450,17 @@ export class RecallOrderDetailsDialog {
     action: RecallOrderDetailsMoreAction,
   ): Promise<void> {
     await this.waitForOrderDetailsDialogReady();
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+
+    if (action === 'callOff') {
+      const directCallOffButton = orderDetailsDialog.getByRole('button', { name: /^Call Off$/i }).last();
+
+      if (await directCallOffButton.isVisible().catch(() => false)) {
+        await directCallOffButton.click();
+        return;
+      }
+    }
+
     await this.clickOrderDetailsMoreButton();
 
     const actionButton = this.orderDetailsMoreMenuActionButton(action);
@@ -1786,6 +1819,17 @@ export class RecallOrderDetailsDialog {
     return new RegExp(tokens.map((token) => `(?=.*${token})`).join(''), 'i');
   }
 
+  private parseMoneyAmount(value: string): number {
+    const normalizedValue = value.replace(/\s+/g, '').replace(/[$,]/g, '');
+    const parsedValue = Number(normalizedValue);
+
+    if (!Number.isFinite(parsedValue)) {
+      throw new Error(`Unable to parse payment amount from Recall details: ${value}`);
+    }
+
+    return parsedValue;
+  }
+
   private async resolvePaymentCardScope(
     paymentSection: Locator,
     paymentMethod?: string,
@@ -1824,6 +1868,66 @@ export class RecallOrderDetailsDialog {
       actionGrid.getByTestId('button-default').filter({ hasText: /^(Tips|小费)$/ }).first(),
       actionGrid.getByRole('button', { name: /^(Tips|小费)$/ }).first(),
     ];
+  }
+
+  private async resolveRefundablePaymentCards(paymentSection: Locator): Promise<Locator> {
+    const paymentCards = paymentSection
+      .locator('[data-payment-method], [class*="_card_"], [class*="_paymentInfo_"]')
+      .filter({ hasText: /\$?\d[\d,.]*/ })
+      .filter({
+        hasNot: paymentSection.getByText(/-\s*\$?\d[\d,.]*/),
+      });
+
+    await expect(paymentCards.first()).toBeVisible({ timeout: 10_000 });
+    return paymentCards;
+  }
+
+  private buildPaymentCardRefundButtonCandidates(paymentCard: Locator): Locator[] {
+    const actionGrid = paymentCard.locator('[class*="_actionGrid_"]');
+
+    return [
+      paymentCard.getByRole('button', { name: /^(Refund|退款)$/i }).first(),
+      actionGrid.getByTestId('button-default').filter({ hasText: /^(Refund|退款)$/i }).first(),
+      actionGrid.getByRole('button', { name: /^(Refund|退款)$/i }).first(),
+    ];
+  }
+
+  private async clickPaymentCardRefundButton(paymentCard: Locator): Promise<void> {
+    const refundButton = await resolveFirstVisibleLocator(
+      this.buildPaymentCardRefundButtonCandidates(paymentCard),
+      'Recall PAYMENT 卡片的 Refund 操作按钮未在预期时间内出现。',
+      10_000,
+    );
+
+    await refundButton.click();
+  }
+
+  private async confirmPaymentRefundDialog(): Promise<void> {
+    const refundDialog = await resolveFirstVisibleLocator(
+      [
+        this.page.getByRole('dialog', { name: /Refund/i }).first(),
+        this.page
+          .locator('[role="dialog"]:visible')
+          .filter({ has: this.page.getByRole('button', { name: /^(Refund|Confirm|Yes|确定|确认)$/i }) })
+          .filter({ hasText: /Refund|退款/i })
+          .first(),
+        this.page.locator('#responsePopuWin:visible').filter({ hasText: /Refund|退款/i }).first(),
+      ],
+      '点击 PAYMENT Refund 后未出现退款确认弹窗。',
+      10_000,
+    );
+    const confirmButton = await resolveFirstVisibleLocator(
+      [
+        refundDialog.getByRole('button', { name: /^(Refund|Confirm|Yes|确定|确认)$/i }).first(),
+        this.page.getByRole('button', { name: /^(Refund|Confirm|Yes|确定|确认)$/i }).first(),
+      ],
+      '退款确认弹窗未出现确认按钮。',
+      10_000,
+    );
+
+    await waitForInputSettled();
+    await confirmButton.click();
+    await expect(refundDialog).toBeHidden({ timeout: 10_000 }).catch(() => undefined);
   }
 
   private paymentCardTipDialogCandidates(): Locator[] {

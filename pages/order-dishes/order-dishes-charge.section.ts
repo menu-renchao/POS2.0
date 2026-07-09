@@ -544,6 +544,9 @@ export class OrderDishesChargeSection {
           )
           .first(),
         this.locators.chargeButton,
+        this.ctx.page.getByRole('button', { name: /^(Charge|加收)$/ }).first(),
+        this.ctx.page.getByRole('menuitem', { name: /^(Charge|加收)$/ }).first(),
+        this.locators.appFrame.getByRole('menuitem', { name: /^(Charge|加收)$/ }).first(),
       ];
 
       const directChargeButton = await this.ctx.findVisibleLocator(candidates);
@@ -551,8 +554,13 @@ export class OrderDishesChargeSection {
         return directChargeButton;
       }
 
-      if (await this.locators.moreActionButton.isVisible().catch(() => false)) {
-        await this.locators.moreActionButton.click();
+      const moreActionButton = await this.ctx.findVisibleLocator([
+        this.locators.moreActionButton,
+        this.ctx.page.getByRole('button', { name: /^(More|更多)$/ }).first(),
+      ]);
+
+      if (moreActionButton) {
+        await moreActionButton.click();
         const chargeButtonAfterMore = await this.ctx.findVisibleLocator(candidates);
 
         if (chargeButtonAfterMore) {

@@ -54,6 +54,18 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.menu.expectGuestCount(...args);
   }
 
+  changeGuestCount(...args: Parameters<OrderDishesMenuSection['changeGuestCount']>): ReturnType<OrderDishesMenuSection['changeGuestCount']> {
+    return this.menu.changeGuestCount(...args);
+  }
+
+  selectSharedSeat(...args: Parameters<OrderDishesMenuSection['selectSharedSeat']>): ReturnType<OrderDishesMenuSection['selectSharedSeat']> {
+    return this.menu.selectSharedSeat(...args);
+  }
+
+  selectSeat(...args: Parameters<OrderDishesMenuSection['selectSeat']>): ReturnType<OrderDishesMenuSection['selectSeat']> {
+    return this.menu.selectSeat(...args);
+  }
+
   clickDish(...args: Parameters<OrderDishesMenuSection['clickDish']>): ReturnType<OrderDishesMenuSection['clickDish']> {
     return this.menu.clickDish(...args);
   }
@@ -100,6 +112,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
 
   changeOrderedDishPrice(...args: Parameters<OrderDishesMenuSection['changeOrderedDishPrice']>): ReturnType<OrderDishesMenuSection['changeOrderedDishPrice']> {
     return this.menu.changeOrderedDishPrice(...args);
+  }
+
+  setOrderedDishTaxExempt(...args: Parameters<OrderDishesMenuSection['setOrderedDishTaxExempt']>): ReturnType<OrderDishesMenuSection['setOrderedDishTaxExempt']> {
+    return this.menu.setOrderedDishTaxExempt(...args);
   }
 
   openModifyForOrderedDish(...args: Parameters<OrderDishesModifierSection['openModifyForOrderedDish']>): ReturnType<OrderDishesModifierSection['openModifyForOrderedDish']> {

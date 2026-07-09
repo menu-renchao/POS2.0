@@ -59,6 +59,18 @@ export class RecallVoidDialog {
     await this.submitCurrentOrderVoid(options);
   }
 
+  @step('页面读取：打开 Recall Void 弹窗并读取作废原因数量')
+  async readVoidReasonCount(): Promise<number> {
+    await this.orderDetails.waitForOrderDetailsDialogReady();
+    await this.openVoidActionFromOrderDetails();
+    await this.waitForVoidDialogReady();
+    await this.openVoidReasonOptions();
+
+    const reasonCount = await this.countVisibleVoidReasonOptions();
+    await this.closeVoidDialog();
+    return reasonCount;
+  }
+
   private async submitCurrentOrderVoid(options: { restoreInventory?: boolean; reason?: string } = {}): Promise<void> {
     const { restoreInventory = true, reason = 'test' } = options;
 
@@ -269,6 +281,87 @@ export class RecallVoidDialog {
         message: 'Recall Void 弹窗未完成展示。',
       },
     );
+  }
+
+  @step('页面操作：打开 Void 弹窗中的作废原因选择')
+  private async openVoidReasonOptions(): Promise<void> {
+    const reasonSelectorCandidates = [
+      this.voidDialog
+        .locator('[data-testid="void-reason-selector"], [data-test-id="void-reason-selector"]')
+        .first(),
+      this.voidDialog
+        .getByText('Void Reason', { exact: true })
+        .locator('xpath=ancestor::*[self::button or @role="button"][1]')
+        .first(),
+      this.voidDialog
+        .getByText('Void Reason', { exact: true })
+        .locator('xpath=following-sibling::*[1]')
+        .first(),
+      this.voidDialog.getByRole('combobox', { name: /Void Reason/i }).first(),
+      this.voidDialog.getByRole('button', { name: /Void Reason/i }).first(),
+    ];
+
+    for (const reasonSelector of reasonSelectorCandidates) {
+      if (!(await reasonSelector.isVisible().catch(() => false))) {
+        continue;
+      }
+
+      await reasonSelector.click();
+      return;
+    }
+  }
+
+  @step('页面读取：统计可见 Void 原因选项数量')
+  private async countVisibleVoidReasonOptions(): Promise<number> {
+    const optionLocators = [
+      this.page.locator(
+        '[data-testid^="void-reason-option-"]:visible, [data-test-id^="void-reason-option-"]:visible',
+      ),
+      this.page.getByRole('option').filter({ hasText: /\S/ }),
+      this.page
+        .locator('[role="listbox"]:visible, [role="menu"]:visible')
+        .locator('button:visible, [role="option"]:visible, [role="menuitem"]:visible'),
+      this.voidDialog.getByRole('radio').filter({ hasText: /\S/ }),
+      this.voidDialog
+        .locator('[data-testid^="void-reason-option-"]:visible, [data-test-id^="void-reason-option-"]:visible'),
+    ];
+
+    for (const options of optionLocators) {
+      const count = await options.count().catch(() => 0);
+
+      if (count > 0) {
+        return count;
+      }
+    }
+
+    return await this.voidDialog.evaluate((dialogElement) => {
+      const cleanText = (value: string | null | undefined): string =>
+        value?.replace(/\s+/g, ' ').trim() ?? '';
+      const excludedButtonNames = /^(Void|Cancel|Restore inventory.*|Void Reason)$/i;
+
+      return Array.from(dialogElement.querySelectorAll('button'))
+        .map((buttonElement) => cleanText(buttonElement.textContent))
+        .filter((buttonText) => buttonText && !excludedButtonNames.test(buttonText))
+        .length;
+    }).catch(() => 0);
+  }
+
+  @step('页面操作：关闭 Recall Void 弹窗')
+  private async closeVoidDialog(): Promise<void> {
+    if (!(await this.voidDialog.isVisible().catch(() => false))) {
+      return;
+    }
+
+    const cancelButton = this.voidDialog.getByRole('button', { name: /^(Cancel|取消)$/i }).first();
+
+    if (await cancelButton.isVisible().catch(() => false)) {
+      await cancelButton.click();
+      await expect(this.voidDialog).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
+      return;
+    }
+
+    await this.page.keyboard.press('Escape');
+    await expect(this.voidDialog).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
   }
 
   @step('页面操作：尝试对当前 Recall 订单详情执行 Void 并读取阻断提示')

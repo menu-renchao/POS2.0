@@ -2,6 +2,7 @@ import { test as base } from '@playwright/test';
 import { AdminConfigApiClient } from '../api/clients/admin-config-api.client';
 import { MenuApiClient } from '../api/clients/menu-api.client';
 import { SaleItemApiClient } from '../api/clients/sale-item-api.client';
+import { SystemConfigurationApiClient } from '../api/clients/system-configuration-api.client';
 import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
 import { createApiRequestContext } from '../api/core/api-context';
 import { ResourceRegistry } from '../api/core/resource-registry';
@@ -21,6 +22,7 @@ type AppFixtures = {
   paymentPage: PaymentPage;
   splitOrderPage: SplitOrderPage;
   apiConfig: ApiConfig;
+  systemConfigurationApi: SystemConfigurationApiClient;
   resourceRegistry: ResourceRegistry;
   apiSetup: ApiSetup;
 };
@@ -52,14 +54,25 @@ export const test = base.extend<AppFixtures>({
     const apiRequest = await createApiRequestContext(apiConfig);
 
     try {
+      const systemConfigurationApi = new SystemConfigurationApiClient(apiRequest);
       await use(
         createApiSetup({
           adminConfigApi: new AdminConfigApiClient(apiRequest),
           menuApi: new MenuApiClient(apiRequest),
           saleItemApi: new SaleItemApiClient(apiRequest),
+          systemConfigurationApi,
           resourceRegistry,
         }),
       );
+    } finally {
+      await apiRequest.dispose();
+    }
+  },
+  systemConfigurationApi: async ({ apiConfig }, use) => {
+    const apiRequest = await createApiRequestContext(apiConfig);
+
+    try {
+      await use(new SystemConfigurationApiClient(apiRequest));
     } finally {
       await apiRequest.dispose();
     }

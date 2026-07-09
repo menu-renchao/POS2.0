@@ -6,6 +6,8 @@ import type { OrderDishesPageContext } from './order-dishes-page-context';
 import type { OrderDishesPageHost } from './order-dishes-page-host';
 import type { OrderDishesLocators } from './order-dishes-locators';
 
+const CONFIRM_BUTTON_NAME = /^(Confirm|确认)$/;
+
 export class OrderDishesMenuSection {
   constructor(
     private readonly ctx: OrderDishesPageContext,
@@ -27,7 +29,33 @@ export class OrderDishesMenuSection {
 
     @step((guestCount: number) => `页面操作：确认点餐页顶部人数为 ${guestCount}`)
     async expectGuestCount(guestCount: number): Promise<void> {
-      await expect(this.resolveGuestCountButton(guestCount)).toBeVisible();
+      await expect(await this.resolveGuestCountButton(guestCount)).toBeVisible();
+    }
+
+    @step((guestCount: number) => `页面操作：将点餐页人数改为 ${guestCount}`)
+    async changeGuestCount(guestCount: number): Promise<void> {
+      await this.host.expectLoaded();
+      await (await this.resolveAnyGuestCountButton()).click();
+
+      const guestCountDialog = await this.resolveGuestCountDialog();
+      await expect(guestCountDialog).toBeVisible();
+      await guestCountDialog.getByRole('button', { name: String(guestCount), exact: true }).click();
+      await waitForInputSettled(undefined, 250);
+      await this.resolveGuestCountDialogConfirmButton(guestCountDialog).click();
+      await expect(guestCountDialog).toBeHidden({ timeout: 10_000 });
+      await this.expectGuestCount(guestCount);
+    }
+
+    @step('页面操作：选择整桌共享座位')
+    async selectSharedSeat(): Promise<void> {
+      await this.host.expectLoaded();
+      await (await this.resolveSharedSeatButton()).click();
+    }
+
+    @step((seatNumber: number) => `页面操作：选择 ${seatNumber} 号座位`)
+    async selectSeat(seatNumber: number): Promise<void> {
+      await this.host.expectLoaded();
+      await (await this.resolveSeatButton(seatNumber)).click();
     }
 
     @step((dishName: string) => `页面操作：点击菜品 ${dishName}`)
@@ -198,6 +226,18 @@ export class OrderDishesMenuSection {
       await expect(confirmButton).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
     }
 
+    @step((dishName: string, taxExempt: boolean) =>
+      `页面操作：将已点菜品 ${dishName} 设置为${taxExempt ? '免税' : '计税'}`,
+    )
+    async setOrderedDishTaxExempt(dishName: string, taxExempt: boolean): Promise<void> {
+      await this.selectOrderedDish(dishName);
+      const taxExemptButton = await this.resolveTaxExemptButton();
+
+      await taxExemptButton.click();
+      await this.selectTaxExemptionChoice(taxExempt);
+      await waitForInputSettled(undefined, 250);
+    }
+
     private async resolveChangePriceButton(): Promise<Locator> {
       return await this.ctx.resolveVisibleLocator(
         [
@@ -206,6 +246,50 @@ export class OrderDishesMenuSection {
         ],
         'Unable to find order-dishes Change Price button.',
       );
+    }
+
+    private async resolveTaxExemptButton(): Promise<Locator> {
+      return await this.ctx.resolveVisibleLocator(
+        [
+          this.locators.appFrame.getByTestId('action-rail-button-taxExempt').first(),
+          this.page.getByTestId('action-rail-button-taxExempt').first(),
+          this.locators.appFrame.getByRole('button', { name: /^Tax$/ }).first(),
+          this.page.getByRole('button', { name: /^Tax$/ }).first(),
+          this.locators.appFrame.getByRole('button', { name: /^(Tax Exempt|免税)$/ }).first(),
+          this.page.getByRole('button', { name: /^(Tax Exempt|免税)$/ }).first(),
+        ],
+        'Unable to find order-dishes Tax Exempt button.',
+      );
+    }
+
+    private async selectTaxExemptionChoice(taxExempt: boolean): Promise<void> {
+      const taxDialog = await this.ctx.resolveVisibleLocator(
+        [
+          this.page
+            .getByRole('alertdialog')
+            .filter({ has: this.page.getByText(/Tax exemption or not\?/i) })
+            .first(),
+          this.page
+            .getByRole('dialog')
+            .filter({ has: this.page.getByText(/Tax exemption or not\?/i) })
+            .first(),
+          this.locators.appFrame
+            .getByRole('alertdialog')
+            .filter({ has: this.locators.appFrame.getByText(/Tax exemption or not\?/i) })
+            .first(),
+          this.locators.appFrame
+            .getByRole('dialog')
+            .filter({ has: this.locators.appFrame.getByText(/Tax exemption or not\?/i) })
+            .first(),
+        ],
+        'Unable to find order-dishes tax exemption dialog.',
+      );
+      const choiceButton = taxDialog
+        .getByRole('button', { name: taxExempt ? /^Exempt$/ : /^Taxes$/ })
+        .first();
+
+      await choiceButton.click();
+      await expect(taxDialog).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
     }
 
     private async expectCurrencyKeypadVisible(): Promise<void> {
@@ -755,17 +839,66 @@ export class OrderDishesMenuSection {
         .first();
     }
 
-    private resolveGuestCountButton(guestCount: number): Locator {
-      return this.locators.appFrame
-        .getByRole('button', {
-          name: new RegExp(`SeatIcon\\s*${guestCount}`),
-        })
-        .or(
-          this.page.getByRole('button', {
-            name: new RegExp(`SeatIcon\\s*${guestCount}`),
-          }),
-        )
-        .first();
+    private async resolveGuestCountButton(guestCount: number): Promise<Locator> {
+      return await this.ctx.resolveVisibleLocator(
+        [
+          this.page.getByRole('button', { name: new RegExp(`SeatIcon\\s*${guestCount}`) }).first(),
+          this.locators.appFrame.getByRole('button', { name: new RegExp(`SeatIcon\\s*${guestCount}`) }).first(),
+        ],
+        `Unable to find order-dishes guest-count button for ${guestCount}.`,
+      );
+    }
+
+    private async resolveAnyGuestCountButton(): Promise<Locator> {
+      return await this.ctx.resolveVisibleLocator(
+        [
+          this.page.getByRole('button', { name: /SeatIcon\s*\d+/ }).first(),
+          this.locators.appFrame.getByRole('button', { name: /SeatIcon\s*\d+/ }).first(),
+        ],
+        'Unable to find order-dishes guest-count button.',
+      );
+    }
+
+    private async resolveGuestCountDialog(): Promise<Locator> {
+      return await this.ctx.resolveVisibleLocator(
+        [
+          this.page.getByRole('dialog', { name: 'Party Size' }).first(),
+          this.page
+            .getByRole('dialog')
+            .filter({ has: this.page.getByRole('heading', { name: 'Party Size' }) })
+            .first(),
+          this.locators.appFrame.getByRole('dialog', { name: 'Party Size' }).first(),
+          this.locators.appFrame
+            .getByRole('dialog')
+            .filter({ has: this.locators.appFrame.getByRole('heading', { name: 'Party Size' }) })
+            .first(),
+        ],
+        'Unable to find order-dishes guest-count dialog.',
+      );
+    }
+
+    private resolveGuestCountDialogConfirmButton(guestCountDialog: Locator): Locator {
+      return guestCountDialog.getByRole('button', { name: CONFIRM_BUTTON_NAME }).first();
+    }
+
+    private async resolveSharedSeatButton(): Promise<Locator> {
+      return await this.ctx.resolveVisibleLocator(
+        [
+          this.page.getByRole('button', { name: 'Share For Whole Table', exact: true }).first(),
+          this.locators.appFrame.getByRole('button', { name: 'Share For Whole Table', exact: true }).first(),
+        ],
+        'Unable to find Share For Whole Table button.',
+      );
+    }
+
+    private async resolveSeatButton(seatNumber: number): Promise<Locator> {
+      return await this.ctx.resolveVisibleLocator(
+        [
+          this.page.getByRole('button', { name: `Seat ${seatNumber}`, exact: true }).first(),
+          this.locators.appFrame.getByRole('button', { name: `Seat ${seatNumber}`, exact: true }).first(),
+        ],
+        `Unable to find Seat ${seatNumber} button.`,
+      );
     }
 
     private async resolveSelectedDishAddButton(): Promise<Locator> {

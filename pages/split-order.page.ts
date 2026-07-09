@@ -130,6 +130,12 @@ export class SplitOrderPage {
     return await readVisiblePosAlertText(this.page);
   }
 
+  @step('页面读取：读取当前分单面板文本')
+  async readPanelText(): Promise<string> {
+    await this.expectLoaded();
+    return (await this.modal.innerText()).replace(/\s+/g, ' ').trim();
+  }
+
   @step('页面操作：点击平分订单按钮')
   async clickEvenOrder(): Promise<void> {
     await this.expectLoaded();
@@ -950,6 +956,17 @@ export class SplitOrderPage {
     }
 
     await this.openMoreActionsIfNeeded();
+    await waitUntil(
+      async () => ({
+        isMenuItemVisible: await menuItem.isVisible().catch(() => false),
+        isToolbarButtonVisible: await toolbarButton.isVisible().catch(() => false),
+      }),
+      (state) => state.isMenuItemVisible || state.isToolbarButtonVisible,
+      {
+        timeout: 5_000,
+        message: `Split action "${actionLabel}" did not become visible after opening More.`,
+      },
+    ).catch(() => undefined);
 
     if (await menuItem.isVisible().catch(() => false)) {
       await menuItem.click();

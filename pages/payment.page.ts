@@ -5,6 +5,7 @@ import { waitUntil } from '../utils/wait';
 
 export type PaymentCardForm = {
   cardNumber: string;
+  cvv: string;
   expMonth: string;
   expYear: string;
   holderName: string;
@@ -65,6 +66,27 @@ export class PaymentPage {
     await (await this.resolvePaymentTypeCashButton()).click();
   }
 
+  @step((amountInCents: number) => `页面操作：输入本次现金支付金额 ${amountInCents} 分`)
+  async fillAmountTendered(amountInCents: number): Promise<void> {
+    if (!Number.isInteger(amountInCents) || amountInCents <= 0) {
+      throw new Error(`Invalid payment amount in cents: ${amountInCents}`);
+    }
+
+    const amountDisplay = await this.resolveAmountTenderedInput();
+    await amountDisplay.click();
+
+    const currentValue = await amountDisplay.inputValue().catch(() => '');
+    for (let index = 0; index < currentValue.replace(/\D/g, '').length + 4; index += 1) {
+      await this.resolveKeypadButton('backspace').click();
+    }
+
+    for (const digit of String(amountInCents)) {
+      await this.resolveKeypadButton(digit).click();
+    }
+
+    await waitForInputSettled(amountDisplay);
+  }
+
   @step('页面操作：在 Payment type 区域点击 Credit Card')
   async clickPaymentTypeCreditCard(): Promise<void> {
     await this.waitForPaymentOverlayToClear();
@@ -79,6 +101,7 @@ export class PaymentPage {
     await (await this.resolveCardMonthInput()).fill(card.expMonth);
     await (await this.resolveCardYearInput()).fill(card.expYear);
     await (await this.resolveCardHolderInput()).fill(card.holderName);
+    await (await this.resolveCardCvvInput()).fill(card.cvv);
   }
 
   @step('页面操作：点击支付确认按钮')
@@ -143,6 +166,55 @@ export class PaymentPage {
         message: 'Payment success panel did not close after confirmation.',
       },
     ).catch(() => undefined);
+  }
+
+  @step('页面操作：关闭支付面板并返回订单详情')
+  async closePaymentPanel(): Promise<void> {
+    if (!(await this.isPaymentPanelVisible())) {
+      return;
+    }
+
+    await (await this.resolvePaymentPanelBackButton()).click();
+    await this.confirmPartialPaidLeaveIfVisible();
+    await waitUntil(
+      async () => await this.isPaymentPanelVisible(),
+      (paymentPanelVisible) => !paymentPanelVisible,
+      {
+        timeout: 10_000,
+        message: 'Payment panel did not close after clicking Back.',
+      },
+    );
+  }
+
+  private async confirmPartialPaidLeaveIfVisible(): Promise<void> {
+    const confirmButton = await waitUntil(
+      async () => {
+        const candidates = [
+          this.paymentFrame.getByRole('button', { name: /^Yes$/i }).first(),
+          this.contractRoot.getByRole('button', { name: /^Yes$/i }).first(),
+          this.page.getByRole('button', { name: /^Yes$/i }).first(),
+        ];
+
+        for (const candidate of candidates) {
+          if (await candidate.isVisible().catch(() => false)) {
+            return candidate;
+          }
+        }
+
+        return null;
+      },
+      (button): button is Locator => button !== null,
+      {
+        timeout: 2_000,
+        message: 'Partial paid leave confirmation did not appear.',
+      },
+    ).catch(() => null);
+
+    if (!confirmButton) {
+      return;
+    }
+
+    await confirmButton.click();
   }
 
   @step('页面读取：读取左侧支付详情_summaryContent')
@@ -256,6 +328,16 @@ export class PaymentPage {
     );
   }
 
+  private async resolvePaymentPanelBackButton(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.contractRoot.getByTestId('payment-panel-header-back'),
+        this.paymentFrame.getByTestId('payment-panel-header-back'),
+      ],
+      'Unable to find payment panel Back button.',
+    );
+  }
+
   private async resolvePaymentTypeControl(): Promise<Locator> {
     return await this.resolveVisibleLocator(
       [
@@ -324,8 +406,10 @@ export class PaymentPage {
   private async resolvePaymentTypeCashButton(): Promise<Locator> {
     return await this.resolveVisibleLocator(
       [
+        this.contractRoot.getByTestId('payment-panel-btn-cash'),
         this.contractRoot.getByTestId('payment-type-cash'),
         this.contractRoot.getByRole('button', { name: /Cash/i }),
+        this.paymentFrame.getByTestId('payment-panel-btn-cash'),
         this.paymentFrame.getByTestId('payment-type-cash'),
         this.paymentFrame.getByRole('button', { name: /Cash/i }).first(),
       ],
@@ -343,6 +427,25 @@ export class PaymentPage {
       ],
       'Unable to find Payment type Credit Card button.',
     );
+  }
+
+  private async resolveAmountTenderedInput(): Promise<Locator> {
+    return await this.resolveVisibleLocator(
+      [
+        this.contractRoot.getByTestId('payment-panel-amount-display'),
+        this.paymentFrame.getByTestId('payment-panel-amount-display'),
+      ],
+      'Unable to find payment amount tendered input.',
+    );
+  }
+
+  private resolveKeypadButton(digit: string): Locator {
+    const testId =
+      digit === 'backspace'
+        ? 'payment-panel-keypad-backspace'
+        : `payment-panel-keypad-digit-${digit}`;
+
+    return this.paymentFrame.getByTestId(testId).or(this.contractRoot.getByTestId(testId)).first();
   }
 
   private async resolveCardNumberInput(): Promise<Locator> {
@@ -390,6 +493,27 @@ export class PaymentPage {
         ),
       ],
       'Unable to find credit-card year input.',
+    );
+  }
+
+  private async resolveCardCvvInput(): Promise<Locator> {
+    const creditCardDialogCandidates = this.resolveTopLevelCreditCardDialogCandidates();
+
+    return await this.resolveVisibleLocator(
+      [
+        this.contractRoot.locator('#cvv2'),
+        this.paymentFrame.locator('#cvv2'),
+        ...creditCardDialogCandidates.map((creditCardDialog) =>
+          creditCardDialog.getByText(/^CVV2$/).locator('xpath=preceding-sibling::input[1]').first(),
+        ),
+        ...creditCardDialogCandidates.map((creditCardDialog) =>
+          creditCardDialog.getByText(/^CVV2$/).locator('xpath=../input[1]').first(),
+        ),
+        ...creditCardDialogCandidates.map((creditCardDialog) =>
+          creditCardDialog.locator('input, textarea').nth(4),
+        ),
+      ],
+      'Unable to find credit-card CVV input.',
     );
   }
 

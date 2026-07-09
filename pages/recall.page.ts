@@ -207,6 +207,16 @@ export class RecallPage {
     return this.orderDetails.readOrderPayments();
   }
 
+  async readOrderPaymentAmounts(): Promise<number[]> {
+    return this.orderDetails.readOrderPaymentAmounts();
+  }
+
+  async refundPaymentRecord(
+    ...args: Parameters<RecallOrderDetailsDialog['refundPaymentRecord']>
+  ): Promise<void> {
+    return this.orderDetails.refundPaymentRecord(...args);
+  }
+
   async readPaymentCardTip(
     ...args: Parameters<RecallOrderDetailsDialog['readPaymentCardTip']>
   ): Promise<string | null> {
@@ -313,6 +323,10 @@ export class RecallPage {
     ...args: Parameters<RecallVoidDialog['attemptVoidCurrentOrder']>
   ): Promise<string | null> {
     return this.voidDialog.attemptVoidCurrentOrder(...args);
+  }
+
+  async readVoidReasonCount(): Promise<number> {
+    return this.voidDialog.readVoidReasonCount();
   }
 
   async voidCurrentOrderKeepingDetails(

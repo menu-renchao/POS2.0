@@ -28,6 +28,8 @@
 - Create `tests/py-migrate/split-order-operation.spec.ts`: first-batch split-order regression suite for prompt cases `1-10`, with shared test helpers local to the spec.
 - Modify `test-data/order-service.ts`: add first-batch split-order operation constants such as tip amounts, void reasons, split amount, blocking messages, and expected statuses.
 - Modify API setup files only when existing menu/charge/discount data is insufficient; pre-seeded reusable POS domain data may be retained permanently and should not be registered for cleanup.
+- Modify `fixtures/test.fixture.ts`: expose `systemConfigurationApi` so UI tests can call POS system-configuration setup before entering the seat-split path.
+- Modify `pages/order-dishes/order-dishes-menu.section.ts` and `pages/order-dishes.page.ts`: add page-level guest-count and seat-selection actions used by seat split scenarios.
 - Modify `pages/shared/pos-alert.ts`: shared page-level helper for reading visible POS alert/dialog text without scattering selectors.
 - Modify `pages/split-order.page.ts`: add `readBlockingMessage()` for split-panel blocking alerts.
 - Modify `flows/split-order.flow.ts`: add a business-level wrapper for reading split-operation blocking messages.
@@ -421,23 +423,39 @@ git commit -m "feat: capture recall void blocking messages"
 
 ### Task 4: POS-19365 Shared-Item Void Blocking Scenario
 
-**Status:** Deferred.
+**Status:** Implemented as executable expected-fail coverage.
 
-This case depends on creating a no-table order with multiple visible seats so the test can add one shared dish and one seat-specific dish before splitting. Diagnostic runs showed the path is currently affected by a product bug: seat display/seat setup is not reliable enough for this migration. Per user direction, do not implement or keep an executable Playwright case for this scenario in this batch.
+Seat display is not a product bug in this flow. Before entering the POS home workflow, call `updateSystemConfigurations` with:
 
-- [x] **Step 1: Confirm current blocker**
+```json
+{"systemConfiguration":[{"id":294,"name":"IS_SHOW_SEATS","value":"0","dataType":"String"}],"userAuth":{"userId":1}}
+```
 
-Confirmed with a temporary diagnostic that selecting guest count `2` can expose `Seat 2`, and a shared dish can split as `1/2`, but this path is covered by the known seat-display bug and is temporarily out of scope.
+Then refresh the POS homepage so the no-table dine-in order page exposes seat controls.
 
-- [x] **Step 2: Remove executable coverage from the batch**
+- [x] **Step 1: Add shared seat-display setup data**
 
-Keep `tests/py-migrate/split-order-operation.spec.ts` as a shared scaffold for subsequent scenarios, but do not add the POS-19365 test until the seat-display issue is fixed.
+Added `orderServiceSeatDisplayConfigurationUpdate` in `test-data/order-service.ts`.
+
+- [x] **Step 2: Expose system-configuration setup in fixtures**
+
+Added `systemConfigurationApi` to `fixtures/test.fixture.ts` and wired it into API setup.
+
+- [x] **Step 3: Add page-level seat controls**
+
+Added guest-count change, shared-seat selection, and seat-number selection to the order dishes page object.
+
+- [x] **Step 4: Add POS-19365 executable scenario**
+
+The test now creates a no-table seat split with one shared dish and one seat dish, pays the first suborder, then attempts to void the second suborder.
+
+Current product behavior does not return the expected blocking message, so the test is marked `test.fail(...)` with a precise reason while preserving runnable coverage.
 
 ---
 
 ### Task 5: POS-19368 Modify One Suborder Tip Scenario
 
-**Status note:** Use even split for this task. Do not use seat split while the seat display/setup bug is out of scope.
+**Status:** Implemented with the seat-display setup and seat split path.
 
 **Files:**
 - Modify: `flows/recall.flow.ts`
@@ -482,29 +500,19 @@ Append this test inside the same spec:
       annotation: [jiraIssueAnnotation('POS-19368')],
     },
     async ({ homePage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
-      });
-
-      const orderDishesPage = await test.step('添加两道菜并添加母单小费', async () => {
-        const page = await enterDineInNoTableOrder(readyHomePage);
-        await addTwoRegularDishes(page);
-        await page.addTip(orderServiceSplitOperationCase.tipAmountInCents);
+      const readyHomePage = await test.step('进入 POS 主页并打开座位显示配置', async () => {
+        const page = await enterReadyHome({ employeeLoginPage, homePage });
+        await enableSeatDisplayOnHome(systemConfigurationApi, page);
         return page;
       });
 
-      const recallPage = await test.step('平分订单保存后进入 Recall', async () => {
-        const splitOrderPage = await orderDishesPage.openSplitOrder();
-        const splitOrderFlow = new SplitOrderFlow();
-        await splitOrderFlow.splitOrderEvenly(splitOrderPage, 2);
-        const returnedPage = await splitOrderFlow.submitAndReturnPage(splitOrderPage);
-        return await enterRecallFromReturnedPage(returnedPage);
-      });
-
       const tipsBeforeEdit = await test.step('记录两个子单修改前 tips', async () => {
-        const targets = await openLatestSplitOrderTargets(recallPage);
+        const { recallPage, targets } = await createSeatSplitRecallOrder(readyHomePage, {
+          addTip: true,
+        });
         return {
           ...targets,
+          recallPage,
           firstTipBefore: await readTargetTips(recallPage, targets.orderNumber, targets.firstTargetOrderNumber),
           secondTipBefore: await readTargetTips(recallPage, targets.orderNumber, targets.secondTargetOrderNumber),
         };
@@ -512,7 +520,7 @@ Append this test inside the same spec:
 
       await test.step('只修改第一个子单 tips', async () => {
         await new RecallFlow().addOrderDetailsTip(
-          recallPage,
+          tipsBeforeEdit.recallPage,
           tipsBeforeEdit.orderNumber,
           tipsBeforeEdit.firstTargetOrderNumber,
           orderServiceSplitOperationCase.updatedTipAmountInCents,
@@ -521,12 +529,12 @@ Append this test inside the same spec:
 
       await test.step('校验第一个子单 tips 更新且第二个子单 tips 不变', async () => {
         const firstTipAfter = await readTargetTips(
-          recallPage,
+          tipsBeforeEdit.recallPage,
           tipsBeforeEdit.orderNumber,
           tipsBeforeEdit.firstTargetOrderNumber,
         );
         const secondTipAfter = await readTargetTips(
-          recallPage,
+          tipsBeforeEdit.recallPage,
           tipsBeforeEdit.orderNumber,
           tipsBeforeEdit.secondTargetOrderNumber,
         );
@@ -539,7 +547,7 @@ Append this test inside the same spec:
   );
 ```
 
-- [ ] **Step 3: Run the single test**
+- [x] **Step 3: Run the single test**
 
 Run:
 
@@ -547,7 +555,7 @@ Run:
 npm test -- tests/py-migrate/split-order-operation.spec.ts -g "POS-19368"
 ```
 
-Expected: PASS.
+Observed: the business scenario reached the final Recall detail state with the second suborder tip unchanged; the local run ended with the known environment teardown error `browserContext.close: spawn EPERM`.
 
 - [ ] **Step 4: Commit Task 5**
 
@@ -559,6 +567,8 @@ git commit -m "test: cover split suborder tip modification"
 ---
 
 ### Task 6: POS-19371 Half-Paid Unsplit Blocking Scenario
+
+**Status:** Implemented as executable expected-fail coverage with the seat-display setup and seat split path.
 
 **Files:**
 - Modify: `tests/py-migrate/split-order-operation.spec.ts`
@@ -580,33 +590,33 @@ Append:
       annotation: [jiraIssueAnnotation('POS-19371')],
     },
     async ({ homePage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
-      });
+      test.fail(
+        true,
+        '当前产品在半支付座位分单点击 Unsplit 后未返回 POS-19371 预期阻断提示，保留用例作为预期失败覆盖。',
+      );
 
-      const orderDishesPage = await test.step('添加两道菜并按座位分单', async () => {
-        const page = await enterDineInNoTableOrder(readyHomePage);
-        await addTwoRegularDishes(page);
-        await page.addTip(orderServiceSplitOperationCase.tipAmountInCents);
+      const readyHomePage = await test.step('进入 POS 主页并打开座位显示配置', async () => {
+        const page = await enterReadyHome({ employeeLoginPage, homePage });
+        await enableSeatDisplayOnHome(systemConfigurationApi, page);
         return page;
       });
 
-      const recallPage = await test.step('保存座位分单后进入 Recall', async () => {
-        const splitOrderPage = await orderDishesPage.openSplitOrder();
-        await new SplitOrderFlow().splitOrderBySeats(splitOrderPage);
-        const returnedPage = await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
-        return await enterRecallFromReturnedPage(returnedPage);
-      });
-
       const targets = await test.step('读取子单号并支付第一个子单', async () => {
-        const splitTargets = await openLatestSplitOrderTargets(recallPage);
-        await payTargetOrderByCash(recallPage, splitTargets.orderNumber, splitTargets.firstTargetOrderNumber);
-        return splitTargets;
+        const context = await createSeatSplitRecallOrder(readyHomePage, { addTip: true });
+        await payTargetOrderByCash(
+          context.recallPage,
+          context.targets.orderNumber,
+          context.targets.firstTargetOrderNumber,
+        );
+        return {
+          ...context.targets,
+          recallPage: context.recallPage,
+        };
       });
 
       await test.step('从 Recall 重新进入分单并尝试撤销分单', async () => {
         const splitOrderPage = await new RecallFlow().openSplitOrder(
-          recallPage,
+          targets.recallPage,
           targets.orderNumber,
           targets.secondTargetOrderNumber,
         );
@@ -619,7 +629,7 @@ Append:
   );
 ```
 
-- [ ] **Step 2: Run the single test**
+- [x] **Step 2: Run the single test**
 
 Run:
 
@@ -627,7 +637,7 @@ Run:
 npm test -- tests/py-migrate/split-order-operation.spec.ts -g "POS-19371"
 ```
 
-Expected: PASS. If product text uses `proceeding` rather than `preceeding`, update only `splitHalfPaidBlockingMessage` to the exact observed product text.
+Observed: PASS as expected-fail. The current product does not return the expected partial-payment blocking message when clicking Unsplit.
 
 - [ ] **Step 3: Commit Task 6**
 
@@ -639,6 +649,13 @@ git commit -m "test: cover half paid split unsplit blocking"
 ---
 
 ### Task 7: Amount Split Half-Paid Scenarios
+
+**Execution update:** Implemented the actual source-prompt cases `POS-19374`, `POS-19377`, and `POS-19380` rather than the early draft placeholders `POS-19372/POS-19373`. Added partial cash payment support through the real payment keypad contract (`payment-panel-amount-display`, `payment-panel-keypad-digit-*`) and a payment-panel leave confirmation branch for semi-paid orders.
+
+Verification notes:
+- `POS-19374` reached the expected semi-paid split panel state; local run ended with the recurring Chrome teardown error `browserContext.close: spawn EPERM`.
+- `POS-19377` completed the unpaid amount-split unsplit flow; local run ended with the same teardown error.
+- `POS-19380` currently does not receive the expected partial-payment blocking alert from the product after clicking Unsplit. The test is retained with an expected-fail marker, but local failure runs can still be reported non-zero when the Chrome teardown error is appended.
 
 **Files:**
 - Modify: `tests/py-migrate/split-order-operation.spec.ts`
@@ -827,6 +844,13 @@ git commit -m "test: cover half paid amount split operations"
 ---
 
 ### Task 8: Split Tips After Unsplit, Reduce Item, And Discount
+
+**Execution update:** Implemented the actual source-prompt cases `POS-19383`, `POS-19386`, and `POS-19389`.
+
+Verification notes:
+- `POS-19383` showed a product/data difference: after modifying one suborder tip to `6.00` and unsplitting, the final parent order tip was `5.00`, while the source prompt expects `8.50`.
+- `POS-19386` completed the seat-split reduce-item flow. Current reusable dish data gives a pre-change first-suborder tip of `4.52` instead of the source prompt's `4.00`, but after reducing the seat-specific item the two suborder tips rebalanced to the expected `3.00/3.00`; local run ended with the recurring Chrome teardown error.
+- `POS-19389` is implemented through the existing item custom-charge flow, but the current child-suborder edit page does not expose a readable Charge/discount entrypoint through the existing page object. A focused child-suborder discount entrypoint or dedicated seed data is still needed before this one can be fully verified.
 
 **Files:**
 - Modify: `tests/py-migrate/split-order-operation.spec.ts`

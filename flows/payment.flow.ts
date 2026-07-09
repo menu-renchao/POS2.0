@@ -6,8 +6,13 @@ export type PaymentCompletionOptions = {
   printReceipt: boolean;
 };
 
+export type PartialCashPaymentOptions = PaymentCompletionOptions & {
+  amountInCents: number;
+};
+
 const testCreditCard = {
   cardNumber: '4000000000000002',
+  cvv: '999',
   expMonth: '12',
   expYear: '55',
   holderName: 'Tester',
@@ -25,6 +30,24 @@ export class PaymentFlow {
       await paymentPage.clickBalanceDueCash();
       await paymentPage.clickPaymentTypeCash();
       await this.finishPrintReceiptStep(paymentPage, options);
+    } catch (error) {
+      await paymentPage.dismissPrintReceiptDialogIfVisible();
+      throw error;
+    }
+  }
+
+  @step('业务步骤：完成指定金额现金支付并处理打印小票选择')
+  async payPartialByCash(
+    paymentPage: PaymentPage,
+    options: PartialCashPaymentOptions,
+  ): Promise<void> {
+    await paymentPage.expectLoaded();
+
+    try {
+      await paymentPage.fillAmountTendered(options.amountInCents);
+      await paymentPage.clickPaymentTypeCash();
+      await this.finishPrintReceiptStep(paymentPage, options);
+      await paymentPage.closePaymentPanel();
     } catch (error) {
       await paymentPage.dismissPrintReceiptDialogIfVisible();
       throw error;
