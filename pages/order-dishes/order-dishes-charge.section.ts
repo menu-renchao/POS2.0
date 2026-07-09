@@ -561,7 +561,14 @@ export class OrderDishesChargeSection {
 
       if (moreActionButton) {
         await moreActionButton.click();
-        const chargeButtonAfterMore = await this.ctx.findVisibleLocator(candidates);
+        const chargeButtonAfterMore = await waitUntil(
+          async () => await this.ctx.findVisibleLocator(candidates),
+          (chargeButton): chargeButton is Locator => chargeButton !== null,
+          {
+            timeout: 3_000,
+            message: 'Charge button did not appear after opening More menu.',
+          },
+        ).catch(() => null);
 
         if (chargeButtonAfterMore) {
           return chargeButtonAfterMore;

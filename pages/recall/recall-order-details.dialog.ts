@@ -664,16 +664,30 @@ export class RecallOrderDetailsDialog {
       .map((amount) => this.parseMoneyAmount(amount));
   }
 
+  @step('页面读取：读取 Recall 订单详情弹窗完整文本')
+  async readOrderDetailsText(): Promise<string> {
+    await this.waitForOrderDetailsDialogReady();
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+
+    return (await orderDetailsDialog.innerText()).replace(/\s+/g, ' ').trim();
+  }
+
   @step((paymentIndex: number) => `页面操作：对 Recall 订单详情第 ${paymentIndex + 1} 笔支付流水发起退款`)
   async refundPaymentRecord(paymentIndex: number): Promise<void> {
     await this.waitForOrderDetailsDialogReady();
     const paymentSection = this.resolvePaymentSection(await this.resolveActiveOrderDetailsDialog());
-    const refundableCards = await this.resolveRefundablePaymentCards(paymentSection);
-    const paymentCard = refundableCards.nth(paymentIndex);
+    const refundableCards = await this.resolveRefundablePaymentCards(paymentSection).catch(() => null);
 
-    await expect(paymentCard).toBeVisible({ timeout: 10_000 });
-    await paymentCard.scrollIntoViewIfNeeded();
-    await this.clickPaymentCardRefundButton(paymentCard);
+    if (refundableCards) {
+      const paymentCard = refundableCards.nth(paymentIndex);
+
+      await expect(paymentCard).toBeVisible({ timeout: 10_000 });
+      await paymentCard.scrollIntoViewIfNeeded();
+      await this.clickPaymentCardRefundButton(paymentCard);
+    } else {
+      await this.clickPaymentSectionRefundButton(paymentSection, paymentIndex);
+    }
+
     await this.confirmPaymentRefundDialog();
     await this.waitForGlobalLoadingOverlayHidden();
   }
@@ -1899,6 +1913,24 @@ export class RecallOrderDetailsDialog {
       10_000,
     );
 
+    await refundButton.click();
+  }
+
+  private async clickPaymentSectionRefundButton(
+    paymentSection: Locator,
+    paymentIndex: number,
+  ): Promise<void> {
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+    const refundButton = await resolveFirstVisibleLocator(
+      [
+        paymentSection.getByRole('button', { name: /^(Refund|退款)$/i }).nth(paymentIndex),
+        orderDetailsDialog.getByRole('button', { name: /^(Refund|退款)$/i }).nth(paymentIndex),
+      ],
+      `Recall PAYMENT 第 ${paymentIndex + 1} 笔流水的 Refund 按钮未在预期时间内出现。`,
+      10_000,
+    );
+
+    await refundButton.scrollIntoViewIfNeeded();
     await refundButton.click();
   }
 

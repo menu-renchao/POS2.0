@@ -73,7 +73,7 @@ export type ChargeState = {
 
 export const CHARGE_BUTTON_NAMES = /^(Charge|加费)$/;
 export const CHARGE_DIALOG_TEXT =
-  /Whole Order Charge|Item Charge|Charge Options|整单加费|菜品加费|加费选项/;
+  /\bCharge\b|Whole Order Charge|Item Charge|Charge Options|整单加费|菜品加费|加费选项/;
 export const CUSTOM_CHARGE_DIALOG_TEXT = /Custom Charge|自定义加费/;
 export const WHOLE_ORDER_BUTTON_NAMES = /^(Whole Order Charge|Whole Order|整单加费|整单加收)$/;
 export const ITEM_CHARGE_BUTTON_NAMES = /^(Item Charge|Item Discount|菜品加费|菜品加收)$/;

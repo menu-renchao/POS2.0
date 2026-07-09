@@ -239,6 +239,10 @@ export class RecallPage {
     return this.orderDetails.readOrderDetailsSnapshot();
   }
 
+  async readOrderDetailsText(): Promise<string> {
+    return this.orderDetails.readOrderDetailsText();
+  }
+
   @step('页面读取：读取 Recall 订单详情可用操作')
   async readOrderDetailAvailableActions(): Promise<RecallOrderDetailActions> {
     return this.orderDetails.readOrderDetailAvailableActions();

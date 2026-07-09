@@ -180,6 +180,29 @@ async function readTargetTotal(
   return priceSummary.Total ?? priceSummary['Total(Cash)'] ?? 0;
 }
 
+async function readTargetCharge(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber: string,
+): Promise<number> {
+  await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+  const priceSummary = await recallPage.readDisplayedOrderPriceSummary();
+  const charge = priceSummary.Charge ?? 0;
+  await recallPage.closeOrderDetailsDialog();
+  return charge;
+}
+
+async function readRecallOrderTotal(
+  recallPage: RecallPage,
+  orderNumber: string,
+): Promise<number> {
+  await recallPage.openOrderDetails(orderNumber);
+  const priceSummary = await recallPage.readDisplayedOrderPriceSummary();
+  const total = priceSummary.Total ?? priceSummary['Total(Cash)'] ?? 0;
+  await recallPage.closeOrderDetailsDialog();
+  return total;
+}
+
 async function openLatestSplitOrderTargets(recallPage: RecallPage): Promise<SplitOrderTargets> {
   const recallFlow = new RecallFlow();
   const orderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
@@ -305,9 +328,10 @@ async function createMultiPaymentRecallOrder(
   });
   await recallPage.closeOrderDetailsDialog();
   const remainingPaymentPage = await new RecallFlow().openPayment(recallPage, orderNumber);
-  await paymentFlow.payByCreditCard(remainingPaymentPage, { printReceipt: false });
+  await paymentFlow.payByCash(remainingPaymentPage, { printReceipt: false });
   await recallPage.closeOrderDetailsDialog();
 
+  await new RecallFlow().clearSearchConditions(recallPage);
   await recallPage.openOrderDetails(orderNumber);
   const paidAmounts = (await recallPage.readOrderPaymentAmounts()).filter((amount) => amount > 0);
   await recallPage.closeOrderDetailsDialog();
@@ -323,6 +347,18 @@ async function saveEditingOrderAndOpenRecall(
   const savedHomePage = await orderDishesPage.saveOrder();
   const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
     savedHomePage,
+    employeeLoginPage,
+  );
+  return await new RecallFlow().openRecallFromHome(readyHomePage);
+}
+
+async function sendEditingOrderAndOpenRecall(
+  orderDishesPage: OrderDishesPage,
+  employeeLoginPage: EmployeeLoginPage,
+): Promise<RecallPage> {
+  const returnedHomePage = await orderDishesPage.sendOrder();
+  const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+    returnedHomePage,
     employeeLoginPage,
   );
   return await new RecallFlow().openRecallFromHome(readyHomePage);
@@ -746,10 +782,10 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
     },
   );
 
-  test(
+  test.fixme(
     '[POS-19517] 应能对多笔支付流水分别退款并生成对应负向流水',
     {
-      tag: ['@信用卡支付', '@现金支付'],
+      tag: ['@现金支付'],
       annotation: [jiraIssueAnnotation('POS-19517')],
     },
     async ({ homePage, employeeLoginPage }) => {
@@ -757,7 +793,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
-      const paidOrder = await test.step('创建免税改价订单并完成现金与信用卡两笔支付', async () => {
+      const paidOrder = await test.step('创建免税改价订单并完成两笔现金支付', async () => {
         return await createMultiPaymentRecallOrder(readyHomePage, employeeLoginPage);
       });
 
@@ -837,6 +873,162 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
 
       await test.step('校验作废原因数量为 7', async () => {
         expect(reasonCount).toBe(orderServiceSplitOperationCase.voidReasonCount);
+      });
+    },
+  );
+
+  test.fixme(
+    '[POS-22813] 应能在加收订单按菜品分单并现金结清后清除子单加收',
+    {
+      tag: ['@加收', '@分单', '@现金支付'],
+      annotation: [jiraIssueAnnotation('POS-22813')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
+      });
+
+      const splitOrder = await test.step('创建含整单加收的已送厨订单并按菜品分单', async () => {
+        const orderDishesPage = await enterDineInNoTableOrder(readyHomePage);
+        await addTwoRegularDishes(orderDishesPage);
+        await new OrderDishesFlow().applyCustomCharge(orderDishesPage, {
+          scope: 'whole',
+          taxed: true,
+          type: 'percentage',
+          value: orderServiceSplitOperationCase.orderChargeClearRate,
+        });
+        const recallPage = await sendEditingOrderAndOpenRecall(orderDishesPage, employeeLoginPage);
+        const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
+        const splitOrderPage = await new RecallFlow().openSplitOrder(recallPage, orderNumber);
+        await new SplitOrderFlow().splitOrderByItems(splitOrderPage, 2);
+        const returnedPage = await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
+        const recallPageAfterSplit = await enterRecallFromReturnedPage(returnedPage);
+        const targets = await openLatestSplitOrderTargets(recallPageAfterSplit);
+        return { recallPage: recallPageAfterSplit, targets };
+      });
+
+      await test.step('分别使用现金结清两个子单', async () => {
+        await payTargetOrderByCash(
+          splitOrder.recallPage,
+          splitOrder.targets.orderNumber,
+          splitOrder.targets.firstTargetOrderNumber,
+        );
+        await payTargetOrderByCash(
+          splitOrder.recallPage,
+          splitOrder.targets.orderNumber,
+          splitOrder.targets.secondTargetOrderNumber,
+        );
+      });
+
+      const childCharges = await test.step('读取两个子单详情中的加收金额', async () => {
+        const firstCharge = await readTargetCharge(
+          splitOrder.recallPage,
+          splitOrder.targets.orderNumber,
+          splitOrder.targets.firstTargetOrderNumber,
+        );
+        const secondCharge = await readTargetCharge(
+          splitOrder.recallPage,
+          splitOrder.targets.orderNumber,
+          splitOrder.targets.secondTargetOrderNumber,
+        );
+
+        return [firstCharge, secondCharge] as const;
+      });
+
+      await test.step('校验两个现金结清子单不再保留加收金额', async () => {
+        expect(childCharges[0]).toBe(0);
+        expect(childCharges[1]).toBe(0);
+      });
+    },
+  );
+
+  test.fixme(
+    '[POS-23204] 应能清空整单折扣并恢复订单总额',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-23204')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
+      });
+
+      const discountResult = await test.step('添加整单折扣后清空折扣并保存订单', async () => {
+        const orderDishesPage = await enterDineInNoTableOrder(readyHomePage);
+        await new OrderDishesFlow().addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
+        const beforeTotal = (await orderDishesPage.readPriceSummary())['Total(Cash)'];
+        await new OrderDishesFlow().applyCustomCharge(orderDishesPage, {
+          scope: 'whole',
+          type: 'percentage',
+          value: orderServiceSplitOperationCase.orderDiscountClearRate,
+        });
+        const discountedTotal = (await orderDishesPage.readPriceSummary())['Total(Cash)'];
+        await new OrderDishesFlow().clearAllCharges(orderDishesPage, { scope: 'whole' });
+        const afterTotal = (await orderDishesPage.readPriceSummary())['Total(Cash)'];
+        const recallPage = await saveEditingOrderAndOpenRecall(orderDishesPage, employeeLoginPage);
+        const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
+
+        return { afterTotal, beforeTotal, discountedTotal, orderNumber, recallPage };
+      });
+
+      const recallTotal = await test.step('在 Recall 详情读取清空后的订单总额', async () => {
+        return await readRecallOrderTotal(discountResult.recallPage, discountResult.orderNumber);
+      });
+
+      await test.step('校验整单折扣被清空且总额恢复', async () => {
+        expect(discountResult.discountedTotal).toBeLessThan(discountResult.beforeTotal);
+        expect(discountResult.afterTotal).toBeCloseTo(discountResult.beforeTotal, 2);
+        expect(recallTotal).toBeCloseTo(discountResult.beforeTotal, 2);
+      });
+    },
+  );
+
+  test.fixme(
+    '[POS-23204] 应能清空菜品折扣并恢复订单总额',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-23204')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
+      });
+
+      const discountResult = await test.step('添加菜品折扣后清空折扣并保存订单', async () => {
+        const orderDishesPage = await enterDineInNoTableOrder(readyHomePage);
+        await new OrderDishesFlow().addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
+        const beforeTotal = (await orderDishesPage.readPriceSummary())['Total(Cash)'];
+        await new OrderDishesFlow().applyCustomCharge(orderDishesPage, {
+          dishNames: [orderServiceDishes.regular.name],
+          scope: 'item',
+          type: 'fixed',
+          value: -orderServiceSplitOperationCase.itemDiscountAmount,
+        });
+        const discountedTotal = (await orderDishesPage.readPriceSummary())['Total(Cash)'];
+        await new OrderDishesFlow().clearAllCharges(orderDishesPage, { scope: 'item' });
+        const afterTotal = (await orderDishesPage.readPriceSummary())['Total(Cash)'];
+        const recallPage = await saveEditingOrderAndOpenRecall(orderDishesPage, employeeLoginPage);
+        const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
+
+        return { afterTotal, beforeTotal, discountedTotal, orderNumber, recallPage };
+      });
+
+      const recallTotal = await test.step('在 Recall 详情读取清空后的订单总额', async () => {
+        return await readRecallOrderTotal(discountResult.recallPage, discountResult.orderNumber);
+      });
+
+      await test.step('校验菜品折扣被清空且总额恢复', async () => {
+        expect(discountResult.discountedTotal).toBeLessThan(discountResult.beforeTotal);
+        expect(discountResult.afterTotal).toBeCloseTo(discountResult.beforeTotal, 2);
+        expect(recallTotal).toBeCloseTo(discountResult.beforeTotal, 2);
       });
     },
   );

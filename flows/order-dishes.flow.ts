@@ -39,6 +39,10 @@ export type CustomChargeParams = {
   value: number;
 };
 
+export type ClearChargesParams = {
+  scope: ChargeScope;
+};
+
 export type PresetModifierOption = {
   action: string;
   category: string;
@@ -321,6 +325,22 @@ export class OrderDishesFlow {
       }
 
       await orderDishesPage.confirmCustomChargeDialog();
+    });
+  }
+
+  @step(
+    (_orderDishesPage: OrderDishesPage, params: ClearChargesParams) =>
+      params.scope === 'whole'
+        ? '业务步骤：清空整单加收或折扣'
+        : '业务步骤：清空菜品加收或折扣',
+  )
+  async clearAllCharges(
+    orderDishesPage: OrderDishesPage,
+    params: ClearChargesParams,
+  ): Promise<void> {
+    await this.runChargeDialogFlow(orderDishesPage, async () => {
+      await orderDishesPage.switchChargeScope(params.scope);
+      await orderDishesPage.clearAllCharges();
     });
   }
 
