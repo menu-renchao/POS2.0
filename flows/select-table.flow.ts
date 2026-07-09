@@ -1,4 +1,5 @@
 import { OrderDishesPage } from '../pages/order-dishes.page';
+import { HomePage } from '../pages/home.page';
 import { type SelectedTableRecord, SelectTablePage } from '../pages/select-table.page';
 import { step } from '../utils/step';
 
@@ -12,6 +13,17 @@ export type TableOrderEntryResult = {
 };
 
 export class SelectTableFlow {
+  @step('业务步骤：从 Dine In 以无桌位路径进入点单页')
+  async enterDineInNoTableOrder(homePage: HomePage): Promise<OrderDishesPage> {
+    const entryPage = await homePage.enterDineInEntry();
+
+    if (entryPage instanceof OrderDishesPage) {
+      return entryPage;
+    }
+
+    return await this.skipTableSelectionAndEnterOrderDishes(entryPage);
+  }
+
   @step('业务步骤：在选桌页面选择任意空桌')
   async selectAnyAvailableTable(
     selectTablePage: SelectTablePage,

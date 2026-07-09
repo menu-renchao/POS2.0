@@ -13,6 +13,9 @@ import { waitUntil } from '../utils/wait';
 import { createHomeScope, type FrameOrHostScope } from './shared/locator-scope';
 import type { HomeEntry } from './shared/page-method-contracts';
 
+export type DineInEntryPage = SelectTablePage | OrderDishesPage;
+type DineInEntryState = 'selectTable' | 'orderDishes';
+
 export class HomePage {
   private readonly scope: FrameOrHostScope;
   private readonly openDrawerButton: Locator;
@@ -85,15 +88,35 @@ export class HomePage {
 
   @step('页面操作：点击 Dine In 入口并进入选桌页')
   async enterDineIn(): Promise<SelectTablePage> {
-    await this.clickFunctionButton('Dine In');
-    const selectTablePage = new SelectTablePage(this.page);
-    await selectTablePage.expectLoaded();
-    return selectTablePage;
+    const entryPage = await this.enterDineInEntry();
+
+    if (entryPage instanceof SelectTablePage) {
+      return entryPage;
+    }
+
+    throw new Error('Dine In 已直接进入点单页；无桌位堂食流程请使用 SelectTableFlow.enterDineInNoTableOrder。');
   }
 
   /** @deprecated 请使用 {@link enterDineIn} */
   async clickDineIn(): Promise<SelectTablePage> {
     return this.enterDineIn();
+  }
+
+  @step('页面操作：点击 Dine In 入口并等待堂食入口页面稳定')
+  async enterDineInEntry(): Promise<DineInEntryPage> {
+    await this.clickFunctionButton('Dine In');
+
+    const entryState = await this.waitForDineInEntryState();
+
+    if (entryState === 'orderDishes') {
+      const orderDishesPage = new OrderDishesPage(this.page);
+      await orderDishesPage.expectLoaded();
+      return orderDishesPage;
+    }
+
+    const selectTablePage = new SelectTablePage(this.page);
+    await selectTablePage.expectLoaded();
+    return selectTablePage;
   }
 
   @step('页面操作：点击 Delivery 入口并进入 Delivery 页面')
@@ -277,5 +300,36 @@ export class HomePage {
 
   private resolveFunctionButtonLocator(buttonName: HomeEntry): Locator {
     return this.scope.appFrame.getByRole('button', { name: buttonName, exact: true });
+  }
+
+  @step('页面读取：等待 Dine In 入口进入选桌页或点单页')
+  private async waitForDineInEntryState(): Promise<DineInEntryState> {
+    const entryState = await waitUntil(
+      async () => {
+        const currentUrl = this.page.url();
+
+        if (/#orderDishes/.test(currentUrl)) {
+          return 'orderDishes';
+        }
+
+        if (/#tableV2/.test(currentUrl)) {
+          return 'selectTable';
+        }
+
+        return null;
+      },
+      (state): state is DineInEntryState => state !== null,
+      {
+        timeout: 15_000,
+        interval: 250,
+        message: 'Dine In did not navigate to select-table or order-dishes page in time.',
+      },
+    );
+
+    if (!entryState) {
+      throw new Error('Unable to determine Dine In entry page.');
+    }
+
+    return entryState;
   }
 }

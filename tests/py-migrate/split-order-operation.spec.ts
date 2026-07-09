@@ -45,8 +45,7 @@ async function enterReadyHome({
 }
 
 async function enterDineInNoTableOrder(homePage: HomePage): Promise<OrderDishesPage> {
-  const selectTablePage = await homePage.enterDineIn();
-  const orderDishesPage = await new SelectTableFlow().skipTableSelectionAndEnterOrderDishes(selectTablePage);
+  const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(homePage);
   await orderDishesPage.expectLoaded();
   return orderDishesPage;
 }
@@ -481,13 +480,11 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       annotation: [jiraIssueAnnotation('POS-19374')],
     },
     async ({ homePage, employeeLoginPage }) => {
-      test.fixme(true, '当前环境信用卡支付存在已知 bug，POS-19517 暂不调试信用卡支付链路。');
-
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
         return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
-      const targets = await test.step('创建按金额分单订单并部分支付第一个子单', async () => {
+      const targets = await test.step('创建按金额分单订单并现金半支付第一个子单', async () => {
         const context = await createAmountSplitRecallOrder(readyHomePage);
         await payTargetOrderByPartialCash(
           context.recallPage,
@@ -523,11 +520,6 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       annotation: [jiraIssueAnnotation('POS-19377')],
     },
     async ({ homePage, employeeLoginPage }) => {
-      test.fail(
-        true,
-        '当前产品在按金额分单半支付后点击 Unsplit 未返回 POS-19380 预期阻断提示，保留用例作为预期失败覆盖。',
-      );
-
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
         return await enterReadyHome({ employeeLoginPage, homePage });
       });
