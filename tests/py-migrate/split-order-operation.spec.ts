@@ -6,6 +6,7 @@ import { PaymentFlow } from '../../flows/payment.flow';
 import { RecallFlow } from '../../flows/recall.flow';
 import { SelectTableFlow } from '../../flows/select-table.flow';
 import { SplitOrderFlow } from '../../flows/split-order.flow';
+import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import type { SystemConfigurationApiClient } from '../../api/clients/system-configuration-api.client';
 import type { EmployeeLoginPage } from '../../pages/employee-login.page';
@@ -141,6 +142,24 @@ async function createEvenSplitRecallOrder(
   const orderDishesPage = await enterDineInNoTableOrder(readyHomePage);
   await addTwoRegularDishes(orderDishesPage);
   await orderDishesPage.addTip(orderServiceSplitOperationCase.tipAmountInCents);
+
+  const splitOrderPage = await orderDishesPage.openSplitOrder();
+  await new SplitOrderFlow().splitOrderEvenly(splitOrderPage, 2);
+  const returnedPage = await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
+  const recallPage = await enterRecallFromReturnedPage(returnedPage);
+  const targets = await openLatestSplitOrderTargets(recallPage);
+  return { recallPage, targets };
+}
+
+async function createToGoEvenSplitRecallOrder(
+  readyHomePage: HomePage,
+): Promise<{ recallPage: RecallPage; targets: SplitOrderTargets }> {
+  const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
+  await new OrderDishesFlow().addRegularDish(
+    orderDishesPage,
+    orderServiceDishes.regular.name,
+    orderServiceDishes.regular.menu,
+  );
 
   const splitOrderPage = await orderDishesPage.openSplitOrder();
   await new SplitOrderFlow().splitOrderEvenly(splitOrderPage, 2);
@@ -1029,6 +1048,60 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         expect(discountResult.discountedTotal).toBeLessThan(discountResult.beforeTotal);
         expect(discountResult.afterTotal).toBeCloseTo(discountResult.beforeTotal, 2);
         expect(recallTotal).toBeCloseTo(discountResult.beforeTotal, 2);
+      });
+    },
+  );
+
+  test(
+    '[POS-25235] 应能在 To Go 平分子单现金支付后追加 1 元小费',
+    {
+      tag: ['@分单', '@小费', '@现金支付'],
+      annotation: [jiraIssueAnnotation('POS-25235')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
+      });
+
+      const splitOrder = await test.step('创建 To Go 订单并平分为两个子单', async () => {
+        return await createToGoEvenSplitRecallOrder(readyHomePage);
+      });
+
+      await test.step('使用现金结清两个子单', async () => {
+        await payTargetOrderByCash(
+          splitOrder.recallPage,
+          splitOrder.targets.orderNumber,
+          splitOrder.targets.firstTargetOrderNumber,
+        );
+        await payTargetOrderByCash(
+          splitOrder.recallPage,
+          splitOrder.targets.orderNumber,
+          splitOrder.targets.secondTargetOrderNumber,
+        );
+      });
+
+      const paymentTip = await test.step('打开第一个已支付子单并在现金支付卡片追加 1 元小费', async () => {
+        await new RecallFlow().clearSearchConditions(splitOrder.recallPage);
+        await splitOrder.recallPage.openOrderDetails(
+          splitOrder.targets.orderNumber,
+          splitOrder.targets.firstTargetOrderNumber,
+        );
+        await splitOrder.recallPage.addPaymentCardTip(
+          orderServiceSplitOperationCase.postPaymentTipAmountInCents,
+          'Cash',
+        );
+        await splitOrder.recallPage.closeOrderDetailsDialog();
+        await splitOrder.recallPage.openOrderDetails(
+          splitOrder.targets.orderNumber,
+          splitOrder.targets.firstTargetOrderNumber,
+        );
+        const priceSummary = await splitOrder.recallPage.readDisplayedOrderPriceSummary();
+        await splitOrder.recallPage.closeOrderDetailsDialog();
+        return priceSummary.Tips ?? 0;
+      });
+
+      await test.step('校验追加后子单小费为 1 元', async () => {
+        expect(paymentTip).toBeCloseTo(orderServiceSplitOperationCase.postPaymentTipAmount, 2);
       });
     },
   );

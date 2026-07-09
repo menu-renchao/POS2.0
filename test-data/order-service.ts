@@ -101,7 +101,7 @@ export function buildOrderServicePickupCustomer(): PickUpOrderParams {
 export const orderServiceSplitOperationCase = {
   amountSplitFirstAmount: 2,
   changedDishPrice: 5,
-  evenSplitUnsplitExpectedTip: 8.5,
+  evenSplitUnsplitExpectedTip: 5,
   expectedModifiedTipAmount: 6,
   itemDiscountAmount: 5,
   multiAmountExpectedTotal: 20,
@@ -114,6 +114,8 @@ export const orderServiceSplitOperationCase = {
   orderChargeMergeRate: 10,
   orderDiscountClearRate: -20,
   partialPaymentAmountInCents: 1,
+  postPaymentTipAmountInCents: 100,
+  postPaymentTipAmount: 1,
   redistributedFirstTipBefore: 4,
   redistributedTipAfter: 3,
   redistributedTipAmountInCents: 600,
