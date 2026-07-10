@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { createApiRequestContext } from '../../../api/core/api-context';
+import type { ApiRequestLogAttachTarget } from '../../../api/core/api-request-logger';
 import {
   buildApiFailureMessage,
   expectResponseEnvelope,
@@ -74,6 +75,48 @@ test.describe('API 核心工具', () => {
     expect(receivedHeaders['x-client-type']).toBe('0');
     expect(receivedHeaders['x-direct-req']).toBe('true');
     expect(receivedHeaders.cookie).toContain('licenseAuthKey=mansuper');
+  });
+
+  test('应记录 API 登录阶段请求日志附件', async () => {
+    const attachments = await withHeaderEchoServer(async (baseURL) => {
+      const loggedAttachments: Array<{ name: string; body: string }> = [];
+      const attachTarget: ApiRequestLogAttachTarget = {
+        attach: async (name, options) => {
+          const body = options && 'body' in options ? options.body : undefined;
+
+          loggedAttachments.push({
+            name,
+            body: Buffer.isBuffer(body) ? body.toString('utf8') : String(body ?? ''),
+          });
+        },
+      };
+      const apiContext = await createApiRequestContext(
+        {
+          baseURL: `${baseURL}/kpos`,
+          auth: {
+            mode: 'apiLogin',
+            clientSn: 'mansuper',
+            clientType: '0',
+            staffPasscode: '11',
+          },
+          testPrefix: 'AT',
+        },
+        attachTarget,
+      );
+
+      await apiContext.dispose();
+      return loggedAttachments;
+    });
+
+    expect(attachments.map((item) => item.name)).toEqual(
+      expect.arrayContaining(['API POST api/client/session/login', 'API POST api/login']),
+    );
+    expect(
+      attachments.find((item) => item.name === 'API POST api/client/session/login')?.body,
+    ).toContain('"x-client-sn": "mansuper"');
+    expect(attachments.find((item) => item.name === 'API POST api/login')?.body).toContain(
+      '"passcode": "11"',
+    );
   });
 
   test('应能在 kpos baseURL 下把相对 API 路径请求到 kpos 目录', async () => {

@@ -106,6 +106,8 @@ test.describe('API 测试夹具', () => {
           origins: expect.any(Array),
         }),
       );
+      const response = await apiRequest.get('api/example');
+      await expect(response.json()).resolves.toEqual({ code: 0, msg: 'success' });
       expect(resourceRegistry.has('missing', 1)).toBe(false);
     });
 

@@ -1,11 +1,23 @@
 import { request, type APIRequestContext } from '@playwright/test';
 import type { ApiConfig } from './api-config';
+import {
+  createLoggedApiRequestContext,
+  type ApiRequestLogAttachTarget,
+  type ApiRequestLogContext,
+} from './api-request-logger';
 import { expectResponseEnvelope } from './api-response';
 
-export async function createApiRequestContext(config: ApiConfig): Promise<APIRequestContext> {
+export async function createApiRequestContext(
+  config: ApiConfig,
+  logTarget?: ApiRequestLogAttachTarget,
+): Promise<APIRequestContext> {
   const baseURL = toApiRequestBaseURL(config.baseURL);
   const directHeaders = toDirectRequestHeaders(config);
-  const sessionKey = await fetchApiLoginSessionKey(baseURL, directHeaders);
+  const logContext: ApiRequestLogContext = {
+    baseURL,
+    extraHTTPHeaders: directHeaders,
+  };
+  const sessionKey = await fetchApiLoginSessionKey(baseURL, directHeaders, logTarget, logContext);
 
   const apiContext = await request.newContext({
     baseURL,
@@ -15,10 +27,16 @@ export async function createApiRequestContext(config: ApiConfig): Promise<APIReq
       origins: [],
     },
   });
+  const loggedApiContext = logTarget
+    ? createLoggedApiRequestContext(apiContext, logTarget, {
+        ...logContext,
+        name: 'api-authenticated-context',
+      })
+    : apiContext;
 
   try {
-    await loginApiStaff(apiContext, config.auth.staffPasscode);
-    return apiContext;
+    await loginApiStaff(loggedApiContext, config.auth.staffPasscode);
+    return loggedApiContext;
   } catch (error) {
     await apiContext.dispose();
     throw error;
@@ -36,14 +54,22 @@ function toDirectRequestHeaders(config: ApiConfig): Record<string, string> {
 async function fetchApiLoginSessionKey(
   baseURL: string,
   extraHTTPHeaders: Record<string, string>,
+  logTarget?: ApiRequestLogAttachTarget,
+  logContext?: ApiRequestLogContext,
 ): Promise<string> {
   const loginContext = await request.newContext({
     baseURL,
     extraHTTPHeaders,
   });
+  const loggedLoginContext = logTarget
+    ? createLoggedApiRequestContext(loginContext, logTarget, {
+        ...logContext,
+        name: 'api-session-login-context',
+      })
+    : loginContext;
 
   try {
-    const response = await loginContext.post('api/client/session/login', { data: {} });
+    const response = await loggedLoginContext.post('api/client/session/login', { data: {} });
     const body: unknown = await response.json();
 
     expectResponseEnvelope(body);

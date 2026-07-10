@@ -29,8 +29,8 @@ export const test = base.extend<ApiFixtures>({
   apiConfig: async ({}, use) => {
     await use(loadApiConfig());
   },
-  apiRequest: async ({ apiConfig }, use) => {
-    const apiRequest = await createApiRequestContext(apiConfig);
+  apiRequest: async ({ apiConfig }, use, testInfo) => {
+    const apiRequest = await createApiRequestContext(apiConfig, testInfo);
 
     try {
       await use(apiRequest);
