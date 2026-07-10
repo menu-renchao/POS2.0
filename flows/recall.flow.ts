@@ -305,6 +305,44 @@ export class RecallFlow {
     return recallPage;
   }
 
+  @step((_: RecallPage, sourceOrderNumber: string, targetOrderNumber: string) =>
+    `业务步骤：将订单 ${sourceOrderNumber} 的第一个菜品移动到已有订单 ${targetOrderNumber}`,
+  )
+  async moveFirstDishToExistingOrder(
+    recallPage: RecallPage,
+    sourceOrderNumber: string,
+    targetOrderNumber: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(sourceOrderNumber);
+    await recallPage.expandOrderDetailsPriceSummary();
+    await recallPage.selectFirstOrderDishItem();
+    await recallPage.clickMoveItemInMoreMenu();
+    await recallPage.expectMoveDishesOutReady();
+    await recallPage.clickMoveDishesToExistingOrder();
+    await recallPage.expectMoveDishesTargetSelectionReady();
+    await recallPage.clickMoveDishesTargetOrder(targetOrderNumber);
+    await recallPage.expectMovedOrderDetailsReady(targetOrderNumber);
+    return recallPage;
+  }
+
+  @step((_: RecallPage, sourceOrderNumber: string) =>
+    `业务步骤：将订单 ${sourceOrderNumber} 的第一个菜品移动到新订单`,
+  )
+  async moveFirstDishToNewOrder(
+    recallPage: RecallPage,
+    sourceOrderNumber: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(sourceOrderNumber);
+    await recallPage.selectFirstOrderDishItem();
+    await recallPage.clickMoveItemInMoreMenu();
+    await recallPage.expectMoveDishesToNewOrderReady();
+    await recallPage.clickMoveDishesToNewOrder();
+    await recallPage.expectMovedToNewOrderDetailsReady(sourceOrderNumber);
+    return recallPage;
+  }
+
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
     targetOrderNumber
       ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并点击 More 中的 Combine`
@@ -318,6 +356,24 @@ export class RecallFlow {
     await recallPage.expectLoaded();
     await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
     await recallPage.clickCombineInMoreMenu();
+    return recallPage;
+  }
+
+  @step((_: RecallPage, sourceOrderNumber: string, targetOrderNumber: string) =>
+    `业务步骤：从 Recall 将订单 ${sourceOrderNumber} 合并到订单 ${targetOrderNumber}`,
+  )
+  async combineOrders(
+    recallPage: RecallPage,
+    sourceOrderNumber: string,
+    targetOrderNumber: string,
+  ): Promise<RecallPage> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(sourceOrderNumber);
+    await recallPage.clickCombineInMoreMenu();
+    await recallPage.expectCombineTargetSelectionReady();
+    await recallPage.clickCombineTargetOrder(targetOrderNumber);
+    await recallPage.confirmCombineChargeWarningIfNeeded();
+    await recallPage.expectCombinedOrderDetailsReady(targetOrderNumber);
     return recallPage;
   }
 

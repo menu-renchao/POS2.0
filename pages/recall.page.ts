@@ -291,9 +291,80 @@ export class RecallPage {
     return this.orderDetails.clickMoveItemInMoreMenu();
   }
 
+  @step('页面操作：选择 Recall 订单详情中的第一个菜品')
+  async selectFirstOrderDishItem(): Promise<void> {
+    return this.orderDetails.selectFirstOrderDishItem();
+  }
+
+  @step('页面校验：Move Dishes Out 操作面板已显示')
+  async expectMoveDishesOutReady(): Promise<void> {
+    return this.orderDetails.expectMoveDishesOutReady();
+  }
+
+  @step('页面操作：选择将菜品移动到已有订单')
+  async clickMoveDishesToExistingOrder(): Promise<void> {
+    return this.orderDetails.clickMoveDishesToExistingOrder();
+  }
+
+  @step('页面校验：Move Dishes Out 可移动到新订单')
+  async expectMoveDishesToNewOrderReady(): Promise<void> {
+    return this.orderDetails.expectMoveDishesToNewOrderReady();
+  }
+
+  @step('页面操作：选择将菜品移动到新订单')
+  async clickMoveDishesToNewOrder(): Promise<void> {
+    return this.orderDetails.clickMoveDishesToNewOrder();
+  }
+
+  @step('页面校验：Recall 已进入移菜目标订单选择状态')
+  async expectMoveDishesTargetSelectionReady(): Promise<void> {
+    return this.orderDetails.expectMoveDishesTargetSelectionReady();
+  }
+
+  @step((orderNumber: string) => `页面操作：选择订单 ${orderNumber} 作为移菜目标订单`)
+  async clickMoveDishesTargetOrder(orderNumber: string): Promise<void> {
+    return this.orderDetails.clickMoveDishesTargetOrder(orderNumber);
+  }
+
+  @step((targetOrderNumber: string) =>
+    `页面校验：移菜后的目标订单 ${targetOrderNumber} 详情已显示`,
+  )
+  async expectMovedOrderDetailsReady(targetOrderNumber: string): Promise<void> {
+    return this.orderDetails.expectMovedOrderDetailsReady(targetOrderNumber);
+  }
+
+  @step((sourceOrderNumber: string) =>
+    `页面校验：从订单 ${sourceOrderNumber} 移出的菜品已显示在新订单详情中`,
+  )
+  async expectMovedToNewOrderDetailsReady(sourceOrderNumber: string): Promise<void> {
+    return this.orderDetails.expectMovedToNewOrderDetailsReady(sourceOrderNumber);
+  }
+
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Combine 按钮')
   async clickCombineInMoreMenu(): Promise<void> {
     return this.orderDetails.clickCombineInMoreMenu();
+  }
+
+  @step('页面校验：Recall 已进入合单目标订单选择状态')
+  async expectCombineTargetSelectionReady(): Promise<void> {
+    return this.orderDetails.expectCombineTargetSelectionReady();
+  }
+
+  @step((orderNumber: string) => `页面操作：选择订单 ${orderNumber} 作为合单目标订单`)
+  async clickCombineTargetOrder(orderNumber: string): Promise<void> {
+    return this.orderDetails.clickCombineTargetOrder(orderNumber);
+  }
+
+  @step('页面操作：存在加收合单警告时确认继续')
+  async confirmCombineChargeWarningIfNeeded(): Promise<void> {
+    return this.orderDetails.confirmCombineChargeWarningIfNeeded();
+  }
+
+  @step((targetOrderNumber: string) =>
+    `页面校验：Recall 合单后的目标订单 ${targetOrderNumber} 详情已显示`,
+  )
+  async expectCombinedOrderDetailsReady(targetOrderNumber: string): Promise<void> {
+    return this.orderDetails.expectCombinedOrderDetailsReady(targetOrderNumber);
   }
 
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Tips 按钮')

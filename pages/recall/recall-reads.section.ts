@@ -7,7 +7,10 @@ export function recallScopedTestId(scope: Locator | Page, testId: string): Locat
 }
 
 export function normalizeOrderNumber(orderNumber: string): string {
-  const normalizedOrderNumber = orderNumber.trim().replace(/^#/, '');
+  const normalizedOrderNumber = orderNumber
+    .trim()
+    .replace(/^#/, '')
+    .replace(/\(\d+\)$/, '');
   return `#${normalizedOrderNumber}`;
 }
 

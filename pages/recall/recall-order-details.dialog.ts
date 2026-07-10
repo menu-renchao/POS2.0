@@ -42,7 +42,7 @@ const recallOrderDetailActionNames = {
 const recallOrderDetailActionTestIds: Partial<Record<RecallOrderDetailAction, string>> = {
   edit: 'shared-order-detail-side-action-editod',
   pay: 'shared-order-detail-side-action-pay',
-  more: 'recall2-order-detail-more',
+  more: 'shared-order-detail-more-trigger',
 };
 
 const recallOrderDetailsMoreActionNames = {
@@ -56,6 +56,13 @@ const recallOrderDetailsMoreActionNames = {
   void: 'Void',
   sort: 'Sort',
 } as const satisfies Record<RecallOrderDetailsMoreAction, string>;
+
+const recallOrderDetailsMoreActionTestIds: Partial<
+  Record<RecallOrderDetailsMoreAction, string>
+> = {
+  moveItem: 'shared-order-detail-more-action-movedishesout',
+  combine: 'shared-order-detail-more-action-combinOd',
+};
 
 type SplitChargePromptAction = 'remove' | 'keep';
 
@@ -84,6 +91,14 @@ export class RecallOrderDetailsDialog {
   private readonly splitChargePromptDialog: Locator;
   private readonly splitChargePromptKeepButton: Locator;
   private readonly splitChargePromptRemoveButton: Locator;
+  private readonly combineSelectionPrompt: Locator;
+  private readonly combineChargeWarning: Locator;
+  private readonly combineChargeConfirmButton: Locator;
+  private readonly combineResultPriceSummaryToggle: Locator;
+  private readonly firstOrderDishItem: Locator;
+  private readonly moveDishesToExistingOrderButton: Locator;
+  private readonly moveDishesToNewOrderButton: Locator;
+  private readonly moveDishesTargetSelectionPrompt: Locator;
   private readonly globalLoadingOverlay: Locator;
 
   constructor(
@@ -118,12 +133,42 @@ export class RecallOrderDetailsDialog {
       .getByRole('alertdialog', { name: 'Notification' })
       .filter({ hasText: 'inconsistent split amounts' })
       .first();
-    this.splitChargePromptKeepButton = this.splitChargePromptDialog.getByRole('button', {
-      name: /^Keep$/,
-    });
-    this.splitChargePromptRemoveButton = this.splitChargePromptDialog.getByRole('button', {
-      name: /^Remove$/,
-    });
+    this.splitChargePromptKeepButton = recallScopedTestId(
+      this.splitChargePromptDialog,
+      'button-keep',
+    );
+    this.splitChargePromptRemoveButton = recallScopedTestId(
+      this.splitChargePromptDialog,
+      'button-remove',
+    );
+    this.combineSelectionPrompt = this.page.getByText(
+      'Please select another order to combine',
+      { exact: true },
+    );
+    this.combineChargeWarning = this.page
+      .locator('[data-testid="notification"], [data-test-id="notification"]')
+      .filter({ hasText: 'There are charge in this order' })
+      .first();
+    this.combineChargeConfirmButton = recallScopedTestId(
+      this.page,
+      'shared-order-detail-combine-confirm-yes',
+    );
+    this.combineResultPriceSummaryToggle = recallScopedTestId(
+      this.orderDetailsDialog,
+      'shared-order-price-summary-toggle',
+    );
+    this.firstOrderDishItem = recallScopedTestId(this.orderDetailsDialog, 'pos-ui-dish-item');
+    this.moveDishesToExistingOrderButton = recallScopedTestId(
+      this.page,
+      'shared-order-detail-move-dishes-to-existing-order',
+    );
+    this.moveDishesToNewOrderButton = recallScopedTestId(
+      this.page,
+      'shared-order-detail-move-dishes-to-new-order',
+    );
+    this.moveDishesTargetSelectionPrompt = this.page
+      .getByText('Select an order in Recall to', { exact: false })
+      .first();
     this.globalLoadingOverlay = this.page.locator('#floatmsgbx');
   }
 
@@ -394,9 +439,182 @@ export class RecallOrderDetailsDialog {
     await this.clickOrderDetailsMoreMenuAction('moveItem');
   }
 
+  @step('页面操作：选择 Recall 订单详情中的第一个菜品')
+  async selectFirstOrderDishItem(): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    await expect(this.firstOrderDishItem).toBeVisible({ timeout: 10_000 });
+    await this.firstOrderDishItem.click();
+  }
+
+  @step('页面校验：Move Dishes Out 操作面板已显示')
+  async expectMoveDishesOutReady(): Promise<void> {
+    await expect(this.moveDishesToExistingOrderButton).toBeVisible({ timeout: 10_000 });
+  }
+
+  @step('页面操作：选择将菜品移动到已有订单')
+  async clickMoveDishesToExistingOrder(): Promise<void> {
+    await expect(this.moveDishesToExistingOrderButton).toBeVisible({ timeout: 10_000 });
+    await this.moveDishesToExistingOrderButton.click();
+  }
+
+  @step('页面校验：Move Dishes Out 可移动到新订单')
+  async expectMoveDishesToNewOrderReady(): Promise<void> {
+    await expect(this.moveDishesToNewOrderButton).toBeVisible({ timeout: 10_000 });
+  }
+
+  @step('页面操作：选择将菜品移动到新订单')
+  async clickMoveDishesToNewOrder(): Promise<void> {
+    await expect(this.moveDishesToNewOrderButton).toBeVisible({ timeout: 10_000 });
+    await this.moveDishesToNewOrderButton.click();
+  }
+
+  @step('页面校验：Recall 已进入移菜目标订单选择状态')
+  async expectMoveDishesTargetSelectionReady(): Promise<void> {
+    await expect(this.moveDishesTargetSelectionPrompt).toBeVisible({ timeout: 10_000 });
+  }
+
+  @step((orderNumber: string) => `页面操作：选择订单 ${orderNumber} 作为移菜目标订单`)
+  async clickMoveDishesTargetOrder(orderNumber: string): Promise<void> {
+    const targetOrderNumber = normalizeOrderNumber(orderNumber);
+    const targetOrderLabel = this.filterBar.orderListContainer
+      .getByText(targetOrderNumber, { exact: true })
+      .first();
+
+    await expect(targetOrderLabel).toBeVisible({ timeout: 10_000 });
+    await targetOrderLabel.click();
+  }
+
+  @step((targetOrderNumber: string) =>
+    `页面校验：移菜后的目标订单 ${targetOrderNumber} 详情已显示`,
+  )
+  async expectMovedOrderDetailsReady(targetOrderNumber: string): Promise<void> {
+    const expectedOrderNumber = normalizeOrderNumber(targetOrderNumber);
+
+    await waitUntil(
+      async () => {
+        const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+        const detailsText = (await orderDetailsDialog.innerText().catch(() => ''))
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        return {
+          hasItems: await this.orderDetailsDialogHasReadableItems(),
+          hasTargetOrderNumber: detailsText.includes(expectedOrderNumber),
+          hasPriceSummary: await this.combineResultPriceSummaryToggle
+            .isVisible()
+            .catch(() => false),
+        };
+      },
+      (state) => state.hasItems && state.hasTargetOrderNumber && state.hasPriceSummary,
+      {
+        timeout: 15_000,
+        interval: 100,
+        message: 'Recall 移菜后的目标订单详情未完成加载。',
+      },
+    );
+  }
+
+  @step((sourceOrderNumber: string) =>
+    `页面校验：从订单 ${sourceOrderNumber} 移出的菜品已显示在新订单详情中`,
+  )
+  async expectMovedToNewOrderDetailsReady(sourceOrderNumber: string): Promise<void> {
+    const sourceOrderNumberText = normalizeOrderNumber(sourceOrderNumber);
+
+    await waitUntil(
+      async () => {
+        const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+        const detailsText = (await orderDetailsDialog.innerText().catch(() => ''))
+          .replace(/\s+/g, ' ')
+          .trim();
+        const visibleOrderNumber = detailsText.match(/#\d+/)?.[0] ?? null;
+
+        return {
+          hasItems: await this.orderDetailsDialogHasReadableItems(),
+          hasNewOrderNumber:
+            visibleOrderNumber !== null && visibleOrderNumber !== sourceOrderNumberText,
+          hasPriceSummary: await this.combineResultPriceSummaryToggle
+            .isVisible()
+            .catch(() => false),
+        };
+      },
+      (state) => state.hasItems && state.hasNewOrderNumber && state.hasPriceSummary,
+      {
+        timeout: 15_000,
+        interval: 100,
+        message: 'Recall 移菜后新订单详情未完成加载。',
+      },
+    );
+  }
+
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Combine 按钮')
   async clickCombineInMoreMenu(): Promise<void> {
     await this.clickOrderDetailsMoreMenuAction('combine');
+  }
+
+  @step('页面校验：Recall 已进入合单目标订单选择状态')
+  async expectCombineTargetSelectionReady(): Promise<void> {
+    await expect(this.combineSelectionPrompt).toBeVisible({ timeout: 10_000 });
+  }
+
+  @step((orderNumber: string) => `页面操作：选择订单 ${orderNumber} 作为合单目标订单`)
+  async clickCombineTargetOrder(orderNumber: string): Promise<void> {
+    const targetOrderNumber = normalizeOrderNumber(orderNumber);
+    const targetOrderLabel = this.filterBar.orderListContainer
+      .getByText(targetOrderNumber, { exact: true })
+      .first();
+
+    await expect(targetOrderLabel).toBeVisible({ timeout: 10_000 });
+    await targetOrderLabel.click();
+  }
+
+  @step('页面操作：存在加收合单警告时确认继续')
+  async confirmCombineChargeWarningIfNeeded(): Promise<void> {
+    const warningVisible = await waitUntil(
+      async () => await this.combineChargeWarning.isVisible().catch(() => false),
+      (isVisible) => isVisible,
+      {
+        timeout: 3_000,
+        interval: 100,
+        message: 'Recall 合单加收警告未出现。',
+      },
+    ).catch(() => false);
+
+    if (!warningVisible) {
+      return;
+    }
+
+    await expect(this.combineChargeConfirmButton).toBeVisible({ timeout: 10_000 });
+    await this.combineChargeConfirmButton.click();
+  }
+
+  @step((targetOrderNumber: string) =>
+    `页面校验：Recall 合单后的目标订单 ${targetOrderNumber} 详情已显示`,
+  )
+  async expectCombinedOrderDetailsReady(targetOrderNumber: string): Promise<void> {
+    const expectedOrderNumber = normalizeOrderNumber(targetOrderNumber);
+
+    await waitUntil(
+      async () => {
+        const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+        const detailsText = (await orderDetailsDialog.innerText().catch(() => ''))
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        return {
+          hasItems: await this.orderDetailsDialogHasReadableItems(),
+          hasTargetOrderNumber: detailsText.includes(expectedOrderNumber),
+          hasPriceSummary: await this.combineResultPriceSummaryToggle
+            .isVisible()
+            .catch(() => false),
+        };
+      },
+      (state) => state.hasItems && state.hasTargetOrderNumber && state.hasPriceSummary,
+      {
+        timeout: 15_000,
+        interval: 100,
+        message: 'Recall 合单后的订单详情未完成加载。',
+      },
+    );
   }
 
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Tips 按钮')
@@ -590,10 +808,10 @@ export class RecallOrderDetailsDialog {
     const priceSummaryRoot = await this.resolveOrderDetailsPriceSummaryRoot();
 
     if (!priceSummaryRoot) {
-      return {};
+      return await this.readOrderDetailsPriceSummaryFromText();
     }
 
-    const summaryLabels = ['Count', 'Subtotal', 'Tax', 'Total Before Tips', 'Tips', 'Total'] as const;
+    const summaryLabels = ['Count', 'Subtotal', 'Charge', 'Tax', 'Total Before Tips', 'Tips', 'Total'] as const;
     const summary: Record<string, number> = {};
 
     for (const label of summaryLabels) {
@@ -680,6 +898,41 @@ export class RecallOrderDetailsDialog {
 
       if (!Number.isNaN(parsedCardTotal)) {
         summary['Total(Card)'] = parsedCardTotal;
+      }
+    }
+
+    return {
+      ...(await this.readOrderDetailsPriceSummaryFromText()),
+      ...summary,
+    };
+  }
+
+  private async readOrderDetailsPriceSummaryFromText(): Promise<Record<string, number>> {
+    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+    const detailsText = (await orderDetailsDialog.innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+    const summary: Record<string, number> = {};
+    const countMatch = detailsText.match(/(?:^|\s)Count\s+(\d+(?:\.\d+)?)/i);
+    const moneyLabels = [
+      ['Subtotal', /(?:^|\s)Subtotal\s+\$([\d,.]+)/i],
+      ['Charge', /(?:^|\s)Charge\s+\$([\d,.]+)/i],
+      ['Tax', /(?:^|\s)Tax\s+\$([\d,.]+)/i],
+      ['Total Before Tips', /(?:^|\s)Total\s+Before\s+Tips\s+\$([\d,.]+)/i],
+      ['Tips', /(?:^|\s)(?<!Before\s)Tips\s+\$([\d,.]+)/i],
+      ['Total', /(?:^|\s)Total(?!\s+Before\s+Tips|\s*\()\s+\$([\d,.]+)/i],
+      ['Total(Cash)', /(?:^|\s)Total\s*\(\s*Cash\s*\)\s+\$([\d,.]+)/i],
+      ['Total(Card)', /(?:^|\s)Total\s*\(\s*Card\s*\)\s+\$([\d,.]+)/i],
+    ] as const;
+
+    if (countMatch) {
+      summary.Count = Number(countMatch[1]);
+    }
+
+    for (const [label, pattern] of moneyLabels) {
+      const match = detailsText.match(pattern);
+      const parsedValue = Number(match?.[1]?.replace(/,/g, '') ?? NaN);
+
+      if (!Number.isNaN(parsedValue)) {
+        summary[label] = parsedValue;
       }
     }
 
@@ -1571,6 +1824,12 @@ export class RecallOrderDetailsDialog {
   }
 
   private orderDetailsMoreMenuActionButton(action: RecallOrderDetailsMoreAction): Locator {
+    const actionTestId = recallOrderDetailsMoreActionTestIds[action];
+
+    if (actionTestId) {
+      return recallScopedTestId(this.page, actionTestId);
+    }
+
     return this.page
       .getByRole('button', {
         name: new RegExp(`^${escapeRegExp(recallOrderDetailsMoreActionNames[action])}$`, 'i'),
@@ -1815,6 +2074,34 @@ export class RecallOrderDetailsDialog {
   }
 
   private async readVisibleChildOrderNumbers(parentOrderNumber: string): Promise<string[]> {
+    const childOrderNumbersFromCards = await this.openOrderCards.evaluateAll(
+      (cardElements, parentOrderNumberText) => {
+        const isVisible = (element: Element): boolean => {
+          const computedStyle = window.getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+
+          return (
+            computedStyle.display !== 'none' &&
+            computedStyle.visibility !== 'hidden' &&
+            rect.width > 0 &&
+            rect.height > 0
+          );
+        };
+        const childOrderNumberPattern = new RegExp(`#${parentOrderNumberText}-\\d+\\b`, 'g');
+
+        return [...new Set(
+          cardElements
+            .filter(isVisible)
+            .flatMap((element) => element.textContent?.match(childOrderNumberPattern) ?? []),
+        )];
+      },
+      parentOrderNumber,
+    );
+
+    if (childOrderNumbersFromCards.length > 0) {
+      return childOrderNumbersFromCards;
+    }
+
     return await this.page.evaluate((parentOrderNumberText) => {
       const isVisible = (element: HTMLElement): boolean => {
         const computedStyle = window.getComputedStyle(element);
