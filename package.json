@@ -5,6 +5,8 @@
   "description": "Playwright + TypeScript UI automation project for the POS frontend",
   "scripts": {
     "test": "playwright test",
+    "test:api": "playwright test tests/api --project=api",
+    "test:api:cleanup": "playwright test tests/api/maintenance --project=api",
     "test:py-migrate": "playwright test tests/py-migrate",
     "test:headed": "playwright test --headed",
     "jenkins:test-tree": "node scripts/generate-jenkins-test-tree.mjs",

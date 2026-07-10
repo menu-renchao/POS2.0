@@ -1,6 +1,6 @@
 export type ApiAuthMode = 'apiLogin';
 
-const API_LOGIN_CLIENT_SN = 'device001';
+const API_LOGIN_CLIENT_SN = 'mansuper';
 const API_LOGIN_CLIENT_TYPE = '0';
 const API_LOGIN_STAFF_PASSCODE = '11';
 

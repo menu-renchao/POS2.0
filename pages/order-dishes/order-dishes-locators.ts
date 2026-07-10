@@ -266,18 +266,13 @@ export class OrderDishesLocators {
     this.splitButton = this.appFrame.getByRole('button', {
       name: /^Split$/,
     }).first();
-    this.modifyButton = this.appFrame
-      .locator(
-        '[data-testid="action-rail-button-modify"], [data-test-id="action-rail-button-modify"], [data-testid="modify-button"], [data-test-id="modify-button"]',
-      )
-      .or(this.appFrame.getByRole('button', { name: /^(Modify|修改)$/ }))
-      .first();
-    this.modifyPanel = this.appFrame
+    this.modifyButton = this.page.getByRole('button', { name: /^Modify$/ }).first();
+    this.modifyPanel = this.page
       .locator(
         '[data-testid="modify-panel"], [data-test-id="modify-panel"], [class*="_panel_"]',
       )
       .filter({
-        has: this.appFrame.getByText(/^(Modify|修改)$/),
+        has: this.page.getByText(/^(Modify|修改)$/),
       })
       .first();
     this.modifyBackButton = this.modifyPanel
@@ -296,35 +291,18 @@ export class OrderDishesLocators {
     this.chargeButton = this.appFrame.getByRole('button', {
       name: CHARGE_BUTTON_NAMES,
     }).first();
-    this.chargeDialog = this.appFrame
-      .locator('[data-testid="charge-dialog"], [data-test-id="charge-dialog"], [role="dialog"]')
-      .filter({ hasText: CHARGE_DIALOG_TEXT })
-      .or(
-        this.page
-          .locator('[data-testid="charge-dialog"], [data-test-id="charge-dialog"], [role="dialog"]')
-          .filter({ hasText: CHARGE_DIALOG_TEXT }),
-      )
-      .or(this.appFrame.getByRole('dialog', { name: /^Charge$/i }))
-      .or(this.page.getByRole('dialog', { name: /^Charge$/i }))
+    this.chargeDialog = this.page
+      .locator('[role="dialog"]')
+      .filter({ hasText: /Whole Order[\s\S]*Item Charge[\s\S]*Custom Charge/ })
       .first();
-    this.customChargeDialog = this.appFrame
-      .locator(
-        '[data-testid="custom-charge-dialog"], [data-test-id="custom-charge-dialog"], [role="dialog"]',
-      )
+    this.customChargeDialog = this.page
+      .locator('[role="dialog"]')
       .filter({
-        has: this.appFrame.getByRole('checkbox', { name: CUSTOM_TAXED_LABELS }).first(),
+        has: this.page.getByRole('heading', { name: /^Custom Charge$/i }).first(),
       })
-      .or(
-        this.page
-          .locator(
-            '[data-testid="custom-charge-dialog"], [data-test-id="custom-charge-dialog"], [role="dialog"]',
-          )
-          .filter({
-            has: this.page.getByRole('checkbox', { name: CUSTOM_TAXED_LABELS }).first(),
-          }),
-      )
-      .or(this.appFrame.getByRole('dialog', { name: /^Custom Charge$/i }))
-      .or(this.page.getByRole('dialog', { name: /^Custom Charge$/i }))
+      .filter({
+        has: this.page.getByRole('button', { name: CUSTOM_TAXED_LABELS }).first(),
+      })
       .first();
     this.clearAllChargesButton = this.chargeDialog.getByRole('button', {
       name: CLEAR_ALL_BUTTON_NAMES,

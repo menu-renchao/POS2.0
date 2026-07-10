@@ -2,11 +2,12 @@ import { defineConfig, devices } from '@playwright/test';
 import { appConfig } from './test-data/env';
 
 const posClientHeaders = {
-  'x-client-sn': 'device001',
+  'x-client-sn': 'mansuper',
   'x-client-type': '0',
 };
 
 const desktopChromeChannel = process.env.CI ? {} : { channel: 'chrome' as const };
+const videoMode = process.env.PLAYWRIGHT_VIDEO === 'true' ? 'retain-on-failure' : 'off';
 
 export default defineConfig({
   testDir: './tests',
@@ -34,10 +35,14 @@ export default defineConfig({
     baseURL: appConfig.baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: videoMode,
     viewport: { width: 1920, height: 1080 },
   },
   projects: [
+    {
+      name: 'api',
+      testMatch: /(?:^|[\\/])api[\\/].*\.spec\.ts$/,
+    },
     {
       name: 'py-migrate',
       testMatch: /(?:^|[\\/])py-migrate[\\/].*\.spec\.ts$/,

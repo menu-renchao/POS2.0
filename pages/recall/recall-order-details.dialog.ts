@@ -6,6 +6,7 @@ import {
 import { step } from '../../utils/step';
 import { waitForInputSettled } from '../../utils/input-stability';
 import { waitUntil } from '../../utils/wait';
+import { readVisiblePosAlertText } from '../shared/pos-alert';
 import { OrderDishesPage } from '../order-dishes.page';
 import { PaymentPage } from '../payment.page';
 import { SplitOrderPage } from '../split-order.page';
@@ -56,6 +57,8 @@ const recallOrderDetailsMoreActionNames = {
   sort: 'Sort',
 } as const satisfies Record<RecallOrderDetailsMoreAction, string>;
 
+type SplitChargePromptAction = 'remove' | 'keep';
+
 export class RecallOrderDetailsDialog {
   private readonly openOrderCards: Locator;
   private readonly visibleOrderDetailsDialogs: Locator;
@@ -66,6 +69,9 @@ export class RecallOrderDetailsDialog {
   private readonly legacyOrderDetailsMoreButton: Locator;
   private readonly namedOrderDetailsMoreButton: Locator;
   private readonly orderDetailsTipsButton: Locator;
+  private readonly splitChargePromptDialog: Locator;
+  private readonly splitChargePromptKeepButton: Locator;
+  private readonly splitChargePromptRemoveButton: Locator;
   private readonly globalLoadingOverlay: Locator;
 
   constructor(
@@ -96,6 +102,16 @@ export class RecallOrderDetailsDialog {
     this.legacyOrderDetailsMoreButton = this.page.locator('#odsmymoreicon');
     this.namedOrderDetailsMoreButton = this.page.getByRole('button', { name: /^MoreIcon More$/i });
     this.orderDetailsTipsButton = recallScopedTestId(this.page, 'recall2-order-detail-tips');
+    this.splitChargePromptDialog = this.page
+      .getByRole('alertdialog', { name: 'Notification' })
+      .filter({ hasText: 'inconsistent split amounts' })
+      .first();
+    this.splitChargePromptKeepButton = this.splitChargePromptDialog.getByRole('button', {
+      name: /^Keep$/,
+    });
+    this.splitChargePromptRemoveButton = this.splitChargePromptDialog.getByRole('button', {
+      name: /^Remove$/,
+    });
     this.globalLoadingOverlay = this.page.locator('#floatmsgbx');
   }
 
@@ -137,9 +153,21 @@ export class RecallOrderDetailsDialog {
         String(value ?? '')
           .replace(/\s+/g, ' ')
           .trim();
+      const isVisible = (element: Element): boolean => {
+        const computedStyle = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+
+        return (
+          computedStyle.display !== 'none' &&
+          computedStyle.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
 
       return [...new Set(
         buttonElements
+          .filter(isVisible)
           .map((buttonElement) => {
             const visibleOrderNumber = normalizeText(buttonElement.textContent).match(/#\d+-\d+\b/)?.[0];
 
@@ -245,6 +273,13 @@ export class RecallOrderDetailsDialog {
     await this.clickOrderDetailsAction('send');
   }
 
+  @step('页面操作：点击 Recall 订单详情中的 Send 按钮并读取成功提示')
+  async clickSendInOrderDetailsAndReadMessage(): Promise<string> {
+    await this.waitForOrderDetailsDialogReady();
+    await this.clickOrderDetailsAction('send');
+    return await readVisiblePosAlertText(this.page);
+  }
+
   @step('页面操作：点击 Recall 订单详情中的 Print 按钮')
   async clickPrintInOrderDetails(): Promise<void> {
     await this.waitForOrderDetailsDialogReady();
@@ -252,14 +287,49 @@ export class RecallOrderDetailsDialog {
   }
 
   @step('页面操作：从 Recall 订单详情点击 Split 并进入分单面板')
-  async openSplitInOrderDetails(): Promise<SplitOrderPage> {
+  async openSplitInOrderDetails(options: {
+    chargePromptAction?: SplitChargePromptAction;
+  } = {}): Promise<SplitOrderPage> {
     await this.waitForOrderDetailsDialogReady();
     await this.clickOrderDetailsAction('split');
+    await this.dismissSplitChargePromptIfNeeded(options.chargePromptAction);
 
     const splitOrderPage = new SplitOrderPage(this.page);
     await splitOrderPage.expectLoaded();
 
     return splitOrderPage;
+  }
+
+  @step((action?: SplitChargePromptAction) =>
+    action === 'remove'
+      ? '页面操作：分单前置弹窗选择移除加收折扣小费'
+      : '页面操作：分单前置弹窗选择保留加收折扣小费',
+  )
+  private async dismissSplitChargePromptIfNeeded(action?: SplitChargePromptAction): Promise<void> {
+    if (!action) {
+      return;
+    }
+
+    await waitUntil(
+      async () => await this.splitChargePromptDialog.isVisible().catch(() => false),
+      (isVisible) => isVisible,
+      {
+        timeout: 3_000,
+        interval: 100,
+        message: 'Split charge prompt did not appear.',
+      },
+    ).catch(() => undefined);
+
+    if (!(await this.splitChargePromptDialog.isVisible().catch(() => false))) {
+      return;
+    }
+
+    if (action === 'remove') {
+      await this.splitChargePromptRemoveButton.click();
+      return;
+    }
+
+    await this.splitChargePromptKeepButton.click();
   }
 
   @step('页面操作：点击 Recall 订单详情中的 Discount 按钮')
@@ -1703,14 +1773,27 @@ export class RecallOrderDetailsDialog {
       const orderCardText = orderCard?.innerText ?? '';
       const splitCountMatch = orderCardText.match(new RegExp(`^(\\d+)\\s+${orderLabelText.replace('#', '\\#')}\\b`));
 
-      return Number(splitCountMatch?.[1] ?? 2);
+      return Number(splitCountMatch?.[1] ?? 0);
     }, parentOrderNumber);
   }
 
   private async readVisibleChildOrderNumbers(parentOrderNumber: string): Promise<string[]> {
     return await this.page.evaluate((parentOrderNumberText) => {
-      const matchedOrderNumbers =
-        document.body.innerText.match(new RegExp(`#${parentOrderNumberText}-\\d+`, 'g')) ?? [];
+      const isVisible = (element: HTMLElement): boolean => {
+        const computedStyle = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+
+        return (
+          computedStyle.display !== 'none' &&
+          computedStyle.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
+      const matchedOrderNumbers = Array.from(document.body.querySelectorAll<HTMLElement>('*'))
+        .filter(isVisible)
+        .flatMap((element) => element.innerText.match(new RegExp(`#${parentOrderNumberText}-\\d+`, 'g')) ?? []);
+
       return [...new Set(matchedOrderNumbers)];
     }, parentOrderNumber);
   }
@@ -1907,19 +1990,23 @@ export class RecallOrderDetailsDialog {
   }
 
   private async clickPaymentCardRefundButton(paymentCard: Locator): Promise<void> {
+    await this.closePosKeyboardIfVisible();
+
     const refundButton = await resolveFirstVisibleLocator(
       this.buildPaymentCardRefundButtonCandidates(paymentCard),
       'Recall PAYMENT 卡片的 Refund 操作按钮未在预期时间内出现。',
       10_000,
     );
 
-    await refundButton.click();
+    await refundButton.click({ timeout: 10_000 });
   }
 
   private async clickPaymentSectionRefundButton(
     paymentSection: Locator,
     paymentIndex: number,
   ): Promise<void> {
+    await this.closePosKeyboardIfVisible();
+
     const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
     const refundButton = await resolveFirstVisibleLocator(
       [
@@ -1931,16 +2018,27 @@ export class RecallOrderDetailsDialog {
     );
 
     await refundButton.scrollIntoViewIfNeeded();
-    await refundButton.click();
+    await refundButton.click({ timeout: 10_000 });
   }
 
   private async confirmPaymentRefundDialog(): Promise<void> {
+    await this.selectAmountRefundModeIfVisible();
+
     const refundDialog = await resolveFirstVisibleLocator(
       [
-        this.page.getByRole('dialog', { name: /Refund/i }).first(),
+        this.page
+          .locator('[role="dialog"][data-testid="pos-ui-modal"]:visible')
+          .filter({ has: this.page.getByRole('heading', { name: /^Refund$/i }) })
+          .filter({ has: this.page.getByTestId('modal-confirm-button') })
+          .first(),
         this.page
           .locator('[role="dialog"]:visible')
-          .filter({ has: this.page.getByRole('button', { name: /^(Refund|Confirm|Yes|确定|确认)$/i }) })
+          .filter({ has: this.page.getByTestId('modal-confirm-button') })
+          .filter({ has: this.page.getByTestId('dropdown-item-CUSTOM') })
+          .first(),
+        this.page
+          .locator('[role="dialog"]:visible')
+          .filter({ has: this.page.getByTestId('modal-confirm-button') })
           .filter({ hasText: /Refund|退款/i })
           .first(),
         this.page.locator('#responsePopuWin:visible').filter({ hasText: /Refund|退款/i }).first(),
@@ -1948,9 +2046,12 @@ export class RecallOrderDetailsDialog {
       '点击 PAYMENT Refund 后未出现退款确认弹窗。',
       10_000,
     );
+
     const confirmButton = await resolveFirstVisibleLocator(
       [
+        refundDialog.getByTestId('modal-confirm-button').first(),
         refundDialog.getByRole('button', { name: /^(Refund|Confirm|Yes|确定|确认)$/i }).first(),
+        this.page.getByTestId('modal-confirm-button').first(),
         this.page.getByRole('button', { name: /^(Refund|Confirm|Yes|确定|确认)$/i }).first(),
       ],
       '退款确认弹窗未出现确认按钮。',
@@ -1958,8 +2059,51 @@ export class RecallOrderDetailsDialog {
     );
 
     await waitForInputSettled();
-    await confirmButton.click();
-    await expect(refundDialog).toBeHidden({ timeout: 10_000 }).catch(() => undefined);
+    await this.closePosKeyboardIfVisible();
+    await confirmButton.evaluate((buttonElement) => {
+      (buttonElement as HTMLElement).click();
+    });
+    await expect(refundDialog).toBeHidden({ timeout: 10_000 });
+  }
+
+  private async selectAmountRefundModeIfVisible(): Promise<void> {
+    const refundByAmountOption = this.refundByAmountMenuItem();
+
+    await refundByAmountOption.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => undefined);
+
+    if (!(await refundByAmountOption.isVisible().catch(() => false))) {
+      return;
+    }
+
+    await refundByAmountOption.click({ timeout: 10_000 });
+    await expect(refundByAmountOption).toBeHidden({ timeout: 5_000 });
+  }
+
+  private refundByAmountMenuItem(): Locator {
+    return this.page.getByRole('menuitem', { name: 'Refund by Amount' }).first();
+  }
+
+  private async closePosKeyboardIfVisible(): Promise<void> {
+    const keyboardCloseButton = this.page.getByTestId('pos-keyboard-button-{close}').last();
+
+    if (!(await keyboardCloseButton.isVisible().catch(() => false))) {
+      return;
+    }
+
+    await keyboardCloseButton.evaluate((buttonElement) => {
+      (buttonElement as HTMLElement).click();
+    });
+  }
+
+  private async clickByDom(locator: Locator): Promise<void> {
+    await locator.scrollIntoViewIfNeeded({ timeout: 1_000 }).catch(() => undefined);
+    await locator.evaluate(
+      (element) => {
+        (element as HTMLElement).click();
+      },
+      undefined,
+      { timeout: 5_000 },
+    );
   }
 
   private paymentCardTipDialogCandidates(): Locator[] {
@@ -1985,8 +2129,12 @@ export class RecallOrderDetailsDialog {
       visiblePosUiModals
         .filter({ has: this.page.getByRole('heading', { name: /^Payment Tips$/i }) })
         .last(),
+      visiblePosUiModals
+        .filter({ has: this.page.getByRole('heading', { name: /^Cash Tips$/i }) })
+        .last(),
       this.page.getByRole('dialog', { name: /^Credit Card Tips$/i }).first(),
       this.page.getByRole('dialog', { name: /^Payment Tips$/i }).first(),
+      this.page.getByRole('dialog', { name: /^Cash Tips$/i }).first(),
     ];
   }
 
@@ -1999,7 +2147,12 @@ export class RecallOrderDetailsDialog {
     );
   }
 
-  private async clickPaymentCardTipsButton(paymentMethod?: string): Promise<void> {
+  private async clickPaymentCardTipsButton(_paymentMethod?: string): Promise<void> {
+    await this.page.getByRole('button', { name: 'Tips' }).click({ timeout: 10_000 });
+    await this.expectPaymentCardTipDialogVisible();
+  }
+
+  private async clickPaymentCardTipsButtonByCardScope(paymentMethod?: string): Promise<void> {
     const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
     const paymentSection = this.resolvePaymentSection(orderDetailsDialog);
 
@@ -2007,7 +2160,7 @@ export class RecallOrderDetailsDialog {
     await this.waitForGlobalLoadingOverlayHidden();
 
     const paymentCard = await this.resolvePaymentCardScope(paymentSection, paymentMethod);
-    await paymentCard.scrollIntoViewIfNeeded();
+    await paymentCard.scrollIntoViewIfNeeded().catch(() => undefined);
 
     const tipsButton = await resolveFirstVisibleLocator(
       this.buildPaymentCardTipsButtonCandidates(paymentCard),
@@ -2017,7 +2170,7 @@ export class RecallOrderDetailsDialog {
       15_000,
     );
 
-    await tipsButton.scrollIntoViewIfNeeded();
+    await tipsButton.scrollIntoViewIfNeeded().catch(() => undefined);
     await tipsButton.click({ timeout: 5_000 });
 
     const paymentCardTipDialogVisible = await waitUntil(
@@ -2152,6 +2305,11 @@ export class RecallOrderDetailsDialog {
       : this.formatTipInputDigits(amountInCents);
     const keypadText = this.formatTipInputDigits(amountInCents);
 
+    if (isPaymentCardDialog) {
+      await this.enterTipValueByKeypad(tipDialog, keypadText);
+      return;
+    }
+
     await input.fill(valueText).catch(async () => {
       await input.evaluate((inputElement, nextValue) => {
         const htmlInput = inputElement as HTMLInputElement;
@@ -2219,6 +2377,8 @@ export class RecallOrderDetailsDialog {
   ): Promise<Locator> {
     const candidates = isPaymentCardDialog
       ? [
+          tipDialog.getByTestId('modal-confirm-button').first(),
+          this.page.getByTestId('modal-confirm-button').first(),
           this.page.locator('#smpiptgo:visible').first(),
           tipDialog.locator('#smpiptgo').first(),
           tipDialog.getByRole('button', { name: /^(Confirm|确认)$/ }).first(),
@@ -2316,11 +2476,15 @@ export class RecallOrderDetailsDialog {
         );
       });
 
-        const paymentCard = targetPaymentMethod
-          ? visibleCards.find((cardElement) =>
-              cleanText(cardElement.textContent).includes(targetPaymentMethod),
-            )
-          : visibleCards.at(-1);
+      const paymentCard = targetPaymentMethod
+        ? visibleCards.find((cardElement) => {
+            const cardText = cleanText(cardElement.textContent);
+            return cardText.includes(targetPaymentMethod) && /\bTips\b/i.test(cardText);
+          }) ??
+          visibleCards.find((cardElement) =>
+            cleanText(cardElement.textContent).includes(targetPaymentMethod),
+          )
+        : visibleCards.at(-1);
 
       if (!paymentCard) {
         return null;
@@ -2328,8 +2492,26 @@ export class RecallOrderDetailsDialog {
 
       const cardText = cleanText(paymentCard.textContent);
       const matchedTip = cardText.match(/Tips:?\s*(\$[\d,.]+)/i);
-      return matchedTip?.[1] ?? null;
+      if (matchedTip) {
+        return matchedTip[1];
+      }
+
+      const dialogText = cleanText(dialogElement.textContent);
+      const paymentTipPattern = targetPaymentMethod
+        ? new RegExp(`${targetPaymentMethod}\\s*\\$[\\d,.]+\\s*Tips\\s*(\\$[\\d,.]+)`, 'i')
+        : /\bTips\s*(\$[\d,.]+)/i;
+      return dialogText.match(paymentTipPattern)?.[1] ?? null;
     }, paymentMethod ?? null);
+  }
+
+  @step((paymentMethod?: string) =>
+    paymentMethod
+      ? `页面读取：读取 Recall 订单详情 PAYMENT 卡片 ${paymentMethod} 中的 Tips 金额`
+      : '页面读取：读取 Recall 订单详情 PAYMENT 卡片中的 Tips 金额',
+  )
+  async readPaymentCardTipAmount(paymentMethod?: string): Promise<number | null> {
+    const tipText = await this.readPaymentCardTip(paymentMethod);
+    return tipText === null ? null : this.parseMoneyAmount(tipText);
   }
 
   private formatTipInputDigits(amountInCents: number): string {
@@ -2349,17 +2531,17 @@ export class RecallOrderDetailsDialog {
   }
 
   private async enterTipValueByKeypad(tipDialog: Locator, valueText: string): Promise<void> {
-    const clearButton = tipDialog.getByRole('button', { name: 'C', exact: true }).first();
-    if (await clearButton.isVisible().catch(() => false)) {
-      await clearButton.click();
-    }
-
     for (const digit of valueText) {
-      const digitButton = tipDialog.getByRole('button', { name: digit, exact: true }).first();
-
-      if (!(await digitButton.isVisible().catch(() => false))) {
-        continue;
-      }
+      const digitButton = await resolveFirstVisibleLocator(
+        [
+          this.page.getByTestId(`pos-keyboard-button-${digit}`).first(),
+          tipDialog.getByTestId(`pos-keyboard-button-${digit}`).first(),
+          tipDialog.getByRole('button', { name: digit, exact: true }).first(),
+          this.page.getByRole('button', { name: digit, exact: true }).first(),
+        ],
+        `Recall Tips 数字键 ${digit} 不可见。`,
+        5_000,
+      );
 
       await digitButton.click({ timeout: 2_000 });
     }

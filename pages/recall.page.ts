@@ -223,6 +223,12 @@ export class RecallPage {
     return this.orderDetails.readPaymentCardTip(...args);
   }
 
+  async readPaymentCardTipAmount(
+    ...args: Parameters<RecallOrderDetailsDialog['readPaymentCardTipAmount']>
+  ): Promise<number | null> {
+    return this.orderDetails.readPaymentCardTipAmount(...args);
+  }
+
   async addOrderDetailsTip(
     ...args: Parameters<RecallOrderDetailsDialog['addOrderDetailsTip']>
   ): Promise<string | null> {
@@ -259,8 +265,10 @@ export class RecallPage {
   }
 
   @step('页面操作：从 Recall 订单详情点击 Split 并进入分单面板')
-  async openSplitInOrderDetails(): Promise<SplitOrderPage> {
-    return this.orderDetails.openSplitInOrderDetails();
+  async openSplitInOrderDetails(
+    options?: Parameters<RecallOrderDetailsDialog['openSplitInOrderDetails']>[0],
+  ): Promise<SplitOrderPage> {
+    return this.orderDetails.openSplitInOrderDetails(options);
   }
 
   @step('页面操作：点击 Recall 订单详情中的 Discount 按钮')

@@ -96,6 +96,7 @@ export class OrderDishesChargeSection {
       await this.expectChargeDialogVisible();
       const optionLocator = await this.resolveChargeOptionLocator(optionName);
       await optionLocator.click();
+      await expect(optionLocator).toHaveAttribute('aria-pressed', 'true');
       this.applyDraftChargeOption({
         kind: 'fixed',
         name: optionName,
@@ -120,37 +121,19 @@ export class OrderDishesChargeSection {
     @step((value: number) => `页面操作：输入自定义加收值 ${value}`)
     async fillCustomChargeValue(value: number): Promise<void> {
       await expect(this.locators.customChargeDialog).toBeVisible();
-      const valueText = String(value);
+      await this.enterCustomChargeValueByKeypad(value);
 
-      await this.locators.customChargeValueInput.fill(valueText).catch(async () => {
-        await this.locators.customChargeValueInput.evaluate((inputElement, nextValue) => {
-          const input = inputElement as HTMLInputElement;
-          input.value = String(nextValue);
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-        }, valueText);
-      });
-
-      const directInputAccepted = await waitUntil(
+      await waitUntil(
         async () => {
-          const currentValue = await this.locators.customChargeValueInput.inputValue().catch(() => '');
           const confirmEnabled = !(await this.locators.customChargeConfirmButton.isDisabled().catch(() => true));
-
-          return {
-            confirmEnabled,
-            matches: currentValue === valueText,
-          };
+          return confirmEnabled;
         },
-        (state) => state.matches && state.confirmEnabled,
+        (confirmEnabled) => confirmEnabled,
         {
-          timeout: 1_000,
-          message: `Custom charge value ${valueText} was not applied through direct input.`,
+          timeout: 5_000,
+          message: `Custom charge value ${value} did not enable the confirm button.`,
         },
-      ).catch(() => null);
-
-      if (!directInputAccepted) {
-        await this.enterCustomChargeValueByKeypad(value);
-      }
+      );
 
       this.customChargeDraft.value = value;
     }
@@ -603,6 +586,7 @@ export class OrderDishesChargeSection {
     private async resolveCustomTaxedLocator(): Promise<Locator | null> {
       const candidates = [
         this.locators.customChargeDialog.getByLabel(CUSTOM_TAXED_LABELS).first(),
+        this.locators.customChargeDialog.getByRole('button', { name: CUSTOM_TAXED_LABELS }).first(),
         this.locators.customChargeDialog.locator('[data-action="taxed"]').first(),
       ];
 

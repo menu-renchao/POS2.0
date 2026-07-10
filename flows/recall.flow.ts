@@ -234,10 +234,11 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
+    options?: Parameters<RecallPage['openSplitInOrderDetails']>[0],
   ): Promise<SplitOrderPage> {
     await recallPage.expectLoaded();
     await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    return await recallPage.openSplitInOrderDetails();
+    return await recallPage.openSplitInOrderDetails(options);
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -438,7 +439,20 @@ export class RecallFlow {
     const paymentAmounts = (await recallPage.readOrderPaymentAmounts()).filter((amount) => amount > 0);
 
     for (let index = 0; index < paymentAmounts.length; index += 1) {
+      const refundedCountBefore = (await recallPage.readOrderPaymentAmounts()).filter((amount) => amount < 0).length;
+
       await recallPage.refundPaymentRecord(index);
+      await waitUntil(
+        async () => {
+          const amounts = await recallPage.readOrderPaymentAmounts();
+          return amounts.filter((amount) => amount < 0).length;
+        },
+        (refundedCount) => refundedCount > refundedCountBefore,
+        {
+          timeout: 15_000,
+          message: `Recall 第 ${index + 1} 笔支付退款后未读取到新增负向流水。`,
+        },
+      );
     }
   }
 

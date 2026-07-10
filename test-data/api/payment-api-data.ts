@@ -34,7 +34,7 @@ export function buildPaymentRecordRequest(orderId: ApiEntityId): PaymentRecordAp
     userAuth: {
       userId: 1,
       userPasscode: '11',
-      sessionKey: 'device001',
+      sessionKey: 'mansuper',
     },
   };
 }

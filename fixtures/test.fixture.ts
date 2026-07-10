@@ -1,6 +1,7 @@
 import { test as base } from '@playwright/test';
 import { AdminConfigApiClient } from '../api/clients/admin-config-api.client';
 import { MenuApiClient } from '../api/clients/menu-api.client';
+import { OrderApiClient } from '../api/clients/order-api.client';
 import { SaleItemApiClient } from '../api/clients/sale-item-api.client';
 import { SystemConfigurationApiClient } from '../api/clients/system-configuration-api.client';
 import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
@@ -22,6 +23,7 @@ type AppFixtures = {
   paymentPage: PaymentPage;
   splitOrderPage: SplitOrderPage;
   apiConfig: ApiConfig;
+  orderApi: OrderApiClient;
   systemConfigurationApi: SystemConfigurationApiClient;
   resourceRegistry: ResourceRegistry;
   apiSetup: ApiSetup;
@@ -65,6 +67,18 @@ export const test = base.extend<AppFixtures>({
         }),
       );
     } finally {
+      const cleanupResult = await resourceRegistry.cleanupAll();
+
+      if (cleanupResult.errors.length > 0) {
+        const errorSummary = cleanupResult.errors
+          .map(({ resource, error }) => `${resource.type}:${String(resource.id)} ${error.message}`)
+          .join('; ');
+
+        console.warn(
+          `UI API setup cleanup finished with ${cleanupResult.errors.length} error(s): ${errorSummary}`,
+        );
+      }
+
       await apiRequest.dispose();
     }
   },
@@ -73,6 +87,15 @@ export const test = base.extend<AppFixtures>({
 
     try {
       await use(new SystemConfigurationApiClient(apiRequest));
+    } finally {
+      await apiRequest.dispose();
+    }
+  },
+  orderApi: async ({ apiConfig }, use) => {
+    const apiRequest = await createApiRequestContext(apiConfig);
+
+    try {
+      await use(new OrderApiClient(apiRequest));
     } finally {
       await apiRequest.dispose();
     }

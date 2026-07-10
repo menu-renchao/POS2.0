@@ -54,6 +54,24 @@ export class PaymentFlow {
     }
   }
 
+  @step('业务步骤：完成指定金额现金支付并停留在支付页')
+  async payPartialByCashKeepingPaymentOpen(
+    paymentPage: PaymentPage,
+    options: PartialCashPaymentOptions,
+  ): Promise<void> {
+    await paymentPage.expectLoaded();
+
+    try {
+      await paymentPage.fillAmountTendered(options.amountInCents);
+      await paymentPage.clickPaymentTypeCash();
+      await this.finishPrintReceiptStep(paymentPage, options);
+      await paymentPage.expectLoaded();
+    } catch (error) {
+      await paymentPage.dismissPrintReceiptDialogIfVisible();
+      throw error;
+    }
+  }
+
   @step('业务步骤：完成信用卡支付并处理打印小票选择')
   async payByCreditCard(
     paymentPage: PaymentPage,

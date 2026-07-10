@@ -31,7 +31,7 @@ export function buildOrderRequest(saleItemId: ApiEntityId, seed?: string | numbe
   return {
     userAuth: {
       userId: 1,
-      sessionKey: 'device001',
+      sessionKey: 'mansuper',
     },
     order: {
       point: 0,

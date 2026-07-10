@@ -128,6 +128,7 @@ function recordHasName(record: Record<string, unknown>, name: string): boolean {
     'saleItemName',
     'taxName',
     'discountName',
+    'chargeName',
   ].some((key) => record[key] === name);
 }
 
@@ -136,6 +137,7 @@ function extractIdFromRecord(record: Record<string, unknown>): ResourceId | unde
     'id',
     'taxId',
     'discountId',
+    'chargeId',
     'menuId',
     'menuGroupId',
     'categoryId',

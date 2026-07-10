@@ -7,6 +7,7 @@ export const orderServiceMenu = {
 
 export const orderServiceDishes = {
   regular: {
+    saleItemId: 698,
     name: '普通菜1',
     menu: orderServiceMenu,
   },
@@ -85,6 +86,14 @@ export const orderServiceCustomers = {
     customerName: 'pos-test',
     note: '我的备注',
     phoneNumber: '01234567890',
+    street: '55',
+    zipCode: '10016',
+  } satisfies DeliveryOrderParams,
+  deliveryWithAmpersandAddress: {
+    address: 'menusifu & test address',
+    customerName: 'pos-32903',
+    note: 'POS-32903 地址备注',
+    phoneNumber: '0329030001',
     street: '55',
     zipCode: '10016',
   } satisfies DeliveryOrderParams,

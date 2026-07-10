@@ -88,14 +88,30 @@ export const test = base.extend<ApiFixtures>({
     { adminConfigApi, systemConfigurationApi, menuApi, saleItemApi, resourceRegistry },
     use,
   ) => {
-    await use(
-      createApiSetup({
-        adminConfigApi,
-        systemConfigurationApi,
-        menuApi,
-        saleItemApi,
-        resourceRegistry,
-      }),
-    );
+    try {
+      await use(
+        createApiSetup({
+          adminConfigApi,
+          systemConfigurationApi,
+          menuApi,
+          saleItemApi,
+          resourceRegistry,
+        }),
+      );
+    } finally {
+      const cleanupResult = await resourceRegistry.cleanupAll();
+
+      if (cleanupResult.errors.length > 0) {
+        const errorSummary = cleanupResult.errors
+          .map(
+            ({ resource, error }) => `${resource.type}:${String(resource.id)} ${error.message}`,
+          )
+          .join('; ');
+
+        console.warn(
+          `API setup cleanup finished with ${cleanupResult.errors.length} error(s): ${errorSummary}`,
+        );
+      }
+    }
   },
 });
