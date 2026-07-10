@@ -26,6 +26,14 @@ test.describe('菜单硬删除清理配置', () => {
     });
   });
 
+  test('应允许通过 API_DB_HOST 覆盖数据库地址', () => {
+    const config = resolveMenuHardDeleteConfig({
+      API_DB_HOST: '192.168.0.247',
+    });
+
+    expect(config.host).toBe('192.168.0.247');
+  });
+
   test('应能构造菜单硬删除数据库连接配置', () => {
     const options = new MysqlDb(
       resolveMenuHardDeleteConfig({

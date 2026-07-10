@@ -28,33 +28,6 @@ String resolveApiHost(Object rawHost) {
     return host
 }
 
-String resolveApiPort(Object rawPort) {
-    def portText = rawPort?.toString()?.trim() ?: ''
-    if (!(portText ==~ /^[0-9]+$/)) {
-        error "API_PORT must be a number between 1 and 65535. Actual: ${portText}"
-    }
-
-    def port = portText.toInteger()
-    if (port < 1 || port > 65535) {
-        error "API_PORT must be a number between 1 and 65535. Actual: ${portText}"
-    }
-
-    return portText
-}
-
-String resolveApiContextPath(Object rawContextPath) {
-    def contextPath = rawContextPath?.toString()?.trim()?.replaceAll('^/+|/+$', '') ?: ''
-    if (!contextPath) {
-        error 'API_CONTEXT_PATH is required. Example: kpos'
-    }
-
-    if (contextPath.contains('..') || !(contextPath ==~ /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/)) {
-        error "API_CONTEXT_PATH may only contain path segments with letters, numbers, underscore, dot, hyphen, or slash. Actual: ${contextPath}"
-    }
-
-    return contextPath
-}
-
 String resolveGitBranch(Object rawBranch) {
     def branch = rawBranch?.toString()?.replace(':selected', '')?.trim() ?: 'main'
     if (!branch.matches('[A-Za-z0-9._/-]+')
@@ -86,6 +59,10 @@ String apiTestCommand(String scope) {
     }
 
     return commands[scope]
+}
+
+boolean shouldRunCleanupAfterScope(String scope) {
+    return ['all', 'endpoints', 'business', 'contracts'].contains(scope)
 }
 
 properties([
@@ -279,7 +256,19 @@ pipeline {
         stage('Run API Tests') {
             steps {
                 script {
-                    bat apiTestCommand(params.API_TEST_SCOPE)
+                    def testStatus = 0
+
+                    try {
+                        testStatus = bat(returnStatus: true, script: apiTestCommand(params.API_TEST_SCOPE))
+                    } finally {
+                        if (shouldRunCleanupAfterScope(params.API_TEST_SCOPE)) {
+                            bat apiTestCommand('cleanup')
+                        }
+                    }
+
+                    if (testStatus != 0) {
+                        error "API tests failed with exit code ${testStatus}"
+                    }
                 }
             }
             post {

@@ -33,17 +33,22 @@ export const MENU_HARD_DELETE_SQL = [
 export function resolveMenuHardDeleteConfig(env: EnvSource = process.env): MenuHardDeleteConfig {
   const explicitHost = env.API_DB_HOST?.trim();
   const baseURL = env.API_BASE_URL?.trim() || env.PLAYWRIGHT_BASE_URL?.trim();
-  if (!explicitHost && !baseURL) {
-    throw new Error('菜单硬删除清理需要 API_DB_HOST，或 API_BASE_URL/PLAYWRIGHT_BASE_URL 用于解析数据库 IP。');
-  }
 
   return {
-    host: explicitHost ?? new URL(baseURL as string).hostname,
+    host: explicitHost || resolveHostFromBaseURL(baseURL),
     port: parsePositiveInteger(env.API_DB_PORT, DEFAULT_DB_PORT, 'API_DB_PORT'),
     database: env.API_DB_NAME?.trim() || DEFAULT_DB_NAME,
     user: env.API_DB_USER?.trim() || DEFAULT_DB_USER,
     password: env.API_DB_PASSWORD ?? DEFAULT_DB_PASSWORD,
   };
+}
+
+function resolveHostFromBaseURL(baseURL: string | undefined): string {
+  if (!baseURL) {
+    return new URL(loadApiConfig().baseURL).hostname;
+  }
+
+  return new URL(baseURL).hostname;
 }
 
 function parsePositiveInteger(
