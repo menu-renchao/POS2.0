@@ -24,7 +24,7 @@ function loadApiDbConfig(env: NodeJS.ProcessEnv = process.env): MysqlConfig {
     port: Number.parseInt(requireEnv(env, 'API_DB_PORT'), 10),
     database: requireEnv(env, 'API_DB_NAME'),
     user: requireEnv(env, 'API_DB_USER'),
-    password: requireEnv(env, 'API_DB_PASSWORD'),
+    password: env.API_DB_PASSWORD ?? '',
   };
 }
 
