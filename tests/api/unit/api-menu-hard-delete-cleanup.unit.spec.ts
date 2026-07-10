@@ -22,7 +22,7 @@ test.describe('菜单硬删除清理配置', () => {
       port: 22108,
       database: 'kpos',
       user: 'root',
-      password: '',
+      password: 'N0mur@4$99!',
     });
   });
 
@@ -38,7 +38,7 @@ test.describe('菜单硬删除清理配置', () => {
       port: 22108,
       database: 'kpos',
       user: 'root',
-      password: '',
+      password: 'N0mur@4$99!',
       multipleStatements: true,
     });
   });

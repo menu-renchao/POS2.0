@@ -12,6 +12,7 @@ const DEFAULT_REQUEST_MARKER_FILE = resolve(
 const DEFAULT_DB_PORT = 22108;
 const DEFAULT_DB_NAME = 'kpos';
 const DEFAULT_DB_USER = 'root';
+const DEFAULT_DB_PASSWORD = 'N0mur@4$99!';
 
 type EnvSource = Record<string, string | undefined>;
 
@@ -41,7 +42,7 @@ export function resolveMenuHardDeleteConfig(env: EnvSource = process.env): MenuH
     port: parsePositiveInteger(env.API_DB_PORT, DEFAULT_DB_PORT, 'API_DB_PORT'),
     database: env.API_DB_NAME?.trim() || DEFAULT_DB_NAME,
     user: env.API_DB_USER?.trim() || DEFAULT_DB_USER,
-    password: env.API_DB_PASSWORD ?? '',
+    password: env.API_DB_PASSWORD ?? DEFAULT_DB_PASSWORD,
   };
 }
 

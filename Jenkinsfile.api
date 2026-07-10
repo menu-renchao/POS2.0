@@ -95,41 +95,6 @@ properties([
             defaultValue: '192.168.0.',
             description: '(required) Target API host. Complete it before running, e.g. 192.168.0.247'
         ),
-        string(
-            name: 'API_PORT',
-            defaultValue: '22080',
-            description: '(required) Target API port.'
-        ),
-        string(
-            name: 'API_CONTEXT_PATH',
-            defaultValue: 'kpos',
-            description: '(required) API context path without leading slash.'
-        ),
-        string(
-            name: 'API_DB_HOST',
-            defaultValue: '',
-            description: '(optional) API cleanup database host. Empty means use API_HOST.'
-        ),
-        string(
-            name: 'API_DB_PORT',
-            defaultValue: '22108',
-            description: '(required for cleanup) API cleanup database port.'
-        ),
-        string(
-            name: 'API_DB_NAME',
-            defaultValue: 'kpos',
-            description: '(required for cleanup) API cleanup database/schema name.'
-        ),
-        string(
-            name: 'API_DB_USER',
-            defaultValue: 'root',
-            description: '(required for cleanup) API cleanup database user.'
-        ),
-        password(
-            name: 'API_DB_PASSWORD',
-            defaultValue: '',
-            description: '(optional) API cleanup database password.'
-        ),
         choice(
             name: 'API_TEST_SCOPE',
             choices: ['all', 'endpoints', 'business', 'contracts', 'unit', 'cleanup'],
@@ -241,14 +206,13 @@ pipeline {
             steps {
                 script {
                     def apiHost = resolveApiHost(params.API_HOST)
-                    def apiPort = resolveApiPort(params.API_PORT)
-                    def apiContextPath = resolveApiContextPath(params.API_CONTEXT_PATH)
-                    def apiDbHost = params.API_DB_HOST?.toString()?.trim()
-                    env.API_DB_HOST = apiDbHost ? resolveApiHost(apiDbHost) : apiHost
-                    env.API_DB_PORT = resolveApiPort(params.API_DB_PORT ?: '22108')
-                    env.API_DB_NAME = params.API_DB_NAME?.toString()?.trim() ?: apiContextPath
-                    env.API_DB_USER = params.API_DB_USER?.toString()?.trim() ?: 'root'
-                    env.API_DB_PASSWORD = params.API_DB_PASSWORD?.toString() ?: ''
+                    def apiPort = '22080'
+                    def apiContextPath = 'kpos'
+                    env.API_DB_HOST = apiHost
+                    env.API_DB_PORT = '22108'
+                    env.API_DB_NAME = 'kpos'
+                    env.API_DB_USER = 'root'
+                    env.API_DB_PASSWORD = 'N0mur@4$99!'
                     env.API_TEST_SCOPE = params.API_TEST_SCOPE
                     env.API_BASE_URL = "http://${apiHost}:${apiPort}/${apiContextPath}"
                     currentBuild.displayName = "#${env.BUILD_NUMBER} ${params.API_TEST_SCOPE} ${env.API_BASE_URL}"
