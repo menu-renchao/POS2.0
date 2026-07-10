@@ -59,6 +59,18 @@ const recallOrderDetailsMoreActionNames = {
 
 type SplitChargePromptAction = 'remove' | 'keep';
 
+const splitTargetReferencePrefix = 'target-order-id:';
+
+function encodeSplitTargetReference(targetOrderId: string): string {
+  return `${splitTargetReferencePrefix}${targetOrderId}`;
+}
+
+function decodeSplitTargetReference(targetOrderNumber: string): string | null {
+  return targetOrderNumber.startsWith(splitTargetReferencePrefix)
+    ? targetOrderNumber.slice(splitTargetReferencePrefix.length)
+    : null;
+}
+
 export class RecallOrderDetailsDialog {
   private readonly openOrderCards: Locator;
   private readonly visibleOrderDetailsDialogs: Locator;
@@ -135,7 +147,7 @@ export class RecallOrderDetailsDialog {
     const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
     const dialogText = (await orderDetailsDialog.textContent().catch(() => '')) ?? '';
     const parentOrderNumber = orderNumber
-      ? normalizeOrderNumber(orderNumber).replace(/^#/, '')
+      ? normalizeOrderNumber(orderNumber).replace(/^#/, '').replace(/-\d+$/, '')
       : dialogText.match(/#(\d+)-\d+/)?.[1];
 
     if (parentOrderNumber) {
@@ -170,8 +182,13 @@ export class RecallOrderDetailsDialog {
           .filter(isVisible)
           .map((buttonElement) => {
             const visibleOrderNumber = normalizeText(buttonElement.textContent).match(/#\d+-\d+\b/)?.[0];
+            const targetOrderId = (
+              buttonElement.getAttribute('data-testid') ??
+              buttonElement.getAttribute('data-test-id') ??
+              ''
+            ).match(/^shared-order-detail-select-target-order-(\d+)$/)?.[1];
 
-            return visibleOrderNumber ?? null;
+            return visibleOrderNumber ?? (targetOrderId ? `target-order-id:${targetOrderId}` : null);
           })
           .filter((orderNumber): orderNumber is string => Boolean(orderNumber)),
       )];
@@ -1650,9 +1667,9 @@ export class RecallOrderDetailsDialog {
     orderNumber: string,
     targetOrderNumber?: string,
   ): Promise<void> {
-    const splitOrderNumberText = targetOrderNumber
-      ? normalizeOrderNumber(targetOrderNumber)
-      : null;
+    const splitTargetOrderId = targetOrderNumber ? decodeSplitTargetReference(targetOrderNumber) : null;
+    const splitOrderNumberText =
+      targetOrderNumber && !splitTargetOrderId ? normalizeOrderNumber(targetOrderNumber) : null;
 
     if (
       splitOrderNumberText &&
@@ -1663,6 +1680,8 @@ export class RecallOrderDetailsDialog {
 
     const splitOrderTargetLabel = splitOrderNumberText
       ? await this.resolveSplitOrderTargetLabel(splitOrderNumberText)
+      : splitTargetOrderId
+        ? await this.resolveSplitOrderTargetButton(splitTargetOrderId)
       : this.orderDetailsDialog
           .getByText(new RegExp(`^${escapeRegExp(orderNumber)}-\\d+$`))
           .first();
@@ -1687,6 +1706,8 @@ export class RecallOrderDetailsDialog {
           message: `Recall 子单 ${splitOrderNumberText} 未在点击后打开。`,
         },
       );
+    } else if (splitTargetOrderId) {
+      await this.waitForOrderDetailsDialogReady();
     } else {
       await this.waitForVisibleOrderDialogCount(visibleDialogCount + 1);
     }
@@ -1736,9 +1757,25 @@ export class RecallOrderDetailsDialog {
     return false;
   }
 
-  private resolveSplitTargetOrderButtons(orderDetailsDialog: Locator): Locator {
-    return orderDetailsDialog.locator(
+  private resolveSplitTargetOrderButtons(_orderDetailsDialog: Locator): Locator {
+    return this.page.locator(
       '[data-test-id^="shared-order-detail-select-target-order-"], [data-testid^="shared-order-detail-select-target-order-"]',
+    );
+  }
+
+  private async resolveSplitOrderTargetButton(splitTargetOrderId: string): Promise<Locator> {
+    return await resolveFirstVisibleLocator(
+      [
+        this.page
+          .locator(
+            [
+              `[data-test-id="shared-order-detail-select-target-order-${splitTargetOrderId}"]`,
+              `[data-testid="shared-order-detail-select-target-order-${splitTargetOrderId}"]`,
+            ].join(', '),
+          )
+          .first(),
+      ],
+      `Recall 子单目标 ${encodeSplitTargetReference(splitTargetOrderId)} 未在当前订单详情中显示。`,
     );
   }
 

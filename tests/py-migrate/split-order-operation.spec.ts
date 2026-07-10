@@ -809,7 +809,8 @@ async function readRecallOrderTotal(
 
 async function openLatestSplitOrderTargets(recallPage: RecallPage): Promise<SplitOrderTargets> {
   const recallFlow = new RecallFlow();
-  const orderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
+  const latestVisibleOrderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
+  const orderNumber = latestVisibleOrderNumber.replace(/-\d+$/, '');
   await recallPage.openOrderDetails(orderNumber);
   const targetOrderNumbers = await recallPage.readTargetOrderNumbers(orderNumber);
 
@@ -2348,7 +2349,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
   );
 
   test(
-    '[POS-22813] 应能在加收订单按菜品分单并现金结清后清除子单加收',
+    '[POS-22813] 应能在加收订单平均分单并现金结清后清除子单加收',
     {
       tag: ['@加收', '@分单', '@现金支付'],
       annotation: [jiraIssueAnnotation('POS-22813')],
@@ -2358,7 +2359,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
-      const splitOrder = await test.step('创建含整单加收的已送厨订单并按菜品分单', async () => {
+      const splitOrder = await test.step('创建含整单加收的已送厨订单并平均分单', async () => {
         const orderDishesPage = await enterDineInNoTableOrder(readyHomePage);
         await addTwoRegularDishes(orderDishesPage);
         await new OrderDishesFlow().applyCustomCharge(orderDishesPage, {
@@ -2375,7 +2376,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           undefined,
           { chargePromptAction: 'keep' },
         );
-        await new SplitOrderFlow().splitOrderByItems(splitOrderPage, 2);
+        await new SplitOrderFlow().splitOrderEvenly(splitOrderPage, 2);
         await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
         const recallPageAfterSplit = await openRecallAfterConfigurationRefresh(
           readyHomePage,
@@ -2399,6 +2400,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       });
 
       const childCharges = await test.step('读取两个子单详情中的加收金额', async () => {
+        await new RecallFlow().clearSearchConditions(splitOrder.recallPage);
         const firstCharge = await readTargetCharge(
           splitOrder.recallPage,
           splitOrder.targets.orderNumber,

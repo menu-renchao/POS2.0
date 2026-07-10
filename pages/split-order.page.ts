@@ -67,7 +67,7 @@ export class SplitOrderPage {
 
     this.modal = this.splitFrame.getByRole('dialog').first();
     this.title = this.modal.getByRole('heading').first();
-    this.evenOrderButton = this.modal.getByRole('button', { name: /Even Order|平分订单/ }).first();
+    this.evenOrderButton = this.modal.getByTestId('evenOrderBtn');
     this.bySeatsButton = this.modal.getByRole('button', { name: /By Seats|按座位分单/ }).first();
     this.evenItemsButton = this.modal.getByRole('button', { name: /Even Item|Even Items|平分菜品/ }).first();
     this.byAmountMenuItem = this.splitFrame.getByRole('menuitem', { name: /^By Amount$/ }).first();
