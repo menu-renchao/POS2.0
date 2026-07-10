@@ -12,17 +12,19 @@ export const CODEGEN_CONTEXT_OPTIONS = Object.freeze({
   viewport: Object.freeze({ width: 1920, height: 1080 }),
 });
 
-export async function runCodegen() {
-  const browser = await chromium.launch({ headless: false });
+export async function runCodegen(browserType = chromium) {
+  const browser = await browserType.launch({ headless: false });
+  let pauseReached = false;
 
   try {
     const context = await browser.newContext(CODEGEN_CONTEXT_OPTIONS);
     const page = await context.newPage();
 
     await page.goto(CODEGEN_URL);
+    pauseReached = true;
     await page.pause();
   } catch (error) {
-    if (browser.isConnected()) {
+    if (!pauseReached || browser.isConnected()) {
       throw error;
     }
   } finally {
