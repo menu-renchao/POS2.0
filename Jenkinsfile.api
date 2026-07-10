@@ -28,6 +28,29 @@ String resolveApiHost(Object rawHost) {
     return host
 }
 
+String resolveApiDbHost(String apiHost, String localIpv4Text, String localHostText) {
+    def normalizedHost = apiHost?.trim() ?: ''
+    def lowerHost = normalizedHost.toLowerCase()
+    if (['localhost', '127.0.0.1'].contains(lowerHost)) {
+        return 'localhost'
+    }
+
+    def localAddresses = (localIpv4Text ?: '')
+        .readLines()
+        .collect { it.trim() }
+        .findAll { it }
+    def localNames = (localHostText ?: '')
+        .readLines()
+        .collect { it.trim().toLowerCase() }
+        .findAll { it }
+
+    if (localAddresses.contains(normalizedHost) || localNames.contains(lowerHost)) {
+        return 'localhost'
+    }
+
+    return normalizedHost
+}
+
 String resolveGitBranch(Object rawBranch) {
     def branch = rawBranch?.toString()?.replace(':selected', '')?.trim() ?: 'main'
     if (!branch.matches('[A-Za-z0-9._/-]+')
@@ -185,7 +208,14 @@ pipeline {
                     def apiHost = resolveApiHost(params.API_HOST)
                     def apiPort = '22080'
                     def apiContextPath = 'kpos'
-                    env.API_DB_HOST = apiHost
+                    def localIpv4Text = bat(
+                        returnStdout: true,
+                        script: '''@echo off
+powershell -NoProfile -Command "[System.Net.Dns]::GetHostAddresses([System.Net.Dns]::GetHostName()) | Where-Object { $_.AddressFamily -eq 'InterNetwork' } | ForEach-Object { $_.IPAddressToString }"
+'''
+                    ).trim()
+                    def localHostText = bat(returnStdout: true, script: '@echo off\r\nhostname').trim()
+                    env.API_DB_HOST = resolveApiDbHost(apiHost, localIpv4Text, localHostText)
                     env.API_DB_PORT = '22108'
                     env.API_DB_NAME = 'kpos'
                     env.API_DB_USER = 'root'
@@ -262,7 +292,9 @@ pipeline {
                         testStatus = bat(returnStatus: true, script: apiTestCommand(params.API_TEST_SCOPE))
                     } finally {
                         if (shouldRunCleanupAfterScope(params.API_TEST_SCOPE)) {
-                            bat apiTestCommand('cleanup')
+                            withEnv(['PLAYWRIGHT_KEEP_EXISTING_REPORTS=true']) {
+                                bat apiTestCommand('cleanup')
+                            }
                         }
                     }
 

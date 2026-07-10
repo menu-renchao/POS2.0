@@ -5,6 +5,7 @@ import { appConfig } from '../../test-data/env';
 
 const PROJECT_ROOT = resolve(__dirname, '..', '..');
 const STALE_OUTPUT_DIRS = ['test-results', 'allure-results', 'allure-report'];
+const KEEP_EXISTING_REPORTS = process.env.PLAYWRIGHT_KEEP_EXISTING_REPORTS === 'true';
 
 function validateUrl(url: string): void {
   try {
@@ -15,11 +16,13 @@ function validateUrl(url: string): void {
 }
 
 async function globalSetup(_config: FullConfig): Promise<void> {
-  for (const dir of STALE_OUTPUT_DIRS) {
-    const dirPath = resolve(PROJECT_ROOT, dir);
+  if (!KEEP_EXISTING_REPORTS) {
+    for (const dir of STALE_OUTPUT_DIRS) {
+      const dirPath = resolve(PROJECT_ROOT, dir);
 
-    if (existsSync(dirPath)) {
-      rmSync(dirPath, { recursive: true, force: true });
+      if (existsSync(dirPath)) {
+        rmSync(dirPath, { recursive: true, force: true });
+      }
     }
   }
 
