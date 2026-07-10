@@ -73,7 +73,7 @@ String resolveGitBranch(Object rawBranch) {
 String apiTestCommand(String scope) {
     def playwrightCli = 'node node_modules\\@playwright\\test\\cli.js test'
     def commands = [
-        all      : "${playwrightCli} tests/api --project=api",
+        all      : "${playwrightCli} tests/api/business tests/api/contracts tests/api/endpoints tests/api/unit --project=api",
         endpoints: "${playwrightCli} tests/api/endpoints --project=api",
         business : "${playwrightCli} tests/api/business --project=api",
         contracts: "${playwrightCli} tests/api/contracts --project=api",
