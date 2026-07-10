@@ -28,23 +28,28 @@ String resolveApiHost(Object rawHost) {
     return host
 }
 
-String resolveApiDbHost(String apiHost, String localIpv4Text, String localHostText) {
+List<String> readNonEmptyLines(String text) {
+    return (text ?: '')
+        .readLines()
+        .collect { it.trim() }
+        .findAll { it }
+}
+
+String resolveApiDbHost(String apiHost, String apiIpv4Text, String localIpv4Text, String localHostText) {
     def normalizedHost = apiHost?.trim() ?: ''
     def lowerHost = normalizedHost.toLowerCase()
     if (['localhost', '127.0.0.1'].contains(lowerHost)) {
         return 'localhost'
     }
 
-    def localAddresses = (localIpv4Text ?: '')
-        .readLines()
-        .collect { it.trim() }
-        .findAll { it }
-    def localNames = (localHostText ?: '')
-        .readLines()
-        .collect { it.trim().toLowerCase() }
-        .findAll { it }
+    def apiAddresses = readNonEmptyLines(apiIpv4Text)
+    def localAddresses = readNonEmptyLines(localIpv4Text)
+    def localNames = readNonEmptyLines(localHostText)
+        .collect { it.toLowerCase() }
 
-    if (localAddresses.contains(normalizedHost) || localNames.contains(lowerHost)) {
+    if (localAddresses.contains(normalizedHost)
+        || localNames.contains(lowerHost)
+        || apiAddresses.any { localAddresses.contains(it) }) {
         return 'localhost'
     }
 
@@ -133,7 +138,7 @@ properties([
                                 workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
                             }
 
-                            workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
+                            workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 API'
 
                             for (workspacePath in workspaceCandidates.unique()) {
                                 def workspaceDir = new File(workspacePath)
@@ -208,6 +213,15 @@ pipeline {
                     def apiHost = resolveApiHost(params.API_HOST)
                     def apiPort = '22080'
                     def apiContextPath = 'kpos'
+                    def apiIpv4Text = ''
+                    withEnv(["RESOLVE_API_HOST=${apiHost}"]) {
+                        apiIpv4Text = bat(
+                            returnStdout: true,
+                            script: '''@echo off
+powershell -NoProfile -Command "try { [System.Net.Dns]::GetHostAddresses($env:RESOLVE_API_HOST) | Where-Object { $_.AddressFamily -eq 'InterNetwork' } | ForEach-Object { $_.IPAddressToString } } catch { }"
+'''
+                        ).trim()
+                    }
                     def localIpv4Text = bat(
                         returnStdout: true,
                         script: '''@echo off
@@ -215,7 +229,7 @@ powershell -NoProfile -Command "[System.Net.Dns]::GetHostAddresses([System.Net.D
 '''
                     ).trim()
                     def localHostText = bat(returnStdout: true, script: '@echo off\r\nhostname').trim()
-                    env.API_DB_HOST = resolveApiDbHost(apiHost, localIpv4Text, localHostText)
+                    env.API_DB_HOST = resolveApiDbHost(apiHost, apiIpv4Text, localIpv4Text, localHostText)
                     env.API_DB_PORT = '22108'
                     env.API_DB_NAME = 'kpos'
                     env.API_DB_USER = 'root'
@@ -288,14 +302,12 @@ powershell -NoProfile -Command "[System.Net.Dns]::GetHostAddresses([System.Net.D
                 script {
                     def testStatus = 0
 
-                    try {
-                        testStatus = bat(returnStatus: true, script: apiTestCommand(params.API_TEST_SCOPE))
-                    } finally {
-                        if (shouldRunCleanupAfterScope(params.API_TEST_SCOPE)) {
-                            withEnv(['PLAYWRIGHT_KEEP_EXISTING_REPORTS=true']) {
-                                bat apiTestCommand('cleanup')
-                            }
+                    if (shouldRunCleanupAfterScope(params.API_TEST_SCOPE)) {
+                        withEnv(['API_RUN_CLEANUP_AFTER_TESTS=true']) {
+                            testStatus = bat(returnStatus: true, script: apiTestCommand(params.API_TEST_SCOPE))
                         }
+                    } else {
+                        testStatus = bat(returnStatus: true, script: apiTestCommand(params.API_TEST_SCOPE))
                     }
 
                     if (testStatus != 0) {

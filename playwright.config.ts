@@ -8,6 +8,7 @@ const posClientHeaders = {
 
 const desktopChromeChannel = process.env.CI ? {} : { channel: 'chrome' as const };
 const videoMode = process.env.PLAYWRIGHT_VIDEO === 'true' ? 'retain-on-failure' : 'off';
+const runApiCleanupAfterTests = process.env.API_RUN_CLEANUP_AFTER_TESTS === 'true';
 
 export default defineConfig({
   testDir: './tests',
@@ -42,6 +43,16 @@ export default defineConfig({
     {
       name: 'api',
       testMatch: /(?:^|[\\/])api[\\/].*\.spec\.ts$/,
+      ...(runApiCleanupAfterTests
+        ? {
+            testIgnore: /(?:^|[\\/])api[\\/]maintenance[\\/].*\.spec\.ts$/,
+            teardown: 'api-cleanup',
+          }
+        : {}),
+    },
+    {
+      name: 'api-cleanup',
+      testMatch: /(?:^|[\\/])api[\\/]maintenance[\\/].*\.spec\.ts$/,
     },
     {
       name: 'py-migrate',
