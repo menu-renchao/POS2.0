@@ -249,6 +249,7 @@ pipeline {
                     env.API_DB_NAME = params.API_DB_NAME?.toString()?.trim() ?: apiContextPath
                     env.API_DB_USER = params.API_DB_USER?.toString()?.trim() ?: 'root'
                     env.API_DB_PASSWORD = params.API_DB_PASSWORD?.toString() ?: ''
+                    env.API_TEST_SCOPE = params.API_TEST_SCOPE
                     env.API_BASE_URL = "http://${apiHost}:${apiPort}/${apiContextPath}"
                     currentBuild.displayName = "#${env.BUILD_NUMBER} ${params.API_TEST_SCOPE} ${env.API_BASE_URL}"
                     echo "API_BASE_URL=${env.API_BASE_URL}"
