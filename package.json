@@ -10,7 +10,7 @@
     "test:py-migrate": "playwright test tests/py-migrate",
     "test:headed": "playwright test --headed",
     "jenkins:test-tree": "node scripts/generate-jenkins-test-tree.mjs",
-    "codegen": "playwright codegen http://192.168.247:22080/kpos/front/myhome.html",
+    "codegen": "node scripts/codegen.mjs",
     "allure:generate": "allure generate allure-results --clean -o allure-report",
     "allure:open": "allure open allure-report"
   },
