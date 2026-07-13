@@ -91,6 +91,12 @@ export class OrderDishesChargeSection {
       draft.selectedDishNames = [...draft.selectedDishNames, dishName];
     }
 
+    @step((dishName: string) => `页面断言：加收弹窗展示菜品 ${dishName}`)
+    async expectChargeDishVisible(dishName: string): Promise<void> {
+      await this.expectChargeDialogVisible();
+      await this.resolveChargeDishLocator(dishName);
+    }
+
     @step((optionName: string) => `页面操作：在加收弹窗中切换预置加收项 ${optionName}`)
     async toggleChargeOption(optionName: string): Promise<void> {
       await this.expectChargeDialogVisible();
@@ -109,6 +115,74 @@ export class OrderDishesChargeSection {
       const customChargeButton = await this.resolveCustomChargeButton();
       await customChargeButton.click();
       await expect(this.locators.customChargeDialog).toBeVisible();
+    }
+
+    @step((value: number) => `页面操作：添加当前作用域自定义百分比折扣 ${value}%`)
+    async applyCustomPercentageDiscount(value: number): Promise<void> {
+      await this.expectChargeDialogVisible();
+      const customDiscountButton = this.page.getByTestId('pos-ui-option-__custom_discount__');
+      await expect(customDiscountButton).toBeVisible();
+      await customDiscountButton.click();
+
+      const customDiscountDialog = this.resolveCustomDiscountDialog();
+      await expect(customDiscountDialog).toBeVisible();
+
+      for (const digit of String(value)) {
+        await customDiscountDialog.getByTestId(`number-button-${digit}`).click();
+      }
+
+      await customDiscountDialog.getByTestId('pos-ui-segmented-option-PERCENTAGE').click();
+      await waitForInputSettled(customDiscountDialog.locator('input').first());
+      await customDiscountDialog.getByTestId('button-default').last().click();
+      await expect(customDiscountDialog).toBeHidden();
+
+      this.applyDraftChargeOption({
+        kind: 'percentage',
+        name: `Charge(${value}%)`,
+        value,
+      });
+    }
+
+    @step((value: number) => `页面操作：添加当前菜品固定金额折扣 $${value.toFixed(2)}`)
+    async applyCustomFixedDiscount(value: number): Promise<void> {
+      await this.expectChargeDialogVisible();
+      const customDiscountButton = this.page.getByTestId('pos-ui-option-__custom_discount__');
+      await expect(customDiscountButton).toBeVisible();
+      await customDiscountButton.click();
+
+      const customDiscountDialog = this.resolveCustomDiscountDialog();
+      await expect(customDiscountDialog).toBeVisible();
+      await customDiscountDialog.getByTestId('pos-ui-segmented-option-FIXED').click();
+
+      const [wholeAmount, centAmount] = value.toFixed(2).split('.');
+      for (const digit of wholeAmount) {
+        await customDiscountDialog.getByTestId(`number-button-${digit}`).click();
+      }
+
+      if (centAmount === '00') {
+        await customDiscountDialog.getByTestId('number-button-00').click();
+      } else {
+        for (const digit of centAmount) {
+          await customDiscountDialog.getByTestId(`number-button-${digit}`).click();
+        }
+      }
+
+      await waitForInputSettled(customDiscountDialog.locator('input').first());
+      await customDiscountDialog.getByTestId('button-default').last().click();
+      await expect(customDiscountDialog).toBeHidden();
+
+      const optionName = `Charge($${value.toFixed(2)})`;
+      for (const dishName of this.ensureChargeDraft().selectedDishNames) {
+        const dishLocator = await this.resolveChargeDishLocator(dishName);
+        await expect(dishLocator).toContainText(optionName);
+        await expect(dishLocator).toContainText(`$${value.toFixed(2)}`);
+      }
+
+      this.applyDraftChargeOption({
+        kind: 'fixed',
+        name: optionName,
+        value,
+      });
     }
 
     @step((type: ChargeCustomType) => `页面操作：切换自定义加收类型为 ${type === 'percentage' ? '百分比' : '固定金额'}`)
@@ -491,6 +565,14 @@ export class OrderDishesChargeSection {
     }
 
     private async resolveChargeScopeLocator(scope: ChargeScope): Promise<Locator> {
+      if (scope === 'item') {
+        const itemScope = this.locators.chargeDialog.getByTestId(
+          'pos-ui-segmented-option-item',
+        );
+        await expect(itemScope).toBeVisible();
+        return itemScope;
+      }
+
       const buttonNames =
         scope === 'whole' ? WHOLE_ORDER_BUTTON_NAMES : ITEM_CHARGE_BUTTON_NAMES;
       const scopeKey = scope === 'whole' ? 'whole' : 'item';
@@ -510,13 +592,12 @@ export class OrderDishesChargeSection {
     }
 
     private async resolveChargeDishLocator(dishName: string): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.chargeDialog.getByRole('button', { name: dishName, exact: true }).first(),
-          this.locators.chargeDialog.locator(`[data-dish-name="${dishName}"]`).first(),
-        ],
-        `Unable to find charge dish button: ${dishName}.`,
-      );
+      const dishLocator = this.locators.chargeDialog
+        .getByTestId('pos-ui-dish-item')
+        .filter({ hasText: dishName })
+        .first();
+      await expect(dishLocator).toBeVisible();
+      return dishLocator;
     }
 
     private async resolveChargeButton(): Promise<Locator> {
@@ -526,6 +607,7 @@ export class OrderDishesChargeSection {
             '[data-testid="icon-button-charge"], [data-test-id="icon-button-charge"], [data-testid="charge-button"], [data-test-id="charge-button"]',
           )
           .first(),
+        this.locators.appFrame.getByTestId('bottom-more-action-addprc'),
         this.locators.chargeButton,
         this.ctx.page.getByRole('button', { name: /^(Charge|加收)$/ }).first(),
         this.ctx.page.getByRole('menuitem', { name: /^(Charge|加收)$/ }).first(),
@@ -559,6 +641,15 @@ export class OrderDishesChargeSection {
       }
 
       throw new Error('Unable to find the charge button on the order page.');
+    }
+
+    private resolveCustomDiscountDialog(): Locator {
+      return this.page
+        .locator('[role="dialog"]')
+        .filter({
+          has: this.page.getByTestId('pos-ui-segmented-option-PERCENTAGE'),
+        })
+        .last();
     }
 
     private async resolveChargeOptionLocator(optionName: string): Promise<Locator> {

@@ -174,6 +174,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.menu.confirmPriceDialog(...args);
   }
 
+  addOpenFood(...args: Parameters<OrderDishesMenuSection['addOpenFood']>): ReturnType<OrderDishesMenuSection['addOpenFood']> {
+    return this.menu.addOpenFood(...args);
+  }
+
   expectSpecificationDialogVisible(...args: Parameters<OrderDishesMenuSection['expectSpecificationDialogVisible']>): ReturnType<OrderDishesMenuSection['expectSpecificationDialogVisible']> {
     return this.menu.expectSpecificationDialogVisible(...args);
   }
@@ -238,6 +242,14 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.charge.clickCustomCharge(...args);
   }
 
+  applyCustomPercentageDiscount(...args: Parameters<OrderDishesChargeSection['applyCustomPercentageDiscount']>): ReturnType<OrderDishesChargeSection['applyCustomPercentageDiscount']> {
+    return this.charge.applyCustomPercentageDiscount(...args);
+  }
+
+  applyCustomFixedDiscount(...args: Parameters<OrderDishesChargeSection['applyCustomFixedDiscount']>): ReturnType<OrderDishesChargeSection['applyCustomFixedDiscount']> {
+    return this.charge.applyCustomFixedDiscount(...args);
+  }
+
   selectCustomChargeType(...args: Parameters<OrderDishesChargeSection['selectCustomChargeType']>): ReturnType<OrderDishesChargeSection['selectCustomChargeType']> {
     return this.charge.selectCustomChargeType(...args);
   }
@@ -278,8 +290,16 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.charge.readChargeSnapshot(...args);
   }
 
+  expectChargeDishVisible(...args: Parameters<OrderDishesChargeSection['expectChargeDishVisible']>): ReturnType<OrderDishesChargeSection['expectChargeDishVisible']> {
+    return this.charge.expectChargeDishVisible(...args);
+  }
+
   expectCartHasItems(...args: Parameters<OrderDishesReadsSection['expectCartHasItems']>): ReturnType<OrderDishesReadsSection['expectCartHasItems']> {
     return this.reads.expectCartHasItems(...args);
+  }
+
+  expectOrderedDishAddition(...args: Parameters<OrderDishesReadsSection['expectOrderedDishAddition']>): ReturnType<OrderDishesReadsSection['expectOrderedDishAddition']> {
+    return this.reads.expectOrderedDishAddition(...args);
   }
 
   readOrderedItems(...args: Parameters<OrderDishesReadsSection['readOrderedItems']>): ReturnType<OrderDishesReadsSection['readOrderedItems']> {

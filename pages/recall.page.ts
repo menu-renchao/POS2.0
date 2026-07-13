@@ -241,6 +241,11 @@ export class RecallPage {
     return this.orderDetails.addPaymentCardTip(...args);
   }
 
+  @step((serverName: string) => `页面操作：将 Recall 订单服务员切换为 ${serverName}`)
+  async changeOrderServer(serverName: string): Promise<void> {
+    return this.orderDetails.changeOrderServer(serverName);
+  }
+
   async readOrderDetailsSnapshot(): Promise<RecallOrderDetails> {
     return this.orderDetails.readOrderDetailsSnapshot();
   }
@@ -257,6 +262,11 @@ export class RecallPage {
   @step('页面操作：点击 Recall 订单详情中的 Send 按钮')
   async clickSendInOrderDetails(): Promise<void> {
     return this.orderDetails.clickSendInOrderDetails();
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Send 按钮并读取成功提示')
+  async clickSendInOrderDetailsAndReadKitchenTicketStatus(): Promise<number> {
+    return this.orderDetails.clickSendInOrderDetailsAndReadKitchenTicketStatus();
   }
 
   @step('页面操作：点击 Recall 订单详情中的 Print 按钮')

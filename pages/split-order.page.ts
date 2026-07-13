@@ -51,7 +51,8 @@ export class SplitOrderPage {
   private readonly moreButton: Locator;
   private readonly confirmButton: Locator;
   private readonly cancelButton: Locator;
-  private readonly addAmountButton: Locator;
+  private readonly addSuborderButton: Locator;
+  private readonly splitPanelModal: Locator;
   private readonly subordersContainer: Locator;
   private readonly totalValue: Locator;
   private readonly remainValue: Locator;
@@ -61,6 +62,7 @@ export class SplitOrderPage {
   private readonly splitInputCancelButton: Locator;
   private readonly combineDialog: Locator;
   private readonly combineConfirmButton: Locator;
+  private readonly posToast: Locator;
 
   constructor(private readonly page: Page) {
     this.splitFrame = this.page.frameLocator('iframe[data-wujie-id="splitPanel"], #splitPanelContainer iframe');
@@ -76,15 +78,19 @@ export class SplitOrderPage {
     this.combineButton = this.modal
       .getByRole('button', { name: /^Combine suborders$|^Combine$|^Merge$|合并$/ })
       .first();
-    this.unsplitMenuItem = this.splitFrame.getByRole('menuitem', { name: /^Unsplit$/ }).first();
+    this.unsplitMenuItem = this.splitFrame.getByTestId('dropdown-item-unsplitBtn');
     this.unsplitButton = this.modal.getByRole('button', { name: /^Unsplit$|取消分单$/ }).first();
-    this.moreButton = this.modal.getByRole('button', { name: /^More$/ }).first();
+    this.moreButton = this.splitFrame.getByTestId('moreBtn');
     this.confirmButton = this.modal
       .locator('[data-testid="splitPanelModal-confirm-button"], [data-testid="split-panel-confirm"]')
       .or(this.modal.getByRole('button', { name: CONFIRM_BUTTON_NAME }).first())
       .first();
     this.cancelButton = this.modal.getByRole('button', { name: CANCEL_BUTTON_NAME }).first();
-    this.addAmountButton = this.modal.getByRole('button', { name: /^(Add Suborder|新增子单)$/ }).first();
+    this.addSuborderButton = this.splitFrame
+      .getByTestId('button-default')
+      .filter({ hasText: 'Add Suborder' })
+      .first();
+    this.splitPanelModal = this.splitFrame.getByTestId('splitPanelModal');
     this.subordersContainer = this.modal;
     this.totalValue = this.modal.locator('._value_1lomb_35, [class*="_value_"]').first();
     this.remainValue = this.modal.locator('._remainValue_1lomb_41, [class*="_remainValue_"]').first();
@@ -109,6 +115,7 @@ export class SplitOrderPage {
     this.combineConfirmButton = this.combineDialog
       .getByRole('button', { name: CONFIRM_BUTTON_NAME })
       .first();
+    this.posToast = this.page.locator('[data-testid^="pos-ui-toast-toast-"]').last();
   }
 
   @step((orderNumber?: string) =>
@@ -176,6 +183,19 @@ export class SplitOrderPage {
     await this.clickSplitAction(this.unsplitMenuItem, this.unsplitButton, 'Unsplit');
   }
 
+  @step('页面操作：确认当前分单面板操作')
+  async confirmCurrentSplitPanel(): Promise<void> {
+    await this.expectLoaded();
+    await this.confirmButton.click();
+  }
+
+  @step('页面操作：再次撤销分单并立即读取短暂 Toast')
+  async retryCancelSplitAndReadToast(): Promise<string> {
+    await this.clickCancelSplit();
+    await expect(this.posToast).toBeVisible({ timeout: 2_000 });
+    return (await this.posToast.innerText()).replace(/\s+/g, ' ').trim();
+  }
+
   @step((count: number) => `页面操作：输入分单份数 ${count}`)
   async fillSplitCount(count: number): Promise<void> {
     await this.fillSplitInputValue(count);
@@ -208,10 +228,29 @@ export class SplitOrderPage {
     await this.page.keyboard.press('Escape').catch(() => {});
   }
 
+  @step((label: string) => `页面断言：新增子单按钮展示文案 ${label}`)
+  async expectAddSuborderLabel(label: string): Promise<void> {
+    await this.expectLoaded();
+    await expect(this.addSuborderButton).toContainText(label);
+  }
+
+  @step('页面操作：点击新增子单按钮')
+  async clickAddSuborder(): Promise<void> {
+    await this.expectLoaded();
+    await this.addSuborderButton.click();
+  }
+
+  @step((suborderIndex: number) => `页面断言：分单面板展示第 ${suborderIndex} 个子单`)
+  async expectSuborderIndexVisible(suborderIndex: number): Promise<void> {
+    await expect(
+      this.splitPanelModal.getByText(new RegExp(`^#\\d+-${suborderIndex}$`), { exact: true }),
+    ).toBeVisible();
+  }
+
   @step('页面操作：点击新增金额子单按钮')
   async clickAddAmountSuborder(): Promise<void> {
     await this.expectLoaded();
-    await this.addAmountButton.click();
+    await this.addSuborderButton.click();
     await this.expectSplitInputVisible();
   }
 

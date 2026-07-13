@@ -148,6 +148,25 @@ export class SplitOrderFlow {
     await this.moveDishes(splitOrderPage, sourceOrderNumber, dishNames, targetOrderNumber);
   }
 
+  @step((_: SplitOrderPage, dishName: string) => `业务步骤：将菜品 ${dishName} 移入新建子单`)
+  async moveDishToNewSuborder(
+    splitOrderPage: SplitOrderPage,
+    dishName: string,
+  ): Promise<void> {
+    const snapshot = await splitOrderPage.readSnapshot();
+    const sourceOrder = snapshot.suborders.find((suborder) =>
+      suborder.dishes.some((dish) => dish.name === dishName),
+    );
+
+    if (!sourceOrder) {
+      throw new Error(`分单面板中未找到包含菜品 ${dishName} 的源子单。`);
+    }
+
+    await splitOrderPage.clickDish(sourceOrder.orderNumber, dishName);
+    await splitOrderPage.clickAddSuborder();
+    await splitOrderPage.expectSuborderIndexVisible(2);
+  }
+
   @step((_splitOrderPage: SplitOrderPage, orderNumbers?: string[]) => `业务步骤：合并分单${orderNumbers?.length ? `，目标子单为 ${orderNumbers.join('、')}` : ''}`)
   async combineSuborders(
     splitOrderPage: SplitOrderPage,

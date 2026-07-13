@@ -9,7 +9,7 @@ export const CODEGEN_CONTEXT_OPTIONS = Object.freeze({
     'x-client-sn': 'mansuper',
     'x-client-type': '0',
   }),
-  viewport: Object.freeze({ width: 1920, height: 1080 }),
+  viewport: Object.freeze({ width: 950, height: 540 }),
 });
 
 export async function runCodegen(browserType = chromium) {

@@ -41,6 +41,11 @@ export class OrderDishesLocators {
   readonly priceDialog: Locator;
   readonly priceInput: Locator;
   readonly priceConfirmButton: Locator;
+  readonly openFoodButton: Locator;
+  readonly openFoodNameInput: Locator;
+  readonly openFoodPriceInput: Locator;
+  readonly openFoodKeyboardCloseButton: Locator;
+  readonly openFoodConfirmButton: Locator;
   readonly specificationDialog: Locator;
   readonly specificationConfirmButton: Locator;
   readonly categoryOptionPanel: Locator;
@@ -48,6 +53,7 @@ export class OrderDishesLocators {
   readonly categoryOptionSubGrid: Locator;
   readonly comboDialog: Locator;
   readonly comboConfirmButton: Locator;
+  readonly orderedDishItems: Locator;
   readonly cartBadge: Locator;
   readonly priceSummaryToggle: Locator;
   readonly priceSummaryDetailsContainer: Locator;
@@ -184,6 +190,11 @@ export class OrderDishesLocators {
     this.priceDialog = this.appFrame.getByRole('dialog', { name: 'Enter Price' });
     this.priceInput = this.priceDialog.getByRole('textbox', { name: 'Price' });
     this.priceConfirmButton = this.priceDialog.getByRole('button', { name: 'Confirm' });
+    this.openFoodButton = this.page.getByTestId('icon-button-Open item');
+    this.openFoodNameInput = this.page.getByRole('textbox', { name: 'Name' });
+    this.openFoodPriceInput = this.page.getByRole('textbox', { name: '0.00' });
+    this.openFoodKeyboardCloseButton = this.page.getByTestId('pos-keyboard-button-{close}');
+    this.openFoodConfirmButton = this.page.getByTestId('open-food-confirm');
     this.specificationDialog = this.appFrame.getByRole('dialog', {
       name: 'Select Specifications',
     });
@@ -205,6 +216,7 @@ export class OrderDishesLocators {
     this.comboConfirmButton = this.comboDialog.locator('button', {
       hasText: /^(Confirm|确认)$/,
     }).first();
+    this.orderedDishItems = this.page.getByTestId('pos-ui-dish-item');
     this.cartBadge = scoped('[data-testid="cart-badge"]');
     this.priceSummaryToggle = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
       appFrame

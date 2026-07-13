@@ -19,6 +19,12 @@ const testCreditCard = {
 } as const;
 
 export class PaymentFlow {
+  @step((_: PaymentPage, amountInCents: number) => `业务步骤：在 Payment 页设置小费 ${amountInCents} 分`)
+  async addTip(paymentPage: PaymentPage, amountInCents: number): Promise<void> {
+    await paymentPage.expectLoaded();
+    await paymentPage.addTip(amountInCents);
+  }
+
   @step('业务步骤：完成现金支付并处理打印小票选择')
   async payByCash(
     paymentPage: PaymentPage,

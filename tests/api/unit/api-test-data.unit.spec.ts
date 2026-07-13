@@ -15,6 +15,7 @@ import {
   buildOrderRequest,
 } from '../../../test-data/api/order-api-data';
 import { buildPaymentRecordRequest, buildTipRequest } from '../../../test-data/api/payment-api-data';
+import { buildChargeSetupRequest } from '../../../test-data/api/admin-config-api-data';
 
 test.describe('API 测试数据工厂', () => {
   test('菜单数据工厂应生成短名称并保留自动化前缀', () => {
@@ -134,5 +135,11 @@ test.describe('API 测试数据工厂', () => {
     expect(buildTipRequest(3.5)).toMatchObject({
       amount: 3.5,
     });
+  });
+
+  test('加收数据工厂应将订单类型名称转换为后台枚举值', () => {
+    expect(
+      buildChargeSetupRequest({ orderType: 'dine in,delivery,pick up,to go' }).charge.orderType,
+    ).toBe('DINE_IN,DELIVERY,PICK_UP,TO_GO');
   });
 });

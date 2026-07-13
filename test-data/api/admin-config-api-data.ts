@@ -78,9 +78,19 @@ export function buildChargeSetupRequest(overrides: ChargeSetupOverrides = {}) {
       ...(overrides.minConsumption !== undefined
         ? { minConsumption: overrides.minConsumption }
         : {}),
-      ...(overrides.orderType !== undefined ? { orderType: overrides.orderType } : {}),
+      ...(overrides.orderType !== undefined
+        ? { orderType: normalizeChargeOrderTypes(overrides.orderType) }
+        : {}),
     },
   };
+}
+
+function normalizeChargeOrderTypes(value: string): string {
+  return value
+    .split(',')
+    .map((orderType) => orderType.trim().replace(/\s+/g, '_').toUpperCase())
+    .filter(Boolean)
+    .join(',');
 }
 
 function buildSetupName(domain: string): string {

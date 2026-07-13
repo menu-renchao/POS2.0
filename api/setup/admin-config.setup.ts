@@ -187,7 +187,6 @@ function mergeChargeUpdateRequest(
   return {
     charge: {
       ...request.charge,
-      ...overrides,
       id,
       chargeId: id,
     },

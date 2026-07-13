@@ -40,6 +40,7 @@ export type CustomChargeParams = {
 };
 
 export type ClearChargesParams = {
+  dishNames?: string[];
   scope: ChargeScope;
 };
 
@@ -179,6 +180,16 @@ export class OrderDishesFlow {
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
     await orderDishesPage.enterPrice(price);
     await orderDishesPage.confirmPriceDialog();
+  }
+
+  @step((_: OrderDishesPage, name: string, price: number) => `业务步骤：添加 Open Food 菜品 ${name}，价格 ${price}`)
+  async addOpenFoodItem(
+    orderDishesPage: OrderDishesPage,
+    name: string,
+    price: number,
+  ): Promise<void> {
+    await orderDishesPage.expectLoaded();
+    await orderDishesPage.addOpenFood(name, price);
   }
 
   @step('业务步骤：通用添加菜品到购物车')
@@ -329,6 +340,52 @@ export class OrderDishesFlow {
   }
 
   @step(
+    (_orderDishesPage: OrderDishesPage, dishNames: string[], value: number) =>
+      `业务步骤：对菜品 ${dishNames.join('、')} 添加自定义百分比折扣 ${value}%`,
+  )
+  async applyCustomItemPercentageDiscount(
+    orderDishesPage: OrderDishesPage,
+    dishNames: string[],
+    value: number,
+  ): Promise<void> {
+    await this.runChargeDialogFlow(orderDishesPage, async () => {
+      await orderDishesPage.switchChargeScope('item');
+      await this.selectChargeDishes(orderDishesPage, dishNames);
+      await orderDishesPage.applyCustomPercentageDiscount(value);
+    });
+  }
+
+  @step(
+    (_orderDishesPage: OrderDishesPage, dishNames: string[], value: number) =>
+      `业务步骤：对菜品 ${dishNames.join('、')} 添加固定金额折扣 $${value.toFixed(2)}`,
+  )
+  async applyCustomItemFixedDiscount(
+    orderDishesPage: OrderDishesPage,
+    dishNames: string[],
+    value: number,
+  ): Promise<void> {
+    await this.runChargeDialogFlow(orderDishesPage, async () => {
+      await orderDishesPage.switchChargeScope('item');
+      await this.selectChargeDishes(orderDishesPage, dishNames);
+      await orderDishesPage.applyCustomFixedDiscount(value);
+    });
+  }
+
+  @step(
+    (_orderDishesPage: OrderDishesPage, value: number) =>
+      `业务步骤：添加整单自定义百分比折扣 ${value}%`,
+  )
+  async applyCustomWholePercentageDiscount(
+    orderDishesPage: OrderDishesPage,
+    value: number,
+  ): Promise<void> {
+    await this.runChargeDialogFlow(orderDishesPage, async () => {
+      await orderDishesPage.switchChargeScope('whole');
+      await orderDishesPage.applyCustomPercentageDiscount(value);
+    });
+  }
+
+  @step(
     (_orderDishesPage: OrderDishesPage, params: ClearChargesParams) =>
       params.scope === 'whole'
         ? '业务步骤：清空整单加收或折扣'
@@ -340,6 +397,11 @@ export class OrderDishesFlow {
   ): Promise<void> {
     await this.runChargeDialogFlow(orderDishesPage, async () => {
       await orderDishesPage.switchChargeScope(params.scope);
+
+      if (params.scope === 'item') {
+        await this.selectChargeDishes(orderDishesPage, params.dishNames);
+      }
+
       await orderDishesPage.clearAllCharges();
     });
   }

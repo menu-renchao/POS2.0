@@ -214,7 +214,11 @@ test.describe('API 数据预置服务', () => {
       taxed: true,
     });
     const chargeList = await apiSetup.charge.read(charge.id);
-    await apiSetup.charge.update(charge.id, { rate: 4.5, active: false });
+    await apiSetup.charge.update(charge.id, {
+      rate: 4.5,
+      active: false,
+      orderType: 'dine in',
+    });
     await apiSetup.charge.delete(charge.id);
 
     expect(charge.id).toBe(1201);
@@ -240,6 +244,7 @@ test.describe('API 数据预置服务', () => {
         chargeId: 1201,
         rate: 4.5,
         active: false,
+        orderType: 'DINE_IN',
       }),
     });
     expect(adminConfig.payloads.deleteCharge[0]).toEqual({ chargeId: 1201 });

@@ -25,6 +25,8 @@ export class HomePage {
   private readonly refreshButton: Locator;
   private readonly exitButton: Locator;
   private readonly refreshLoadingText: Locator;
+  private readonly configurationRefreshDialog: Locator;
+  private readonly configurationRefreshButton: Locator;
 
   constructor(private readonly page: Page) {
     this.scope = createHomeScope(page);
@@ -35,6 +37,13 @@ export class HomePage {
     this.refreshButton = this.scope.appFrame.getByTestId('icon-button-refresh');
     this.exitButton = this.scope.appFrame.getByTestId('icon-button-exit');
     this.refreshLoadingText = this.page.locator('#floatmsgbx');
+    this.configurationRefreshDialog = this.scope.appFrame.getByRole('alertdialog', {
+      name: 'Notification',
+    });
+    this.configurationRefreshButton = this.configurationRefreshDialog.getByRole('button', {
+      name: 'Refresh',
+      exact: true,
+    });
   }
 
   @step('页面操作：打开 POS 首页')
@@ -55,6 +64,14 @@ export class HomePage {
 
   @step('页面操作：点击主页刷新按钮并等待刷新完成')
   async clickRefresh(): Promise<void> {
+    if (await this.configurationRefreshDialog.isVisible().catch(() => false)) {
+      await this.configurationRefreshButton.click();
+      await expect(this.configurationRefreshDialog).toBeHidden({ timeout: 15_000 });
+      await this.waitUntilRefreshCompleted();
+      await this.expectEmployeeReady();
+      return;
+    }
+
     await waitUntil(
       async () => ({
         isVisible: await this.refreshButton.isVisible().catch(() => false),
@@ -70,6 +87,31 @@ export class HomePage {
     await this.refreshButton.click({ timeout: 10_000 });
     await this.waitUntilRefreshCompleted();
     await this.expectEmployeeReady();
+  }
+
+  @step('页面操作：确认延迟出现的系统配置刷新通知')
+  async confirmDelayedConfigurationRefresh(): Promise<boolean> {
+    const notificationAppeared = await waitUntil(
+      async () => await this.configurationRefreshDialog.isVisible().catch(() => false),
+      (isVisible) => isVisible,
+      {
+        timeout: 3_000,
+        interval: 100,
+        message: 'System configuration refresh notification did not appear.',
+      },
+    )
+      .then(() => true)
+      .catch(() => false);
+
+    if (!notificationAppeared) {
+      return false;
+    }
+
+    await this.configurationRefreshButton.click();
+    await expect(this.configurationRefreshDialog).toBeHidden({ timeout: 15_000 });
+    await this.waitUntilRefreshCompleted();
+    await this.expectEmployeeReady();
+    return true;
   }
 
   @step('页面操作：确认主页固定头部按钮已经可用')

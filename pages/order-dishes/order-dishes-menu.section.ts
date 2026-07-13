@@ -341,6 +341,20 @@ export class OrderDishesMenuSection {
       await this.locators.priceConfirmButton.click();
     }
 
+    @step((name: string, price: number) => `页面操作：添加 Open Food 菜品 ${name}，价格 ${price}`)
+    async addOpenFood(name: string, price: number): Promise<void> {
+      await this.host.expectLoaded();
+      await this.locators.openFoodButton.click();
+      await expect(this.locators.openFoodConfirmButton).toBeVisible();
+
+      await this.locators.openFoodNameInput.fill(name);
+      await this.locators.openFoodPriceInput.fill(price.toFixed(3));
+      await this.locators.openFoodKeyboardCloseButton.click();
+      await waitForInputSettled(this.locators.openFoodPriceInput);
+      await this.locators.openFoodConfirmButton.click();
+      await expect(this.locators.openFoodConfirmButton).toBeHidden();
+    }
+
     @step('页面操作：确认规格选择弹窗可见')
     async expectSpecificationDialogVisible(): Promise<void> {
       await expect(this.locators.specificationDialog).toBeVisible();

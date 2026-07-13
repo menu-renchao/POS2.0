@@ -1,4 +1,8 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import {
+  expect,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 import {
   findFirstVisibleLocator,
   resolveFirstVisibleLocator,
@@ -6,7 +10,6 @@ import {
 import { step } from '../../utils/step';
 import { waitForInputSettled } from '../../utils/input-stability';
 import { waitUntil } from '../../utils/wait';
-import { readVisiblePosAlertText } from '../shared/pos-alert';
 import { OrderDishesPage } from '../order-dishes.page';
 import { PaymentPage } from '../payment.page';
 import { SplitOrderPage } from '../split-order.page';
@@ -85,6 +88,7 @@ export class RecallOrderDetailsDialog {
   private readonly orderDetailsEditButton: Locator;
   private readonly orderDetailsPayButton: Locator;
   readonly orderDetailsMoreButton: Locator;
+  private readonly sharedOrderDetailsMoreButton: Locator;
   private readonly legacyOrderDetailsMoreButton: Locator;
   private readonly namedOrderDetailsMoreButton: Locator;
   private readonly orderDetailsTipsButton: Locator;
@@ -100,6 +104,7 @@ export class RecallOrderDetailsDialog {
   private readonly moveDishesToNewOrderButton: Locator;
   private readonly moveDishesTargetSelectionPrompt: Locator;
   private readonly globalLoadingOverlay: Locator;
+  private readonly orderDetailsServerButton: Locator;
 
   constructor(
     readonly page: Page,
@@ -126,9 +131,17 @@ export class RecallOrderDetailsDialog {
       this.orderDetailsDialog,
       'recall2-order-detail-more',
     );
+    this.sharedOrderDetailsMoreButton = recallScopedTestId(
+      this.page,
+      'shared-order-detail-more-trigger',
+    );
     this.legacyOrderDetailsMoreButton = this.page.locator('#odsmymoreicon');
     this.namedOrderDetailsMoreButton = this.page.getByRole('button', { name: /^MoreIcon More$/i });
     this.orderDetailsTipsButton = recallScopedTestId(this.page, 'recall2-order-detail-tips');
+    this.orderDetailsServerButton = recallScopedTestId(
+      this.orderDetailsDialog,
+      'shared-order-detail-action-server',
+    );
     this.splitChargePromptDialog = this.page
       .getByRole('alertdialog', { name: 'Notification' })
       .filter({ hasText: 'inconsistent split amounts' })
@@ -189,23 +202,27 @@ export class RecallOrderDetailsDialog {
   @step('页面读取：读取当前 Recall 订单详情中的可选子单号')
   async readTargetOrderNumbers(orderNumber?: string): Promise<string[]> {
     await this.waitForOrderDetailsDialogReady();
-    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
-    const dialogText = (await orderDetailsDialog.textContent().catch(() => '')) ?? '';
-    const parentOrderNumber = orderNumber
-      ? normalizeOrderNumber(orderNumber).replace(/^#/, '').replace(/-\d+$/, '')
-      : dialogText.match(/#(\d+)-\d+/)?.[1];
+    return await waitUntil(
+      async () => {
+        const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+        const dialogText = (await orderDetailsDialog.textContent().catch(() => '')) ?? '';
+        const parentOrderNumber = orderNumber
+          ? normalizeOrderNumber(orderNumber).replace(/^#/, '').replace(/-\d+$/, '')
+          : dialogText.match(/#(\d+)-\d+/)?.[1];
 
-    if (parentOrderNumber) {
-      const visibleChildOrderNumbers = await this.readVisibleChildOrderNumbers(parentOrderNumber);
+        if (parentOrderNumber) {
+          const visibleChildOrderNumbers = await this.readVisibleChildOrderNumbers(
+            parentOrderNumber,
+          );
 
-      if (visibleChildOrderNumbers.length > 0) {
-        return visibleChildOrderNumbers;
-      }
-    }
+          if (visibleChildOrderNumbers.length > 0) {
+            return visibleChildOrderNumbers;
+          }
+        }
 
-    const targetOrderButtons = this.resolveSplitTargetOrderButtons(orderDetailsDialog);
+        const targetOrderButtons = this.resolveSplitTargetOrderButtons(orderDetailsDialog);
 
-    const targetOrderNumbers = await targetOrderButtons.evaluateAll((buttonElements) => {
+        const targetOrderNumbers = await targetOrderButtons.evaluateAll((buttonElements) => {
       const normalizeText = (value: string | null | undefined): string =>
         String(value ?? '')
           .replace(/\s+/g, ' ')
@@ -237,19 +254,30 @@ export class RecallOrderDetailsDialog {
           })
           .filter((orderNumber): orderNumber is string => Boolean(orderNumber)),
       )];
-    });
+        });
 
-    if (targetOrderNumbers.length > 0) {
-      return targetOrderNumbers;
-    }
+        if (targetOrderNumbers.length > 0) {
+          return targetOrderNumbers;
+        }
 
-    if (!parentOrderNumber) {
-      return [];
-    }
+        if (!parentOrderNumber) {
+          return [];
+        }
 
-    const splitCount = await this.readVisibleSplitCount(parentOrderNumber);
+        const splitCount = await this.readVisibleSplitCount(parentOrderNumber);
 
-    return Array.from({ length: splitCount }, (_, index) => `#${parentOrderNumber}-${index + 1}`);
+        return Array.from(
+          { length: splitCount },
+          (_, index) => `#${parentOrderNumber}-${index + 1}`,
+        );
+      },
+      (targetOrderNumbers) => targetOrderNumbers.length >= 2,
+      {
+        timeout: 10_000,
+        interval: 100,
+        message: 'Recall 订单详情未展示至少两个分单子单。',
+      },
+    );
   }
 
   @step((targetOrderNumber: string) => `页面操作：在当前 Recall 订单详情中切换到子单 ${targetOrderNumber}`)
@@ -335,11 +363,26 @@ export class RecallOrderDetailsDialog {
     await this.clickOrderDetailsAction('send');
   }
 
-  @step('页面操作：点击 Recall 订单详情中的 Send 按钮并读取成功提示')
-  async clickSendInOrderDetailsAndReadMessage(): Promise<string> {
+  @step('页面操作：点击 Recall 订单详情中的 Send 按钮并等待送厨接口成功')
+  async clickSendInOrderDetailsAndReadKitchenTicketStatus(): Promise<number> {
     await this.waitForOrderDetailsDialogReady();
-    await this.clickOrderDetailsAction('send');
-    return await readVisiblePosAlertText(this.page);
+    const [kitchenTicketResponse] = await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname.endsWith('/kpos/api/print/kitchen/ticket'),
+        { timeout: 15_000 },
+      ),
+      this.clickOrderDetailsAction('send'),
+    ]);
+
+    if (!kitchenTicketResponse.ok()) {
+      throw new Error(
+        `Recall 订单送厨接口失败：${kitchenTicketResponse.status()} ${kitchenTicketResponse.url()}`,
+      );
+    }
+
+    return kitchenTicketResponse.status();
   }
 
   @step('页面操作：点击 Recall 订单详情中的 Print 按钮')
@@ -426,7 +469,8 @@ export class RecallOrderDetailsDialog {
   @step('页面操作：点击 Recall 订单详情中的 More 按钮')
   async clickOrderDetailsMoreButton(): Promise<void> {
     await this.waitForOrderDetailsDialogReady();
-    await this.clickOrderDetailsAction('more');
+    await expect(this.sharedOrderDetailsMoreButton).toBeVisible({ timeout: 10_000 });
+    await this.sharedOrderDetailsMoreButton.click();
   }
 
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Charge 按钮')
@@ -1069,6 +1113,18 @@ export class RecallOrderDetailsDialog {
 
     await this.waitForGlobalLoadingOverlayAfterTipMutation();
     return null;
+  }
+
+  @step((serverName: string) => `页面操作：将 Recall 订单服务员切换为 ${serverName}`)
+  async changeOrderServer(serverName: string): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    await expect(this.orderDetailsServerButton).toBeVisible();
+    await this.orderDetailsServerButton.click();
+
+    const serverOption = this.resolveServerOption(serverName);
+    await expect(serverOption).toBeVisible();
+    await serverOption.click();
+    await expect(this.orderDetailsServerButton).toContainText(serverName);
   }
 
   @step('页面读取：读取当前详情弹窗中的完整订单信息')
@@ -2073,53 +2129,23 @@ export class RecallOrderDetailsDialog {
     }, parentOrderNumber);
   }
 
-  private async readVisibleChildOrderNumbers(parentOrderNumber: string): Promise<string[]> {
-    const childOrderNumbersFromCards = await this.openOrderCards.evaluateAll(
-      (cardElements, parentOrderNumberText) => {
-        const isVisible = (element: Element): boolean => {
-          const computedStyle = window.getComputedStyle(element);
-          const rect = element.getBoundingClientRect();
-
-          return (
-            computedStyle.display !== 'none' &&
-            computedStyle.visibility !== 'hidden' &&
-            rect.width > 0 &&
-            rect.height > 0
-          );
-        };
-        const childOrderNumberPattern = new RegExp(`#${parentOrderNumberText}-\\d+\\b`, 'g');
-
-        return [...new Set(
-          cardElements
-            .filter(isVisible)
-            .flatMap((element) => element.textContent?.match(childOrderNumberPattern) ?? []),
-        )];
-      },
-      parentOrderNumber,
+  private async readVisibleChildOrderNumbers(
+    parentOrderNumber: string,
+  ): Promise<string[]> {
+    const childOrderNumberPattern = new RegExp(
+      `^#${escapeRegExp(parentOrderNumber)}-\\d+\\b`,
     );
+    const childOrderButtons = this.page.getByRole('button', {
+      name: childOrderNumberPattern,
+    });
 
-    if (childOrderNumbersFromCards.length > 0) {
-      return childOrderNumbersFromCards;
-    }
-
-    return await this.page.evaluate((parentOrderNumberText) => {
-      const isVisible = (element: HTMLElement): boolean => {
-        const computedStyle = window.getComputedStyle(element);
-        const rect = element.getBoundingClientRect();
-
-        return (
-          computedStyle.display !== 'none' &&
-          computedStyle.visibility !== 'hidden' &&
-          rect.width > 0 &&
-          rect.height > 0
-        );
-      };
-      const matchedOrderNumbers = Array.from(document.body.querySelectorAll<HTMLElement>('*'))
-        .filter(isVisible)
-        .flatMap((element) => element.innerText.match(new RegExp(`#${parentOrderNumberText}-\\d+`, 'g')) ?? []);
-
-      return [...new Set(matchedOrderNumbers)];
-    }, parentOrderNumber);
+    return await childOrderButtons.evaluateAll((buttonElements) => [
+      ...new Set(
+        buttonElements.flatMap(
+          (element) => element.textContent?.match(/#\d+-\d+\b/g) ?? [],
+        ),
+      ),
+    ]);
   }
 
   private async readVisibleOrderDialogCount(): Promise<number> {
@@ -2869,6 +2895,13 @@ export class RecallOrderDetailsDialog {
 
       await digitButton.click({ timeout: 2_000 });
     }
+  }
+
+  private resolveServerOption(serverName: string): Locator {
+    return this.page
+      .locator('[data-testid^="dropdown-item-"], [data-test-id^="dropdown-item-"]')
+      .filter({ has: this.page.getByText(serverName, { exact: true }) })
+      .first();
   }
 
   private bigTipDialogCandidates(): Locator[] {

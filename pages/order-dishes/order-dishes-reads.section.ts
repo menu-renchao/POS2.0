@@ -36,6 +36,21 @@ export class OrderDishesReadsSection {
       }
     }
 
+    @step(
+      (dishName: string, additionName: string, price: string) =>
+        `页面断言：菜品 ${dishName} 展示附加项 ${additionName}，金额 ${price}`,
+    )
+    async expectOrderedDishAddition(
+      dishName: string,
+      additionName: string,
+      price: string,
+    ): Promise<void> {
+      await this.host.expectLoaded();
+      const dishItem = this.locators.orderedDishItems.filter({ hasText: dishName }).first();
+      await expect(dishItem).toContainText(additionName);
+      await expect(dishItem).toContainText(price);
+    }
+
     @step('页面读取：读取点单页左侧已点菜品明细')
     async readOrderedItems(): Promise<OrderedDishItem[]> {
       await this.host.expectLoaded();

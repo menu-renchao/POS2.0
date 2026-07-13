@@ -29,6 +29,9 @@ export class PaymentPage {
   private readonly printReceiptCancelButton: Locator;
   private readonly printReceiptConfirmButton: Locator;
   private readonly paymentSuccessConfirmButton: Locator;
+  private readonly paymentFlow: Locator;
+  private readonly tipsButton: Locator;
+  private readonly tipsConfirmButton: Locator;
 
   constructor(private readonly page: Page) {
     this.contractRoot = this.page.getByTestId('payment-page');
@@ -38,6 +41,11 @@ export class PaymentPage {
     this.printReceiptCancelButton = this.printReceiptDialog.locator('#print-customer-cancel');
     this.printReceiptConfirmButton = this.printReceiptDialog.locator('#print-customer-submit');
     this.paymentSuccessConfirmButton = this.paymentFrame.getByTestId('pay-success-status-button-1');
+    this.paymentFlow = this.paymentFrame.getByTestId('payment-panel-payment-flow');
+    this.tipsButton = this.paymentFrame.getByTestId('payment-panel-action-tips');
+    this.tipsConfirmButton = this.paymentFrame.getByTestId(
+      'preset-numeric-input-modal-confirm-button',
+    );
   }
 
   @step('页面操作：确认支付页面已经加载完成')
@@ -80,11 +88,48 @@ export class PaymentPage {
       await this.resolveKeypadButton('backspace').click();
     }
 
-    for (const digit of String(amountInCents)) {
+    const amountDigits = String(amountInCents);
+    const wholeDigits = amountDigits.endsWith('00') ? amountDigits.slice(0, -2) : amountDigits;
+    for (const digit of wholeDigits) {
       await this.resolveKeypadButton(digit).click();
     }
 
+    if (amountDigits.endsWith('00')) {
+      await this.resolveKeypadButton('00').click();
+    }
+
     await waitForInputSettled(amountDisplay);
+  }
+
+  @step((amountInCents: number) => `页面操作：在 Payment 页添加小费 ${amountInCents} 分`)
+  async addTip(amountInCents: number): Promise<void> {
+    if (!Number.isInteger(amountInCents) || amountInCents <= 0) {
+      throw new Error(`Invalid tip amount in cents: ${amountInCents}`);
+    }
+
+    await this.tipsButton.click();
+    const amountDigits = String(amountInCents);
+    const wholeDigits = amountDigits.endsWith('00') ? amountDigits.slice(0, -2) : amountDigits;
+
+    for (const digit of wholeDigits) {
+      await this.paymentFrame
+        .getByTestId(`preset-currency-keypad-input-number-${digit}`)
+        .click();
+    }
+
+    if (amountDigits.endsWith('00')) {
+      await this.paymentFrame
+        .getByTestId('preset-currency-keypad-input-double-zero')
+        .click();
+    }
+
+    await waitForInputSettled(undefined, 250);
+    await this.tipsConfirmButton.click();
+  }
+
+  @step((text: string) => `页面断言：Payment 支付流程展示 ${text}`)
+  async expectPaymentFlowText(text: string): Promise<void> {
+    await expect(this.paymentFlow).toContainText(text);
   }
 
   @step('页面操作：在 Payment type 区域点击 Credit Card')
