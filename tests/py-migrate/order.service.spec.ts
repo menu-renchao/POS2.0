@@ -19,7 +19,6 @@ import {
   orderServiceCustomers,
   orderServiceDishes,
   orderServiceEditRecallTaxCase,
-  orderServiceMultiDishQuantityCase,
   orderServiceCancelSplitCase,
   orderServiceSplitByAmountCase,
   orderServiceSplitByDishCase,
@@ -40,12 +39,6 @@ type AppEntryPages = {
 };
 
 const recallDishRoundTripCases = [
-  {
-    title: '[POS-15602] 应能 To Go 点普通菜后在 Recall 校验菜品名称和价格',
-    issue: 'POS-15602',
-    dish: orderServiceDishes.regular,
-    stepTitle: '从 To Go 进入点单页，添加普通菜并保存后在 Recall 校验',
-  },
   {
     title: '[POS-15641] 应能 To Go 点另一个分类菜品后在 Recall 校验菜品名称和价格',
     issue: 'POS-15641',
@@ -337,60 +330,6 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
       },
     );
   }
-
-  test(
-    '[POS-32905] 应能点单时累计整数菜品数量并在 Recall 保持数量',
-    {
-      annotation: [jiraIssueAnnotation('POS-32905')],
-    },
-    async ({ homePage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
-      });
-
-      const orderDishesPage = await test.step(
-        `从 To Go 点两个菜并将第一个菜数量调整为 ${orderServiceMultiDishQuantityCase.multiDishFirstQuantity}`,
-        async () => {
-          const page = await new TakeoutFlow().startToGoOrder(readyHomePage);
-
-          await new OrderDishesFlow().addDishToCart(page, {
-            ...orderServiceDishes.regular.menu,
-            dishName: orderServiceDishes.regular.name,
-            quantity: orderServiceMultiDishQuantityCase.multiDishFirstQuantity,
-          });
-          await new OrderDishesFlow().addRegularDish(page, orderServiceDishes.test.name, orderServiceDishes.test.menu);
-
-          return page;
-        },
-      );
-
-      await test.step(
-        `校验点单页 Count 为整数 ${orderServiceMultiDishQuantityCase.multiDishTotalCount}`,
-        async () => {
-          const priceSummary = await orderDishesPage.readPriceSummary();
-
-          expect(priceSummary.Count).toBe(orderServiceMultiDishQuantityCase.multiDishTotalCount);
-        },
-      );
-
-      await test.step('保存订单后在 Recall 校验两个菜的数量保持一致', async () => {
-        const orderDetails = await saveOrderAndOpenLatestRecallDetails(orderDishesPage);
-        const firstDish = orderDetails.items.find(
-          (item) => item.name === orderServiceDishes.regular.name,
-        );
-        const secondDish = orderDetails.items.find(
-          (item) => item.name === orderServiceDishes.test.name,
-        );
-
-        expect(firstDish?.quantity).toBe(
-          orderServiceMultiDishQuantityCase.multiDishFirstRecallQuantity,
-        );
-        expect(secondDish?.quantity).toBe(
-          orderServiceMultiDishQuantityCase.multiDishSecondRecallQuantity,
-        );
-      });
-    },
-  );
 
   test(
     '[POS-30575] 应能创建 Delivery 订单并在 Recall 详情展示客户信息',

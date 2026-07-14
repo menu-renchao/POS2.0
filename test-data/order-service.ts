@@ -154,3 +154,15 @@ export const orderServiceSeatDisplayConfigurationUpdate = {
     userId: 1,
   },
 } as const;
+
+export const orderPageRegressionCases = {
+  itemDiscount: { rate: 10 },
+  modifier: { name: 'POS-42888', price: 0 },
+  specialPriceDiscount: { price: 5.85, rate: 50, expectedSubtotal: 2.92 },
+  splitTips: { tipAmountInCents: 200, splitTip: 1, mergedTip: 2 },
+  splitEvenly: { count: 2 },
+  splitBySeats: { guestCount: 2 },
+  splitByAmount: { changedPrice: 10.6, amounts: [2, 8.6] },
+  combineDecimal: { quantity: 2.55 },
+  pricedDecimal: { price: 6.5, quantity: 1.5, expectedLineCents: 975 },
+} as const;

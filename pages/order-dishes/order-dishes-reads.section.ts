@@ -28,6 +28,12 @@ export class OrderDishesReadsSection {
 
   private orderDishesContentFrame: Frame | null = null;
 
+    @step('页面读取：读取点单页 Count 原始文本')
+    async readCountText(): Promise<string> {
+      await this.host.expectLoaded();
+      return (await this.locators.countText.innerText()).trim();
+    }
+
     @step('页面操作：确认购物车中有菜品')
     async expectCartHasItems(): Promise<void> {
       if (await this.locators.cartBadge.isVisible()) {

@@ -28,8 +28,10 @@ export class OrderDishesLocators {
   readonly changePriceButton: Locator;
   readonly changePriceConfirmButton: Locator;
   readonly countButton: Locator;
+  readonly countText: Locator;
   readonly firstAvailableDishButton: Locator;
   readonly menuGroupCards: Locator;
+  readonly selectedMenuGroupName: Locator;
   readonly menuCategoryCards: Locator;
   readonly countDialog: Locator;
   readonly countDialogInput: Locator;
@@ -162,6 +164,7 @@ export class OrderDishesLocators {
         .or(hostPage.getByRole('button', { name: /^(Count|数量)$/ }))
         .first(),
     );
+    this.countText = this.page.locator('#ododttcnt');
     this.firstAvailableDishButton = this.appFrame
       .locator(
         'button:not([name*="Back"]):not([name*="Cart"]):not([name*="Send"]):not([name*="Pay"])',
@@ -170,6 +173,7 @@ export class OrderDishesLocators {
     this.menuGroupCards = scoped(
       '[data-testid^="menu-group-card-"], [data-test-id^="menu-group-card-"]',
     );
+    this.selectedMenuGroupName = this.page.locator('#grplist .grplistbtAct .grplistbtText');
     this.menuCategoryCards = scoped(
       '[data-testid^="menu-category-card-"], [data-test-id^="menu-category-card-"]',
     );

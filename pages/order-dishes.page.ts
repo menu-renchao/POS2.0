@@ -86,6 +86,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.menu.switchMenu(...args);
   }
 
+  readSelectedMenuGroupName(...args: Parameters<OrderDishesMenuSection['readSelectedMenuGroupName']>): ReturnType<OrderDishesMenuSection['readSelectedMenuGroupName']> {
+    return this.menu.readSelectedMenuGroupName(...args);
+  }
+
   changeDishCount(...args: Parameters<OrderDishesMenuSection['changeDishCount']>): ReturnType<OrderDishesMenuSection['changeDishCount']> {
     return this.menu.changeDishCount(...args);
   }
@@ -304,6 +308,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
 
   readOrderedItems(...args: Parameters<OrderDishesReadsSection['readOrderedItems']>): ReturnType<OrderDishesReadsSection['readOrderedItems']> {
     return this.reads.readOrderedItems(...args);
+  }
+
+  readCountText(...args: Parameters<OrderDishesReadsSection['readCountText']>): ReturnType<OrderDishesReadsSection['readCountText']> {
+    return this.reads.readCountText(...args);
   }
 
   readPriceSummary(...args: Parameters<OrderDishesReadsSection['readPriceSummary']>): ReturnType<OrderDishesReadsSection['readPriceSummary']> {

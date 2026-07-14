@@ -122,6 +122,12 @@ export class OrderDishesMenuSection {
       await this.switchMenuCategory(categoryName);
     }
 
+    @step('页面读取：读取当前选中的菜单组名称')
+    async readSelectedMenuGroupName(): Promise<string> {
+      await this.host.expectLoaded();
+      return (await this.locators.selectedMenuGroupName.innerText()).replace(/\s+/g, ' ').trim();
+    }
+
     @step((quantity: number) => `页面操作：通过 Count 按钮将待点菜数量修改为 ${quantity}`)
     async changeDishCount(quantity: number): Promise<void> {
       await this.host.expectLoaded();
