@@ -111,7 +111,12 @@ export class SplitOrderPage {
     this.splitInputCancelButton = this.splitInputDialog
       .getByRole('button', { name: CANCEL_BUTTON_NAME })
       .first();
-    this.combineDialog = this.splitFrame.locator('.splitCombineModal, [role="dialog"]').last();
+    this.combineDialog = this.splitFrame.getByRole('dialog').filter({
+      has: this.splitFrame.getByRole('heading', {
+        name: 'Combine Suborders',
+        exact: true,
+      }),
+    });
     this.combineConfirmButton = this.combineDialog
       .getByRole('button', { name: CONFIRM_BUTTON_NAME })
       .first();
@@ -1095,11 +1100,12 @@ export class SplitOrderPage {
   }
 
   private resolveCombineOrder(orderNumber: string): Locator {
-    return this.combineDialog
-      .locator(
-        `[data-testid="combine-order"][data-order-number="${orderNumber}"], [data-order-number="${orderNumber}"]`,
-      )
-      .first();
+    const normalizedOrderNumber = this.normalizeOrderNumber(orderNumber);
+    const buttonName = new RegExp(
+      `^#${this.escapeRegExp(normalizedOrderNumber)}\\s+Total\\s+\\$`,
+    );
+
+    return this.combineDialog.getByRole('button', { name: buttonName });
   }
 
   private async readSuborderTotal(suborder: Locator): Promise<string | null> {
