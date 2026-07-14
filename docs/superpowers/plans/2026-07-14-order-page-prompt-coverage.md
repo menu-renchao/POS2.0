@@ -171,7 +171,7 @@ Evidence for every other status must name the missing or conflicting behavior an
 
 - [ ] **Step 3: 更新行 1～19 与汇总计数**
 
-Use `apply_patch` to replace `未归类`、`未审计` and generic evidence in rows 1～19. Use business domains only from this set: `菜单与语言`、`Option`、`改价折扣备注`、`Open Food`、`客户信息`、`权限与 Void`、`分单与小费`。
+Use `apply_patch` to replace `未归类`、`未审计` and generic evidence in rows 1～19. Use business domains only from this set: `菜单与语言`、`Option`、`改价折扣备注`、`Open Food`、`客户信息`、`权限与 Void`、`分单与小费`、`送厨与合并菜`。
 
 Recalculate the summary row by counting all current final statuses; keep remaining unaudited rows outside that total distribution but keep total fixed at 66.
 
