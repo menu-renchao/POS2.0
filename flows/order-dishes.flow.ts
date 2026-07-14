@@ -2,7 +2,9 @@ import {
   type ChargeCustomType,
   type ChargeScope,
   type ModifierPriceSelection,
+  type OrderChargeSnapshot,
   OrderDishesPage,
+  type OrderPriceSummary,
 } from '../pages/order-dishes.page';
 import { type HomePage } from '../pages/home.page';
 import { step } from '../utils/step';
@@ -404,6 +406,33 @@ export class OrderDishesFlow {
 
       await orderDishesPage.clearAllCharges();
     });
+  }
+
+  @step('业务步骤：确认后台变更后的加收并读取确认前后状态')
+  async confirmRefreshedChargeAndReadState(
+    orderDishesPage: OrderDishesPage,
+  ): Promise<{
+    afterConfirmationSummary: OrderPriceSummary;
+    beforeConfirmationSummary: OrderPriceSummary;
+    chargeDialogSnapshot: OrderChargeSnapshot;
+  }> {
+    const beforeConfirmationSummary = await orderDishesPage.readPriceSummary();
+    await orderDishesPage.clickCharge();
+
+    try {
+      const chargeDialogSnapshot = await orderDishesPage.readChargeSnapshot();
+      await orderDishesPage.confirmChargeDialog();
+      const afterConfirmationSummary = await orderDishesPage.readPriceSummary();
+
+      return {
+        afterConfirmationSummary,
+        beforeConfirmationSummary,
+        chargeDialogSnapshot,
+      };
+    } catch (error) {
+      await orderDishesPage.closeChargeDialog();
+      throw error;
+    }
   }
 
   @step(

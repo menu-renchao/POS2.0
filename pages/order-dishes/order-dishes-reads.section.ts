@@ -542,6 +542,7 @@ export class OrderDishesReadsSection {
       summary.Count = await this.readPriceSummaryRowNumber('Count');
       summary.Subtotal = await this.readPriceSummaryRowNumber('Subtotal');
       summary.Tax = await this.readPriceSummaryRowNumber('Tax');
+      summary.Charge = await this.tryReadPriceSummaryRowNumber('Charge');
       summary['Total Before Tips'] = await this.readPriceSummaryRowNumber('Total Before Tips');
       summary.Tips = await this.tryReadPriceSummaryRowNumber('Tips');
       const total = await this.tryReadPriceSummaryMoneyNumber('Total');
@@ -605,7 +606,7 @@ export class OrderDishesReadsSection {
 
         for (const pair of pairs) {
           const normalizedLabel =
-            /^(Count|Subtotal|Tax|Total Before Tips|Tips|Total(?:\((?:Cash|Card)\))?)$/i.test(
+            /^(Count|Subtotal|Tax|Charge|Total Before Tips|Tips|Total(?:\((?:Cash|Card)\))?)$/i.test(
               pair.label,
             )
               ? pair.label
@@ -642,6 +643,7 @@ export class OrderDishesReadsSection {
         Count: entries.Count,
         Subtotal: entries.Subtotal,
         Tax: entries.Tax,
+        ...(entries.Charge === undefined ? {} : { Charge: entries.Charge }),
         'Total Before Tips': entries['Total Before Tips'],
         ...(entries.Tips === undefined ? {} : { Tips: entries.Tips }),
         'Total(Cash)': resolvedTotal,
@@ -678,6 +680,7 @@ export class OrderDishesReadsSection {
       const count = readNumber(/\bCount\s+([\d,.]+)/);
       const subtotal = readNumber(/\bSubtotal\s+\$?([\d,.]+)/);
       const tax = readNumber(/\bTax\s+\$?([\d,.]+)/);
+      const charge = readNumber(/\bCharge\s+\$?([\d,.]+)/);
       const totalBeforeTips = readNumber(/\bTotal Before Tips\s+\$?([\d,.]+)/);
       const tips = readNumber(/\bTips\s+\$?([\d,.]+)/);
       const totalMatch = [...normalizedText.matchAll(/\bTotal\s+\$?([\d,.]+)/g)];
@@ -700,6 +703,7 @@ export class OrderDishesReadsSection {
         Count: count,
         Subtotal: subtotal,
         Tax: tax,
+        ...(charge === null ? {} : { Charge: charge }),
         'Total Before Tips': totalBeforeTips,
         ...(tips === null ? {} : { Tips: tips }),
         'Total(Cash)': totalValue,

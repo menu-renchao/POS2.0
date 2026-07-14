@@ -44,6 +44,7 @@ type SplitOrderTargetsWithRecallPage = SplitOrderTargets & {
 type ChargeExpectedAmount = '5.00' | '10.00' | '20.00' | 'percent10' | 'percent20';
 
 type ChargeEditCase = {
+  confirmUpdatedCharge?: boolean;
   issue: `POS-${number}`;
   title: string;
   initialCharge: ChargeSetupOverrides;
@@ -188,6 +189,7 @@ const manualChargeEditCases: readonly ChargeEditCase[] = [
     expectedChargeName: manualPercentChargeName,
     expectedChargeAmount: 'percent20',
     expectedChargeAvailable: true,
+    confirmUpdatedCharge: true,
   },
   {
     issue: 'POS-27163',
@@ -244,10 +246,6 @@ const blockedManualChargeEditReasons = new Map<string, string>([
   [
     'POS-27159',
     '实测后台将手动固定加收由 $10 改为 $20 后，重新编辑订单仍保留历史 $10。',
-  ],
-  [
-    'POS-27160',
-    '实测后台将手动百分比加收由 10% 改为 20% 后，重新编辑订单仍保留历史 10% 金额 $0.88，未重算为 $1.76。',
   ],
   [
     'POS-27163',
@@ -3107,6 +3105,58 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
             await apiSetup.charge.update(chargeResource.id, chargeCase.updateCharge);
           }
         });
+
+        if (chargeCase.confirmUpdatedCharge) {
+          const editedOrderPage = await test.step('重新打开最近订单进入编辑页', async () => {
+            return await editSavedOrderAfterConfigurationRefresh(
+              homePage,
+              employeeLoginPage,
+              savedOrder.orderNumber,
+            );
+          });
+
+          const refreshedCharge = await test.step('打开加收弹窗并确认后台更新后的加收', async () => {
+            return await new OrderDishesFlow().confirmRefreshedChargeAndReadState(editedOrderPage);
+          });
+
+          await test.step('校验打开加收前编辑页保留原百分比加收金额', async () => {
+            const initialChargeAmount = resolveExpectedChargeAmount(
+              'percent10',
+              refreshedCharge.beforeConfirmationSummary,
+            );
+            expect.soft(refreshedCharge.beforeConfirmationSummary.Charge).toBeCloseTo(
+              initialChargeAmount,
+              2,
+            );
+          });
+
+          await test.step('校验加收弹窗显示后台更新后的百分比加收金额', async () => {
+            const dialogChargeAmount = parseChargeAmountText(
+              readWholeChargeAmountText(
+                refreshedCharge.chargeDialogSnapshot,
+                chargeCase.expectedChargeName,
+              ),
+            );
+            const expectedUpdatedAmount = resolveExpectedChargeAmount(
+              chargeCase.expectedChargeAmount,
+              refreshedCharge.beforeConfirmationSummary,
+            );
+            expect.soft(dialogChargeAmount).toBeCloseTo(expectedUpdatedAmount, 2);
+          });
+
+          await test.step('校验确认后编辑页更新为新的百分比加收金额', async () => {
+            const expectedUpdatedAmount = resolveExpectedChargeAmount(
+              chargeCase.expectedChargeAmount,
+              refreshedCharge.afterConfirmationSummary,
+            );
+            expect.soft(refreshedCharge.afterConfirmationSummary.Charge).toBeCloseTo(
+              expectedUpdatedAmount,
+              2,
+            );
+          });
+
+          return;
+        }
 
         const editedOrder = await test.step('重新打开最近订单进入编辑并读取加收明细', async () => {
           return await reopenSavedOrderForChargeCheck(

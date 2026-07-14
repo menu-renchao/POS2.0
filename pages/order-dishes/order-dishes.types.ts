@@ -12,6 +12,7 @@ export type OrderedDishItemAddition = {
 };
 
 export type OrderPriceSummary = {
+  Charge?: number;
   Count: number;
   Subtotal: number;
   Tax: number;
