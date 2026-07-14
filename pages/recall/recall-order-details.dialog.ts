@@ -1970,6 +1970,7 @@ export class RecallOrderDetailsDialog {
     await this.waitForGlobalLoadingOverlayHidden();
   }
 
+  @step('页面读取：读取 Recall 子单目标卡中的精确子单号')
   private async readSplitTargetOrderNumber(splitTargetOrderCard: Locator): Promise<string> {
     const orderNumberText = (
       await splitTargetOrderCard.getByText(/^#\d+-\d+$/, { exact: true }).first().textContent()
@@ -1982,6 +1983,7 @@ export class RecallOrderDetailsDialog {
     return orderNumberText;
   }
 
+  @step((orderNumber: string) => `页面读取：检查 Recall 子单 ${orderNumber} 的顶层详情是否就绪`)
   private async isTopmostChildOrderDetailsReady(orderNumber: string): Promise<boolean> {
     if ((await this.readVisibleOrderDialogCount()) === 0) {
       return false;
@@ -2006,6 +2008,7 @@ export class RecallOrderDetailsDialog {
     }, visibleOrderNumber);
   }
 
+  @step((orderNumber: string) => `页面操作：等待 Recall 子单 ${orderNumber} 的顶层详情就绪`)
   private async waitForTopmostChildOrderDetailsReady(orderNumber: string): Promise<void> {
     await waitUntil(
       async () => await this.isTopmostChildOrderDetailsReady(orderNumber),
@@ -2018,6 +2021,7 @@ export class RecallOrderDetailsDialog {
     );
   }
 
+  @step((orderNumber: string) => `页面操作：等待 Recall 母单 ${orderNumber} 的详情就绪`)
   private async waitForParentOrderDetailsReady(orderNumber: string): Promise<void> {
     const visibleOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
 
