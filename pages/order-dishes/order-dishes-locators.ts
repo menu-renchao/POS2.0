@@ -30,7 +30,7 @@ export class OrderDishesLocators {
   readonly countButton: Locator;
   readonly countText: Locator;
   readonly firstAvailableDishButton: Locator;
-  readonly menuGroupCards: Locator;
+  readonly menuGroupCard: (groupName: string) => Locator;
   readonly selectedMenuGroupName: Locator;
   readonly menuCategoryCards: Locator;
   readonly countDialog: Locator;
@@ -170,13 +170,11 @@ export class OrderDishesLocators {
         'button:not([name*="Back"]):not([name*="Cart"]):not([name*="Send"]):not([name*="Pay"])',
       )
       .first();
-    this.menuGroupCards = scoped(
-      '[data-testid^="menu-group-card-"], [data-test-id^="menu-group-card-"]',
-    );
+    const menuGroupCards = this.page.locator('[data-testid^="menu-group-card-"]');
+    this.menuGroupCard = (groupName: string) =>
+      menuGroupCards.filter({ hasText: groupName }).first();
     this.selectedMenuGroupName = this.page
-      .locator(
-        '[data-testid^="menu-group-card-"][class*="_selected_"], [data-test-id^="menu-group-card-"][class*="_selected_"]',
-      )
+      .locator('[data-testid^="menu-group-card-"][class*="_selected_"]')
       .first();
     this.menuCategoryCards = scoped(
       '[data-testid^="menu-category-card-"], [data-test-id^="menu-category-card-"]',

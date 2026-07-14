@@ -89,19 +89,11 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
       });
 
       const { orderPage, before, beforeSubtotal } = await test.step(
-        '切换到目标菜单组并添加普通菜',
+        '先切换到备用菜单组，再切回目标菜单组并添加普通菜',
         async () => {
           const page = await new TakeoutFlow().startToGoOrder(ready);
-          const initialGroup = await page.readSelectedMenuGroupName();
-
-          if (initialGroup === orderServiceMenu.group) {
-            await page.switchMenuGroup(orderServiceMenu.alternateGroup);
-            expect(await page.readSelectedMenuGroupName()).toBe(
-              orderServiceMenu.alternateGroup,
-            );
-          }
-
-          expect(await page.readSelectedMenuGroupName()).not.toBe(orderServiceMenu.group);
+          await page.switchMenuGroup(orderServiceMenu.alternateGroup);
+          expect(await page.readSelectedMenuGroupName()).toBe(orderServiceMenu.alternateGroup);
           await page.switchMenu(orderServiceMenu.group, orderServiceMenu.category);
           expect(await page.readSelectedMenuGroupName()).toBe(orderServiceMenu.group);
           await page.clickDish(orderServiceDishes.regular.name);
@@ -680,7 +672,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
               persistedOrder.orderNumber,
               pendingSplitOrderPage,
               returnedPage,
-              { reason: 'POS-16315 自动化清理' },
+              { requireSplitChildren: true, reason: 'POS-16315 自动化清理' },
             );
           });
         }
@@ -843,7 +835,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
               persistedOrder.orderNumber,
               pendingSplitOrderPage,
               returnedPage,
-              { reason: 'POS-16325 自动化清理' },
+              { requireSplitChildren: false, reason: 'POS-16325 自动化清理' },
             );
           });
         }

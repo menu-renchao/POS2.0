@@ -201,77 +201,91 @@ export class RecallOrderDetailsDialog {
   }
 
   @step('页面读取：读取当前 Recall 订单详情中的可选子单号')
-  async readTargetOrderNumbers(orderNumber?: string): Promise<string[]> {
+  async readTargetOrderNumbers(
+    orderNumber?: string,
+    options: { requireSplitChildren?: boolean } = {},
+  ): Promise<string[]> {
     await this.waitForOrderDetailsDialogReady();
-    return await waitUntil(
-      async () => {
-        const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
-        const dialogText = (await orderDetailsDialog.textContent().catch(() => '')) ?? '';
-        const parentOrderNumber = orderNumber
-          ? normalizeOrderNumber(orderNumber).replace(/^#/, '').replace(/-\d+$/, '')
-          : dialogText.match(/#(\d+)-\d+/)?.[1];
+    const readVisibleTargetOrderNumbers = async (): Promise<string[]> => {
+      const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+      const dialogText = (await orderDetailsDialog.textContent().catch(() => '')) ?? '';
+      const parentOrderNumber = orderNumber
+        ? normalizeOrderNumber(orderNumber).replace(/^#/, '').replace(/-\d+$/, '')
+        : dialogText.match(/#(\d+)-\d+/)?.[1];
 
-        if (parentOrderNumber) {
-          const visibleChildOrderNumbers = await this.readVisibleChildOrderNumbers(
-            parentOrderNumber,
+      if (parentOrderNumber) {
+        const visibleChildOrderNumbers = await this.readVisibleChildOrderNumbers(parentOrderNumber);
+
+        if (visibleChildOrderNumbers.length > 0) {
+          return visibleChildOrderNumbers;
+        }
+      }
+
+      const targetOrderButtons = this.resolveSplitTargetOrderButtons(orderDetailsDialog);
+      const targetOrderNumbers = await targetOrderButtons.evaluateAll((buttonElements) => {
+        const normalizeText = (value: string | null | undefined): string =>
+          String(value ?? '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const isVisible = (element: Element): boolean => {
+          const computedStyle = window.getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+
+          return (
+            computedStyle.display !== 'none' &&
+            computedStyle.visibility !== 'hidden' &&
+            rect.width > 0 &&
+            rect.height > 0
           );
+        };
 
-          if (visibleChildOrderNumbers.length > 0) {
-            return visibleChildOrderNumbers;
-          }
-        }
+        return [
+          ...new Set(
+            buttonElements
+              .filter(isVisible)
+              .map((buttonElement) => {
+                const visibleOrderNumber = normalizeText(buttonElement.textContent).match(
+                  /#\d+-\d+\b/,
+                )?.[0];
+                const targetOrderId = (
+                  buttonElement.getAttribute('data-testid') ??
+                  buttonElement.getAttribute('data-test-id') ??
+                  ''
+                ).match(/^shared-order-detail-select-target-order-(\d+)$/)?.[1];
 
-        const targetOrderButtons = this.resolveSplitTargetOrderButtons(orderDetailsDialog);
+                return (
+                  visibleOrderNumber ??
+                  (targetOrderId ? `target-order-id:${targetOrderId}` : null)
+                );
+              })
+              .filter((targetOrderNumber): targetOrderNumber is string =>
+                Boolean(targetOrderNumber),
+              ),
+          ),
+        ];
+      });
 
-        const targetOrderNumbers = await targetOrderButtons.evaluateAll((buttonElements) => {
-      const normalizeText = (value: string | null | undefined): string =>
-        String(value ?? '')
-          .replace(/\s+/g, ' ')
-          .trim();
-      const isVisible = (element: Element): boolean => {
-        const computedStyle = window.getComputedStyle(element);
-        const rect = element.getBoundingClientRect();
+      if (targetOrderNumbers.length > 0) {
+        return targetOrderNumbers;
+      }
 
-        return (
-          computedStyle.display !== 'none' &&
-          computedStyle.visibility !== 'hidden' &&
-          rect.width > 0 &&
-          rect.height > 0
-        );
-      };
+      if (!parentOrderNumber) {
+        return [];
+      }
 
-      return [...new Set(
-        buttonElements
-          .filter(isVisible)
-          .map((buttonElement) => {
-            const visibleOrderNumber = normalizeText(buttonElement.textContent).match(/#\d+-\d+\b/)?.[0];
-            const targetOrderId = (
-              buttonElement.getAttribute('data-testid') ??
-              buttonElement.getAttribute('data-test-id') ??
-              ''
-            ).match(/^shared-order-detail-select-target-order-(\d+)$/)?.[1];
+      const splitCount = await this.readVisibleSplitCount(parentOrderNumber);
+      return Array.from(
+        { length: splitCount },
+        (_, index) => `#${parentOrderNumber}-${index + 1}`,
+      );
+    };
 
-            return visibleOrderNumber ?? (targetOrderId ? `target-order-id:${targetOrderId}` : null);
-          })
-          .filter((orderNumber): orderNumber is string => Boolean(orderNumber)),
-      )];
-        });
+    if (options.requireSplitChildren === false) {
+      return await readVisibleTargetOrderNumbers();
+    }
 
-        if (targetOrderNumbers.length > 0) {
-          return targetOrderNumbers;
-        }
-
-        if (!parentOrderNumber) {
-          return [];
-        }
-
-        const splitCount = await this.readVisibleSplitCount(parentOrderNumber);
-
-        return Array.from(
-          { length: splitCount },
-          (_, index) => `#${parentOrderNumber}-${index + 1}`,
-        );
-      },
+    return await waitUntil(
+      readVisibleTargetOrderNumbers,
       (targetOrderNumbers) => targetOrderNumbers.length >= 2,
       {
         timeout: 10_000,

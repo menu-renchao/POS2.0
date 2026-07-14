@@ -37,6 +37,10 @@ export type RecallVoidOptions = {
   restoreInventory?: boolean;
 };
 
+export type RecallPersistedOrderCleanupOptions = RecallVoidOptions & {
+  requireSplitChildren: boolean;
+};
+
 export class RecallFlow {
   @step('业务步骤：从首页进入 Recall 页面')
   async openRecallFromHome(homePage: HomePage): Promise<RecallPage> {
@@ -489,32 +493,48 @@ export class RecallFlow {
     return await recallPage.attemptVoidCurrentOrder(options);
   }
 
-  @step((_: RecallPage, orderNumber: string) => `业务步骤：从 Recall 作废订单 ${orderNumber}`)
-  async voidOrder(
+  @step(
+    (_: RecallPage, orderNumber: string, targetOrderNumbers: string[]) =>
+      `业务步骤：从 Recall 作废分单 ${orderNumber} 的 ${targetOrderNumbers.length} 个子单`,
+  )
+  private async voidSplitChildren(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumbers: string[],
+    options: RecallVoidOptions = {},
+  ): Promise<void> {
+    await recallPage.expectLoaded();
+    if (targetOrderNumbers.length < 2) {
+      throw new Error(`分单 ${orderNumber} 清理时未读取到至少两个子单。`);
+    }
+
+    for (const targetOrderNumber of targetOrderNumbers) {
+      await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+      await recallPage.voidCurrentOrder(options);
+    }
+  }
+
+  @step((_: RecallPage, orderNumber: string) => `业务步骤：从 Recall 作废未分单母单 ${orderNumber}`)
+  private async voidUnsplitOrder(
     recallPage: RecallPage,
     orderNumber: string,
     options: RecallVoidOptions = {},
   ): Promise<void> {
     await recallPage.expectLoaded();
     await recallPage.openOrderDetails(orderNumber);
-    const targetOrderNumbers = await recallPage
-      .readTargetOrderNumbers(orderNumber)
-      .catch(() => []);
-
-    if (targetOrderNumbers.length > 0) {
-      for (const targetOrderNumber of targetOrderNumbers) {
-        await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-        await recallPage.voidCurrentOrder(options);
-      }
-      return;
-    }
-
     await recallPage.voidCurrentOrder(options);
   }
 
   @step(
-    (_: RecallPage, orderNumber: string) =>
-      `业务步骤：尽量提交分单并按母单号 ${orderNumber} 作废本用例订单`,
+    (
+      _homePage: HomePage,
+      _recallPage: RecallPage,
+      orderNumber: string,
+      _pendingSplitOrderPage: SplitOrderPage | undefined,
+      _returnedPage: SplitOrderReturnPage | undefined,
+      options: RecallPersistedOrderCleanupOptions,
+    ) =>
+      `业务步骤：按${options.requireSplitChildren ? '已持久化子单' : '允许折回母单'}结构清理订单 ${orderNumber}`,
   )
   async cleanupPersistedSplitOrder(
     homePage: HomePage,
@@ -522,7 +542,7 @@ export class RecallFlow {
     orderNumber: string,
     pendingSplitOrderPage: SplitOrderPage | undefined,
     returnedPage: SplitOrderReturnPage | undefined,
-    options: RecallVoidOptions = {},
+    options: RecallPersistedOrderCleanupOptions,
   ): Promise<void> {
     let cleanupReturnPage = returnedPage;
 
@@ -538,16 +558,22 @@ export class RecallFlow {
       : await this.enterRecallFromSplitReturnPage(recallPage, homePage);
     await cleanupRecallPage.expectLoaded();
     await cleanupRecallPage.openOrderDetails(orderNumber);
-    const targetOrderNumbers = await cleanupRecallPage
-      .readTargetOrderNumbers(orderNumber)
-      .catch(() => []);
+    const targetOrderNumbers = await cleanupRecallPage.readTargetOrderNumbers(orderNumber, {
+      requireSplitChildren: options.requireSplitChildren,
+    });
 
     if (targetOrderNumbers.length > 0) {
       await cleanupRecallPage.openOrderDetails(orderNumber, targetOrderNumbers[0]);
     }
 
     await cleanupRecallPage.clickClearTableInMoreMenu();
-    await this.voidOrder(cleanupRecallPage, orderNumber, options);
+
+    if (targetOrderNumbers.length > 0) {
+      await this.voidSplitChildren(cleanupRecallPage, orderNumber, targetOrderNumbers, options);
+      return;
+    }
+
+    await this.voidUnsplitOrder(cleanupRecallPage, orderNumber, options);
   }
 
   @step('业务步骤：从分单提交返回页进入 Recall')

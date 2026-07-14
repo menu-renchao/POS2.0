@@ -107,7 +107,7 @@ export class OrderDishesMenuSection {
     @step((groupName: string) => `页面操作：切换菜单组 ${groupName}`)
     async switchMenuGroup(groupName: string): Promise<void> {
       await this.host.expectLoaded();
-      await (await this.resolveMenuGroupCard(groupName)).click();
+      await this.locators.menuGroupCard(groupName).click();
       await expect(this.locators.selectedMenuGroupName).toHaveText(groupName);
     }
 
@@ -649,21 +649,6 @@ export class OrderDishesMenuSection {
       }
 
       throw new Error(`Unable to find dish button: ${dishName}.`);
-    }
-
-    private async resolveMenuGroupCard(groupName: string): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.menuGroupCards
-            .filter({
-              hasText: new RegExp(this.ctx.escapeRegExp(groupName)),
-            })
-            .first(),
-          this.locators.appFrame.getByRole('button', { name: groupName, exact: true }).first(),
-          this.page.getByRole('button', { name: groupName, exact: true }).first(),
-        ],
-        `Unable to find menu group: ${groupName}.`,
-      );
     }
 
     private async resolveMenuCategoryCard(categoryName: string): Promise<Locator> {
