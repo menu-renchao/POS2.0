@@ -120,12 +120,12 @@ export class RecallOrderDetailsDialog {
       .locator('[role="dialog"][data-testid="pos-ui-modal"]:visible')
       .last();
     this.splitTargetOrderCards = this.page.locator(
-      '[data-test-id^="shared-order-detail-select-target-order-"]',
+      'div[role="button"][data-test-id^="shared-order-detail-select-target-order-"]',
     );
     this.splitTargetOrderCardById = (targetOrderId: string) =>
       this.page
         .locator(
-          `[data-test-id="shared-order-detail-select-target-order-${targetOrderId}"]`,
+          `div[role="button"][data-test-id="shared-order-detail-select-target-order-${targetOrderId}"]`,
         )
         .first();
     this.splitTargetOrderCardByNumber = (targetOrderNumber: string) =>
@@ -209,15 +209,7 @@ export class RecallOrderDetailsDialog {
     await this.closeOrderDetailsDialog();
     await this.clickVisibleOrderNumber(normalizedOrderNumber);
     await this.waitForOrderDetailsDialogReady();
-    await waitUntil(
-      async () => await this.isActiveOrderDetailsHeader(normalizedOrderNumber, true),
-      (isExpectedOrderVisible) => isExpectedOrderVisible,
-      {
-        timeout: 10_000,
-        interval: 100,
-        message: `Recall 订单 ${normalizedOrderNumber} 的详情标题未在点击后显示。`,
-      },
-    );
+    await this.waitForParentOrderDetailsReady(normalizedOrderNumber);
     await this.selectSplitTargetOrderIfNeeded(targetOrderNumber);
   }
 
@@ -1953,103 +1945,160 @@ export class RecallOrderDetailsDialog {
     const splitTargetOrderId = decodeSplitTargetReference(targetOrderNumber);
     const splitOrderNumberText =
       !splitTargetOrderId ? normalizeOrderNumber(targetOrderNumber) : null;
+    let splitOrderTargetCard: Locator;
 
-    if (
-      splitOrderNumberText &&
-      (await this.isActiveOrderDetailsHeader(splitOrderNumberText))
-    ) {
+    if (splitTargetOrderId) {
+      splitOrderTargetCard = await this.resolveSplitOrderTargetButton(splitTargetOrderId);
+    } else if (splitOrderNumberText) {
+      splitOrderTargetCard = await this.resolveSplitOrderTargetLabel(splitOrderNumberText);
+    } else {
+      throw new Error(`Recall 子单引用无效：${targetOrderNumber}`);
+    }
+
+    await expect(splitOrderTargetCard).toBeVisible({ timeout: 10_000 });
+    const expectedChildOrderNumber =
+      splitOrderNumberText ?? (await this.readSplitTargetOrderNumber(splitOrderTargetCard));
+
+    if (await this.isTopmostChildOrderDetailsReady(expectedChildOrderNumber)) {
       return;
     }
 
-    const splitOrderTargetLabel = splitOrderNumberText
-      ? await this.resolveSplitOrderTargetLabel(splitOrderNumberText)
-      : splitTargetOrderId
-        ? await this.resolveSplitOrderTargetButton(splitTargetOrderId)
-        : this.splitTargetOrderCardByNumber(normalizeOrderNumber(targetOrderNumber));
-
-    await expect(splitOrderTargetLabel).toBeVisible({ timeout: 10_000 });
-
     const visibleDialogCount = await this.readVisibleOrderDialogCount();
-    await splitOrderTargetLabel.evaluate((targetLabelElement) => {
-      const clickableElement =
-        targetLabelElement.closest<HTMLElement>('button, [role="button"]') ??
-        (targetLabelElement as HTMLElement);
-      clickableElement.click();
-    });
-    if (splitOrderNumberText) {
-      await waitUntil(
-        async () => await this.isActiveOrderDetailsHeader(splitOrderNumberText),
-        (isTargetOrderVisible) => isTargetOrderVisible,
-        {
-          timeout: 5_000,
-          message: `Recall 子单 ${splitOrderNumberText} 未在点击后打开。`,
-        },
-      );
-    } else if (splitTargetOrderId) {
-      await this.waitForOrderDetailsDialogReady();
-    } else {
-      await this.waitForVisibleOrderDialogCount(visibleDialogCount + 1);
-    }
-    await this.waitForOrderDetailsDialogReady();
+    await splitOrderTargetCard.click();
+    await this.waitForVisibleOrderDialogCount(visibleDialogCount + 1);
+    await this.waitForTopmostChildOrderDetailsReady(expectedChildOrderNumber);
+    await this.waitForGlobalLoadingOverlayHidden();
   }
 
-  private async isActiveOrderDetailsHeader(
-    orderNumber: string,
-    allowSplitOverview = false,
-  ): Promise<boolean> {
-    const visibleOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
-    const visibleDialogCount = await this.readVisibleOrderDialogCount();
+  private async readSplitTargetOrderNumber(splitTargetOrderCard: Locator): Promise<string> {
+    const orderNumberText = (
+      await splitTargetOrderCard.getByText(/^#\d+-\d+$/, { exact: true }).first().textContent()
+    )?.trim();
 
-    for (let index = 0; index < visibleDialogCount; index += 1) {
-      const candidate = this.visibleOrderDetailsDialogs.nth(index);
-      const isTargetDetailsDialog = await candidate.evaluate((dialogElement, expectedDialog) => {
-        const cleanText = (value: string | null | undefined): string =>
-          String(value ?? '')
-            .replace(/\s+/g, ' ')
-            .trim();
-        const visibleElements = Array.from(dialogElement.querySelectorAll<HTMLElement>('*')).filter(
-          (element) => {
-            const computedStyle = window.getComputedStyle(element);
-            const rect = element.getBoundingClientRect();
-
-            return (
-              computedStyle.display !== 'none' &&
-              computedStyle.visibility !== 'hidden' &&
-              rect.width > 0 &&
-              rect.height > 0
-            );
-          },
-        );
-        const hasTargetOrderNumber = visibleElements.some((element) => {
-          const elementText = cleanText(element.textContent);
-
-          return (
-            elementText === expectedDialog.targetOrderNumber ||
-            (elementText.startsWith(`${expectedDialog.targetOrderNumber}(`) &&
-              /^\(\d+\)$/.test(elementText.slice(expectedDialog.targetOrderNumber.length)))
-          );
-        });
-        const actionButtonTexts = Array.from(
-          dialogElement.querySelectorAll<HTMLButtonElement>('button'),
-          (buttonElement) => cleanText(buttonElement.textContent),
-        );
-        const hasDetailsAction = actionButtonTexts.some((buttonText) =>
-          /^(Edit|Pay|Reopen|MoreIcon More|More)$/i.test(buttonText),
-        );
-        const hasSplitOverviewActions =
-          expectedDialog.allowSplitOverview &&
-          actionButtonTexts.includes('Split') &&
-          actionButtonTexts.includes('Print');
-
-        return hasTargetOrderNumber && (hasDetailsAction || hasSplitOverviewActions);
-      }, { targetOrderNumber: visibleOrderNumber, allowSplitOverview });
-
-      if (isTargetDetailsDialog) {
-        return true;
-      }
+    if (!orderNumberText || !/^#\d+-\d+$/.test(orderNumberText)) {
+      throw new Error('Recall 子单目标卡未展示合法的 #N-M 子单号。');
     }
 
-    return false;
+    return orderNumberText;
+  }
+
+  private async isTopmostChildOrderDetailsReady(orderNumber: string): Promise<boolean> {
+    if ((await this.readVisibleOrderDialogCount()) === 0) {
+      return false;
+    }
+
+    const visibleOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
+    const topmostOrderDetailsDialog = this.visibleOrderDetailsDialogs.last();
+
+    return await topmostOrderDetailsDialog.evaluate((dialogElement, expectedOrderNumber) => {
+      const normalizeText = (value: string | null | undefined): string =>
+        String(value ?? '').replace(/\s+/g, ' ').trim();
+      const hasExactTitle = Array.from(dialogElement.querySelectorAll('div > span')).some(
+        (titleElement) => normalizeText(titleElement.textContent) === expectedOrderNumber,
+      );
+      const hasEditAction = Boolean(
+        dialogElement.querySelector(
+          'button[data-test-id="shared-order-detail-side-action-editod"]',
+        ),
+      );
+
+      return hasExactTitle && hasEditAction;
+    }, visibleOrderNumber);
+  }
+
+  private async waitForTopmostChildOrderDetailsReady(orderNumber: string): Promise<void> {
+    await waitUntil(
+      async () => await this.isTopmostChildOrderDetailsReady(orderNumber),
+      (isReady) => isReady,
+      {
+        timeout: 10_000,
+        interval: 100,
+        message: `Recall 子单 ${orderNumber} 的顶层详情未在点击目标卡后显示。`,
+      },
+    );
+  }
+
+  private async waitForParentOrderDetailsReady(orderNumber: string): Promise<void> {
+    const visibleOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
+
+    await waitUntil(
+      async () => {
+        const visibleDialogCount = await this.readVisibleOrderDialogCount();
+
+        if (visibleDialogCount === 0) {
+          return {
+            visibleDialogCount,
+            standardTitleVisible: false,
+            editActionVisible: false,
+            splitOverviewTitleVisible: false,
+            splitOverviewActionVisible: false,
+            splitOverviewPrintVisible: false,
+          };
+        }
+
+        const topmostOrderDetailsDialog = this.visibleOrderDetailsDialogs.last();
+        const contract = await topmostOrderDetailsDialog.evaluate(
+          (dialogElement, expectedOrderNumber) => {
+            const normalizeText = (value: string | null | undefined): string =>
+              String(value ?? '').replace(/\s+/g, ' ').trim();
+            const standardTitleVisible = Array.from(
+              dialogElement.querySelectorAll('div > span'),
+            ).some(
+              (titleElement) => normalizeText(titleElement.textContent) === expectedOrderNumber,
+            );
+            const editActionVisible = Boolean(
+              dialogElement.querySelector(
+                'button[data-test-id="shared-order-detail-side-action-editod"]',
+              ),
+            );
+            const splitOverviewTitleVisible = Array.from(
+              dialogElement.querySelectorAll('h3'),
+            ).some((headingElement) => {
+              const headingText = normalizeText(headingElement.textContent);
+
+              return (
+                headingText.startsWith(`${expectedOrderNumber}(`) &&
+                /^\(\d+\)$/.test(headingText.slice(expectedOrderNumber.length))
+              );
+            });
+            const splitOverviewActionVisible = Boolean(
+              dialogElement.querySelector(
+                'button[data-test-id="shared-order-detail-select-target-split"]',
+              ),
+            );
+            const splitOverviewPrintVisible = Boolean(
+              dialogElement.querySelector(
+                'button[data-test-id="shared-order-detail-select-target-print-with-printer"]',
+              ),
+            );
+
+            return {
+              standardTitleVisible,
+              editActionVisible,
+              splitOverviewTitleVisible,
+              splitOverviewActionVisible,
+              splitOverviewPrintVisible,
+            };
+          },
+          visibleOrderNumber,
+        );
+
+        return {
+          visibleDialogCount,
+          ...contract,
+        };
+      },
+      (state) =>
+        (state.standardTitleVisible && state.editActionVisible) ||
+        (state.splitOverviewTitleVisible &&
+          state.splitOverviewActionVisible &&
+          state.splitOverviewPrintVisible),
+      {
+        timeout: 10_000,
+        interval: 100,
+        message: `Recall 订单 ${visibleOrderNumber} 的严格详情标题与动作区未显示。`,
+      },
+    );
   }
 
   private async resolveSplitOrderTargetButton(splitTargetOrderId: string): Promise<Locator> {
