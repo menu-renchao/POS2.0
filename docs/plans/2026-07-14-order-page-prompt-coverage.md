@@ -19,6 +19,78 @@
 
 Tasks 2～5 已完成状态分类和逐行录制证据定义；Task 6 已按全矩阵顺序为所有 `需要录制` 行生成正式录制编号与一对一录制条目。
 
+## 批次 0 验证
+
+- 执行日期：`2026-07-14`
+- 矩阵基线：66 行，编号 1～66 无缺口，状态值全部合法；状态汇总为 `4/5/10/47/0/0`（已等价覆盖/待补断言/可直接实现/需要录制/产品异常/环境阻塞）。
+- 证据完整性：已等价覆盖但无 spec 行号证据 `0`，需要录制但无录制编号 `0`，含模糊“环境不可用”阻塞 `0`。
+- 录制映射：矩阵中 47 个唯一录制编号与 `docs/playwright-recordings-needed.md` 的 47 个唯一条目双向完全一致，缺失 `0`，额外 `0`。
+- 提示词重复性：点单页面源文件 66 条正文完全重复组 `0`；对点单页面 66 条与点单操作 95 条正文统一换行、去首尾空白、合并连续空白并转小写后，文件内重复组均为 `0`，跨文件重复正文为 `0`。
+
+### 矩阵行数、编号与状态集合
+
+```powershell
+$matrix = Get-Content -Raw -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8
+$rows = [regex]::Matches($matrix, '(?m)^\| (?<n>\d+) \| (?:(?:POS-\d+)(?:,\s*POS-\d+)*|—) \|(?<body>.+)$')
+$numbers = @($rows | ForEach-Object { [int]$_.Groups['n'].Value })
+$allowed = '已等价覆盖|待补断言|可直接实现|需要录制|产品异常|环境阻塞'
+$invalid = @($rows | Where-Object { $_.Groups['body'].Value -notmatch "\| ($allowed) \|" })
+[pscustomobject]@{
+  Rows = $rows.Count
+  NumberingIssues = @(Compare-Object (1..66) $numbers).Count
+  InvalidStatuses = $invalid.Count
+}
+```
+
+退出码 `0`；观测结果：`Rows=66`、`NumberingIssues=0`、`InvalidStatuses=0`。
+
+### 状态证据完整性
+
+```powershell
+$rows = Get-Content -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8 | Where-Object { $_ -match '^\| (?<n>\d+) \| (?:(?:POS-\d+)(?:,\s*POS-\d+)*|—) \|' }
+$invalidCovered = @($rows | Where-Object { $_ -match '\| 已等价覆盖 \|' -and $_ -notmatch 'tests/py-migrate/.+\.spec\.ts:\d+' })
+$invalidRecording = @($rows | Where-Object { $_ -match '\| 需要录制 \|' -and $_ -notmatch 'ORDER-PAGE-\d{3}' })
+$vagueEnvironment = @($rows | Where-Object { $_ -match '\| 环境阻塞 \|' -and $_ -match '环境不可用' })
+[pscustomobject]@{
+  CoveredWithoutSpecEvidence = $invalidCovered.Count
+  RecordingWithoutId = $invalidRecording.Count
+  VagueEnvironmentBlockers = $vagueEnvironment.Count
+}
+```
+
+退出码 `0`；观测结果：`CoveredWithoutSpecEvidence=0`、`RecordingWithoutId=0`、`VagueEnvironmentBlockers=0`。
+
+### 提示词完全重复正文
+
+```powershell
+$raw = Get-Content -Raw -LiteralPath 'C:\Users\nhqrt\Desktop\test_order_page_playwright_prompts.md' -Encoding UTF8
+$cases = [regex]::Matches($raw, '(?ms)^## (?<n>\d+)\. (?<title>.+?)\r?\n(?<body>.*?)(?=^## \d+\. |\z)')
+$duplicates = @($cases | Group-Object { $_.Groups['body'].Value } | Where-Object Count -gt 1)
+[pscustomobject]@{ Cases = $cases.Count; ExactDuplicateGroups = $duplicates.Count }
+```
+
+退出码 `0`；观测结果：`Cases=66`、`ExactDuplicateGroups=0`。
+
+### 仓库静态验证
+
+```powershell
+npx tsc --noEmit
+```
+
+Windows 上实际以 `npx.cmd tsc --noEmit` 执行；退出码 `0`，无 TypeScript 错误。
+
+```powershell
+git diff --check
+```
+
+退出码 `0`，无空白错误。
+
+### 后续批次入口
+
+- 唯一范围入口为本矩阵 66 行；后续实现按矩阵编号追踪状态与证据。
+- 无需新录制即可进入业务实现的范围为 5 条 `待补断言` 与 10 条 `可直接实现`；4 条 `已等价覆盖` 作为回归基线。
+- 47 条 `需要录制` 仅通过矩阵中的 `ORDER-PAGE-001`～`ORDER-PAGE-047` 进入 `docs/playwright-recordings-needed.md` 获取录制要求，录制返回后先回写本矩阵再进入实现批次。
+
 ## 汇总
 
 | 已等价覆盖 | 待补断言 | 可直接实现 | 需要录制 | 产品异常 | 环境阻塞 | 总数 |
