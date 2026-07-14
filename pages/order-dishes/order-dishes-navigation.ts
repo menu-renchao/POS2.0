@@ -78,7 +78,9 @@ export class OrderDishesPageNavigation {
       }
 
       await this.dismissPostSaveDialogsIfNeeded();
-      return { homePage: new HomePage(this.page), orderNumber: orderNumber.trim() };
+      const homePage = new HomePage(this.page);
+      await homePage.expectEmployeeReady();
+      return { homePage, orderNumber: orderNumber.trim() };
     }
 
     @step('页面操作：点击 Send 送厨订单')
