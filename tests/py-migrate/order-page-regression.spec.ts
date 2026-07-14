@@ -57,8 +57,26 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
           (item) => item.name === orderServiceDishes.regular.name,
         );
 
-        expect(after?.name).toBe(before?.name);
-        expect(after?.price).toBe(before?.price);
+        expect(before, '点单页应读取到目标菜品').toBeDefined();
+        expect(after, 'Recall 应读取到目标菜品').toBeDefined();
+
+        if (!before || !after) {
+          throw new Error('点单页和 Recall 均应读取到目标菜品。');
+        }
+
+        expect(after.name).toBe(before.name);
+        expect(before.price, '点单页目标菜品应包含价格').not.toBeNull();
+        expect(after.price, 'Recall 目标菜品应包含价格').not.toBeNull();
+
+        if (before.price === null || after.price === null) {
+          throw new Error('点单页和 Recall 的目标菜品均应包含价格。');
+        }
+
+        const beforePrice = Number(before.price.replace(/[$,]/g, ''));
+        const afterPrice = Number(after.price.replace(/[$,]/g, ''));
+        expect(Number.isFinite(beforePrice), '点单页目标菜品价格应为有效金额').toBe(true);
+        expect(Number.isFinite(afterPrice), 'Recall 目标菜品价格应为有效金额').toBe(true);
+        expect(toCents(afterPrice)).toBe(toCents(beforePrice));
       });
     },
   );
