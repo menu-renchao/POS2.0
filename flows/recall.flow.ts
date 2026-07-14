@@ -5,7 +5,7 @@ import {
 import { HomePage } from '../pages/home.page';
 import { OrderDishesPage } from '../pages/order-dishes.page';
 import { PaymentPage } from '../pages/payment.page';
-import { SplitOrderPage } from '../pages/split-order.page';
+import { type SplitOrderReturnPage, SplitOrderPage } from '../pages/split-order.page';
 import {
   type RecallManualSearchTag,
   type RecallOrderStatus,
@@ -487,6 +487,89 @@ export class RecallFlow {
     await recallPage.expectLoaded();
     await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
     return await recallPage.attemptVoidCurrentOrder(options);
+  }
+
+  @step((_: RecallPage, orderNumber: string) => `业务步骤：从 Recall 作废订单 ${orderNumber}`)
+  async voidOrder(
+    recallPage: RecallPage,
+    orderNumber: string,
+    options: RecallVoidOptions = {},
+  ): Promise<void> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber);
+    const targetOrderNumbers = await recallPage
+      .readTargetOrderNumbers(orderNumber)
+      .catch(() => []);
+
+    if (targetOrderNumbers.length > 0) {
+      for (const targetOrderNumber of targetOrderNumbers) {
+        await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+        await recallPage.voidCurrentOrder(options);
+      }
+      return;
+    }
+
+    await recallPage.voidCurrentOrder(options);
+  }
+
+  @step(
+    (_: RecallPage, orderNumber: string) =>
+      `业务步骤：尽量提交分单并按母单号 ${orderNumber} 作废本用例订单`,
+  )
+  async cleanupPersistedSplitOrder(
+    homePage: HomePage,
+    recallPage: RecallPage,
+    orderNumber: string,
+    pendingSplitOrderPage: SplitOrderPage | undefined,
+    returnedPage: SplitOrderReturnPage | undefined,
+    options: RecallVoidOptions = {},
+  ): Promise<void> {
+    let cleanupReturnPage = returnedPage;
+
+    if (pendingSplitOrderPage) {
+      cleanupReturnPage = await pendingSplitOrderPage.submitAndReturnPage().catch(async () => {
+        await pendingSplitOrderPage.clickCancelSplit().catch(() => undefined);
+        return await pendingSplitOrderPage.submitAndReturnPage().catch(() => undefined);
+      });
+    }
+
+    const cleanupRecallPage = cleanupReturnPage
+      ? await this.enterRecallFromSplitReturnPage(cleanupReturnPage, homePage)
+      : await this.enterRecallFromSplitReturnPage(recallPage, homePage);
+    await cleanupRecallPage.expectLoaded();
+    await cleanupRecallPage.openOrderDetails(orderNumber);
+    const targetOrderNumbers = await cleanupRecallPage
+      .readTargetOrderNumbers(orderNumber)
+      .catch(() => []);
+
+    if (targetOrderNumbers.length > 0) {
+      await cleanupRecallPage.openOrderDetails(orderNumber, targetOrderNumbers[0]);
+    }
+
+    await cleanupRecallPage.clickClearTableInMoreMenu();
+    await this.voidOrder(cleanupRecallPage, orderNumber, options);
+  }
+
+  @step('业务步骤：从分单提交返回页进入 Recall')
+  private async enterRecallFromSplitReturnPage(
+    returnedPage: SplitOrderReturnPage,
+    homePage: HomePage,
+  ): Promise<RecallPage> {
+    try {
+      if (returnedPage instanceof RecallPage) {
+        await returnedPage.expectLoaded();
+        return returnedPage;
+      }
+
+      if (returnedPage instanceof OrderDishesPage) {
+        return await returnedPage.clickRecall();
+      }
+
+      return await returnedPage.enterRecall();
+    } catch {
+      await homePage.expectPrimaryFunctionCardsVisible();
+      return await homePage.enterRecall();
+    }
   }
 
   @step('业务步骤：对当前 Recall 订单详情中的所有正向支付流水发起退款')

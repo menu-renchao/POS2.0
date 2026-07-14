@@ -56,6 +56,7 @@ export type RecallOrderDetailsMoreAction =
   | 'tips'
   | 'paging'
   | 'callOff'
+  | 'clearTable'
   | 'copy'
   | 'void'
   | 'sort';

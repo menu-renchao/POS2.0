@@ -1,6 +1,7 @@
 import { type DeliveryOrderParams, type PickUpOrderParams } from '../flows/takeout.flow';
 
 export const orderServiceMenu = {
+  alternateGroup: 'Group 001',
   category: '全类型类',
   group: '自动化菜单组',
 } as const;

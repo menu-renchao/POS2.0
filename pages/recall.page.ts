@@ -392,6 +392,11 @@ export class RecallPage {
     return this.orderDetails.clickCallOffInMoreMenu();
   }
 
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Clear Table 按钮')
+  async clickClearTableInMoreMenu(): Promise<void> {
+    return this.orderDetails.clickClearTableInMoreMenu();
+  }
+
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Copy 按钮')
   async clickCopyInMoreMenu(): Promise<void> {
     return this.orderDetails.clickCopyInMoreMenu();

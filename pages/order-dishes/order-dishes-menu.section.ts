@@ -108,6 +108,7 @@ export class OrderDishesMenuSection {
     async switchMenuGroup(groupName: string): Promise<void> {
       await this.host.expectLoaded();
       await (await this.resolveMenuGroupCard(groupName)).click();
+      await expect(this.locators.selectedMenuGroupName).toHaveText(groupName);
     }
 
     @step((categoryName: string) => `页面操作：切换菜单类别 ${categoryName}`)

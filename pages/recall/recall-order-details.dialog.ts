@@ -55,6 +55,7 @@ const recallOrderDetailsMoreActionNames = {
   tips: 'Tips',
   paging: 'Paging',
   callOff: 'Call Off',
+  clearTable: 'Clear Table',
   copy: 'Copy',
   void: 'Void',
   sort: 'Sort',
@@ -676,6 +677,13 @@ export class RecallOrderDetailsDialog {
     await this.clickOrderDetailsMoreMenuAction('callOff');
   }
 
+  @step('页面操作：点击 Recall 订单详情 More 菜单中的 Clear Table 按钮')
+  async clickClearTableInMoreMenu(): Promise<void> {
+    const clearedOrderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
+    await this.clickOrderDetailsMoreMenuAction('clearTable');
+    await expect(clearedOrderDetailsDialog).toBeHidden({ timeout: 15_000 });
+  }
+
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Copy 按钮')
   async clickCopyInMoreMenu(): Promise<void> {
     await this.clickOrderDetailsMoreMenuAction('copy');
@@ -707,24 +715,13 @@ export class RecallOrderDetailsDialog {
       return;
     }
 
+    await this.waitForGlobalLoadingOverlayHidden();
+    await this.clickOrderDetailsPriceSummaryHeaderRow();
+
     await waitUntil(
-      async () => {
-        await this.waitForGlobalLoadingOverlayHidden();
-
-        if (
-          (await this.isOrderDetailsPriceSummaryExpanded()) ||
-          (await this.isOrderDetailsPriceSummaryReadableWithoutSubtotal())
-        ) {
-          return true;
-        }
-
-        await this.clickOrderDetailsPriceSummaryHeaderRow();
-
-        return (
-          (await this.isOrderDetailsPriceSummaryExpanded()) ||
-          (await this.isOrderDetailsPriceSummaryReadableWithoutSubtotal())
-        );
-      },
+      async () =>
+        (await this.isOrderDetailsPriceSummaryExpanded()) ||
+        (await this.isOrderDetailsPriceSummaryReadableWithoutSubtotal()),
       (expanded) => expanded,
       {
         timeout: 10_000,

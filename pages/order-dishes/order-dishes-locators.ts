@@ -173,7 +173,11 @@ export class OrderDishesLocators {
     this.menuGroupCards = scoped(
       '[data-testid^="menu-group-card-"], [data-test-id^="menu-group-card-"]',
     );
-    this.selectedMenuGroupName = this.page.locator('#grplist .grplistbtAct .grplistbtText');
+    this.selectedMenuGroupName = this.page
+      .locator(
+        '[data-testid^="menu-group-card-"][class*="_selected_"], [data-test-id^="menu-group-card-"][class*="_selected_"]',
+      )
+      .first();
     this.menuCategoryCards = scoped(
       '[data-testid^="menu-category-card-"], [data-test-id^="menu-category-card-"]',
     );
