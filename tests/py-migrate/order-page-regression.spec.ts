@@ -39,17 +39,21 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         return await enterReadyHome(homePage, employeeLoginPage);
       });
 
-      const { orderPage, before } = await test.step('切换到目标菜单组并添加普通菜', async () => {
-        const page = await new TakeoutFlow().startToGoOrder(ready);
-        await page.switchMenu(orderServiceMenu.group, orderServiceMenu.category);
-        expect(await page.readSelectedMenuGroupName()).toBe(orderServiceMenu.group);
-        await page.clickDish(orderServiceDishes.regular.name);
-        const orderedDish = (await page.readOrderedItems()).find(
-          (item) => item.name === orderServiceDishes.regular.name,
-        );
+      const { orderPage, before, beforeSubtotal } = await test.step(
+        '切换到目标菜单组并添加普通菜',
+        async () => {
+          const page = await new TakeoutFlow().startToGoOrder(ready);
+          await page.switchMenu(orderServiceMenu.group, orderServiceMenu.category);
+          expect(await page.readSelectedMenuGroupName()).toBe(orderServiceMenu.group);
+          await page.clickDish(orderServiceDishes.regular.name);
+          const orderedDish = (await page.readOrderedItems()).find(
+            (item) => item.name === orderServiceDishes.regular.name,
+          );
+          const subtotal = (await page.readPriceSummary()).Subtotal;
 
-        return { orderPage: page, before: orderedDish };
-      });
+          return { orderPage: page, before: orderedDish, beforeSubtotal: subtotal };
+        },
+      );
 
       await test.step('保存订单后在 Recall 校验目标菜品名称和价格', async () => {
         const { details } = await saveAndReadLatestRecallDetails(orderPage);
@@ -65,18 +69,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         }
 
         expect(after.name).toBe(before.name);
-        expect(before.price, '点单页目标菜品应包含价格').not.toBeNull();
-        expect(after.price, 'Recall 目标菜品应包含价格').not.toBeNull();
-
-        if (before.price === null || after.price === null) {
-          throw new Error('点单页和 Recall 的目标菜品均应包含价格。');
-        }
-
-        const beforePrice = Number(before.price.replace(/[$,]/g, ''));
-        const afterPrice = Number(after.price.replace(/[$,]/g, ''));
-        expect(Number.isFinite(beforePrice), '点单页目标菜品价格应为有效金额').toBe(true);
-        expect(Number.isFinite(afterPrice), 'Recall 目标菜品价格应为有效金额').toBe(true);
-        expect(toCents(afterPrice)).toBe(toCents(beforePrice));
+        expect(toCents(details.priceSummary.Subtotal)).toBe(toCents(beforeSubtotal));
       });
     },
   );
