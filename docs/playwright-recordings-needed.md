@@ -59,7 +59,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 
 ## 点单页面提示词待补充
 
-以下 47 条需求与点单页面提示词覆盖矩阵严格一一对应，编号按原提示词编号升序分配。
+以下 48 条需求与点单页面提示词覆盖矩阵严格一一对应，编号按原提示词编号升序分配。
 
 录制提交格式统一沿用本文档顶部“提交格式”，不在各条目中重复。
 
@@ -89,7 +89,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 
 ### ORDER-PAGE-003：提示词 4 Seperate the same dishes开关开启，订单送厨后编辑页面，选择菜品，点击加1，存单后检查订单上的税率正确
 
-- Jira：无。
+- Jira：`POS-30543`。
 - 已知前置：Separate same dishes 原配置值及更新/恢复权限、堂食无桌订单、目标普通菜及其税配置、可用送厨链路；录制前保存开关原值，结束后恢复并刷新 POS。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页前置开启 Separate same dishes 并刷新 POS，进入堂食无桌订单连续添加目标菜、读取税额 `$1.20`、送厨/保存，Recall 打开同一订单进入真实编辑页，对目标菜加 1 后再保存并回查税额 `$1.80`，最后恢复开关；
@@ -101,7 +101,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 
 ### ORDER-PAGE-004：提示词 5 后台点单前确认客户信息，客户姓名必填，电话必填，点支付按钮后弹出输入电话号码和客户姓名的弹框
 
-- Jira：无。
+- Jira：`POS-42889`。
 - 已知前置：“点单前确认客户信息”、姓名必填、电话必填三个配置项的原值及更新/恢复权限、堂食无桌订单、普通菜、唯一客户姓名和有效电话；结束后恢复三个配置项并刷新 POS。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页前置开启“点单前确认客户信息”、姓名必填和电话必填，刷新后进入堂食无桌、加菜并点 Pay，分别触发缺姓名/电话提示，再填写完整信息确认进入 Payment，最后返回首页并恢复配置；
@@ -113,7 +113,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 
 ### ORDER-PAGE-005：提示词 6 没有删菜权限的用户点单后删菜，弹出权限提示框提示没有权限，输入正确的密码可正常删菜
 
-- Jira：无。
+- Jira：`POS-39750`。
 - 已知前置：一名无删菜权限员工、一名可授权删菜员工、两者可用口令和可恢复的角色权限；英文语言原状态、堂食无桌订单、普通菜、厨房送厨链路及可选 Void 原因；结束后恢复员工、权限和语言。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页退出当前员工，以无删菜权限员工口令进入，切英文后新建堂食无桌、加菜并整单送厨，Recall 打开同一订单编辑并删除菜品，断言无权限提示，输入有权限口令后保存、选择 Void 原因，再回查菜品状态并恢复员工/语言/权限；
@@ -125,7 +125,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 
 ### ORDER-PAGE-006：提示词 10 open Food 点单，不选择任何税，可以成功完成付款
 
-- Jira：无。
+- Jira：`POS-42011`。
 - 已知前置：堂食无桌订单、可录入名称与价格且允许保持无税的 Open Food、可用现金全额支付权限，以及用于 Recall 精确回查的订单号。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页进入堂食无桌，打开 Open Food，输入名称/价格并明确保持“不选择任何税”，完成现金全额付款，按保存的订单号进入 Recall 并校验订单状态 `Paid`；
@@ -137,7 +137,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 
 ### ORDER-PAGE-007：提示词 11 连续创建两个不输入姓名的pick up订单，修改其中一个食客姓名，另一个不受影响
 
-- Jira：无。
+- Jira：`POS-42943`。
 - 已知前置：两笔不填写姓名的 Pick Up 订单、普通菜、两笔独立订单号/customerId、用于第一笔订单的唯一食客姓名及客户信息编辑权限。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页连续创建两笔不填姓名的 Pick Up 并分别保存订单号，Recall 按单号打开第一笔进入客户/食客编辑，填写唯一姓名并保存，再分别回开两笔订单；
@@ -219,7 +219,19 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：缺少菜级一级/二级 option 的父子转场、选择顺序、保存 payload 和两页 additions 回显契约。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责两级菜级 option 选择/读取，`flows/order-dishes.flow.ts` 负责保存回查，`test-data/order-service.ts` 固化父子数据。
 
-### ORDER-PAGE-014：提示词 27 test_open_food_keyboard_multi_language
+### ORDER-PAGE-014：提示词 26 POS-16324 点单页点击分单后支付部分子单，查看订单信息
+
+- Jira：`POS-16324`。
+- 已知前置：可从 POS 首页进入真实桌台流程的员工上下文、可精确定位的桌台/订单和普通非套餐菜、可用分单与现金支付权限，以及可按母单号和子单号精确回查的 Recall 数据。
+- 请从 POS 首页开始录制：
+  1. 从 POS 首页进入真实桌台流程，创建并记录可精确定位的订单，添加一条可精确定位的普通非套餐菜；进入 Split，展示真实 drag source 和新子单 drop target，以鼠标/拖拽事件把目标菜拖入新子单，读取拖拽后的菜品归属，再提交分单并保留母单号、两个子单号和 itemId；
+  2. 对其中一个子单发起结账，复用产品真实现金支付路径完成该子单付款；返回 Recall，按母/子单号分别打开两个子单，并展示源步骤 `get first order background` 对应的首条订单背景 DOM、样式及其产品含义；
+  3. 在 Recall 最终读取并保留两个子单状态：已现金支付的子单严格为 `Paid`，未支付子单严格为 `New Order`；同时确认目标菜只归属拖拽目标子单，分单提交 payload 的母子单号/itemId 与页面一致。
+- 请保留证据：源订单、桌台和普通菜的稳定业务 ID 与 DOM；drag source/drop target 的原始 `data-testid`、role、label、可见文本、边界框、鼠标轨迹及 drag/drop/pointer 事件；拖拽前后菜品归属；分单提交请求/响应中的母单号、两个子单号和 itemId；目标子单现金支付请求/响应；Recall 两个子单的 `Paid`/`New Order` 状态、首条订单背景 DOM/样式；以及影响结果的关键网络请求。
+- 当前阻塞：现有 `SplitOrderFlow.moveDishToNewSuborder` 只点击选菜后新增子单，`moveDishes` 也通过点击和接收按钮移动，均不等价于源步骤要求的真实拖拽；缺少 drag source/drop target、边界/事件、拖后归属和分单提交母子单/itemId 契约。
+- 录制返回后计划补充：`pages/split-order.page.ts`、`flows/split-order.flow.ts`、`flows/payment.flow.ts`、`pages/recall/recall-order-details.dialog.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/split-order.page.ts` 只负责真实拖拽动作和拖后归属读取，`flows/split-order.flow.ts` 负责编排分单/提交并保存母子单标识，支付继续复用 `flows/payment.flow.ts`，Recall 详情继续复用现有子单状态读取能力。
+
+### ORDER-PAGE-015：提示词 27 test_open_food_keyboard_multi_language
 
 - Jira：无。
 - 已知前置：Open Food 键盘语言/布局配置原值及更新/恢复权限、To Go 入口、可区分切换前后布局的字符与 Open Food 名称；结束后恢复配置并刷新 POS。
@@ -231,7 +243,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：读取/切换 Open Food 屏幕键盘语言布局，并用该布局按键输入区分字符。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责配置及 finally 恢复，`pages/order-dishes/order-dishes-menu.section.ts` 负责键盘语言/布局读取、真实按键输入和名称读取，`flows/order-dishes.flow.ts` 负责编排。
 
-### ORDER-PAGE-015：提示词 29 POS-30575：delivery点单，输入用户信息，进入点单页面点击info,info信息预输入的一致
+### ORDER-PAGE-016：提示词 29 POS-30575：delivery点单，输入用户信息，进入点单页面点击info,info信息预输入的一致
 
 - Jira：`POS-30575`。
 - 已知前置：Delivery 客户 name=`pos-test`、phone=`01234567890`、有效地址和备注，可进入点单页的员工上下文，以及本次 customerId/订单草稿可追踪的数据。
@@ -243,7 +255,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：点单页点击 Info 并读取客户信息弹框预填字段。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-customer.dialog.ts`、`flows/takeout.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：Delivery Page 负责首次录入，`pages/order-dishes/order-dishes-customer.dialog.ts` 负责 Info 弹框动作/读取，`flows/takeout.flow.ts` 负责编排。
 
-### ORDER-PAGE-016：提示词 30 POS-31045：选择的套餐子菜包含多个option，点单页面连续删除option正常
+### ORDER-PAGE-017：提示词 30 POS-31045：选择的套餐子菜包含多个option，点单页面连续删除option正常
 
 - Jira：`POS-31045`。
 - 已知前置：堂食无桌订单、套餐 `diy_combo1_adjustable`、同一套餐子菜上的多个可删除 option，以及可区分套餐主菜、子菜和 option 的菜单数据。
@@ -255,7 +267,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：在点单订单行连续删除套餐子菜 option。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责套餐选择与订单行 option 删除动作，`pages/order-dishes/order-dishes-reads.section.ts` 负责窄读取，`flows/order-dishes.flow.ts` 负责编排。
 
-### ORDER-PAGE-017：提示词 31 POS-30762：切换pos菜单模式后，搜索检查，默认搜索菜品 Broccoli Garlic Sauce
+### ORDER-PAGE-018：提示词 31 POS-30762：切换pos菜单模式后，搜索检查，默认搜索菜品 Broccoli Garlic Sauce
 
 - Jira：`POS-30762`。
 - 已知前置：POS/EMENU 菜单模式原值及更新/恢复权限、堂食无桌订单、POS 模式菜 `Broccoli Garlic Sauce`、EMENU 模式菜 `All you can eat item`；结束后恢复原模式并刷新 POS。
@@ -267,7 +279,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：切换 POS/EMENU 菜单模式，并在两种模式下使用真实 Search Menu 输入/结果/清空控件。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责配置及恢复，`pages/order-dishes/order-dishes-menu.section.ts` 负责单一真实搜索契约，`flows/order-dishes.flow.ts` 负责模式切换后的点单编排。
 
-### ORDER-PAGE-018：提示词 32 POS-31662：点单页面，选择菜品，点击modify，添加任意global option，点击add，新增数量成功，页面右侧继续展示modify页面
+### ORDER-PAGE-019：提示词 32 POS-31662：点单页面，选择菜品，点击modify，添加任意global option，点击add，新增数量成功，页面右侧继续展示modify页面
 
 - Jira：`POS-31662`。
 - 已知前置：堂食无桌订单、普通非套餐菜、可选 global option 和 Modify 权限；录制前确认 option 初始数量，动作结束后返回 POS 首页。
@@ -279,7 +291,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：global option 的 Add 加量及加量后面板保持。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-modifier.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-modifier.section.ts` 负责 Add/数量/面板读取，`pages/order-dishes/order-dishes-reads.section.ts` 负责订单 addition 读取，`flows/order-dishes.flow.ts` 负责编排。
 
-### ORDER-PAGE-019：提示词 33 POS-31663：点单页面，选择菜品，点击modify，添加任意global option，点击count，增加数量，新增数量成功，页面右侧继续展 示modify页面，点击count修改数量为0，点单列表不再展示该global option，页面右侧继续展示modify页面
+### ORDER-PAGE-020：提示词 33 POS-31663：点单页面，选择菜品，点击modify，添加任意global option，点击count，增加数量，新增数量成功，页面右侧继续展 示modify页面，点击count修改数量为0，点单列表不再展示该global option，页面右侧继续展示modify页面
 
 - Jira：`POS-31663`。
 - 已知前置：堂食无桌订单、普通非套餐菜、可选 global option、Count 输入权限及目标数量 `5`/`0`；动作结束后返回 POS 首页。
@@ -291,7 +303,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：global option Count 设置 5 再设置 0，并保持面板。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-modifier.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-modifier.section.ts` 负责 Count/数量/面板动作与读取，reads section 负责订单行，`flows/order-dishes.flow.ts` 负责编排。
 
-### ORDER-PAGE-020：提示词 34 POS-31664：点单页面，选择菜品，点击modify，添加任意global option，点击count，增加数量为2，页面右侧继续展示modify页 面，点击reduce，页面右侧继续展示modify页面，减少至0，点单列表不再展示该global option，页面右侧继续展示modify页面
+### ORDER-PAGE-021：提示词 34 POS-31664：点单页面，选择菜品，点击modify，添加任意global option，点击count，增加数量为2，页面右侧继续展示modify页 面，点击reduce，页面右侧继续展示modify页面，减少至0，点单列表不再展示该global option，页面右侧继续展示modify页面
 
 - Jira：`POS-31664`。
 - 已知前置：堂食无桌订单、普通非套餐菜、可选 global option、Count/Reduce 操作权限及初始目标数量 `2`；动作结束后返回 POS 首页。
@@ -303,9 +315,9 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：global option Count 设 2 后用 Reduce 逐次减到 0。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-modifier.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-modifier.section.ts` 负责 Count/Reduce/数量/面板，reads section 负责订单行，`flows/order-dishes.flow.ts` 负责编排。
 
-### ORDER-PAGE-021：提示词 35 下单页和订单详情卡片上展示用户信息
+### ORDER-PAGE-022：提示词 35 下单页和订单详情卡片上展示用户信息
 
-- Jira：无。
+- Jira：`POS-31409`。
 - 已知前置：堂食无桌订单、唯一客户姓名、普通菜、可保存回查的订单号及客户信息编辑权限；需能读取 Recall 详情卡片并从 Edit 返回点单页。
 - 请从 POS 首页开始录制：
   1. `tests/py-migrate/order.service.spec.ts:432` 的 POS-31409 候选创建 Pick Up 并只断言 Recall 详情中的客户姓名，未覆盖提示词要求的堂食、订单详情卡片和编辑后的下单页。最小录制路径：从 POS 首页创建堂食订单，通过真实客户入口录入唯一姓名并加菜保存，按订单号进入 Recall，读取订单详情卡片姓名，点击 Edit 回到点单页再次读取姓名，最后返回首页；当前缺失的准确 UI 动作是“堂食录入客户姓名，以及 Recall 卡片和编辑点单页两处读取姓名”；
@@ -315,7 +327,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：堂食录入客户姓名，以及 Recall 卡片和编辑点单页两处读取姓名。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-customer.dialog.ts`、`pages/recall/recall-reads.section.ts`、`flows/order-customer.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-customer.dialog.ts` 负责堂食录入/编辑页读取，`pages/recall/recall-reads.section.ts` 负责卡片姓名读取，`flows/order-customer.flow.ts` 负责编排保存、精确定位和编辑。
 
-### ORDER-PAGE-022：提示词 36 POS-33447：Search Menu设置关闭，进入点单页面，页面不再展示搜索输入框，页面展示无违和 POS-33456：Search Menu设置开启，recall进入订单编辑页面，页面展示搜索输入框，可正常搜索，默认搜索菜品Broccoli Garlic Sauce
+### ORDER-PAGE-023：提示词 36 POS-33447：Search Menu设置关闭，进入点单页面，页面不再展示搜索输入框，页面展示无违和 POS-33456：Search Menu设置开启，recall进入订单编辑页面，页面展示搜索输入框，可正常搜索，默认搜索菜品Broccoli Garlic Sauce
 
 - Jira：`POS-33447, POS-33456`。
 - 已知前置：Search Menu 开关原值及更新/恢复权限、堂食无桌订单、普通菜、可精确回开的订单号和搜索目标 `Broccoli Garlic Sauce`；需保留源步骤 `print` 的触发条件以确认其真实含义，结束后恢复开关并刷新 POS。
@@ -327,7 +339,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：缺少 Search Menu 开关关闭/开启、Recall 编辑页搜索框隐藏/显示和搜索的稳定契约；源步骤 `print` 未说明目标与预期，必须通过录制确认该中间动作或状态，不能静默省略。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/recall.flow.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责开关恢复，`pages/order-dishes/order-dishes-menu.section.ts` 负责搜索可见性/输入/结果，`flows/recall.flow.ts` 负责按单进入编辑，`flows/order-dishes.flow.ts` 负责两种配置状态的点单编排。
 
-### ORDER-PAGE-023：提示词 40 POS-34106 点单页面，礼品卡实体卡新增页面，手机号输入框，手机号输入正确，可新建卡成功
+### ORDER-PAGE-024：提示词 40 POS-34106 点单页面，礼品卡实体卡新增页面，手机号输入框，手机号输入正确，可新建卡成功
 
 - Jira：`POS-34106`。
 - 已知前置：可创建实体卡的礼品卡服务、唯一手机号、普通菜和具备清理权限的后台账号。
@@ -339,7 +351,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：从结账页打开实体礼品卡新增页，填写手机号并提交。
 - 录制返回后计划补充：`pages/payment.page.ts`、`flows/gift-card.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/payment.page.ts` 负责结账页礼品卡动作与读取，`flows/gift-card.flow.ts` 负责编排创建、比对和 finally 清理。
 
-### ORDER-PAGE-024：提示词 41 POS-34873 用户无Edit Order->Void Printed Item权限，删除hold的菜品（reduce删除），输入有权限的密码，可删除成功 系统中在staff中预置了用户1（非boss权限），以防与其他用户冲突
+### ORDER-PAGE-025：提示词 41 POS-34873 用户无Edit Order->Void Printed Item权限，删除hold的菜品（reduce删除），输入有权限的密码，可删除成功 系统中在staff中预置了用户1（非boss权限），以防与其他用户冲突
 
 - Jira：`POS-34873`。
 - 已知前置：两名独立员工、可恢复的角色权限、普通菜和可用厨房打印链路。
@@ -351,7 +363,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：创建 Hold 且已打印的菜品，并在该行 Reduce 后完成权限口令授权。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-kitchen.section.ts`、`pages/order-dishes/order-dishes-void.section.ts`、`flows/employee-permission.flow.ts`、`flows/order-kitchen.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-kitchen.section.ts` 负责 Hold/打印动作，`pages/order-dishes/order-dishes-void.section.ts` 负责行级 Reduce 权限弹框，`flows/employee-permission.flow.ts` 负责员工切换及 finally 恢复，`flows/order-kitchen.flow.ts` 负责订单状态编排。
 
-### ORDER-PAGE-025：提示词 42 POS-35325 用户无Edit Order->Void Printed Item权限，删除延迟送厨的菜品（count数量减少），输入有权限的密码，可删除成功 系统中在staff中预置了用户1（非boss权限），以防与其他用户冲突
+### ORDER-PAGE-026：提示词 42 POS-35325 用户无Edit Order->Void Printed Item权限，删除延迟送厨的菜品（count数量减少），输入有权限的密码，可删除成功 系统中在staff中预置了用户1（非boss权限），以防与其他用户冲突
 
 - Jira：`POS-35325`。
 - 已知前置：两名独立员工、可恢复的角色权限、普通菜和支持 Delay 的厨房打印链路。
@@ -363,7 +375,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：创建 Delay 且已打印的菜品，并在 Count=0 后完成权限口令授权。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-kitchen.section.ts`、`pages/order-dishes/order-dishes-void.section.ts`、`flows/employee-permission.flow.ts`、`flows/order-kitchen.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-kitchen.section.ts` 负责 Delay/打印动作，`pages/order-dishes/order-dishes-void.section.ts` 负责行级 Count 权限弹框，`flows/employee-permission.flow.ts` 负责员工切换及 finally 恢复，`flows/order-kitchen.flow.ts` 负责订单状态编排。
 
-### ORDER-PAGE-026：提示词 43 POS-34895 设置不自动合并相同菜，点单页面选中相同菜，1菜1行，不合并
+### ORDER-PAGE-027：提示词 43 POS-34895 设置不自动合并相同菜，点单页面选中相同菜，1菜1行，不合并
 
 - Jira：`POS-34895`。
 - 已知前置：可重复添加的普通菜，以及两项配置各自可更新/恢复的账号权限。
@@ -375,7 +387,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：逐项执行不自动合并与分开展示开关，并由网络证据判断它们是两个配置还是同一配置的不同操作。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责逐项配置及 finally 恢复，`pages/order-dishes/order-dishes-reads.section.ts` 负责同名行窄读取，`flows/order-dishes.flow.ts` 负责编排重复点菜。
 
-### ORDER-PAGE-027：提示词 44 POS-34903 设置相同菜合并显示(状态一致的)，已经存在不含有option的菜（已送厨），新加菜分开显示
+### ORDER-PAGE-028：提示词 44 POS-34903 设置相同菜合并显示(状态一致的)，已经存在不含有option的菜（已送厨），新加菜分开显示
 
 - Jira：`POS-34903`。
 - 已知前置：无 option 的可送厨房普通菜、可用厨房链路，以及三项配置入口的更新/恢复权限。
@@ -387,7 +399,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：分别执行状态一致合并、分开展示和后台合并展示三项配置，并由网络证据决定是否实际落到同一配置。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-kitchen.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责三项配置及 finally 恢复，`pages/order-dishes/order-dishes-reads.section.ts` 负责行状态读取，`flows/order-kitchen.flow.ts` 负责送厨、精确回开与恢复编排。
 
-### ORDER-PAGE-028：提示词 45 POS-34910 设置相同菜合并显示(包含已送厨），相同菜已送厨，编辑后继续加相同菜，加入到已送厨的一行， 保持合并展示，显示出 X In Kitchen，菜品字体红色
+### ORDER-PAGE-029：提示词 45 POS-34910 设置相同菜合并显示(包含已送厨），相同菜已送厨，编辑后继续加相同菜，加入到已送厨的一行， 保持合并展示，显示出 X In Kitchen，菜品字体红色
 
 - Jira：`POS-34910`。
 - 已知前置：可送厨房普通菜、可用厨房链路，以及两项配置入口的更新/恢复权限。
@@ -399,7 +411,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：缺少包含已送厨合并、分开展示、厨房数量标记和红色样式的稳定契约；源步骤 `print` 未说明打印对象与预期，必须通过录制确认该中间动作或状态，不能静默省略。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-kitchen.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责逐项配置及 finally 恢复，`pages/order-dishes/order-dishes-reads.section.ts` 负责合并行/状态/样式读取，`flows/order-kitchen.flow.ts` 负责送厨、精确回开与恢复编排。
 
-### ORDER-PAGE-029：提示词 46 POS-34842 Automatically redirect after reduce items开关关闭，相连两个菜属于不同类别，当前选中菜品减到没有时，停留 原category
+### ORDER-PAGE-030：提示词 46 POS-34842 Automatically redirect after reduce items开关关闭，相连两个菜属于不同类别，当前选中菜品减到没有时，停留 原category
 
 - Jira：`POS-34842`。
 - 已知前置：同菜单组下两个相邻类别及各自普通菜、可恢复的跳转配置。
@@ -411,7 +423,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：关闭真实自动跳转配置，并在减完当前菜后读取仍选中的原类别。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责配置恢复，`pages/order-dishes/order-dishes-menu.section.ts` 负责 Reduce 与当前类别读取，`flows/order-dishes.flow.ts` 负责跨类别编排。
 
-### ORDER-PAGE-030：提示词 47 POS-33186 点单，修改菜的数量为小于1的小数，减菜正常
+### ORDER-PAGE-031：提示词 47 POS-33186 点单，修改菜的数量为小于1的小数，减菜正常
 
 - Jira：`POS-33186`。
 - 已知前置：支持小数数量的普通菜、To Go 入口和可读取原始数量的订单行。
@@ -423,7 +435,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：源标题要求数量“小于 1”，但源步骤写 `num=1.25`，两者业务边界冲突；需确认真实输入值，并确认 Reduce 后按步长减少还是直接移除。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责 Count/Reduce，`pages/order-dishes/order-dishes-reads.section.ts` 负责原始数量读取，`flows/order-dishes.flow.ts` 负责编排。
 
-### ORDER-PAGE-031：提示词 48 POS-33241 点单，包含小数数量的菜，拖拽分单正常，母单和子单菜的小数数量展示正常，价格正确
+### ORDER-PAGE-032：提示词 48 POS-33241 点单，包含小数数量的菜，拖拽分单正常，母单和子单菜的小数数量展示正常，价格正确
 
 - Jira：`POS-33241`。
 - 已知前置：支持小数数量的普通菜、另一道可区分菜品及可进入分单的未支付订单。
@@ -435,7 +447,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：从稳定 drag source 拖到稳定 drop target 并等待业务状态落定。
 - 录制返回后计划补充：`pages/split-order.page.ts`、`flows/split-order.flow.ts`、`flows/recall.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/split-order.page.ts` 新增原始拖拽动作与拖后状态读取，`flows/split-order.flow.ts` 负责编排拖拽、提交及母子单回查，`flows/recall.flow.ts` 负责按单进入分单。
 
-### ORDER-PAGE-032：提示词 50 POS-33600 点单，选择指定价格的菜，修改菜的数量为指定小数，保存订单成功
+### ORDER-PAGE-033：提示词 50 POS-33600 点单，选择指定价格的菜，修改菜的数量为指定小数，保存订单成功
 
 - Jira：`POS-33600`。
 - 已知前置：支持小数数量与改价的目标菜、源价格 `650` 分、数量 `2.55`、两份追加普通菜、To Go 入口及可按订单号 Recall 回查的订单。
@@ -447,7 +459,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：`650分 × 2.55 = 1657.5分` 产生半分，仓库没有产品逐行或整单的舍入口径；需录制确认目标行整数分金额及追加两行后的汇总舍入层级。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-reads.section.ts` 负责行金额/数量读取，`flows/order-dishes.flow.ts` 负责编排改价、加菜与回查。
 
-### ORDER-PAGE-033：提示词 52 POS-35129 点单，选择指定价格的菜，修改菜的数量为指定小数，保存订单成功
+### ORDER-PAGE-034：提示词 52 POS-35129 点单，选择指定价格的菜，修改菜的数量为指定小数，保存订单成功
 
 - Jira：`POS-35129`。
 - 已知前置：支持小数数量的普通菜、候选指定价格、数量 `2.55`、To Go 入口及可保存并按订单号 Recall 回查的订单。
@@ -459,7 +471,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：标题和业务目标要求“指定价格”并“保存成功”，但源详细步骤只改数量并读取点单行；需确认是否执行改价、是否保存/Recall，以及最终断言点单行还是持久化金额。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责 Count/候选改价/Save 页面动作，reads section 负责数量价格读取，`flows/order-dishes.flow.ts` 负责编排确认后的完整路径。
 
-### ORDER-PAGE-034：提示词 53 POS-35660 开启相同菜合并展示开关，点单，修改菜的数量为小数，给菜添加调味正常
+### ORDER-PAGE-035：提示词 53 POS-35660 开启相同菜合并展示开关，点单，修改菜的数量为小数，给菜添加调味正常
 
 - Jira：`POS-35660`。
 - 已知前置：支持小数数量和改价的普通菜、可计数全局调味及可恢复配置。
@@ -471,7 +483,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：按真实配置名开启合并，并在 Modify 中把全局调味 count 设为 2。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-modifier.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责配置恢复，`pages/order-dishes/order-dishes-modifier.section.ts` 负责调味 Count，reads section 负责数量/价格/additions，`flows/order-dishes.flow.ts` 负责编排。
 
-### ORDER-PAGE-035：提示词 54 POS-22640 自定义类型-POS点单点击自定义类型 Delivery，点单，打单成功
+### ORDER-PAGE-036：提示词 54 POS-22640 自定义类型-POS点单点击自定义类型 Delivery，点单，打单成功
 
 - Jira：`POS-22640`。
 - 已知前置：启用且映射到 Delivery 的自定义订单类型、可打印订单和明确的打印输出目录。
@@ -483,7 +495,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：选择自定义订单类型 Delivery。
 - 录制返回后计划补充：`pages/home.page.ts`、`pages/delivery.page.ts`、`pages/recall/recall-order-details.dialog.ts`、`flows/takeout.flow.ts`、`flows/recall.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/home.page.ts` 负责自定义类型入口，`pages/delivery.page.ts` 负责客户字段，`pages/recall/recall-order-details.dialog.ts` 负责打印动作/结果，`flows/takeout.flow.ts` 负责编排自定义 Delivery，`flows/recall.flow.ts` 负责编排精确回开和打印。
 
-### ORDER-PAGE-036：提示词 55 POS-36286 POS首页delivery下单，添加用户信息进入订单页面，点击退出直接退出点单页
+### ORDER-PAGE-037：提示词 55 POS-36286 POS首页delivery下单，添加用户信息进入订单页面，点击退出直接退出点单页
 
 - Jira：`POS-36286`。
 - 已知前置：无同名待处理订单、唯一且可追踪的 Delivery 客户数据、name=`pos-test`、phone=`01234567890`、有效地址，以及可进入点单页但不添加菜品的员工上下文。
@@ -495,7 +507,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：库存 To Go 用例的 `exitOrderPage` 不能证明 Delivery 填写客户/地址后的退出行为；现有 Back/iframe/`#odBack` 候选定位没有稳定首页后置，需确认 Delivery 专属退出控件及实际确认分支。
 - 录制返回后计划补充：`pages/delivery.page.ts`、`pages/order-dishes/order-dishes-navigation.ts`、`flows/takeout.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/delivery.page.ts` 负责 Delivery 录入，`pages/order-dishes/order-dishes-navigation.ts` 负责单一退出 locator、确认分支及返回 `HomePage` 后置，`flows/takeout.flow.ts` 负责编排 Delivery 进入和退出结果。
 
-### ORDER-PAGE-037：提示词 56 POS-36255 菜名名称与number（如均为AA）相同时，点单页面搜索只能搜到一个AA
+### ORDER-PAGE-038：提示词 56 POS-36255 菜名名称与number（如均为AA）相同时，点单页面搜索只能搜到一个AA
 
 - Jira：`POS-36255`。
 - 已知前置：可写入并清理的可见菜单组/分类、创建和删除临时菜的权限，以及 name、number 均为 `AA`、price=`10.0` 的隔离临时菜数据。
@@ -507,7 +519,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：`SaleItemApiRequest` 尚未建模 number 字段，现有搜索方法只通过候选 locator 点击首个结果；缺少 name=number 的真实创建 payload，以及搜索结果集合、数量和业务 ID 的读取契约。
 - 录制返回后计划补充：`api/setup/menu.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/menu.setup.ts` 负责临时菜生命周期，`pages/order-dishes/order-dishes-menu.section.ts` 负责搜索输入和窄结果读取，`flows/order-dishes.flow.ts` 负责编排刷新、搜索与退出。
 
-### ORDER-PAGE-038：提示词 57 POS-37804 无note权限用户，套餐子菜加note出权限提示
+### ORDER-PAGE-039：提示词 57 POS-37804 无note权限用户，套餐子菜加note出权限提示
 
 - Jira：`POS-37804`。
 - 已知前置：受限员工、有授权员工和包含可编辑子菜的套餐。
@@ -519,9 +531,9 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：在套餐子菜行打开 Note 并完成受限到授权的弹窗流程。
 - 录制返回后计划补充：`api/setup/employee-permission.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/employee-permission.flow.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：后台 API/setup 负责员工与权限恢复，`pages/order-dishes/order-dishes-menu.section.ts` 负责套餐子菜/Note/授权弹窗页面动作，`flows/employee-permission.flow.ts` 负责员工切换与 finally 恢复，`flows/order-dishes.flow.ts` 负责套餐编排。
 
-### ORDER-PAGE-039：提示词 58 必选类功能优化，未满足条件时无法提交，且自动跳转
+### ORDER-PAGE-040：提示词 58 必选类功能优化，未满足条件时无法提交，且自动跳转
 
-- Jira：无。
+- Jira：`POS-42060`。
 - 已知前置：可编辑的 KDS 分类、属于该类的 Mongolian Chicken 和另一普通菜。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页进入 Admin 菜单管理，保存目标分类原配置后把 `KDS` 配为必选类及真实最低选择规则，回首页刷新，创建无桌堂食并只添加不满足必选类的普通菜，点击 Save，读取当前分类名和 URL；再添加 `Mongolian Chicken` 满足规则，重新保存并恢复后台配置。前置数据：可编辑的 KDS 分类、属于该类的 Mongolian Chicken 和另一普通菜；现有 Page 可保存/切换分类，但没有必选类配置字段、未满足时的提示/自动跳转或当前分类读取 API。当前缺失的准确 UI 动作是“配置必选类并在失败保存后观察自动跳到 KDS”；
@@ -531,9 +543,9 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：配置必选类并在失败保存后观察自动跳到 KDS。
 - 录制返回后计划补充：`api/setup/menu.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`pages/order-dishes/order-dishes-navigation.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/menu.setup.ts` 负责分类配置与恢复，`pages/order-dishes/order-dishes-menu.section.ts` 负责当前分类读取，navigation 负责保存结果，`flows/order-dishes.flow.ts` 负责编排两阶段提交。
 
-### ORDER-PAGE-040：提示词 59 category未勾选“限制折扣”导致该category下所有菜品可以参与整单按比例加收
+### ORDER-PAGE-041：提示词 59 category未勾选“限制折扣”导致该category下所有菜品可以参与整单按比例加收
 
-- Jira：无。
+- Jira：`POS-42958`。
 - 已知前置：至少两道同分类可区分菜、另一分类对照菜和可用百分比加收。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页进入 Admin 菜单管理，记录目标 category 的“限制折扣”原值后取消勾选并保存，回首页刷新，创建无桌堂食，添加该 category 下两道可区分普通菜 A/B（若只能使用动态分类，则先读取并固化完整分类成员集合），再添加一条其他分类菜作为排除对照；打开整单 Charge、应用明确百分比加收，逐项读取参与态、eligible base、加收金额和 Subtotal，最后恢复配置。前置数据：至少两道同分类可区分菜、另一分类对照菜和可用百分比加收；现有 `OrderDishesFlow.applyCustomCharge`/价格汇总可执行整单加收，但 Category API 没有“限制折扣”的准确字段和值，单一道菜也不能证明标题要求的“所有菜品”。当前缺失的准确 UI 动作是“取消限制折扣并逐项证明同分类全部成员进入 proportional whole-order charge 基数”；
@@ -543,9 +555,9 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：取消限制折扣并逐项证明同分类全部成员进入 proportional whole-order charge 基数。
 - 录制返回后计划补充：`api/setup/menu.setup.ts`、`pages/order-dishes/order-dishes-charge.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/menu.setup.ts` 负责分类配置恢复与成员读取，`pages/order-dishes/order-dishes-charge.section.ts` 负责逐行参与态，reads section 负责行金额/汇总，`flows/order-dishes.flow.ts` 负责编排多菜对照。
 
-### ORDER-PAGE-041：提示词 60 新UI点单页面，category正常展示配置的POS NAME
+### ORDER-PAGE-042：提示词 60 新UI点单页面，category正常展示配置的POS NAME
 
-- Jira：无。
+- Jira：`POS-42097`。
 - 已知前置：可创建/删除分类与菜品的 API 权限、可见菜单组、后台名称 A、POS NAME B、price=`1.0` 的隔离临时菜，以及结束后按 ID 清理分类和菜品的条件。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页前置创建独立临时 category（后台名称 A、POS NAME B）及 price=`1.0` 的临时菜并关联到可见菜单组，进入 Admin 菜单管理核对/保存 POS NAME，回首页刷新，创建无桌堂食、切换目标菜单组，读取类别卡文本并选择后读取当前类别，最后按 ID 清理菜品和 category。前置数据：可创建/删除分类与菜品的 API 权限；`apiSetup.category.create` 虽接受通用 overrides，但 `CategoryApiRequest` 未建模 posName，现有 `switchMenuCategory` 只按给定文本点击且没有当前类别窄读取，不能证明 UI 用 POS NAME 而非 name/displayName。当前缺失的准确 UI 动作是“读取 category 卡片和选中态实际展示字段”；
@@ -555,9 +567,9 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：`CategoryApiRequest` 尚未建模 posName，现有 `switchMenuCategory` 只能按给定文本点击且没有当前类别窄读取；需确认 category 卡片和选中态究竟展示 posName、name 还是 displayName。
 - 录制返回后计划补充：`api/setup/menu.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/menu.setup.ts` 负责临时分类/菜生命周期，`pages/order-dishes/order-dishes-menu.section.ts` 负责类别列表和当前类别读取，`flows/order-dishes.flow.ts` 负责编排。
 
-### ORDER-PAGE-042：提示词 61 套餐的子菜支持改价
+### ORDER-PAGE-043：提示词 61 套餐的子菜支持改价
 
-- Jira：无。
+- Jira：`POS-42061`。
 - 已知前置：可改价套餐及员工改价权限。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页创建无桌堂食，快速添加包含子菜且允许改价的套餐，进入套餐编辑，明确选择一个 subitem，打开该子菜的 Price 动作、输入目标价格并确认，读取套餐主菜、目标子菜和订单总额。前置数据：可改价套餐及员工改价权限；现有 `changeOrderedDishPrice` 通过普通已点菜行解析，套餐 API 只有选择 section item/确认，没有选择已点套餐子菜或子菜 Price 控件，因此不能把主菜改价当作子菜改价。当前缺失的准确 UI 动作是“在套餐层级中选中 subitem 并对其改价”；
@@ -567,9 +579,9 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：在套餐层级中选中 subitem 并对其改价。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责套餐子菜选择与改价，reads section 负责父子价格窄读取，`flows/order-dishes.flow.ts` 负责套餐编排。
 
-### ORDER-PAGE-043：提示词 62 按菜分单后子单打折，打折界面整单金额检查
+### ORDER-PAGE-044：提示词 62 按菜分单后子单打折，打折界面整单金额检查
 
-- Jira：无。
+- Jira：`POS-36254`。
 - 已知前置：可分单未支付订单及可精确定位的母/子单号。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页刷新后创建无桌堂食并添加三道可区分普通菜，在 Split 页面按源步骤真实拖拽菜品建立子单并提交、保存母单号；从首页进入 Recall，精确打开指定子单，先读取该子单菜品列表和价格汇总，再点击 Edit 并记录真实转场落点，在编辑后的实际页面打开 Discount，最后读取该折扣界面的 Whole Order 金额。前置数据：可分单未支付订单及可精确定位的母/子单号；现有 `SplitOrderFlow.splitOrderByItems/moveDishes` 是点击选择而非拖拽，`RecallFlow.openDiscount` 绕过了源要求的“读子单菜品→Edit→Discount”路径，也不能证明 Discount 面板由 Recall 拥有。当前缺失的准确 UI 动作是“真实拖拽分单，以及从指定子单详情经 Edit 转场后打开 Discount 并读取 Whole Order”；
@@ -579,9 +591,9 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：真实拖拽分单，以及从指定子单详情经 Edit 转场后打开 Discount 并读取 Whole Order。
 - 录制返回后计划补充：`pages/split-order.page.ts`、`flows/split-order.flow.ts`、`pages/recall/recall-order-details.dialog.ts`、`pages/order-dishes/order-dishes-charge.section.ts`、`flows/recall.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/split-order.page.ts` 负责拖拽，`flows/split-order.flow.ts` 负责提交；`pages/recall/recall-order-details.dialog.ts` 只负责指定子单读取和 Edit；Discount 动作/读数归属由录制后的真实转场决定（若回到点单页则由 order-dishes charge section 负责，若为独立页面则建立专用 Page），`flows/recall.flow.ts` 负责编排完整转场。
 
-### ORDER-PAGE-044：提示词 63 自定义类型-报表显示Report-Overview-预览显示自定义类型的报表数据-数据正确
+### ORDER-PAGE-045：提示词 63 自定义类型-报表显示Report-Overview-预览显示自定义类型的报表数据-数据正确
 
-- Jira：无。
+- Jira：`POS-22657`。
 - 已知前置：目标自定义 Delivery 订单类型、云报表账号/服务、Cloud Report 配置原值及更新/恢复权限、name=`pos-test`、phone=`01234567890`、有效地址和普通菜。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页记录 Cloud Report 原配置并启用，按源顺序打开/读取 Report Overview 的 `cloud report amount` 基线，单独读取启用后出现的“打印提示信息”及其真实位置/文案，再回首页刷新 POS 使配置生效；随后从首页创建自定义 Delivery 订单（name=`pos-test`、phone=`01234567890`）、加菜并保存，从首页再次打开 Cloud Report，切换真实 report frame/window，在 Report Overview 选择目标自定义订单类型并读取最终数据；最后恢复原配置并再次刷新 POS。前置数据：目标自定义订单类型、云报表账号/服务和可恢复配置；`ReportPage` 当前为空，`HomePage.enterReport` 只点击入口，自定义类型入口也缺失。“打印提示信息”疑似源步骤误写，但在产品确认前必须保留为独立中间断言，不能替代或合并最终 Overview 数据断言。当前缺失的准确 UI 动作是“启用后读取 amount/打印提示、刷新，再进入 frame 选择类型并读最终报表”；
@@ -591,9 +603,9 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：`ReportPage` 当前为空，首页仅有 Report 入口，自定义类型入口也缺失；源步骤“打印提示信息”的归属和含义不明确，需独立录制 amount、打印提示、刷新、frame 切换、类型筛选和最终 Overview 数据，不得用提示替代报表断言。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/home.page.ts`、`pages/report.page.ts`、`flows/report.flow.ts`、`flows/takeout.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：system configuration setup 负责配置恢复，`pages/home.page.ts` 负责两次刷新和首页提示（若提示实属其他页则按录制归属），`pages/report.page.ts` 负责 amount/frame/筛选/读数，`flows/report.flow.ts` 负责编排启用、基线、提示、刷新、增量与恢复，`flows/takeout.flow.ts` 负责自定义 Delivery。
 
-### ORDER-PAGE-045：提示词 64 系统语言为中文，点单搜索框输入菜的首字母返回对应的菜
+### ORDER-PAGE-046：提示词 64 系统语言为中文，点单搜索框输入菜的首字母返回对应的菜
 
-- Jira：无。
+- Jira：`POS-43827`。
 - 已知前置：可编辑目标菜、中文语言资源和可恢复默认语言。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页进入 Admin 菜品/分类配置，记录目标菜原中英文名并设置可确认首字母为 `ptc` 的中文名，回首页将系统语言切为 Chinese，创建无桌堂食，在 Search Menu 输入 `ptc`，读取全部结果并选择目标菜，退出回首页后恢复默认语言和菜品配置。前置数据：可编辑目标菜、中文语言资源和可恢复默认语言；现有 Home 只有 language 图标 locator，没有语言选项/当前状态 API，搜索 API 只能按完整 dishName 找首个结果。当前缺失的准确 UI 动作是“切换并读取中文状态后按中文首字母搜索”，不能用中文名称展示或一般英文搜索替代；
@@ -603,9 +615,9 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：切换并读取中文状态后按中文首字母搜索。
 - 录制返回后计划补充：`pages/home.page.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`api/setup/menu.setup.ts`、`flows/language.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/home.page.ts` 负责语言切换/读取，`pages/order-dishes/order-dishes-menu.section.ts` 负责搜索结果读取，`api/setup/menu.setup.ts` 负责菜品配置恢复，`flows/language.flow.ts` 负责编排 finally。
 
-### ORDER-PAGE-046：提示词 65 套餐设置display all one time，子菜不可重复选，规则设置max，点单保存combo后，可正常编辑，修改子菜
+### ORDER-PAGE-047：提示词 65 套餐设置display all one time，子菜不可重复选，规则设置max，点单保存combo后，可正常编辑，修改子菜
 
-- Jira：无。
+- Jira：`POS-43956`。
 - 已知前置：可配置的 combo、至少 max+1 个候选子菜和可恢复配置。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页记录套餐原配置，在后台/API 将目标套餐设为 `display all one time`、子菜不可重复且规则为明确 max，刷新后创建无桌堂食，打开 combo 验证全量一次展示和重复选择限制，按 max 选满并保存订单号；从 Recall 精确打开并 Edit，进入套餐编辑替换一个 subitem，保存后回查，finally 恢复配置。前置数据：可配置的 combo、至少 max+1 个候选子菜和可恢复配置；现有 combo API 只能按 section/dish 点击并确认，没有这些规则的配置 setup、重复限制读数或已保存套餐的 subitem 编辑动作。当前缺失的准确 UI 动作是“在 display-all/max/non-repeat 规则下编辑已保存 combo 子菜”；
@@ -615,9 +627,9 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：在 display-all/max/non-repeat 规则下编辑已保存 combo 子菜。
 - 录制返回后计划补充：`api/setup/combo.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`flows/recall.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：套餐配置 API/setup 负责规则与恢复，`pages/order-dishes/order-dishes-menu.section.ts` 负责 combo 选择/编辑，reads section 负责 parent/subitem 窄读取，`flows/order-dishes.flow.ts` 负责保存、精确回开和 finally。
 
-### ORDER-PAGE-047：提示词 66 combo子菜没有option，选择子菜返回主菜可正常选择option
+### ORDER-PAGE-048：提示词 66 combo子菜没有option，选择子菜返回主菜可正常选择option
 
-- Jira：无。
+- Jira：`POS-43823`。
 - 已知前置：可创建/删除 combo 关系、主菜 option、无 option 子菜和普通菜 option。
 - 请从 POS 首页开始录制：
   1. 最小录制路径：从 POS 首页用 API 创建隔离套餐主菜、无 option 子菜、套餐主菜 option 关系，以及一条带自身 option 的普通非套餐对照菜，确认刷新后创建无桌堂食；打开 combo、选择无 option subitem，记录返回套餐主菜 option 面板并选择 parent option、确认套餐订单行；随后按源步骤添加普通非套餐菜，打开/选择它自己的 option，分别读取两条订单行和面板状态，退出后按 ID 清理全部临时数据。前置数据：可创建/删除 combo 关系、主菜 option、无 option 子菜和普通菜 option；现有 `apiSetup.saleItem` 只有普通菜 CRUD，未提供 combo/option 关系 setup，套餐面板也只有 section item/确认。当前缺失的准确 UI 动作是“无 option 子菜返回 combo parent option 后，再添加普通非套餐菜作为 option 对照”；该对照用于排除普通菜 option 面板/状态被误认成 combo parent option；
