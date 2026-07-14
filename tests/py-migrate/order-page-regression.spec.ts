@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { HomeFlow } from '../../flows/home.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
 import { RecallFlow } from '../../flows/recall.flow';
@@ -23,9 +24,16 @@ async function enterReadyHome(homePage: HomePage, employeeLoginPage: EmployeeLog
   return ready;
 }
 
-async function saveAndReadLatestRecallDetails(orderDishesPage: OrderDishesPage) {
+async function saveAndReadLatestRecallDetails(
+  orderDishesPage: OrderDishesPage,
+  employeeLoginPage: EmployeeLoginPage,
+) {
   const homePage = await orderDishesPage.saveOrder();
-  const recallPage = await new RecallFlow().openRecallFromHome(homePage);
+  const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+    homePage,
+    employeeLoginPage,
+  );
+  const recallPage = await new RecallFlow().openRecallFromHome(readyHomePage);
   const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
   await recallPage.openOrderDetails(orderNumber);
   return { details: await recallPage.readOrderDetailsSnapshot(), orderNumber, recallPage };
@@ -33,11 +41,16 @@ async function saveAndReadLatestRecallDetails(orderDishesPage: OrderDishesPage) 
 
 async function saveAndOpenSplit(
   orderPage: OrderDishesPage,
+  employeeLoginPage: EmployeeLoginPage,
   options?: Parameters<RecallFlow['openSplitOrder']>[3],
 ) {
   const homePage = await orderPage.saveOrder();
+  const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+    homePage,
+    employeeLoginPage,
+  );
   const recallFlow = new RecallFlow();
-  const recallPage = await recallFlow.openRecallFromHome(homePage);
+  const recallPage = await recallFlow.openRecallFromHome(readyHomePage);
   const orderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
   const splitOrderPage = await recallFlow.openSplitOrder(
     recallPage,
@@ -90,7 +103,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
       );
 
       await test.step('保存订单后在 Recall 校验目标菜品名称和价格', async () => {
-        const { details } = await saveAndReadLatestRecallDetails(orderPage);
+        const { details } = await saveAndReadLatestRecallDetails(orderPage, employeeLoginPage);
         const after = details.items.find(
           (item) => item.name === orderServiceDishes.regular.name,
         );
@@ -139,7 +152,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
       });
 
       await test.step('保存订单后在 Recall 校验两个菜品数量', async () => {
-        const { details } = await saveAndReadLatestRecallDetails(orderPage);
+        const { details } = await saveAndReadLatestRecallDetails(orderPage, employeeLoginPage);
 
         expect(
           details.items.find((item) => item.name === orderServiceDishes.regular.name)?.quantity,
@@ -266,7 +279,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
       );
 
       await test.step('保存订单后从 Recall 校验小数数量和数字小计金额一致', async () => {
-        const { details } = await saveAndReadLatestRecallDetails(orderPage);
+        const { details } = await saveAndReadLatestRecallDetails(orderPage, employeeLoginPage);
 
         expect(
           details.items.find((item) => item.name === orderServiceDishes.regular.name)?.quantity,
@@ -314,7 +327,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
 
         await test.step('保存订单后在 Recall 校验备注', async () => {
-          const { details } = await saveAndReadLatestRecallDetails(orderPage);
+          const { details } = await saveAndReadLatestRecallDetails(orderPage, employeeLoginPage);
           expect(
             details.items
               .find((item) => item.name === dishName)
@@ -349,7 +362,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
 
         const splitOrderPage = await test.step('保存订单并从 Recall 打开分单页面', async () => {
-          return (await saveAndOpenSplit(orderPage)).splitOrderPage;
+          return (await saveAndOpenSplit(orderPage, employeeLoginPage)).splitOrderPage;
         });
         const splitFlow = new SplitOrderFlow();
 
@@ -397,7 +410,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
 
         const splitOrderPage = await test.step('保存订单并从 Recall 打开分单页面', async () => {
-          return (await saveAndOpenSplit(orderPage)).splitOrderPage;
+          return (await saveAndOpenSplit(orderPage, employeeLoginPage)).splitOrderPage;
         });
         const splitFlow = new SplitOrderFlow();
 
@@ -445,7 +458,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
 
         const splitOrderPage = await test.step('保存订单并从 Recall 打开分单页面', async () => {
-          return (await saveAndOpenSplit(orderPage)).splitOrderPage;
+          return (await saveAndOpenSplit(orderPage, employeeLoginPage)).splitOrderPage;
         });
         const splitFlow = new SplitOrderFlow();
 
@@ -486,7 +499,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
 
         const persistedOrder = await test.step('保存订单并从 Recall 打开分单页面', async () => {
-          return await saveAndOpenSplit(orderPage);
+          return await saveAndOpenSplit(orderPage, employeeLoginPage);
         });
         const splitFlow = new SplitOrderFlow();
         const original = await test.step('读取分单前订单总额', async () => {
@@ -563,7 +576,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
 
         const splitOrderPage = await test.step('保存订单并从 Recall 打开分单页面', async () => {
-          return (await saveAndOpenSplit(orderPage)).splitOrderPage;
+          return (await saveAndOpenSplit(orderPage, employeeLoginPage)).splitOrderPage;
         });
         const splitFlow = new SplitOrderFlow();
         const original = await test.step('读取按座位分单前订单快照', async () => {
@@ -610,7 +623,9 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
 
         const persistedOrder = await test.step('保存订单并从 Recall 打开分单页面', async () => {
-          return await saveAndOpenSplit(orderPage, { chargePromptAction: 'keep' });
+          return await saveAndOpenSplit(orderPage, employeeLoginPage, {
+            chargePromptAction: 'keep',
+          });
         });
         const splitFlow = new SplitOrderFlow();
         const firstChildOrderNumber = await test.step('平分为两个子单并读取首个子单号', async () => {
@@ -695,7 +710,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
 
         const splitOrderPage = await test.step('保存订单并从 Recall 打开分单页面', async () => {
-          return (await saveAndOpenSplit(orderPage)).splitOrderPage;
+          return (await saveAndOpenSplit(orderPage, employeeLoginPage)).splitOrderPage;
         });
         const splitFlow = new SplitOrderFlow();
 
