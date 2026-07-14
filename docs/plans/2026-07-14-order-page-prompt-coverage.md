@@ -21,31 +21,31 @@
 
 | 已等价覆盖 | 待补断言 | 可直接实现 | 需要录制 | 产品异常 | 环境阻塞 | 总数 |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0 | 0 | 0 | 0 | 0 | 0 | 66 |
+| 2 | 5 | 3 | 9 | 0 | 0 | 66 |
 
 ## 明细
 
 | 编号 | Jira | 标题 | 业务域 | 状态 | 覆盖或缺口证据 | 计划落点 | 录制编号 | 最近验证 |
 |---:|---|---|---|---|---|---|---|---|
-| 1 | POS-15602 | POS-15602 点单页面菜单---组---切换组 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 2 | POS-15605 | POS-15605 点单页面菜单--组 中文展示 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 3 | POS-15641 | POS-15641 点单页面菜单--类--组下多个类时，进行类切换 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 4 | — | Seperate the same dishes开关开启，订单送厨后编辑页面，选择菜品，点击加1，存单后检查订单上的税率正确 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 5 | — | 后台点单前确认客户信息，客户姓名必填，电话必填，点支付按钮后弹出输入电话号码和客户姓名的弹框 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 6 | — | 没有删菜权限的用户点单后删菜，弹出权限提示框提示没有权限，输入正确的密码可正常删菜 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 7 | — | 菜品操作改价时可以选择单菜折扣 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 8 | — | 点Modify可以输入菜品的备注，保存订单后，菜品后面的备注信息正确 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 9 | — | 点单，加小费，平分订单，合并子单，订单小费金额正常 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 10 | — | open Food 点单，不选择任何税，可以成功完成付款 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 11 | — | 连续创建两个不输入姓名的pick up订单，修改其中一个食客姓名，另一个不受影响 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 12 | POS-15643 | POS-15643 点单页面菜单--类，带option的类 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 13 | POS-15737 | POS-15737 点单界面菜单--类，类的中文展示 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 14 | POS-15758 | POS-15758 点单界面菜单--option 创建类的option,包含二级option | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 15 | POS-15759 | POS-15759 点单界面菜单--option 创建类的option,包含二级option，点单时选择了类的option，未选二级option | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 16 | POS-15760 | POS-15760 点单界面菜单--option 创建菜的option,包含二级option，点单时选择了菜的option，未选二级option | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 17 | POS-15761 | POS-15761 点单界面菜单--option 创建菜的option，点单时选择了菜的option | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 18 | POS-15762 | POS-15762 点单界面菜单--option 创建菜的option，点单时未选择菜的option | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
-| 19 | POS-15763 | POS-15763 点单界面菜单--option 创建菜的option,包含二级option，点单时选择了菜的option，和二级option | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
+| 1 | POS-15602 | POS-15602 点单页面菜单---组---切换组 | 菜单与语言 | 待补断言 | tests/py-migrate/order.service.spec.ts:44 的候选用例经 `OrderDishesFlow.addRegularDish` 实际点击菜单组和类别，但最终只断言 Recall 菜名与价格，缺少切换后当前组为“自动化菜单组”的可观察断言；目标：在 `pages/order-dishes/order-dishes-menu.section.ts` 增加当前组读取/断言，并在 `tests/py-migrate/order.service.spec.ts` 补断言 | `pages/order-dishes/order-dishes-menu.section.ts`、`tests/py-migrate/order.service.spec.ts` | — | 2026-07-14：完整审计候选测试与 Page/Flow |
+| 2 | POS-15605 | POS-15605 点单页面菜单--组 中文展示 | 菜单与语言 | 需要录制 | `pages/home.page.ts` 仅能确认语言按钮可见，`pages/order-dishes/order-dishes-menu.section.ts` 无菜单组列表读取；恢复条件：录制中文切换弹层、中文组名、组列表稳定 DOM 及恢复默认语言路径 | `pages/home.page.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/language.flow.ts` | 待 Task 6 分配 | 2026-07-14：确认语言切换与组列表 DOM 契约缺失 |
+| 3 | POS-15641 | POS-15641 点单页面菜单--类--组下多个类时，进行类切换 | 菜单与语言 | 待补断言 | tests/py-migrate/order.service.spec.ts:50 的候选用例经 `OrderDishesFlow.addRegularDish` 实际切换组和类别，但最终只断言 Recall 菜名与价格，缺少多类别切换后当前类别正确的断言；目标：在 `pages/order-dishes/order-dishes-menu.section.ts` 增加当前类别读取/断言，并在 `tests/py-migrate/order.service.spec.ts` 补断言 | `pages/order-dishes/order-dishes-menu.section.ts`、`tests/py-migrate/order.service.spec.ts` | — | 2026-07-14：完整审计候选测试与 Page/Flow |
+| 4 | — | Seperate the same dishes开关开启，订单送厨后编辑页面，选择菜品，点击加1，存单后检查订单上的税率正确 | 菜单与语言 | 待补断言 | tests/py-migrate/order.service.spec.ts:203 已覆盖堂食无桌、保存、Recall 编辑加 1 和再次保存，但仅断言税率比例近似不变及 Subtotal 一致，未断言提示词要求的编辑前税额 `$1.20`、编辑后税额 `$1.80`；目标：在该用例补固定税额断言并绑定对应测试数据/开关前置 | `tests/py-migrate/order.service.spec.ts`、`test-data/order-service.ts` | — | 2026-07-14：完整审计税额测试及其读数 API |
+| 5 | — | 后台点单前确认客户信息，客户姓名必填，电话必填，点支付按钮后弹出输入电话号码和客户姓名的弹框 | 客户信息 | 需要录制 | 当前无“点单前确认客户信息”后台配置 API，也无支付前姓名/电话必填弹框 Page/Flow；恢复条件：录制配置入口与恢复值、点击 Pay 后弹框稳定 DOM、缺字段提示及完整信息提交后的消失条件 | `pages/order-dishes/order-dishes-customer.dialog.ts`、`flows/order-customer.flow.ts` | 待 Task 6 分配 | 2026-07-14：确认配置与客户必填弹框契约缺失 |
+| 6 | — | 没有删菜权限的用户点单后删菜，弹出权限提示框提示没有权限，输入正确的密码可正常删菜 | 权限与 Void | 需要录制 | `pages/order-dishes/order-dishes-menu.section.ts` 仅有普通减菜动作，缺已送厨菜品 Void、无权限提示、授权口令和删菜原因 DOM；恢复条件：录制受限员工/授权员工数据、权限弹框与原因弹框稳定 DOM、授权后菜品状态 | `pages/order-dishes/order-dishes-void.section.ts`、`flows/employee-permission.flow.ts` | 待 Task 6 分配 | 2026-07-14：确认菜品 Void 权限链路缺失 |
+| 7 | — | 菜品操作改价时可以选择单菜折扣 | 改价折扣备注 | 待补断言 | tests/py-migrate/split-order-operation.spec.ts:2711 已经对单菜应用 10% 折扣，但只断言折扣明细 `Charge(10%)` 的出现/清除，且已知问题注解明确未校验订单总额；缺少提示词要求的 `价格1 × 0.9 = 价格2` 数值断言，目标为该 spec 的单菜折扣场景 | `tests/py-migrate/split-order-operation.spec.ts` | — | 2026-07-14：完整审计单菜折扣测试与 Charge Flow |
+| 8 | — | 点Modify可以输入菜品的备注，保存订单后，菜品后面的备注信息正确 | 改价折扣备注 | 待补断言 | tests/py-migrate/split-order-operation.spec.ts:2824 已通过 Modify 添加自定义调味并保存，但最终仅比较复制前后总额，未读取 Recall 菜品 additions 校验备注文本；目标：在该 spec 或 `tests/py-migrate/order.service.spec.ts` 补保存后备注回显断言 | `tests/py-migrate/split-order-operation.spec.ts`、`tests/py-migrate/order.service.spec.ts` | — | 2026-07-14：完整审计 Modify、保存和 Recall 能力 |
+| 9 | — | 点单，加小费，平分订单，合并子单，订单小费金额正常 | 分单与小费 | 可直接实现 | `pages/order-dishes/order-dishes-tip.section.ts` 已有小费输入，`flows/split-order.flow.ts:28` 已有平分，`:171` 已有合并，`pages/recall.page.ts:198` 可读 Tips；真实路径与读数契约完整，可直接新增断言分单后 `1.00`、合并后 `2.00` 的用例 | `tests/py-migrate/order.service.spec.ts` | — | 2026-07-14：核对小费、平分、合并及 Recall 读数 API |
+| 10 | — | open Food 点单，不选择任何税，可以成功完成付款 | Open Food | 可直接实现 | `pages/order-dishes/order-dishes-menu.section.ts:345` 已用稳定 Open Food DOM 完成名称/价格输入，`PaymentFlow.payByCash` 已覆盖现金全额结账，`RecallFlow.searchOrders` 可按 `RecallOrderStatuses.paid` 筛选并精确打开订单；不触发税选择即可直接实现并断言 `Paid` | `tests/py-migrate/order.service.spec.ts` | — | 2026-07-14：核对 Open Food、现金支付与 Recall 状态筛选 API |
+| 11 | — | 连续创建两个不输入姓名的pick up订单，修改其中一个食客姓名，另一个不受影响 | 客户信息 | 需要录制 | `TakeoutFlow.startPickUpOrder` 只能在新建 Pick Up 时填写信息，当前点单页/Recall 无编辑食客姓名入口；恢复条件：录制两个匿名 Pick Up 的区分字段、食客姓名编辑入口与稳定 DOM、修改后两单各自姓名的读取位置 | `pages/order-dishes/order-dishes-customer.dialog.ts`、`flows/order-customer.flow.ts` | 待 Task 6 分配 | 2026-07-14：确认 Pick Up 食客姓名编辑契约缺失 |
+| 12 | POS-15643 | POS-15643 点单页面菜单--类，带option的类 | Option | 已等价覆盖 | tests/py-migrate/order.service.spec.ts:901；[POS-15643 POS-15758 POS-15759] 应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显；关键断言：点单页与 Recall 的菜品 additions 均等于 `[free option, free suboption]`，Recall 菜品价格等于点单页价格且订单仅有该菜 | 无需新增 | — | 2026-07-14：完整审计测试、helper 与 Page DOM |
+| 13 | POS-15737 | POS-15737 点单界面菜单--类，类的中文展示 | 菜单与语言 | 需要录制 | `pages/home.page.ts` 无语言切换动作，`pages/order-dishes/order-dishes-menu.section.ts` 无类别列表/当前类别中文读取；恢复条件：录制中文切换弹层、目标类别中文名、类别列表稳定 DOM 及恢复默认语言路径 | `pages/home.page.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/language.flow.ts` | 待 Task 6 分配 | 2026-07-14：确认语言切换与类别中文 DOM 契约缺失 |
+| 14 | POS-15758 | POS-15758 点单界面菜单--option 创建类的option,包含二级option | Option | 已等价覆盖 | tests/py-migrate/order.service.spec.ts:901；[POS-15643 POS-15758 POS-15759] 应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显；关键断言：点单页与 Recall 的菜品 additions 均等于 `[free option, free suboption]`，Recall 菜品价格等于点单页价格且订单仅有该菜 | 无需新增 | — | 2026-07-14：完整审计测试、helper 与 Page DOM |
+| 15 | POS-15759 | POS-15759 点单界面菜单--option 创建类的option,包含二级option，点单时选择了类的option，未选二级option | Option | 可直接实现 | `pages/order-dishes/order-dishes-menu.section.ts:426` 的 `selectCategoryOption(option, suboption?)` 支持省略二级 option，`tests/py-migrate/order.service.spec.ts:152` 的 round-trip helper 也会在省略时断言仅回显一级 option；真实 DOM 与断言契约完整 | `tests/py-migrate/order.service.spec.ts` | — | 2026-07-14：核对可选 suboption 与两页回显 helper |
+| 16 | POS-15760 | POS-15760 点单界面菜单--option 创建菜的option,包含二级option，点单时选择了菜的option，未选二级option | Option | 需要录制 | 现有 `selectCategoryOption` 和 `orderServiceCategoryOptions` 仅由类级 option 实测，缺菜级嵌套 option 菜品数据及其 DOM 区分；恢复条件：录制菜级一级/二级 option 面板、选择一级但不选二级后的保存行为和 Recall additions | `pages/order-dishes/order-dishes-menu.section.ts`、`test-data/order-service.ts` | 待 Task 6 分配 | 2026-07-14：确认菜级 option 数据与 DOM 契约缺失 |
+| 17 | POS-15761 | POS-15761 点单界面菜单--option 创建菜的option，点单时选择了菜的option | Option | 需要录制 | 当前没有经实测的菜级 option 菜品、选项名称或独立 Page API；恢复条件：录制菜级 option 面板稳定 DOM、目标菜/option 数据及点单页与 Recall 的预期 additions | `pages/order-dishes/order-dishes-menu.section.ts`、`test-data/order-service.ts` | 待 Task 6 分配 | 2026-07-14：确认菜级 option 数据与 DOM 契约缺失 |
+| 18 | POS-15762 | POS-15762 点单界面菜单--option 创建菜的option，点单时未选择菜的option | Option | 需要录制 | 当前没有可识别为“带可选菜级 option”的测试菜，也未确定不选择 option 时如何关闭/离开面板及保存后的预期；恢复条件：录制跳过菜级 option 的真实交互、稳定 DOM 和 Recall 无 additions 的结果 | `pages/order-dishes/order-dishes-menu.section.ts`、`test-data/order-service.ts` | 待 Task 6 分配 | 2026-07-14：确认跳过菜级 option 的路径与预期缺失 |
+| 19 | POS-15763 | POS-15763 点单界面菜单--option 创建菜的option,包含二级option，点单时选择了菜的option，和二级option | Option | 需要录制 | 类级 nested option 测试不能证明菜级 nested option 的入口和回显；恢复条件：录制菜级一级/二级 option 的稳定 DOM、目标数据，以及选择两级后点单页和 Recall additions 的实际顺序 | `pages/order-dishes/order-dishes-menu.section.ts`、`test-data/order-service.ts` | 待 Task 6 分配 | 2026-07-14：确认菜级 nested option 数据与 DOM 契约缺失 |
 | 20 | POS-16303 | POS-16303 点单页面订单-订单底部功能--平分订单 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
 | 21 | POS-16314 | POS-16314 点单页面订单-订单底部功能--拖动分单 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
 | 22 | POS-16315 | POS-16315 点单页面订单-订单底部功能--按座位分单 | 未归类 | 未审计 | 尚未执行语义审计 | 本矩阵对应域任务 | — | 源文件基线检查通过 |
