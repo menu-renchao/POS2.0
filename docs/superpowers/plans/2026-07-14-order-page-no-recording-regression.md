@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 新建一个 Playwright spec，实现矩阵中的 5 条待补断言和 9 条可直接实现用例，并迁移同 Jira 旧用例避免重复。
+**Goal:** 新建一个 Playwright spec，实现矩阵中的 4 条待补断言和 8 条可直接实现用例，并迁移同 Jira 旧用例避免重复。
 
-**Architecture:** 14 条场景集中在 `tests/py-migrate/order-page-regression.spec.ts`，按菜单、折扣备注、分单小费、数量合单分组。只新增两个 Page 窄读取 API；其余动作复用现有 Flow，固定数据扩展到 `test-data/order-service.ts`，最终同步覆盖矩阵状态。
+**Architecture:** 12 条场景集中在 `tests/py-migrate/order-page-regression.spec.ts`，按菜单、备注、分单小费、数量合单分组。只新增两个 Page 窄读取 API；其余动作复用现有 Flow，固定数据扩展到 `test-data/order-service.ts`，最终同步覆盖矩阵状态。
 
 **Tech Stack:** TypeScript 5.9、Playwright Test 1.60、现有 Page/Flow/fixture/API setup。
 
@@ -17,7 +17,9 @@
 - 新 locator 只使用成功 trace 已确认的单一 DOM 契约，不新增 `.or()`、多语言正则或候选链。
 - 不使用 `waitForTimeout`；输入后确认沿用已有 200ms 稳定等待。
 - 价格比较使用 Page 返回的 number，并转换为整数分断言。
-- 48 条 `需要录制` 场景不进入本计划。
+- 50 条 `需要录制` 场景不进入本计划。
+
+> **2026-07-14 用户决策：** POS-42886、POS-28674 改由 `ORDER-PAGE-049`、`ORDER-PAGE-050` 录制，不进入本计划。真实 UI 已证明现有 `pos-ui-option-__custom_discount__` 打开正向 `Custom Charge`：8.80 输入 10% 后为 9.68，改价 5.85 后输入 50% 为 8.78；不得把该入口当成 Discount 实现。
 
 ---
 
@@ -148,9 +150,7 @@ Append to `test-data/order-service.ts`:
 
 ```ts
 export const orderPageRegressionCases = {
-  itemDiscount: { rate: 10 },
   modifier: { name: 'POS-42888', price: 0 },
-  specialPriceDiscount: { price: 5.85, rate: 50, expectedSubtotal: 2.92 },
   splitTips: { tipAmountInCents: 200, splitTip: 1, mergedTip: 2 },
   splitEvenly: { count: 2 },
   splitBySeats: { guestCount: 2 },
@@ -176,29 +176,20 @@ git commit -m "test: add order page menu and count regressions"
 
 ---
 
-### Task 2: 添加折扣与备注三条回归
+### Task 2: 添加备注回归
 
 **Files:**
 - Modify: `tests/py-migrate/order-page-regression.spec.ts`
 
 **Interfaces:**
-- Consumes: `SelectTableFlow.enterDineInNoTableOrder`、`applyCustomItemPercentageDiscount`、`addCustomModifier`、`changeOrderedDishPrice`。
-- Produces: POS-42886、POS-42888、POS-28674。
+- Consumes: `SelectTableFlow.enterDineInNoTableOrder`、`addCustomModifier`。
+- Produces: POS-42888。
 
-- [ ] **Step 1: 写三个真实 UI 测试**
+- [ ] **Step 1: 写一个真实 UI 测试**
 
-Use these exact operations and assertions inside a Chinese `折扣与备注回归` describe:
+Use these exact operations and assertions inside a Chinese `备注回归` describe:
 
 ```ts
-// POS-42886
-const before = (await orderPage.readPriceSummary()).Subtotal;
-await orderFlow.applyCustomItemPercentageDiscount(orderPage, [dishName], 10);
-const after = (await orderPage.readPriceSummary()).Subtotal;
-expect(toCents(after)).toBe(Math.round(toCents(before) * 0.9));
-expect((await orderPage.readOrderedItems()).flatMap(
-  (item) => item.additions.map((addition) => addition.name),
-)).toContain('Charge(10%)');
-
 // POS-42888
 await orderFlow.addCustomModifier(orderPage, {
   dishName,
@@ -208,13 +199,6 @@ const { details } = await saveAndReadLatestRecallDetails(orderPage);
 expect(details.items.find((item) => item.name === dishName)?.additions.map(
   (addition) => addition.name.trim(),
 )).toContain('POS-42888');
-
-// POS-28674
-await orderPage.changeOrderedDishPrice(dishName, 5.85);
-await orderFlow.applyCustomItemPercentageDiscount(orderPage, [dishName], 50);
-expect((await orderPage.readPriceSummary()).Subtotal).toBe(2.92);
-const saved = await saveAndReadLatestRecallDetails(orderPage);
-expect(saved.details.priceSummary.Subtotal).toBe(2.92);
 ```
 
 Each test starts from a fresh Dine In no-table order, adds `orderServiceDishes.regular`, uses its own Jira title/annotation, and has Chinese `test.step` phases.
@@ -222,14 +206,14 @@ Each test starts from a fresh Dine In no-table order, adds `orderServiceDishes.r
 - [ ] **Step 2: 定向运行并提交**
 
 ```powershell
-npx.cmd playwright test tests/py-migrate/order-page-regression.spec.ts --project=py-migrate --grep "POS-42886|POS-42888|POS-28674" --reporter=line
+npx.cmd playwright test tests/py-migrate/order-page-regression.spec.ts --project=py-migrate --grep "POS-42888" --reporter=line
 ```
 
-Expected: 3 passed. Keep POS-23204 and POS-24394 in `split-order-operation.spec.ts`.
+Expected: 1 passed. Keep POS-23204 and POS-24394 in `split-order-operation.spec.ts`.
 
 ```powershell
 git add -- tests/py-migrate/order-page-regression.spec.ts
-git commit -m "test: add order page discount and modifier regressions"
+git commit -m "test: add order page modifier regression"
 ```
 
 ---
@@ -456,13 +440,13 @@ Expected: 2 passed.
 - Verify: `tests/py-migrate/split-order-operation.spec.ts`
 
 **Interfaces:**
-- Consumes: Tasks 1～5 的 14 条 UI 结果。
-- Produces: 新文件恰好 14 条、七个同 Jira 旧测试已删除、矩阵状态与真实运行一致。
+- Consumes: Tasks 1～5 的 12 条 UI 结果。
+- Produces: 新文件恰好 12 条、七个同 Jira 旧测试已删除、矩阵状态与真实运行一致。
 
-- [ ] **Step 1: 验证 14 条和去重结果**
+- [ ] **Step 1: 验证 12 条和去重结果**
 
 ```powershell
-$target = 'POS-15602','POS-42886','POS-42888','POS-28674','POS-39762','POS-16303','POS-16314','POS-16315','POS-16316','POS-16318','POS-16325','POS-32905','POS-33244','POS-33600'
+$target = 'POS-15602','POS-42888','POS-39762','POS-16303','POS-16314','POS-16315','POS-16316','POS-16318','POS-16325','POS-32905','POS-33244','POS-33600'
 $spec = Get-Content -Raw -Encoding UTF8 'tests\py-migrate\order-page-regression.spec.ts'
 $found = @([regex]::Matches($spec, "\[($($target -join '|'))\]") | ForEach-Object { $_.Groups[1].Value })
 [pscustomobject]@{
@@ -473,7 +457,7 @@ $found = @([regex]::Matches($spec, "\[($($target -join '|'))\]") | ForEach-Objec
 }
 ```
 
-Expected: `Target=14`、`Tests=14`、`UniqueTests=14`、`Missing=0`。
+Expected: `Target=12`、`Tests=12`、`UniqueTests=12`、`Missing=0`。
 
 ```powershell
 rg -n "POS-15602|POS-16303|POS-16314|POS-16316|POS-16318|POS-16325|POS-32905" tests/py-migrate
@@ -491,21 +475,21 @@ npm.cmd run test:scripts
 npx.cmd playwright test tests/py-migrate/order-page-regression.spec.ts --project=py-migrate --reporter=line
 ```
 
-Expected: list shows 14 tests; TypeScript exits 0; script tests show 3 passed; UI run shows 14 passed. If UI environment is unavailable, record the real error and do not mark affected rows covered.
+Expected: list shows 12 tests; TypeScript exits 0; script tests show 3 passed; UI run shows 12 passed. If UI environment is unavailable, record the real error and do not mark affected rows covered.
 
 - [ ] **Step 3: 按真实通过行号更新矩阵**
 
 ```powershell
-rg -n "POS-15602|POS-42886|POS-42888|POS-28674|POS-39762|POS-16303|POS-16314|POS-16315|POS-16316|POS-16318|POS-16325|POS-32905|POS-33244|POS-33600" tests/py-migrate/order-page-regression.spec.ts
+rg -n "POS-15602|POS-42888|POS-39762|POS-16303|POS-16314|POS-16315|POS-16316|POS-16318|POS-16325|POS-32905|POS-33244|POS-33600" tests/py-migrate/order-page-regression.spec.ts
 ```
 
-For each passed test, set its row to `已等价覆盖` and record the observed `order-page-regression.spec.ts:<line>` plus the Page/Flow chain. If all 14 pass, summary becomes:
+For each passed test, set its row to `已等价覆盖` and record the observed `order-page-regression.spec.ts:<line>` plus the Page/Flow chain. If all 12 pass, summary becomes:
 
 ```text
-18 / 0 / 0 / 48 / 0 / 0 = 66
+16 / 0 / 0 / 50 / 0 / 0 = 66
 ```
 
-Do not renumber or modify the 48 recording IDs.
+Do not renumber or modify existing `ORDER-PAGE-001`～`ORDER-PAGE-048`; POS-42886、POS-28674 remain recording-only as `ORDER-PAGE-049`、`ORDER-PAGE-050`.
 
 - [ ] **Step 4: 最终检查与提交**
 
@@ -520,7 +504,7 @@ git commit -m "docs: mark no-recording order page cases covered"
 
 ## Self-Review Notes
 
-- 14 个 Jira 全部映射到一个任务；Task 6 用脚本验证完整集合。
+- 12 个 Jira 全部映射到一个任务；Task 6 用脚本验证完整集合。
 - 七条同 Jira 旧用例迁出，POS-23204/POS-24394 保留。
 - 两个 Page API 在 locator、section、facade、测试中的命名完全一致。
 - POS-15602 成功 trace 证明菜单组选中态与 Count locator。

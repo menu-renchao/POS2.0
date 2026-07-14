@@ -2,7 +2,7 @@
 
 本文档记录当前自动化中缺少真实页面 DOM 契约、需要人工录制补充的场景。
 
-订单操作回归当前共有 **7 条 skipped**：其中 **6 条需要录制**，归并为 **2 组录制请求**（报表 Fee/Unpaid 5 条，POS-27242 1 条）；POS-32954 因“POS NG 不适用”保留 skip 但不需要录制。点单页面提示词另新增 **48 条**一对一录制请求。
+订单操作回归当前共有 **7 条 skipped**：其中 **6 条需要录制**，归并为 **2 组录制请求**（报表 Fee/Unpaid 5 条，POS-27242 1 条）；POS-32954 因“POS NG 不适用”保留 skip 但不需要录制。点单页面提示词另新增 **50 条**一对一录制请求。
 
 ## 提交格式
 
@@ -59,9 +59,11 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 
 ## 点单页面提示词待补充
 
-以下 48 条需求与点单页面提示词覆盖矩阵严格一一对应，编号按原提示词编号升序分配。
+以下 50 条需求与点单页面提示词覆盖矩阵严格一一对应。既有 `ORDER-PAGE-001`～`ORDER-PAGE-048` 保持原顺序和映射；两条重新分类的折扣场景追加为 `ORDER-PAGE-049`、`ORDER-PAGE-050`，不重编号既有条目。
 
 录制提交格式统一沿用本文档顶部“提交格式”，不在各条目中重复。
+
+本次重新分类不得记录或引用用户刚删除的 POS-27242 附件内容；现有 POS-27242 录制请求保持不变。
 
 ### ORDER-PAGE-001：提示词 2 POS-15605 点单页面菜单--组 中文展示
 
@@ -638,6 +640,30 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 请保留证据：临时 combo parent/subitem/parentOption 与 ordinaryItem/ordinaryOption 的创建删除请求和各自 ID，菜单响应中的 owner 关系，combo subitem 卡、自动返回状态、parent option 面板、普通菜 option 面板、两条订单行层级 DOM，两个阶段草稿 payload 中 option.ownerItemId；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
 - 当前阻塞：无 option 子菜返回 combo parent option 后，再添加普通非套餐菜作为 option 对照。
 - 录制返回后计划补充：`api/setup/combo.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：套餐配置 API/setup 负责临时关系生命周期，`pages/order-dishes/order-dishes-menu.section.ts` 负责两类 option 面板与转场，reads section 负责套餐/普通菜订单行窄读取，`flows/order-dishes.flow.ts` 负责编排对照与清理。
+
+### ORDER-PAGE-049：提示词 7 POS-42886 菜品操作改价时可以选择单菜折扣
+
+- Jira：`POS-42886`。
+- 已知前置：可从 POS 首页进入点单页、折前 Subtotal 为 8.80 的普通菜，以及产品真实支持的单菜 Discount 入口；不得把 `Custom Charge` 当作 Discount。
+- 请从 POS 首页开始录制：
+  1. 最小录制路径：从 POS 首页建立员工上下文，进入堂食无桌点单并添加目标普通菜，读取并保留折前 Subtotal 8.80；选中目标菜后进入真实单菜折扣入口，记录该入口的作用域与选中目标；在真实折扣弹窗中选择百分比、输入 10 并确认，读取折后 Subtotal 7.92；保存订单，再从 Recall 精确打开该订单并复核目标菜折扣明细与 Subtotal 7.92；
+  2. 逐一展示真实折扣入口、目标菜选中态、作用域、弹窗标题和模式、百分比选择、数字输入、确认动作、保存与 Recall 转场，不得使用 `pos-ui-option-__custom_discount__` 打开的 `Custom Charge` 弹窗替代；
+  3. 在最终断言所在页面保留折前 8.80、10% 折扣金额、折后 7.92 与 Recall 一致性证据，并明确结果不是 9.68 或 `Charge(10%) $0.88`。
+- 请保留证据：真实单菜 Discount 入口、作用域、目标菜选中态、弹窗内稳定 data-testid/role/label、百分比模式、输入方式、确认按钮、折扣前后数值，以及保存/Recall 请求响应中的订单号、目标 itemId、折扣类型/比例/金额和最终 Subtotal。
+- 当前阻塞：真实 UI 已证明现有 `pos-ui-option-__custom_discount__` 只打开正向 `Custom Charge`；10% 后 Subtotal 从 8.80 变为 9.68，现有契约不能代表 Discount，且缺少真实折扣入口、弹窗和结果 DOM 契约。
+- 录制返回后计划补充：`pages/order-dishes/order-dishes-discount.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order-page-regression.spec.ts` 中的以下职责：Page 负责真实单菜折扣入口、弹窗动作与窄读取，Flow 负责编排选菜、保存和 Recall 回查，spec 断言 8.80 的 10% 折扣按产品规则得到 7.92。
+
+### ORDER-PAGE-050：提示词 28 POS-28674 特殊价格的菜-设置50%折扣，保存订单
+
+- Jira：`POS-28674`。
+- 已知前置：可从 POS 首页进入点单页、支持把目标菜改价为 5.85，以及产品真实支持的单菜 50% Discount 入口；不得把 `Custom Charge` 当作 Discount。
+- 请从 POS 首页开始录制：
+  1. 最小录制路径：从 POS 首页建立员工上下文，进入堂食无桌点单并添加目标菜；通过真实改价入口把目标菜改为 5.85，读取并保留改价结果；选中该菜进入真实单菜折扣入口，在真实折扣弹窗中选择百分比、输入 50 并确认，读取按产品舍入后的 Subtotal 2.92；保存订单，再从 Recall 精确打开该订单并复核目标菜改价、50% 折扣明细与 Subtotal 2.92；
+  2. 逐一展示改价入口与确认、真实折扣入口、目标菜选中态、作用域、弹窗标题和模式、百分比选择、数字输入、确认动作、保存与 Recall 转场，不得使用 `Custom Charge` 弹窗替代；
+  3. 在最终断言所在页面保留改价 5.85、50% 折扣金额、按产品舍入后的 2.92 与 Recall 一致性证据，并明确结果不是 8.78 Charge。
+- 请保留证据：真实改价与单菜 Discount 入口、作用域、目标菜选中态、弹窗内稳定 data-testid/role/label、百分比模式、输入方式、确认按钮、折扣前后数值，以及保存/Recall 请求响应中的订单号、目标 itemId、改价、折扣类型/比例/金额和最终 Subtotal。
+- 当前阻塞：把目标菜改价为 5.85 后调用现有 50% 接口，Subtotal 实际为 8.78；现有 `Custom Charge` 契约不能代表 Discount，且缺少真实 50% 折扣入口、作用域、弹窗与保存/Recall 结果契约。
+- 录制返回后计划补充：`pages/order-dishes/order-dishes-discount.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order-page-regression.spec.ts` 中的以下职责：Page 负责改价后真实单菜折扣入口、弹窗动作与窄读取，Flow 负责编排改价、折扣、保存和 Recall 回查，spec 断言 5.85 的 50% 折扣按产品舍入得到 2.92。
 
 ## 已收到，无需重复录制
 
