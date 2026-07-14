@@ -46,6 +46,9 @@
 
 ### Page 对象增量
 
+- `pages/order-dishes/order-dishes-locators.ts`
+  - 根据 POS-15602 成功 trace 中的真实 DOM，集中定义当前菜单组标签 `#grplist .grplistbtAct .grplistbtText` 和 Count 原值 `#ododttcnt`。
+  - 两个 locator 都只使用本页当前实际暴露的单一 legacy DOM 契约，不增加 frame/host、属性别名或多语言候选链。
 - `pages/order-dishes/order-dishes-menu.section.ts`
   - 增加 `readSelectedMenuGroupName(): Promise<string>`，返回当前选中菜单组名称。
   - 只使用页面实际暴露的稳定选中态契约；不得新增 `.or()`、候选属性列表、语言正则或父页面 fallback。
@@ -77,7 +80,7 @@ Recall 侧不新增数量 API，直接复用 `RecallOrderItem.quantity` / `order
 - POS-42886：单菜 10% 折扣后读取折扣前后价格，断言折后价等于原价乘 0.9，并保留折扣明细。
 - POS-42888：Modify 输入备注后保存，Recall 目标菜 additions 精确包含该备注。
 - POS-28674：菜价改为 5.85 后应用 50% 单菜折扣，保存前和 Recall 都断言折扣明细与产品舍入后的 2.92。
-- POS-39762：加 1.00 小费后平分并合并，断言分单后 Tips 为 1.00、合并后 Tips 为 2.00。
+- POS-39762：按源步骤加 2.00 小费后平分并合并，断言指定子单 Tips 为 1.00、合并后 Tips 为 2.00。
 - POS-16303、POS-16314、POS-16315、POS-16316、POS-16318、POS-16325：统一断言子单数量、菜品或座位归属、子单金额、支付状态以及金额守恒；每条只覆盖标题要求的分单模式。
 - POS-32905：点单页 Count 原文必须为 `4` 且不含小数点；Recall 数量直接断言 `3`、`1`。
 - POS-33244：合单后小数菜仍为 2.55，另一菜数量和价格不变，Subtotal 等于合单前两单之和。
