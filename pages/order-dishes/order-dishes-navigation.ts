@@ -39,6 +39,48 @@ export class OrderDishesPageNavigation {
       return new HomePage(this.page);
     }
 
+    @step('页面操作：保存订单并读取保存接口返回的精确订单号')
+    async saveOrderWithReference(): Promise<{ homePage: HomePage; orderNumber: string }> {
+      await this.host.expectLoaded();
+      const saveOrderButton = await this.resolveSaveOrderButton();
+      const [saveResponse] = await Promise.all([
+        this.page.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/kpos/api/order/save',
+          { timeout: 15_000 },
+        ),
+        saveOrderButton.click(),
+      ]);
+
+      if (!saveResponse.ok()) {
+        throw new Error(
+          `保存订单接口失败：${saveResponse.status()} ${saveResponse.url()}`,
+        );
+      }
+
+      const responseBody = (await saveResponse.json()) as unknown;
+      const responseData =
+        responseBody && typeof responseBody === 'object' && 'data' in responseBody
+          ? responseBody.data
+          : null;
+      const savedOrder =
+        responseData && typeof responseData === 'object' && 'order' in responseData
+          ? responseData.order
+          : null;
+      const orderNumber =
+        savedOrder && typeof savedOrder === 'object' && 'orderNumber' in savedOrder
+          ? savedOrder.orderNumber
+          : null;
+
+      if (typeof orderNumber !== 'string' || orderNumber.trim().length === 0) {
+        throw new Error('保存订单接口响应缺少非空字符串 data.order.orderNumber。');
+      }
+
+      await this.dismissPostSaveDialogsIfNeeded();
+      return { homePage: new HomePage(this.page), orderNumber: orderNumber.trim() };
+    }
+
     @step('页面操作：点击 Send 送厨订单')
     async sendOrder(): Promise<HomePage> {
       await this.host.expectLoaded();

@@ -338,6 +338,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.navigation.saveOrder(...args);
   }
 
+  saveOrderWithReference(...args: Parameters<OrderDishesPageNavigation['saveOrderWithReference']>): ReturnType<OrderDishesPageNavigation['saveOrderWithReference']> {
+    return this.navigation.saveOrderWithReference(...args);
+  }
+
   sendOrder(...args: Parameters<OrderDishesPageNavigation['sendOrder']>): ReturnType<OrderDishesPageNavigation['sendOrder']> {
     return this.navigation.sendOrder(...args);
   }

@@ -175,9 +175,9 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
           orderPageRegressionCases.combineDecimal.quantity,
         );
         const subtotal = (await orderPage.readPriceSummary()).Subtotal;
-        const savedHomePage = await orderPage.saveOrder();
+        const { homePage: savedHomePage, orderNumber } =
+          await orderPage.saveOrderWithReference();
         const recallPage = await recallFlow.openRecallFromHome(savedHomePage);
-        const orderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
 
         return { orderNumber, recallPage, subtotal };
       });
@@ -196,14 +196,15 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
 
       const secondOrder = await test.step('保存第二笔订单并记录精确订单号和数字小计', async () => {
         const subtotal = (await secondOrderPage.readPriceSummary()).Subtotal;
-        const savedHomePage = await secondOrderPage.saveOrder();
+        const { homePage: savedHomePage, orderNumber } =
+          await secondOrderPage.saveOrderWithReference();
         const recallPage = await recallFlow.openRecallFromHome(savedHomePage);
-        const orderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
 
         return { orderNumber, recallPage, subtotal };
       });
 
       await test.step('从 Recall 将第一笔订单合并到第二笔目标订单', async () => {
+        expect(firstOrder.orderNumber).not.toBe(secondOrder.orderNumber);
         await recallFlow.combineOrders(
           secondOrder.recallPage,
           firstOrder.orderNumber,
@@ -251,6 +252,8 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
           );
           await page.changeOrderedDishPrice(orderServiceDishes.regular.name, testCase.price);
           await page.changeOrderedDishQuantity(orderServiceDishes.regular.name, testCase.quantity);
+          const changedDishSubtotal = (await page.readPriceSummary()).Subtotal;
+          expect(toCents(changedDishSubtotal)).toBe(testCase.expectedLineCents);
           await orderFlow.addRegularDish(
             page,
             orderServiceDishes.test.name,
@@ -258,7 +261,6 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
           );
           const subtotal = (await page.readPriceSummary()).Subtotal;
 
-          expect(toCents(testCase.price * testCase.quantity)).toBe(testCase.expectedLineCents);
           return { orderPage: page, beforeSubtotal: subtotal };
         },
       );
@@ -269,6 +271,9 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         expect(
           details.items.find((item) => item.name === orderServiceDishes.regular.name)?.quantity,
         ).toBe(String(orderPageRegressionCases.pricedDecimal.quantity));
+        expect(
+          details.items.find((item) => item.name === orderServiceDishes.test.name)?.quantity,
+        ).toBe('1');
         expect(toCents(details.priceSummary.Subtotal)).toBe(toCents(beforeSubtotal));
         expect(details.priceSummary.Subtotal).toBeCloseTo(beforeSubtotal, 2);
       });
