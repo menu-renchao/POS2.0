@@ -609,7 +609,9 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
 
         const persistedOrder = await test.step('保存订单并从 Recall 打开分单页面', async () => {
-          return await saveAndOpenSplit(orderPage, employeeLoginPage);
+          return await saveAndOpenSplit(orderPage, employeeLoginPage, {
+            chargePromptAction: 'remove',
+          });
         });
         const { splitOrderPage } = persistedOrder;
         const splitFlow = new SplitOrderFlow();
@@ -796,7 +798,9 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
 
         const persistedOrder = await test.step('保存订单并从 Recall 打开分单页面', async () => {
-          return await saveAndOpenSplit(orderPage, employeeLoginPage);
+          return await saveAndOpenSplit(orderPage, employeeLoginPage, {
+            chargePromptAction: 'remove',
+          });
         });
         const { splitOrderPage } = persistedOrder;
         const splitFlow = new SplitOrderFlow();

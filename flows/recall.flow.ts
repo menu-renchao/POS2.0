@@ -558,9 +558,17 @@ export class RecallFlow {
       : await this.enterRecallFromSplitReturnPage(recallPage, homePage);
     await cleanupRecallPage.expectLoaded();
     await cleanupRecallPage.openOrderDetails(orderNumber);
-    const targetOrderNumbers = await cleanupRecallPage.readTargetOrderNumbers(orderNumber, {
-      requireSplitChildren: options.requireSplitChildren,
-    });
+    const targetOrderNumbers = options.requireSplitChildren
+      ? await waitUntil(
+          async () => await cleanupRecallPage.readTargetOrderNumbers(),
+          (orderNumbers) => orderNumbers.length >= 2,
+          {
+            timeout: 10_000,
+            interval: 100,
+            message: `Recall 订单 ${orderNumber} 未展示至少两个持久化子单。`,
+          },
+        )
+      : await cleanupRecallPage.readTargetOrderNumbers();
 
     if (targetOrderNumbers.length > 0) {
       await cleanupRecallPage.openOrderDetails(orderNumber, targetOrderNumbers[0]);

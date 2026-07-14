@@ -43,15 +43,20 @@ export class OrderDishesPageNavigation {
     async saveOrderWithReference(): Promise<{ homePage: HomePage; orderNumber: string }> {
       await this.host.expectLoaded();
       const saveOrderButton = await this.resolveSaveOrderButton();
-      const [saveResponse] = await Promise.all([
-        this.page.waitForResponse(
-          (response) =>
-            response.request().method() === 'POST' &&
-            new URL(response.url()).pathname === '/kpos/api/order/save',
+      const [saveRequest] = await Promise.all([
+        this.page.waitForRequest(
+          (request) =>
+            request.method() === 'POST' &&
+            new URL(request.url()).pathname === '/kpos/api/order/save',
           { timeout: 15_000 },
         ),
         saveOrderButton.click(),
       ]);
+      const saveResponse = await saveRequest.response();
+
+      if (!saveResponse) {
+        throw new Error(`保存订单请求未返回响应：${saveRequest.url()}`);
+      }
 
       if (!saveResponse.ok()) {
         throw new Error(

@@ -660,7 +660,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
           await test.step('读取分单后的两个子单号并确认第一个子单 tips', async () => {
             const latestOrderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
             await recallPage.openOrderDetails(latestOrderNumber);
-            const targetOrderNumbers = await recallPage.readTargetOrderNumbers(latestOrderNumber);
+            const targetOrderNumbers = await recallPage.readTargetOrderNumbers();
             expect(targetOrderNumbers.length).toBeGreaterThanOrEqual(2);
 
             const [firstTargetOrderNumber, secondTargetOrderNumber] = targetOrderNumbers;

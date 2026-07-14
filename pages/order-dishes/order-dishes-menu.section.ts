@@ -230,7 +230,7 @@ export class OrderDishesMenuSection {
       await confirmButton.evaluate((buttonElement) => {
         (buttonElement as HTMLElement).click();
       });
-      await expect(confirmButton).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
+      await expect(confirmButton).toBeHidden({ timeout: 5_000 });
     }
 
     @step((dishName: string, taxExempt: boolean) =>

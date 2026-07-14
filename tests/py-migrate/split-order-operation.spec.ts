@@ -869,7 +869,7 @@ async function openLatestSplitOrderTargets(recallPage: RecallPage): Promise<Spli
   const latestVisibleOrderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
   const orderNumber = latestVisibleOrderNumber.replace(/-\d+$/, '');
   await recallPage.openOrderDetails(orderNumber);
-  const targetOrderNumbers = await recallPage.readTargetOrderNumbers(orderNumber);
+  const targetOrderNumbers = await recallPage.readTargetOrderNumbers();
 
   expect(targetOrderNumbers.length, 'Recall 详情应至少展示两个分单子单。').toBeGreaterThanOrEqual(2);
 
