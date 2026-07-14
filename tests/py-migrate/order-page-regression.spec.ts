@@ -3,11 +3,13 @@ import { HomeFlow } from '../../flows/home.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
 import { RecallFlow } from '../../flows/recall.flow';
 import { SelectTableFlow } from '../../flows/select-table.flow';
+import { SplitOrderFlow } from '../../flows/split-order.flow';
 import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import type { EmployeeLoginPage } from '../../pages/employee-login.page';
 import type { HomePage } from '../../pages/home.page';
 import type { OrderDishesPage } from '../../pages/order-dishes.page';
+import type { SplitOrderSnapshot } from '../../pages/split-order.page';
 import {
   orderPageRegressionCases,
   orderServiceDishes,
@@ -27,6 +29,28 @@ async function saveAndReadLatestRecallDetails(orderDishesPage: OrderDishesPage) 
   const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
   await recallPage.openOrderDetails(orderNumber);
   return { details: await recallPage.readOrderDetailsSnapshot(), orderNumber, recallPage };
+}
+
+async function saveAndOpenSplit(orderPage: OrderDishesPage) {
+  const homePage = await orderPage.saveOrder();
+  const recallFlow = new RecallFlow();
+  const recallPage = await recallFlow.openRecallFromHome(homePage);
+  const orderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
+  const splitOrderPage = await recallFlow.openSplitOrder(recallPage, orderNumber);
+  return { orderNumber, recallPage, splitOrderPage };
+}
+
+function suborderTotal(snapshot: SplitOrderSnapshot): number {
+  return snapshot.suborders.reduce(
+    (sum, suborder) => sum + Number(suborder.total ?? 0),
+    0,
+  );
+}
+
+function expectUnpaidSuborders(snapshot: SplitOrderSnapshot): void {
+  for (const suborder of snapshot.suborders) {
+    expect(suborder.paidStatus, `子单 ${suborder.orderNumber} 应保持未支付状态`).toBeNull();
+  }
 }
 
 function toCents(value: number): number {
@@ -162,6 +186,268 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
               .find((item) => item.name === dishName)
               ?.additions.map((addition) => addition.name.trim()),
           ).toContain('POS-42888');
+        });
+      },
+    );
+  });
+
+  test.describe('持久化分单回归', { tag: ['@分单'] }, () => {
+    test.describe.configure({ timeout: 180_000 });
+
+    test(
+      '[POS-16303] 应能保存 To Go 订单后从 Recall 平分两份并保持金额守恒',
+      {
+        annotation: [jiraIssueAnnotation('POS-16303')],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome(homePage, employeeLoginPage);
+        });
+
+        const orderPage = await test.step('创建 To Go 订单并添加普通菜', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(ready);
+          await new OrderDishesFlow().addRegularDish(
+            page,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          return page;
+        });
+
+        const splitOrderPage = await test.step('保存订单并从 Recall 打开分单页面', async () => {
+          return (await saveAndOpenSplit(orderPage)).splitOrderPage;
+        });
+        const splitFlow = new SplitOrderFlow();
+
+        await test.step('将订单平分为两个子单', async () => {
+          await splitFlow.splitOrderEvenly(splitOrderPage, 2);
+        });
+
+        await test.step('校验两个未支付子单的金额总和与订单总额一致', async () => {
+          const even = await splitOrderPage.readSnapshot();
+          expect(even.suborders).toHaveLength(2);
+          expectUnpaidSuborders(even);
+          expect(suborderTotal(even)).toBeCloseTo(Number(even.total), 2);
+        });
+
+        await test.step('提交平分结果', async () => {
+          await splitFlow.submitAndReturnPage(splitOrderPage);
+        });
+      },
+    );
+
+    test(
+      '[POS-16314] 应能保存两道不同菜品后从 Recall 将普通菜2移入新子单',
+      {
+        annotation: [jiraIssueAnnotation('POS-16314')],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome(homePage, employeeLoginPage);
+        });
+
+        const orderPage = await test.step('创建 To Go 订单并添加两道不同菜品', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(ready);
+          const orderFlow = new OrderDishesFlow();
+          await orderFlow.addRegularDish(
+            page,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          await orderFlow.addRegularDish(
+            page,
+            orderServiceDishes.test.name,
+            orderServiceDishes.test.menu,
+          );
+          return page;
+        });
+
+        const splitOrderPage = await test.step('保存订单并从 Recall 打开分单页面', async () => {
+          return (await saveAndOpenSplit(orderPage)).splitOrderPage;
+        });
+        const splitFlow = new SplitOrderFlow();
+
+        await test.step('将普通菜2移入新建子单', async () => {
+          await splitFlow.moveDishToNewSuborder(splitOrderPage, orderServiceDishes.test.name);
+        });
+
+        await test.step('校验普通菜2仅在一个未支付子单中且金额守恒', async () => {
+          const moved = await splitOrderPage.readSnapshot();
+          expect(moved.suborders).toHaveLength(2);
+          expectUnpaidSuborders(moved);
+          expect(
+            moved.suborders.filter((order) =>
+              order.dishes.some((dish) => dish.name === orderServiceDishes.test.name),
+            ),
+          ).toHaveLength(1);
+          expect(suborderTotal(moved)).toBeCloseTo(Number(moved.total), 2);
+        });
+
+        await test.step('提交按菜移动结果', async () => {
+          await splitFlow.submitAndReturnPage(splitOrderPage);
+        });
+      },
+    );
+
+    test(
+      '[POS-16316] 应能保存改价为 10.60 的订单后从 Recall 按 2 和 8.6 分单',
+      {
+        annotation: [jiraIssueAnnotation('POS-16316')],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome(homePage, employeeLoginPage);
+        });
+
+        const orderPage = await test.step('创建 To Go 订单并将普通菜1价格修改为 10.60', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(ready);
+          await new OrderDishesFlow().addRegularDish(
+            page,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          await page.changeOrderedDishPrice(orderServiceDishes.regular.name, 10.6);
+          return page;
+        });
+
+        const splitOrderPage = await test.step('保存订单并从 Recall 打开分单页面', async () => {
+          return (await saveAndOpenSplit(orderPage)).splitOrderPage;
+        });
+        const splitFlow = new SplitOrderFlow();
+
+        await test.step('按金额 2 和 8.6 拆分订单', async () => {
+          await splitFlow.splitOrderByAmounts(splitOrderPage, [2, 8.6]);
+        });
+
+        await test.step('校验两个未支付子单金额依次为 2 和 8.6', async () => {
+          const amounts = await splitOrderPage.readSnapshot();
+          expect(amounts.suborders.map((order) => Number(order.total))).toEqual([2, 8.6]);
+          expectUnpaidSuborders(amounts);
+        });
+
+        await test.step('提交按金额分单结果', async () => {
+          await splitFlow.submitAndReturnPage(splitOrderPage);
+        });
+      },
+    );
+
+    test(
+      '[POS-16318] 应能保存订单并提交平分后从 Recall 撤销分单恢复总额',
+      {
+        annotation: [jiraIssueAnnotation('POS-16318')],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome(homePage, employeeLoginPage);
+        });
+
+        const orderPage = await test.step('创建 To Go 订单并添加普通菜', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(ready);
+          await new OrderDishesFlow().addRegularDish(
+            page,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          return page;
+        });
+
+        const persistedOrder = await test.step('保存订单并从 Recall 打开分单页面', async () => {
+          return await saveAndOpenSplit(orderPage);
+        });
+        const splitFlow = new SplitOrderFlow();
+        const original = await test.step('读取分单前订单总额', async () => {
+          return Number((await persistedOrder.splitOrderPage.readSnapshot()).total);
+        });
+
+        await test.step('将订单平分两份并校验子单未支付后提交', async () => {
+          await splitFlow.splitOrderEvenly(persistedOrder.splitOrderPage, 2);
+          const even = await persistedOrder.splitOrderPage.readSnapshot();
+          expect(even.suborders).toHaveLength(2);
+          expectUnpaidSuborders(even);
+          await splitFlow.submitAndReturnPage(persistedOrder.splitOrderPage);
+        });
+
+        const reopened = await test.step('从 Recall 重新打开已提交订单的分单页面', async () => {
+          return await new RecallFlow().openSplitOrder(
+            persistedOrder.recallPage,
+            persistedOrder.orderNumber,
+          );
+        });
+
+        await test.step('撤销已提交的平分结果', async () => {
+          await splitFlow.cancelSplit(reopened);
+        });
+
+        await test.step('校验撤销后恢复为一个未支付子单且订单总额不变', async () => {
+          const restored = await reopened.readSnapshot();
+          expect(restored.suborders).toHaveLength(1);
+          expectUnpaidSuborders(restored);
+          expect(Number(restored.total)).toBeCloseTo(original, 2);
+        });
+
+        await test.step('提交撤销分单结果', async () => {
+          await splitFlow.submitAndReturnPage(reopened);
+        });
+      },
+    );
+
+    test(
+      '[POS-16325] 应能保存两人堂食两菜订单后从 Recall 对普通菜1执行 Even Item',
+      {
+        annotation: [jiraIssueAnnotation('POS-16325')],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome(homePage, employeeLoginPage);
+        });
+
+        const orderPage = await test.step('选择任意空桌和两位客人并添加两道菜', async () => {
+          const selectTablePage = await ready.enterDineIn();
+          const { orderDishesPage } =
+            await new SelectTableFlow().selectAnyAvailableTableAndEnterOrderDishes(
+              selectTablePage,
+              2,
+            );
+          const orderFlow = new OrderDishesFlow();
+          await orderFlow.addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          await orderFlow.addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.test.name,
+            orderServiceDishes.test.menu,
+          );
+          return orderDishesPage;
+        });
+
+        const splitOrderPage = await test.step('保存订单并从 Recall 打开分单页面', async () => {
+          return (await saveAndOpenSplit(orderPage)).splitOrderPage;
+        });
+        const splitFlow = new SplitOrderFlow();
+
+        await test.step('在子单 1 将普通菜1按两份执行 Even Item', async () => {
+          await splitFlow.evenSplitDishOnSuborder(splitOrderPage, {
+            dishName: orderServiceDishes.regular.name,
+            splitCount: 2,
+            suborderIndex: '1',
+          });
+        });
+
+        await test.step('校验普通菜1拆成两个二分之一且子单保持未支付', async () => {
+          const items = await splitOrderPage.readSnapshot();
+          expect(
+            items.suborders
+              .flatMap((order) => order.dishes)
+              .filter((dish) => dish.name === orderServiceDishes.regular.name)
+              .map((dish) => dish.proportion),
+          ).toEqual(['1/2', '1/2']);
+          expectUnpaidSuborders(items);
+        });
+
+        await test.step('提交按菜品平分结果', async () => {
+          await splitFlow.submitAndReturnPage(splitOrderPage);
         });
       },
     );
