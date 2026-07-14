@@ -103,7 +103,7 @@ Run:
 
 ```powershell
 $matrix = Get-Content -Raw -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8
-$rows = [regex]::Matches($matrix, '(?m)^\| (?<n>\d+) \|')
+$rows = [regex]::Matches($matrix, '(?m)^\| (?<n>\d+) \| (?:(?:POS-\d+)(?:,\s*POS-\d+)*|—) \|')
 $numbers = @($rows | ForEach-Object { [int]$_.Groups['n'].Value })
 [pscustomobject]@{
   Rows = $rows.Count
@@ -181,7 +181,7 @@ Run:
 
 ```powershell
 $matrix = Get-Content -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8
-$targetRows = $matrix | Where-Object { $_ -match '^\| (?<n>\d+) \|' -and [int]$Matches.n -le 19 }
+$targetRows = $matrix | Where-Object { $_ -match '^\| (?<n>\d+) \| (?:(?:POS-\d+)(?:,\s*POS-\d+)*|—) \|' -and [int]$Matches.n -le 19 }
 $unaudited = @($targetRows | Where-Object { $_ -match '未审计|未归类|尚未执行语义审计' })
 [pscustomobject]@{ Rows = $targetRows.Count; Unaudited = $unaudited.Count }
 ```
@@ -240,7 +240,7 @@ Run:
 
 ```powershell
 $matrix = Get-Content -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8
-$targetRows = $matrix | Where-Object { $_ -match '^\| (?<n>\d+) \|' -and [int]$Matches.n -ge 20 -and [int]$Matches.n -le 39 }
+$targetRows = $matrix | Where-Object { $_ -match '^\| (?<n>\d+) \| (?:(?:POS-\d+)(?:,\s*POS-\d+)*|—) \|' -and [int]$Matches.n -ge 20 -and [int]$Matches.n -le 39 }
 $unaudited = @($targetRows | Where-Object { $_ -match '未审计|未归类|尚未执行语义审计' })
 [pscustomobject]@{ Rows = $targetRows.Count; Unaudited = $unaudited.Count }
 ```
@@ -297,7 +297,7 @@ Run:
 
 ```powershell
 $matrix = Get-Content -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8
-$targetRows = $matrix | Where-Object { $_ -match '^\| (?<n>\d+) \|' -and [int]$Matches.n -ge 40 -and [int]$Matches.n -le 53 }
+$targetRows = $matrix | Where-Object { $_ -match '^\| (?<n>\d+) \| (?:(?:POS-\d+)(?:,\s*POS-\d+)*|—) \|' -and [int]$Matches.n -ge 40 -and [int]$Matches.n -le 53 }
 $unaudited = @($targetRows | Where-Object { $_ -match '未审计|未归类|尚未执行语义审计' })
 [pscustomobject]@{ Rows = $targetRows.Count; Unaudited = $unaudited.Count }
 ```
@@ -354,7 +354,7 @@ Run:
 
 ```powershell
 $matrix = Get-Content -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8
-$rows = @($matrix | Where-Object { $_ -match '^\| (?<n>\d+) \|' })
+$rows = @($matrix | Where-Object { $_ -match '^\| (?<n>\d+) \| (?:(?:POS-\d+)(?:,\s*POS-\d+)*|—) \|' })
 $unaudited = @($rows | Where-Object { $_ -match '未审计|未归类|尚未执行语义审计' })
 [pscustomobject]@{ Rows = $rows.Count; Unaudited = $unaudited.Count }
 ```
@@ -386,7 +386,7 @@ Run:
 
 ```powershell
 $rows = Get-Content -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8
-$recordingRows = @($rows | Where-Object { $_ -match '^\| \d+ \|' -and $_ -match '\| 需要录制 \|' })
+$recordingRows = @($rows | Where-Object { $_ -match '^\| (?<n>\d+) \| (?:(?:POS-\d+)(?:,\s*POS-\d+)*|—) \|' -and $_ -match '\| 需要录制 \|' })
 $recordingRows
 'RecordingCount={0}' -f $recordingRows.Count
 ```
@@ -459,7 +459,7 @@ Run:
 
 ```powershell
 $matrix = Get-Content -Raw -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8
-$rows = [regex]::Matches($matrix, '(?m)^\| (?<n>\d+) \|(?<body>.+)$')
+$rows = [regex]::Matches($matrix, '(?m)^\| (?<n>\d+) \| (?:(?:POS-\d+)(?:,\s*POS-\d+)*|—) \|(?<body>.+)$')
 $numbers = @($rows | ForEach-Object { [int]$_.Groups['n'].Value })
 $allowed = '已等价覆盖|待补断言|可直接实现|需要录制|产品异常|环境阻塞'
 $invalid = @($rows | Where-Object { $_.Groups['body'].Value -notmatch "\| ($allowed) \|" })
@@ -477,7 +477,7 @@ Expected: `Rows=66`、`NumberingIssues=0`、`InvalidStatuses=0`。
 Run:
 
 ```powershell
-$rows = Get-Content -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8 | Where-Object { $_ -match '^\| \d+ \|' }
+$rows = Get-Content -LiteralPath 'docs\plans\2026-07-14-order-page-prompt-coverage.md' -Encoding UTF8 | Where-Object { $_ -match '^\| (?<n>\d+) \| (?:(?:POS-\d+)(?:,\s*POS-\d+)*|—) \|' }
 $invalidCovered = @($rows | Where-Object { $_ -match '\| 已等价覆盖 \|' -and $_ -notmatch 'tests/py-migrate/.+\.spec\.ts:\d+' })
 $invalidRecording = @($rows | Where-Object { $_ -match '\| 需要录制 \|' -and $_ -notmatch 'ORDER-PAGE-\d{3}' })
 $vagueEnvironment = @($rows | Where-Object { $_ -match '\| 环境阻塞 \|' -and $_ -match '环境不可用' })
