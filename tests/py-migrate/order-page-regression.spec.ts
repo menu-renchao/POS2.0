@@ -41,10 +41,7 @@ async function saveAndOpenSplit(orderPage: OrderDishesPage) {
 }
 
 function suborderTotal(snapshot: SplitOrderSnapshot): number {
-  return snapshot.suborders.reduce(
-    (sum, suborder) => sum + Number(suborder.total ?? 0),
-    0,
-  );
+  return snapshot.suborders.reduce((sum, suborder) => sum + suborder.total, 0);
 }
 
 function expectUnpaidSuborders(snapshot: SplitOrderSnapshot): void {
@@ -227,7 +224,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
           const even = await splitOrderPage.readSnapshot();
           expect(even.suborders).toHaveLength(2);
           expectUnpaidSuborders(even);
-          expect(suborderTotal(even)).toBeCloseTo(Number(even.total), 2);
+          expect(suborderTotal(even)).toBeCloseTo(even.total, 2);
         });
 
         await test.step('提交平分结果', async () => {
@@ -280,7 +277,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
               order.dishes.some((dish) => dish.name === orderServiceDishes.test.name),
             ),
           ).toHaveLength(1);
-          expect(suborderTotal(moved)).toBeCloseTo(Number(moved.total), 2);
+          expect(suborderTotal(moved)).toBeCloseTo(moved.total, 2);
         });
 
         await test.step('提交按菜移动结果', async () => {
@@ -321,7 +318,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
 
         await test.step('校验两个未支付子单金额依次为 2 和 8.6', async () => {
           const amounts = await splitOrderPage.readSnapshot();
-          expect(amounts.suborders.map((order) => Number(order.total))).toEqual([2, 8.6]);
+          expect(amounts.suborders.map((order) => order.total)).toEqual([2, 8.6]);
           expectUnpaidSuborders(amounts);
         });
 
@@ -356,7 +353,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
         });
         const splitFlow = new SplitOrderFlow();
         const original = await test.step('读取分单前订单总额', async () => {
-          return Number((await persistedOrder.splitOrderPage.readSnapshot()).total);
+          return (await persistedOrder.splitOrderPage.readSnapshot()).total;
         });
 
         await test.step('将订单平分两份并校验子单未支付后提交', async () => {
@@ -382,7 +379,7 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
           const restored = await reopened.readSnapshot();
           expect(restored.suborders).toHaveLength(1);
           expectUnpaidSuborders(restored);
-          expect(Number(restored.total)).toBeCloseTo(original, 2);
+          expect(restored.total).toBeCloseTo(original, 2);
         });
 
         await test.step('提交撤销分单结果', async () => {

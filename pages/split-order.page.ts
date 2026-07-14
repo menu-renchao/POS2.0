@@ -17,14 +17,14 @@ export type SplitOrderSuborderSnapshot = {
   orderNumber: string;
   paidStatus: string | null;
   seats: string[];
-  total: string | null;
+  total: number;
 };
 
 export type SplitOrderSnapshot = {
-  remain: string | null;
+  remain: number | null;
   suborders: SplitOrderSuborderSnapshot[];
   title: string;
-  total: string | null;
+  total: number;
 };
 
 export type SplitOrderReturnPage = HomePage | OrderDishesPage | RecallPage;
@@ -714,7 +714,21 @@ export class SplitOrderPage {
       throw new Error('Unable to read the split order snapshot because the split panel was not found.');
     }
 
-    return snapshot;
+    return {
+      remain:
+        snapshot.remain === null
+          ? null
+          : this.parseRequiredSnapshotAmount(snapshot.remain, '剩余金额'),
+      suborders: snapshot.suborders.map((suborder) => ({
+        ...suborder,
+        total: this.parseRequiredSnapshotAmount(
+          suborder.total,
+          `子单 ${suborder.orderNumber} 总额`,
+        ),
+      })),
+      title: snapshot.title,
+      total: this.parseRequiredSnapshotAmount(snapshot.total, '订单总额'),
+    };
   }
 
   @step((orderNumber: string, dishName: string) => `页面读取：读取子单 ${orderNumber} 中菜品 ${dishName} 的平分比例`)
@@ -1167,6 +1181,20 @@ export class SplitOrderPage {
   private parseSplitDishProportionFromText(text: string): string | null {
     const matchedProportion = text.match(/(?:^|\s)(1\/\d+)(?!\d)/);
     return matchedProportion?.[1] ?? null;
+  }
+
+  private parseRequiredSnapshotAmount(value: string | null, label: string): number {
+    if (value === null) {
+      throw new Error(`分单页面快照缺少${label}。`);
+    }
+
+    const amount = Number(value);
+
+    if (!Number.isFinite(amount)) {
+      throw new Error(`分单页面快照中的${label}不是有效数字：${value}`);
+    }
+
+    return amount;
   }
 
   private normalizeOrderNumber(value: string | null | undefined): string {
