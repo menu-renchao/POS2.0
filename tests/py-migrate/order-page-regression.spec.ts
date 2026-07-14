@@ -151,6 +151,130 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
     },
   );
 
+  test(
+    '[POS-33244] 应能合并含小数数量的两笔 To Go 订单并保持数量和小计守恒',
+    {
+      annotation: [jiraIssueAnnotation('POS-33244')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome(homePage, employeeLoginPage);
+      });
+      const recallFlow = new RecallFlow();
+      const orderFlow = new OrderDishesFlow();
+
+      const firstOrder = await test.step('创建第一笔 To Go 订单并将普通菜1数量改为 2.55', async () => {
+        const orderPage = await new TakeoutFlow().startToGoOrder(ready);
+        await orderFlow.addRegularDish(
+          orderPage,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
+        await orderPage.changeOrderedDishQuantity(
+          orderServiceDishes.regular.name,
+          orderPageRegressionCases.combineDecimal.quantity,
+        );
+        const subtotal = (await orderPage.readPriceSummary()).Subtotal;
+        const savedHomePage = await orderPage.saveOrder();
+        const recallPage = await recallFlow.openRecallFromHome(savedHomePage);
+        const orderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
+
+        return { orderNumber, recallPage, subtotal };
+      });
+
+      const secondOrderPage = await test.step('退出 Recall 并从首页创建第二笔 To Go 测试菜订单', async () => {
+        await firstOrder.recallPage.exitRecall();
+        await homePage.expectPrimaryFunctionCardsVisible();
+        const orderPage = await new TakeoutFlow().startToGoOrder(homePage);
+        await orderFlow.addRegularDish(
+          orderPage,
+          orderServiceDishes.test.name,
+          orderServiceDishes.test.menu,
+        );
+        return orderPage;
+      });
+
+      const secondOrder = await test.step('保存第二笔订单并记录精确订单号和数字小计', async () => {
+        const subtotal = (await secondOrderPage.readPriceSummary()).Subtotal;
+        const savedHomePage = await secondOrderPage.saveOrder();
+        const recallPage = await recallFlow.openRecallFromHome(savedHomePage);
+        const orderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
+
+        return { orderNumber, recallPage, subtotal };
+      });
+
+      await test.step('从 Recall 将第一笔订单合并到第二笔目标订单', async () => {
+        await recallFlow.combineOrders(
+          secondOrder.recallPage,
+          firstOrder.orderNumber,
+          secondOrder.orderNumber,
+        );
+      });
+
+      await test.step('按目标订单号回查并校验两道菜数量和小计金额守恒', async () => {
+        await secondOrder.recallPage.openOrderDetails(secondOrder.orderNumber);
+        const combined = await secondOrder.recallPage.readOrderDetailsSnapshot();
+        const expectedSubtotal = firstOrder.subtotal + secondOrder.subtotal;
+
+        expect(
+          combined.items.find((item) => item.name === orderServiceDishes.regular.name)?.quantity,
+        ).toBe(String(orderPageRegressionCases.combineDecimal.quantity));
+        expect(
+          combined.items.find((item) => item.name === orderServiceDishes.test.name)?.quantity,
+        ).toBe('1');
+        expect(toCents(combined.priceSummary.Subtotal)).toBe(toCents(expectedSubtotal));
+        expect(combined.priceSummary.Subtotal).toBeCloseTo(expectedSubtotal, 2);
+      });
+    },
+  );
+
+  test(
+    '[POS-33600] 应能保存改价为 6.50 且数量为 1.5 的菜品并保持小计一致',
+    {
+      annotation: [jiraIssueAnnotation('POS-33600')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome(homePage, employeeLoginPage);
+      });
+
+      const { orderPage, beforeSubtotal } = await test.step(
+        '创建 To Go 订单并将普通菜1改价为 6.50、数量改为 1.5 后添加普通菜2',
+        async () => {
+          const page = await new TakeoutFlow().startToGoOrder(ready);
+          const orderFlow = new OrderDishesFlow();
+          const testCase = orderPageRegressionCases.pricedDecimal;
+          await orderFlow.addRegularDish(
+            page,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          await page.changeOrderedDishPrice(orderServiceDishes.regular.name, testCase.price);
+          await page.changeOrderedDishQuantity(orderServiceDishes.regular.name, testCase.quantity);
+          await orderFlow.addRegularDish(
+            page,
+            orderServiceDishes.test.name,
+            orderServiceDishes.test.menu,
+          );
+          const subtotal = (await page.readPriceSummary()).Subtotal;
+
+          expect(toCents(testCase.price * testCase.quantity)).toBe(testCase.expectedLineCents);
+          return { orderPage: page, beforeSubtotal: subtotal };
+        },
+      );
+
+      await test.step('保存订单后从 Recall 校验小数数量和数字小计金额一致', async () => {
+        const { details } = await saveAndReadLatestRecallDetails(orderPage);
+
+        expect(
+          details.items.find((item) => item.name === orderServiceDishes.regular.name)?.quantity,
+        ).toBe(String(orderPageRegressionCases.pricedDecimal.quantity));
+        expect(toCents(details.priceSummary.Subtotal)).toBe(toCents(beforeSubtotal));
+        expect(details.priceSummary.Subtotal).toBeCloseTo(beforeSubtotal, 2);
+      });
+    },
+  );
+
   test.describe('折扣与备注回归', () => {
     test(
       '[POS-42888] 应能通过 Modify 添加备注并在 Recall 保留',
