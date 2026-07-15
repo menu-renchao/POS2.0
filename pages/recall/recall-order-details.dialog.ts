@@ -206,7 +206,7 @@ export class RecallOrderDetailsDialog {
   async openOrderDetails(orderNumber: string, targetOrderNumber?: string): Promise<void> {
     const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
 
-    await this.closeOrderDetailsDialog();
+    await this.dismissOrderDetailsDialogIfNeeded();
     await this.clickVisibleOrderNumber(normalizedOrderNumber);
     await this.waitForOrderDetailsDialogReady();
     await this.waitForParentOrderDetailsReady(normalizedOrderNumber);
@@ -1652,14 +1652,7 @@ export class RecallOrderDetailsDialog {
   }
   @step('页面操作：关闭当前订单详情弹窗')
   async closeOrderDetailsDialog(): Promise<void> {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      if (!(await this.orderDetailsDialog.isVisible().catch(() => false))) {
-        return;
-      }
-
-      await this.page.keyboard.press('Escape');
-      await expect(this.orderDetailsDialog).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
-    }
+    await this.dismissOrderDetailsDialogIfNeeded();
   }
 
   @step('页面操作：如 Recall 订单详情仍停留在页面上，则关闭详情并返回 Recall 列表')
@@ -1750,8 +1743,7 @@ export class RecallOrderDetailsDialog {
       }
     }
 
-    await this.page.keyboard.press('Escape').catch(() => undefined);
-    await expect(this.orderDetailsDialog).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
+    await expect(this.orderDetailsDialog).toBeHidden({ timeout: 5_000 });
   }
 
   @step('页面操作：在 Recall 订单详情中点击 Edit')
