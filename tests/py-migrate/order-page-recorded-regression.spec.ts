@@ -26,7 +26,7 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       annotation: [jiraIssueAnnotation('POS-42889')],
     },
     async ({ apiSetup, employeeLoginPage, homePage }) => {
-      const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName({
+      await apiSetup.systemConfiguration.updateManyByName({
         IS_PAYMENT_CONFIRM_REQUIRED: true,
         IS_NAME_REQUIRED: true,
         IS_PHONE_REQUIRED: true,
@@ -64,7 +64,11 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
           expect(await paymentPage.isPaymentPanelVisible()).toBe(false);
         });
       } finally {
-        await restoreConfiguration();
+        await apiSetup.systemConfiguration.updateManyByName({
+          IS_PAYMENT_CONFIRM_REQUIRED: false,
+          IS_NAME_REQUIRED: false,
+          IS_PHONE_REQUIRED: false,
+        });
       }
     },
   );
