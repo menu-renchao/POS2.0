@@ -1,8 +1,14 @@
 import { HomePage } from '../pages/home.page';
 import { OrderDishesPage } from '../pages/order-dishes.page';
 import { RecallPage } from '../pages/recall.page';
-import { type SplitOrderReturnPage, SplitOrderPage } from '../pages/split-order.page';
+import {
+  type SplitOrderReturnPage,
+  type SplitOrderSnapshot,
+  type SplitOrderSuborderSnapshot,
+  SplitOrderPage,
+} from '../pages/split-order.page';
 import { step } from '../utils/step';
+import { PaymentFlow } from './payment.flow';
 
 export const SPLIT_ORDER_SUBORDER_INDICES = ['1', '2', '3'] as const;
 
@@ -12,6 +18,20 @@ export type EvenSplitDishOnSuborderParams = {
   dishName: string;
   splitCount: number;
   suborderIndex: SplitOrderSuborderIndex;
+};
+
+export type PartialSplitPaymentOptions = {
+  paidSuborderIndex: number;
+  printReceipt: boolean;
+  splitCount: number;
+};
+
+export type PartialSplitPaymentResult = {
+  afterPayment: SplitOrderSnapshot;
+  paidSuborder: SplitOrderSuborderSnapshot;
+  parentOrderNumber: string;
+  returnPage: SplitOrderReturnPage;
+  unpaidSuborders: SplitOrderSuborderSnapshot[];
 };
 
 function assertSplitOrderSuborderIndex(
@@ -30,6 +50,72 @@ export class SplitOrderFlow {
     await splitOrderPage.clickEvenOrder();
     await splitOrderPage.fillSplitCount(count);
     await splitOrderPage.confirmSplitInput();
+  }
+
+  @step(
+    (_splitOrderPage: SplitOrderPage, options: PartialSplitPaymentOptions) =>
+      `业务步骤：将订单平分为 ${options.splitCount} 份，现金支付第 ${options.paidSuborderIndex} 个子单并提交`,
+  )
+  async splitEvenlyPaySuborderByCashAndSubmit(
+    splitOrderPage: SplitOrderPage,
+    options: PartialSplitPaymentOptions,
+  ): Promise<PartialSplitPaymentResult> {
+    if (!Number.isInteger(options.splitCount) || options.splitCount < 1) {
+      throw new Error(`平分份数必须是正整数，收到：${options.splitCount}`);
+    }
+    if (
+      !Number.isInteger(options.paidSuborderIndex) ||
+      options.paidSuborderIndex < 1 ||
+      options.paidSuborderIndex > options.splitCount
+    ) {
+      throw new Error(
+        `支付子单序号必须是 1 到 ${options.splitCount} 的整数，收到：${options.paidSuborderIndex}`,
+      );
+    }
+
+    await this.splitOrderEvenly(splitOrderPage, options.splitCount);
+    const beforePayment = await splitOrderPage.readSnapshot();
+    const paidSuborder = beforePayment.suborders[options.paidSuborderIndex - 1];
+
+    if (!paidSuborder) {
+      throw new Error(
+        `分单后不存在第 ${options.paidSuborderIndex} 个子单；实际子单数：${beforePayment.suborders.length}`,
+      );
+    }
+
+    const paymentPage = await splitOrderPage.openSuborderPayment(options.paidSuborderIndex);
+    await new PaymentFlow().payByCash(paymentPage, {
+      printReceipt: options.printReceipt,
+    });
+
+    const afterPayment = await splitOrderPage.readSnapshot();
+    const settledPaidSuborder = afterPayment.suborders.find(
+      (suborder) => suborder.orderNumber === paidSuborder.orderNumber,
+    );
+
+    if (!settledPaidSuborder) {
+      throw new Error(`支付后未找到子单 ${paidSuborder.orderNumber}。`);
+    }
+
+    const parentOrderNumber = settledPaidSuborder.orderNumber.split('-')[0];
+    if (!parentOrderNumber) {
+      throw new Error(`无法从子单号 ${settledPaidSuborder.orderNumber} 解析母单号。`);
+    }
+
+    const unpaidSuborders = afterPayment.suborders.filter(
+      (suborder) => suborder.orderNumber !== settledPaidSuborder.orderNumber,
+    );
+    await splitOrderPage.submitAndWaitForSuccess();
+    await splitOrderPage.clickBlankOutsideSubmittedSplitModal();
+    const returnPage = await splitOrderPage.dismissOrderSummaryIfNeededAndReturnHome();
+
+    return {
+      afterPayment,
+      paidSuborder: settledPaidSuborder,
+      parentOrderNumber,
+      returnPage,
+      unpaidSuborders,
+    };
   }
 
   @step((_splitOrderPage: SplitOrderPage, amounts: number[]) => `业务步骤：按金额分单，金额序列为 ${amounts.join('、')}`)
