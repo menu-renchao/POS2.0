@@ -101,6 +101,7 @@ export class RecallOrderDetailsDialog {
   private readonly moveDishesToNewOrderButton: Locator;
   private readonly moveDishesTargetSelectionPrompt: Locator;
   private readonly globalLoadingOverlay: Locator;
+  private readonly globalLoadingBackdrops: Locator;
   private readonly orderDetailsServerButton: Locator;
   private readonly splitTargetOrderCards: Locator;
   private readonly splitTargetOrderCardById: (targetOrderId: string) => Locator;
@@ -196,6 +197,9 @@ export class RecallOrderDetailsDialog {
       .getByText('Select an order in Recall to', { exact: false })
       .first();
     this.globalLoadingOverlay = this.page.locator('#floatmsgbx');
+    this.globalLoadingBackdrops = this.page
+      .getByTestId('pos-ui-loading-overlay')
+      .filter({ visible: true });
   }
 
   @step((orderNumber: string, targetOrderNumber?: string) =>
@@ -1657,93 +1661,106 @@ export class RecallOrderDetailsDialog {
 
   @step('页面操作：如 Recall 订单详情仍停留在页面上，则关闭详情并返回 Recall 列表')
   async dismissOrderDetailsDialogIfNeeded(): Promise<void> {
-    if (!(await this.orderDetailsDialog.isVisible().catch(() => false))) {
+    const initialDialogCount = await this.visibleOrderDetailsDialogs.count();
+    if (initialDialogCount === 0) {
       return;
     }
 
-    const orderDetailsDialog = await this.resolveActiveOrderDetailsDialog();
-    const backdropPoints = await orderDetailsDialog.evaluate((dialogElement) => {
-      const dialogRect = dialogElement.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const dialogArea = dialogRect.width * dialogRect.height;
-      const descendantRects = Array.from(dialogElement.querySelectorAll<HTMLElement>('*'))
-        .map((element) => {
-          const rect = element.getBoundingClientRect();
-          return {
-            left: rect.left,
-            top: rect.top,
-            right: rect.right,
-            bottom: rect.bottom,
-            width: rect.width,
-            height: rect.height,
-            area: rect.width * rect.height,
-          };
-        })
-        .filter(
-          (rect) =>
-            rect.width >= 120 &&
-            rect.height >= 120 &&
-            rect.area < dialogArea * 0.95 &&
-            rect.left >= dialogRect.left &&
-            rect.top >= dialogRect.top &&
-            rect.right <= dialogRect.right &&
-            rect.bottom <= dialogRect.bottom,
-        )
-        .sort((left, right) => right.area - left.area);
+    const maxDismissalAttempts = Math.min(initialDialogCount + 2, 10);
+    for (let attempt = 0; attempt < maxDismissalAttempts; attempt += 1) {
+      let loadingHiddenSince: number | null = null;
+      await waitUntil(
+        async () => await this.globalLoadingBackdrops.count(),
+        (loadingBackdropCount) => {
+          if (loadingBackdropCount > 0) {
+            loadingHiddenSince = null;
+            return false;
+          }
 
-      const contentRect = descendantRects[0] ?? {
-        left: dialogRect.left,
-        top: dialogRect.top,
-        right: dialogRect.right,
-        bottom: dialogRect.bottom,
-      };
-      const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max));
-      const points: Array<{ x: number; y: number }> = [];
-      const pushPoint = (x: number, y: number) => {
-        points.push({
-          x: clamp(Math.round(x), 8, viewportWidth - 8),
-          y: clamp(Math.round(y), 8, viewportHeight - 8),
-        });
-      };
+          loadingHiddenSince ??= Date.now();
+          return Date.now() - loadingHiddenSince >= 750;
+        },
+        {
+          timeout: 15_000,
+          interval: 50,
+          message: 'Recall 全局 Loading 遮罩未在关闭订单详情前稳定消失。',
+        },
+      );
 
-      if (contentRect.left - dialogRect.left >= 16) {
-        pushPoint(contentRect.left - 8, contentRect.top + 24);
-        pushPoint(contentRect.left - 8, contentRect.bottom - 24);
+      const visibleDialogCount = await this.visibleOrderDetailsDialogs.count();
+      if (visibleDialogCount === 0) {
+        break;
       }
 
-      if (contentRect.top - dialogRect.top >= 16) {
-        pushPoint(contentRect.left + 24, contentRect.top - 8);
-        pushPoint(contentRect.right - 24, contentRect.top - 8);
+      const orderDetailsDialog = this.visibleOrderDetailsDialogs.last();
+      const orderDetailsBackdrop = this.orderDetailsBackdrop(orderDetailsDialog);
+      const dialogBox = await orderDetailsDialog.boundingBox();
+      const backdropBox = await orderDetailsBackdrop.boundingBox();
+      if (!dialogBox || !backdropBox) {
+        throw new Error('Recall 订单详情弹窗或遮罩缺少可点击的页面位置');
       }
 
-      if (dialogRect.right - contentRect.right >= 16) {
-        pushPoint(contentRect.right + 8, contentRect.top + 24);
-        pushPoint(contentRect.right + 8, contentRect.bottom - 24);
+      const dialogRight = dialogBox.x + dialogBox.width;
+      const dialogBottom = dialogBox.y + dialogBox.height;
+      const backdropRight = backdropBox.x + backdropBox.width;
+      const backdropBottom = backdropBox.y + backdropBox.height;
+      const outsideRegions = [
+        {
+          size: dialogBox.x - backdropBox.x,
+          point: { x: (backdropBox.x + dialogBox.x) / 2, y: dialogBox.y + dialogBox.height / 2 },
+        },
+        {
+          size: backdropRight - dialogRight,
+          point: { x: (dialogRight + backdropRight) / 2, y: dialogBox.y + dialogBox.height / 2 },
+        },
+        {
+          size: dialogBox.y - backdropBox.y,
+          point: { x: dialogBox.x + dialogBox.width / 2, y: (backdropBox.y + dialogBox.y) / 2 },
+        },
+        {
+          size: backdropBottom - dialogBottom,
+          point: { x: dialogBox.x + dialogBox.width / 2, y: (dialogBottom + backdropBottom) / 2 },
+        },
+      ];
+      const largestOutsideRegion = outsideRegions.reduce((largestRegion, region) =>
+        region.size > largestRegion.size ? region : largestRegion,
+      );
+      const backdropPoint = largestOutsideRegion.point;
+      const pointIsOutsideDialog =
+        largestOutsideRegion.size > 0 &&
+        (backdropPoint.x < dialogBox.x ||
+          backdropPoint.x > dialogRight ||
+          backdropPoint.y < dialogBox.y ||
+          backdropPoint.y > dialogBottom);
+      if (!pointIsOutsideDialog) {
+        throw new Error('Recall 订单详情弹窗外未找到可点击的遮罩区域');
       }
 
-      if (dialogRect.bottom - contentRect.bottom >= 16) {
-        pushPoint(contentRect.left + 24, contentRect.bottom + 8);
-        pushPoint(contentRect.right - 24, contentRect.bottom + 8);
-      }
-
-      pushPoint(12, 12);
-      pushPoint(viewportWidth - 12, 12);
-      pushPoint(12, viewportHeight - 12);
-      pushPoint(viewportWidth - 12, viewportHeight - 12);
-
-      return points;
-    });
-
-    for (const backdropPoint of backdropPoints) {
-      await this.page.mouse.click(backdropPoint.x, backdropPoint.y);
-
-      if (!(await this.orderDetailsDialog.isVisible().catch(() => false))) {
-        return;
-      }
+      await orderDetailsBackdrop.click({
+        position: {
+          x: backdropPoint.x - backdropBox.x,
+          y: backdropPoint.y - backdropBox.y,
+        },
+      });
+      await waitUntil(
+        async () => await this.visibleOrderDetailsDialogs.count(),
+        (remainingDialogCount) => remainingDialogCount < visibleDialogCount,
+        {
+          timeout: 5_000,
+          message: 'Recall 订单详情遮罩点击后，可见详情弹窗数量未减少。',
+        },
+      );
     }
 
-    await expect(this.orderDetailsDialog).toBeHidden({ timeout: 5_000 });
+    await expect(this.visibleOrderDetailsDialogs).toHaveCount(0, { timeout: 1_000 });
+  }
+
+  private orderDetailsBackdrop(orderDetailsDialog: Locator): Locator {
+    return this.page
+      .locator('div[class*="_overlay_"]:has(> [role="dialog"][data-testid="pos-ui-modal"])', {
+        has: orderDetailsDialog,
+      })
+      .last();
   }
 
   @step('页面操作：在 Recall 订单详情中点击 Edit')
