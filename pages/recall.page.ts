@@ -199,6 +199,10 @@ export class RecallPage {
     return this.orderDetails.readDisplayedOrderPriceSummary();
   }
 
+  async readDisplayedOrderPriceSummaryText(): Promise<string> {
+    return this.orderDetails.readDisplayedOrderPriceSummaryText();
+  }
+
   async readOrderContext(): Promise<RecallOrderContext> {
     return this.orderDetails.readOrderContext();
   }

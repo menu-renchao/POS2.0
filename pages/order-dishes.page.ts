@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { OrderDishesChargeSection } from './order-dishes/order-dishes-charge.section';
+import { OrderDishesCustomerSection } from './order-dishes/order-dishes-customer.section';
 import { OrderDishesMenuSection } from './order-dishes/order-dishes-menu.section';
 import { OrderDishesModifierSection } from './order-dishes/order-dishes-modifier.section';
 import { OrderDishesPageContext } from './order-dishes/order-dishes-page-context';
@@ -27,6 +28,7 @@ export class OrderDishesPage implements OrderDishesPageHost {
   public readonly menu: OrderDishesMenuSection;
   public readonly modifier: OrderDishesModifierSection;
   public readonly charge: OrderDishesChargeSection;
+  public readonly customer: OrderDishesCustomerSection;
   public readonly reads: OrderDishesReadsSection;
   public readonly tips: OrderDishesTipSection;
 
@@ -38,6 +40,7 @@ export class OrderDishesPage implements OrderDishesPageHost {
       this.menu.selectOrderedDish(dishName),
     );
     this.charge = new OrderDishesChargeSection(this.ctx, this);
+    this.customer = new OrderDishesCustomerSection(this.ctx, this);
     this.reads = new OrderDishesReadsSection(this.ctx, this);
     this.tips = new OrderDishesTipSection(this.ctx, this);
   }
@@ -68,6 +71,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
 
   clickDish(...args: Parameters<OrderDishesMenuSection['clickDish']>): ReturnType<OrderDishesMenuSection['clickDish']> {
     return this.menu.clickDish(...args);
+  }
+
+  addOpenFoodWithoutTax(...args: Parameters<OrderDishesMenuSection['addOpenFoodWithoutTax']>): ReturnType<OrderDishesMenuSection['addOpenFoodWithoutTax']> {
+    return this.menu.addOpenFoodWithoutTax(...args);
   }
 
   searchAndClickDish(...args: Parameters<OrderDishesMenuSection['searchAndClickDish']>): ReturnType<OrderDishesMenuSection['searchAndClickDish']> {
@@ -346,6 +353,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.navigation.sendOrder(...args);
   }
 
+  sendOrderWithReference(...args: Parameters<OrderDishesPageNavigation['sendOrderWithReference']>): ReturnType<OrderDishesPageNavigation['sendOrderWithReference']> {
+    return this.navigation.sendOrderWithReference(...args);
+  }
+
   clickSaveOrder(...args: Parameters<OrderDishesPageNavigation['clickSaveOrder']>): ReturnType<OrderDishesPageNavigation['clickSaveOrder']> {
     return this.navigation.clickSaveOrder(...args);
   }
@@ -366,6 +377,14 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.menu.reduceOrderedDishQuantity(...args);
   }
 
+  requestSentDishRemovalAndExpectAuthorization(...args: Parameters<OrderDishesMenuSection['requestSentDishRemovalAndExpectAuthorization']>): ReturnType<OrderDishesMenuSection['requestSentDishRemovalAndExpectAuthorization']> {
+    return this.menu.requestSentDishRemovalAndExpectAuthorization(...args);
+  }
+
+  authorizePendingDishRemoval(...args: Parameters<OrderDishesMenuSection['authorizePendingDishRemoval']>): ReturnType<OrderDishesMenuSection['authorizePendingDishRemoval']> {
+    return this.menu.authorizePendingDishRemoval(...args);
+  }
+
   changeOrderedDishQuantity(...args: Parameters<OrderDishesMenuSection['changeOrderedDishQuantity']>): ReturnType<OrderDishesMenuSection['changeOrderedDishQuantity']> {
     return this.menu.changeOrderedDishQuantity(...args);
   }
@@ -376,6 +395,30 @@ export class OrderDishesPage implements OrderDishesPageHost {
 
   openPayment(...args: Parameters<OrderDishesPageNavigation['openPayment']>): ReturnType<OrderDishesPageNavigation['openPayment']> {
     return this.navigation.openPayment(...args);
+  }
+
+  openCustomerDialogForPayment(...args: Parameters<OrderDishesCustomerSection['openCustomerDialogForPayment']>): ReturnType<OrderDishesCustomerSection['openCustomerDialogForPayment']> {
+    return this.customer.openCustomerDialogForPayment(...args);
+  }
+
+  confirmEmptyCustomerAndExpectNameRequired(...args: Parameters<OrderDishesCustomerSection['confirmEmptyCustomerAndExpectNameRequired']>): ReturnType<OrderDishesCustomerSection['confirmEmptyCustomerAndExpectNameRequired']> {
+    return this.customer.confirmEmptyCustomerAndExpectNameRequired(...args);
+  }
+
+  fillCustomerName(...args: Parameters<OrderDishesCustomerSection['fillCustomerName']>): ReturnType<OrderDishesCustomerSection['fillCustomerName']> {
+    return this.customer.fillCustomerName(...args);
+  }
+
+  confirmCustomerNameAndExpectPhoneRequired(...args: Parameters<OrderDishesCustomerSection['confirmCustomerNameAndExpectPhoneRequired']>): ReturnType<OrderDishesCustomerSection['confirmCustomerNameAndExpectPhoneRequired']> {
+    return this.customer.confirmCustomerNameAndExpectPhoneRequired(...args);
+  }
+
+  fillCustomerPhone(...args: Parameters<OrderDishesCustomerSection['fillCustomerPhone']>): ReturnType<OrderDishesCustomerSection['fillCustomerPhone']> {
+    return this.customer.fillCustomerPhone(...args);
+  }
+
+  confirmCustomerAndOpenPayment(...args: Parameters<OrderDishesCustomerSection['confirmCustomerAndOpenPayment']>): ReturnType<OrderDishesCustomerSection['confirmCustomerAndOpenPayment']> {
+    return this.customer.confirmCustomerAndOpenPayment(...args);
   }
 
   openSplitOrder(...args: Parameters<OrderDishesPageNavigation['openSplitOrder']>): ReturnType<OrderDishesPageNavigation['openSplitOrder']> {

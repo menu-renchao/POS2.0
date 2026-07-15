@@ -95,6 +95,37 @@ export class OrderDishesPageNavigation {
       return new HomePage(this.page);
     }
 
+    @step('页面操作：点击 Send 送厨订单并读取保存接口返回的精确订单号')
+    async sendOrderWithReference(): Promise<{ homePage: HomePage; orderNumber: string }> {
+      await this.host.expectLoaded();
+      const [saveRequest] = await Promise.all([
+        this.page.waitForRequest(
+          (request) =>
+            request.method() === 'POST' &&
+            new URL(request.url()).pathname === '/kpos/api/order/save',
+          { timeout: 15_000 },
+        ),
+        (await this.resolveSendButton()).click(),
+      ]);
+      const saveResponse = await saveRequest.response();
+
+      if (!saveResponse?.ok()) {
+        throw new Error(`送厨订单接口失败：${saveResponse?.status() ?? '无响应'} ${saveRequest.url()}`);
+      }
+
+      const responseBody = (await saveResponse.json()) as {
+        data?: { order?: { orderNumber?: unknown } };
+      };
+      const orderNumber = responseBody.data?.order?.orderNumber;
+      if (typeof orderNumber !== 'string' || orderNumber.trim().length === 0) {
+        throw new Error('送厨订单接口响应缺少非空字符串 data.order.orderNumber。');
+      }
+
+      const homePage = new HomePage(this.page);
+      await homePage.expectEmployeeReady();
+      return { homePage, orderNumber: orderNumber.trim() };
+    }
+
     @step('页面操作：点击 Save 保存订单但不假设页面跳转')
     async clickSaveOrder(): Promise<void> {
       await this.host.expectLoaded();
@@ -270,10 +301,7 @@ export class OrderDishesPageNavigation {
 
     private async resolvePayButton(): Promise<Locator> {
       return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByRole('button', { name: 'Pay' }).first(),
-          this.page.getByRole('button', { name: 'Pay' }).first(),
-        ],
+        [this.locators.payButton],
         'Unable to find order-dishes Pay button.',
       );
     }

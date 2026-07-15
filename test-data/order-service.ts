@@ -108,6 +108,25 @@ export function buildOrderServicePickupCustomer(): PickUpOrderParams {
   };
 }
 
+export function buildRequiredPaymentCustomer(): { name: string; phone: string } {
+  return {
+    name: `AT${Date.now().toString().slice(-10)}`,
+    phone: '(934)221-9925',
+  };
+}
+
+export function buildOpenFoodWithoutTaxCase(): { name: string; price: number } {
+  return {
+    name: `OF${Date.now().toString().slice(-10)}`,
+    price: 1,
+  };
+}
+
+export const orderServiceKitchenVoidPermissionCase = {
+  authorizationPasscode: '11',
+  expectedVoidMarker: 'VOIDED',
+} as const;
+
 export const orderServiceSplitOperationCase = {
   amountSplitFirstAmount: 2,
   changedDishPrice: 5,

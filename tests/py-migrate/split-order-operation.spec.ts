@@ -24,7 +24,9 @@ import {
   orderServiceSplitOperationCase,
 } from '../../test-data/order-service';
 import { expectOkEnvelope } from '../../api/setup/setup-resource';
+import { createShortTestName } from '../../api/core/test-data-id';
 import { jiraIssueAnnotation } from '../../utils/jira';
+import { waitUntil } from '../../utils/wait';
 
 type AppEntryPages = {
   employeeLoginPage: EmployeeLoginPage;
@@ -424,7 +426,7 @@ const chargeFollowUpCases: readonly ChargeFollowUpCase[] = [
   },
   {
     issue: 'POS-27242',
-    title: '[POS-27242] 应能在手动加收配置修改后从编辑页按菜品分单并按子单分摊加收',
+    title: '[POS-27242] 应能在手动加收配置修改后按菜品分单并按子单分摊加收',
     initialCharge: manualFixedCharge,
     source: 'manual',
     operation: 'edit-item-split',
@@ -864,12 +866,25 @@ async function readRecallOrderTotal(
   return total;
 }
 
-async function openLatestSplitOrderTargets(recallPage: RecallPage): Promise<SplitOrderTargets> {
+async function openLatestSplitOrderTargets(
+  recallPage: RecallPage,
+  expectedOrderNumber?: string,
+): Promise<SplitOrderTargets> {
   const recallFlow = new RecallFlow();
-  const latestVisibleOrderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
+  const latestVisibleOrderNumber = expectedOrderNumber
+    ? expectedOrderNumber
+    : await recallFlow.readLatestVisibleOrderNumber(recallPage);
   const orderNumber = latestVisibleOrderNumber.replace(/-\d+$/, '');
   await recallPage.openOrderDetails(orderNumber);
-  const targetOrderNumbers = await recallPage.readTargetOrderNumbers();
+  const targetOrderNumbers = await waitUntil(
+    async () => await recallPage.readTargetOrderNumbers(),
+    (orderNumbers) => orderNumbers.length >= 2,
+    {
+      timeout: 10_000,
+      interval: 250,
+      message: `Recall 母单 ${orderNumber} 未稳定展示至少两个分单子单。`,
+    },
+  );
 
   expect(targetOrderNumbers.length, 'Recall 详情应至少展示两个分单子单。').toBeGreaterThanOrEqual(2);
 
@@ -1790,16 +1805,62 @@ async function splitSavedOrderFromRecallDetails(
   await new SplitOrderFlow().splitOrderEvenly(splitOrderPage, 2);
   const returnedPage = await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
   const returnedRecallPage = await enterRecallFromReturnedPage(returnedPage);
-  const targets = await openLatestSplitOrderTargets(returnedRecallPage);
+  const targets = await openLatestSplitOrderTargets(returnedRecallPage, orderNumber);
 
   return { ...targets, recallPage: returnedRecallPage };
+}
+
+async function splitSavedOrderByItemFromRecallDetails(
+  homePage: HomePage,
+  employeeLoginPage: EmployeeLoginPage,
+  orderNumber: string,
+  dishName: string,
+): Promise<SplitOrderTargetsWithRecallPage> {
+  const recallPage = await openRecallAfterConfigurationRefresh(homePage, employeeLoginPage);
+  const splitOrderPage = await new RecallFlow().openSplitOrder(
+    recallPage,
+    orderNumber,
+    undefined,
+    { chargePromptAction: 'keep' },
+  );
+  await new SplitOrderFlow().moveDishToNewSuborder(splitOrderPage, dishName);
+  const returnedPage = await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
+  const returnedRecallPage = await enterRecallFromReturnedPage(returnedPage);
+  const targets = await openLatestSplitOrderTargets(returnedRecallPage, orderNumber);
+
+  return { ...targets, recallPage: returnedRecallPage };
+}
+
+async function readTargetChargeDetails(
+  recallPage: RecallPage,
+  orderNumber: string,
+  targetOrderNumber: string,
+  chargeName: string,
+): Promise<{ priceSummary: Record<string, number>; namedChargeAmount: number; text: string }> {
+  await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+  const priceSummary = await recallPage.readDisplayedOrderPriceSummary();
+  const text = await recallPage.readDisplayedOrderPriceSummaryText();
+  await recallPage.closeOrderDetailsDialog();
+
+  const escapedChargeName = chargeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const chargeAmountMatch = text.match(
+    new RegExp(`${escapedChargeName}\\s*:?\\s*\\$?([\\d,]+(?:\\.\\d{1,2})?)`),
+  );
+  if (!chargeAmountMatch) {
+    throw new Error(`未能从价格摘要中读取加收“${chargeName}”的金额：${text}`);
+  }
+
+  return {
+    priceSummary,
+    namedChargeAmount: Number(chargeAmountMatch[1].replace(/,/g, '')),
+    text,
+  };
 }
 
 async function splitSavedOrderFromEditPage(
   homePage: HomePage,
   employeeLoginPage: EmployeeLoginPage,
   orderNumber: string,
-  mode: 'even' | 'item',
 ): Promise<SplitOrderTargetsWithRecallPage> {
   const editingPage = await editSavedOrderAfterConfigurationRefresh(
     homePage,
@@ -1808,11 +1869,7 @@ async function splitSavedOrderFromEditPage(
   );
   const splitOrderPage = await editingPage.openSplitOrder();
 
-  if (mode === 'item') {
-    await new SplitOrderFlow().splitOrderByItems(splitOrderPage, 2);
-  } else {
-    await new SplitOrderFlow().splitOrderEvenly(splitOrderPage, 2);
-  }
+  await new SplitOrderFlow().splitOrderEvenly(splitOrderPage, 2);
 
   const returnedPage = await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
   const recallPage = await enterRecallFromReturnedPage(returnedPage);
@@ -1825,16 +1882,6 @@ async function readFirstSplitTargetCharge(
   splitOrder: SplitOrderTargetsWithRecallPage,
 ): Promise<number> {
   return await readTargetCharge(
-    splitOrder.recallPage,
-    splitOrder.orderNumber,
-    splitOrder.firstTargetOrderNumber,
-  );
-}
-
-async function readFirstSplitTargetPriceSummary(
-  splitOrder: SplitOrderTargetsWithRecallPage,
-): Promise<Record<string, number>> {
-  return await readTargetPriceSummary(
     splitOrder.recallPage,
     splitOrder.orderNumber,
     splitOrder.firstTargetOrderNumber,
@@ -3280,10 +3327,6 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
     );
   }
 
-  const recordingBlockedChargeFollowUpIssues = new Map<ChargeFollowUpCase['issue'], string>([
-    ['POS-27242', '编辑页按菜品分单路径需补充 POS NG 真实录制脚本后再启用。'],
-  ]);
-
   const expectedFailureChargeFollowUpIssues = new Map<ChargeFollowUpCase['issue'], string>([
     ['POS-27192', '自动加收配置修改后从编辑页保存会丢失新加收，需产品修复后再启用。'],
     ['POS-27248', '自动加收配置修改后从编辑页平分订单会丢失加收，需产品修复后再启用。'],
@@ -3297,9 +3340,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         annotation: [jiraIssueAnnotation(chargeCase.issue)],
       },
       async ({ homePage, employeeLoginPage, apiSetup, orderApi }) => {
-        const recordingBlockedReason = recordingBlockedChargeFollowUpIssues.get(chargeCase.issue);
         const expectedFailureReason = expectedFailureChargeFollowUpIssues.get(chargeCase.issue);
-        test.fixme(Boolean(recordingBlockedReason), recordingBlockedReason);
         test.fail(Boolean(expectedFailureReason), expectedFailureReason);
 
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
@@ -3332,7 +3373,14 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         });
 
         await test.step('更新后台加收配置并准备后续订单操作', async () => {
-          await apiSetup.charge.update(chargeResource.id, chargeCase.updateCharge);
+          const updateCharge =
+            chargeCase.issue === 'POS-27242'
+              ? {
+                  ...chargeCase.updateCharge,
+                  name: createShortTestName({ prefix: 'AT', domain: 'CHGU', maxLength: 16 }),
+                }
+              : chargeCase.updateCharge;
+          await apiSetup.charge.update(chargeResource.id, updateCharge);
         });
 
         if (chargeCase.operation === 'detail-send') {
@@ -3386,13 +3434,62 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           return;
         }
 
-        if (chargeCase.operation === 'edit-item-split' || chargeCase.operation === 'edit-even-split') {
+        if (chargeCase.operation === 'edit-item-split') {
+          const splitOrder = await test.step('从 Recall 详情按菜品移入新子单并返回 Recall', async () => {
+            return await splitSavedOrderByItemFromRecallDetails(
+              homePage,
+              employeeLoginPage,
+              savedOrder.orderNumber,
+              orderServiceDishes.regular.name,
+            );
+          });
+
+          const childChargeDetails = await test.step('读取两个子单的加收名称与金额', async () => {
+            const firstChild = await readTargetChargeDetails(
+              splitOrder.recallPage,
+              splitOrder.orderNumber,
+              splitOrder.firstTargetOrderNumber,
+              chargeCase.expectedChargeName,
+            );
+            const secondChild = await readTargetChargeDetails(
+              splitOrder.recallPage,
+              splitOrder.orderNumber,
+              splitOrder.secondTargetOrderNumber,
+              chargeCase.expectedChargeName,
+            );
+            return [firstChild, secondChild];
+          });
+
+          await test.step('校验两个子单保留历史加收名称并按各自小计比例分摊', async () => {
+            for (const child of childChargeDetails) {
+              expect(child.text).toContain(chargeCase.expectedChargeName);
+              expect(child.namedChargeAmount).toBeCloseTo(
+                Number(
+                  (
+                    ((chargeCase.initialCharge.rate ?? 0) * child.priceSummary.Subtotal) /
+                    savedOrder.beforeSummary.Subtotal
+                  ).toFixed(2),
+                ),
+                2,
+              );
+            }
+
+            expect(
+              childChargeDetails.reduce(
+                (total, child) => total + child.namedChargeAmount,
+                0,
+              ),
+            ).toBeCloseTo(chargeCase.initialCharge.rate ?? 0, 2);
+          });
+          return;
+        }
+
+        if (chargeCase.operation === 'edit-even-split') {
           const splitOrder = await test.step('从编辑页分单并返回 Recall', async () => {
             return await splitSavedOrderFromEditPage(
               homePage,
               employeeLoginPage,
               savedOrder.orderNumber,
-              chargeCase.operation === 'edit-item-split' ? 'item' : 'even',
             );
           });
 
@@ -3402,15 +3499,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
 
           await test.step('校验编辑页分单后的子单加收金额', async () => {
             expect(childCharge).toBeCloseTo(
-              chargeCase.operation === 'edit-item-split'
-                ? Number(
-                    (
-                      ((chargeCase.initialCharge.rate ?? 0) *
-                        (await readFirstSplitTargetPriceSummary(splitOrder)).Subtotal) /
-                      savedOrder.beforeSummary.Subtotal
-                    ).toFixed(2),
-                  )
-                : Number(chargeCase.expectedChargeAmount),
+              Number(chargeCase.expectedChargeAmount),
               2,
             );
           });

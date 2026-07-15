@@ -42,7 +42,7 @@ const recallDishRoundTripCases = [
   },
 ] as const;
 
-function readCurrencyAmount(value: string | undefined): number {
+function readCurrencyAmount(value: string | null | undefined): number {
   if (!value) {
     throw new Error('Expected a currency value, but received empty content.');
   }
@@ -173,115 +173,103 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
       tag: ['@smoke'],
       annotation: [jiraIssueAnnotation('POS-30543')],
     },
-    async ({ homePage, employeeLoginPage }) => {
-      const readyHomePage = await test.step('从首页进入系统并建立员工上下文前置条件', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
-      });
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      const restoreConfiguration = await apiSetup.systemConfiguration.updateByName(
+        'BREAK_OR_COMBIN_SAME_DISHES',
+        true,
+        { verify: true },
+      );
 
-      const savedOrderContext = await test.step('通过 New Order 不选桌完成堂食点单并保存', async () => {
-        const selectTablePage = await readyHomePage.enterDineIn();
-        const orderDishesPage = await new SelectTableFlow().skipTableSelectionAndEnterOrderDishes(selectTablePage);
+      try {
+        const readyHomePage = await test.step('启用同菜合并配置并刷新 POS', async () => {
+          const readyPage = await enterReadyHome({ employeeLoginPage, homePage });
+          await readyPage.clickRefresh();
+          return readyPage;
+        });
 
-        await new OrderDishesFlow().addRegularDish(
-          orderDishesPage,
-          orderServiceDishes.regular.name,
-          orderServiceDishes.regular.menu,
-        );
-        await new OrderDishesFlow().addRegularDish(
-          orderDishesPage,
-          orderServiceDishes.test.name,
-          orderServiceDishes.test.menu,
-        );
+        const savedOrderContext = await test.step('创建无桌堂食订单并保存精确订单号', async () => {
+          const selectTablePage = await readyHomePage.enterDineIn();
+          const orderDishesPage = await new SelectTableFlow().skipTableSelectionAndEnterOrderDishes(
+            selectTablePage,
+          );
+          await new OrderDishesFlow().addRegularDish(
+            orderDishesPage,
+            orderServiceDishes.test.name,
+            orderServiceDishes.test.menu,
+          );
 
-        const savedHomePage = await orderDishesPage.saveOrder();
-        await savedHomePage.expectPrimaryFunctionCardsVisible();
+          const savedOrder = await orderDishesPage.saveOrderWithReference();
+          await savedOrder.homePage.expectPrimaryFunctionCardsVisible();
+          return savedOrder;
+        });
 
-        return {
-          savedHomePage,
-        };
-      });
+        const recallBeforeEdit = await test.step('按精确订单号读取编辑前小计和税额', async () => {
+          const recallPage = await new RecallFlow().openRecallFromHome(savedOrderContext.homePage);
+          await recallPage.openOrderDetails(savedOrderContext.orderNumber);
+          const orderDetails = await recallPage.readOrderDetailsSnapshot();
+          const testItem = orderDetails.items.find(
+            (item) => item.name === orderServiceDishes.test.name,
+          );
 
-      const recallBeforeEdit = await test.step('进入 Recall 读取最新订单并记录编辑前税额', async () => {
-        const recallPage = await new RecallFlow().openRecallFromHome(savedOrderContext.savedHomePage);
-        const orderDetails = await new RecallFlow().viewFirstVisibleOrderDetails(recallPage);
-        const subtotalBeforeEdit = orderDetails.priceSummary.Subtotal;
-        const taxBeforeEdit = orderDetails.priceSummary.Tax;
-        const testItem = orderDetails.items.find(
-          (item) => item.name === orderServiceDishes.test.name,
-        );
+          expect(testItem?.price, 'Recall 中目标菜品应有单价').toBeTruthy();
+          expect(orderDetails.priceSummary.Subtotal, '编辑前应能读取 Subtotal').toBeGreaterThan(0);
+          expect(orderDetails.priceSummary.Tax, '编辑前应能读取税额').toBeGreaterThan(0);
 
-        expect(orderDetails.items.map((item) => item.name), 'Recall 应包含送厨菜品').toEqual(
-          expect.arrayContaining([orderServiceDishes.regular.name, orderServiceDishes.test.name]),
-        );
-        expect(subtotalBeforeEdit, '编辑前 Recall 应能读取 Subtotal').toBeTruthy();
-        expect(taxBeforeEdit, '编辑前 Recall 应能读取税额').toBeTruthy();
-        expect(testItem?.price, 'Recall 中 test 菜品应有单价').toBeTruthy();
+          return {
+            recallPage,
+            subtotal: orderDetails.priceSummary.Subtotal,
+            tax: orderDetails.priceSummary.Tax,
+            testItemPrice: readCurrencyAmount(testItem?.price),
+          };
+        });
 
-        return {
-          recallPage,
-          subtotalBeforeEdit,
-          taxBeforeEdit,
-          testItemPrice: testItem?.price ?? '',
-        };
-      });
-
-      const editResult = await test.step(
-        `从 Recall 编辑订单并将 ${orderServiceDishes.test.name} 加 1 后保存`,
-        async () => {
-          const recallPage: RecallPage = recallBeforeEdit.recallPage;
-          const editingOrderDishesPage = await new RecallFlow().editFirstVisibleOrder(recallPage);
-
+        const editResult = await test.step('从 Recall 编辑目标订单，将同一菜品数量加一后保存', async () => {
+          const editingOrderDishesPage = await new RecallFlow().editOrder(
+            recallBeforeEdit.recallPage,
+            savedOrderContext.orderNumber,
+          );
           await new OrderDishesFlow().increaseOrderedDishQuantityByOne(
             editingOrderDishesPage,
             orderServiceDishes.test.name,
           );
-          const priceSummaryAfterQuantityChange = await editingOrderDishesPage.readPriceSummary();
-          const subtotalAfterQuantityChange = priceSummaryAfterQuantityChange.Subtotal;
-          const subtotalDelta = subtotalAfterQuantityChange - recallBeforeEdit.subtotalBeforeEdit;
-          const testItemPrice = readCurrencyAmount(recallBeforeEdit.testItemPrice);
 
-          expect(
-            subtotalDelta,
-            `点单页加 1 后 Subtotal 应增加 ${orderServiceDishes.test.name} 单价`,
-          ).toBeCloseTo(testItemPrice, 2);
+          const editedSummary = await editingOrderDishesPage.readPriceSummary();
+          expect(editedSummary.Subtotal - recallBeforeEdit.subtotal).toBeCloseTo(
+            recallBeforeEdit.testItemPrice,
+            2,
+          );
 
-          const savedHomePage = await editingOrderDishesPage.saveOrder();
-          await savedHomePage.expectPrimaryFunctionCardsVisible();
+          const savedOrder = await editingOrderDishesPage.saveOrderWithReference();
+          return { ...savedOrder, subtotal: editedSummary.Subtotal };
+        });
 
-          return {
-            savedHomePage,
-            subtotalAfterQuantityChange,
-          };
-        },
-      );
+        await test.step('回查同一订单并校验数量、小计和税额均已更新', async () => {
+          const refreshedHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+            editResult.homePage,
+            employeeLoginPage,
+          );
+          const recallPage = await new RecallFlow().openRecallFromHome(refreshedHomePage);
+          await recallPage.openOrderDetails(editResult.orderNumber);
+          const orderDetails = await recallPage.readOrderDetailsSnapshot();
+          const subtotalAfterEdit = orderDetails.priceSummary.Subtotal;
+          const taxAfterEdit = orderDetails.priceSummary.Tax;
 
-      await test.step('再次进入 Recall 校验保存后的税额已更新', async () => {
-        const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
-          editResult.savedHomePage,
-          employeeLoginPage,
-        );
-        const recallPage = await new RecallFlow().openRecallFromHome(readyHomePage);
-
-        const orderDetailsAfterEdit = await new RecallFlow().viewFirstVisibleOrderDetails(recallPage);
-        const subtotalAfterEdit = orderDetailsAfterEdit.priceSummary.Subtotal;
-        const taxAfterEdit = orderDetailsAfterEdit.priceSummary.Tax;
-        const afterTaxRate = taxAfterEdit / subtotalAfterEdit;
-        const beforeTaxRate = recallBeforeEdit.taxBeforeEdit / recallBeforeEdit.subtotalBeforeEdit;
-
-        expect(
-          orderDetailsAfterEdit.items.find((item) => item.name === orderServiceDishes.test.name)
-            ?.quantity,
-        ).toBe(orderServiceEditRecallTaxCase.editedTestDishQuantity);
-        expect(subtotalAfterEdit, 'Recall 保存后应保留更新后的 Subtotal').toBeTruthy();
-        expect(taxAfterEdit, 'Recall 保存后应保留更新后的税额').toBeTruthy();
-        expect(afterTaxRate, 'Recall 保存后的 tax/subtotal 比例应与修改前近似一致').toBeCloseTo(
-          beforeTaxRate,
-          2,
-        );
-        expect(subtotalAfterEdit, 'Recall 保存后 Subtotal 应与点单页实时值一致').toBe(
-          editResult.subtotalAfterQuantityChange,
-        );
-      });
+          const savedTargetQuantity = orderDetails.items
+            .filter((item) => item.name === orderServiceDishes.test.name)
+            .reduce((total, item) => total + Number(item.quantity), 0);
+          expect(savedTargetQuantity).toBe(
+            Number(orderServiceEditRecallTaxCase.editedTestDishQuantity),
+          );
+          expect(subtotalAfterEdit).toBe(editResult.subtotal);
+          expect(taxAfterEdit, '数量增加后税额应增加').toBeGreaterThan(recallBeforeEdit.tax);
+          expect(taxAfterEdit / subtotalAfterEdit).toBeCloseTo(
+            recallBeforeEdit.tax / recallBeforeEdit.subtotal,
+            2,
+          );
+        });
+      } finally {
+        await restoreConfiguration();
+      }
     },
   );
 

@@ -25,6 +25,7 @@ import {
   createSystemConfigurationSetupService,
   type SystemConfigurationSetupService,
 } from './system-configuration.setup';
+import { createStaffSetupService, type StaffSetupService } from './staff.setup';
 
 export type ApiSetupFactoryOptions = {
   adminConfigApi: AdminConfigApiClient;
@@ -43,6 +44,7 @@ export type ApiSetup = {
   category: CategorySetupService;
   saleItem: SaleItemSetupService;
   systemConfiguration: SystemConfigurationSetupService;
+  staff: StaffSetupService;
 };
 
 export function createApiSetup(options: ApiSetupFactoryOptions): ApiSetup {
@@ -55,5 +57,6 @@ export function createApiSetup(options: ApiSetupFactoryOptions): ApiSetup {
     category: createCategorySetupService(options),
     saleItem: createSaleItemSetupService(options),
     systemConfiguration: createSystemConfigurationSetupService(options),
+    staff: createStaffSetupService(options),
   };
 }

@@ -120,12 +120,12 @@ export class RecallOrderDetailsDialog {
       .locator('[role="dialog"][data-testid="pos-ui-modal"]:visible')
       .last();
     this.splitTargetOrderCards = this.page.locator(
-      'div[role="button"][data-test-id^="shared-order-detail-select-target-order-"]',
+      '[data-test-id^="shared-order-detail-select-target-order-"]',
     );
     this.splitTargetOrderCardById = (targetOrderId: string) =>
       this.page
         .locator(
-          `div[role="button"][data-test-id="shared-order-detail-select-target-order-${targetOrderId}"]`,
+          `[data-test-id="shared-order-detail-select-target-order-${targetOrderId}"]`,
         )
         .first();
     this.splitTargetOrderCardByNumber = (targetOrderNumber: string) =>
@@ -987,6 +987,19 @@ export class RecallOrderDetailsDialog {
     await this.waitForOrderDetailsDialogReady();
     await this.expandOrderDetailsPriceSummary();
     return await this.readOrderDetailsPriceSummaryFromLabels();
+  }
+
+  @step('页面读取：读取订单详情价格汇总区域当前展示的完整文本')
+  async readDisplayedOrderPriceSummaryText(): Promise<string> {
+    await this.waitForOrderDetailsDialogReady();
+    await this.expandOrderDetailsPriceSummary();
+    const priceSummaryRoot = await this.resolveOrderDetailsPriceSummaryRoot();
+
+    if (!priceSummaryRoot) {
+      throw new Error('订单详情中未找到可读取的价格汇总区域。');
+    }
+
+    return (await priceSummaryRoot.innerText()).replace(/\s+/g, ' ').trim();
   }
 
   @step('页面读取：读取订单详情中的订单类型、桌号、人数与服务员信息')
@@ -1991,21 +2004,15 @@ export class RecallOrderDetailsDialog {
 
     const visibleOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
     const topmostOrderDetailsDialog = this.visibleOrderDetailsDialogs.last();
+    const childTitle = topmostOrderDetailsDialog.getByText(visibleOrderNumber, { exact: true });
+    const priceSummaryToggle = topmostOrderDetailsDialog.locator(
+      '[data-test-id="shared-order-price-summary-toggle"]',
+    );
 
-    return await topmostOrderDetailsDialog.evaluate((dialogElement, expectedOrderNumber) => {
-      const normalizeText = (value: string | null | undefined): string =>
-        String(value ?? '').replace(/\s+/g, ' ').trim();
-      const hasExactTitle = Array.from(dialogElement.querySelectorAll('div > span')).some(
-        (titleElement) => normalizeText(titleElement.textContent) === expectedOrderNumber,
-      );
-      const hasEditAction = Boolean(
-        dialogElement.querySelector(
-          'button[data-test-id="shared-order-detail-side-action-editod"]',
-        ),
-      );
-
-      return hasExactTitle && hasEditAction;
-    }, visibleOrderNumber);
+    return (
+      (await childTitle.isVisible().catch(() => false)) &&
+      (await priceSummaryToggle.isVisible().catch(() => false))
+    );
   }
 
   @step((orderNumber: string) => `页面操作：等待 Recall 子单 ${orderNumber} 的顶层详情就绪`)

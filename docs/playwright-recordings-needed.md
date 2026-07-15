@@ -2,7 +2,7 @@
 
 本文档记录当前自动化中缺少真实页面 DOM 契约、需要人工录制补充的场景。
 
-订单操作回归当前共有 **7 条 skipped**：其中 **6 条需要录制**，归并为 **2 组录制请求**（报表 Fee/Unpaid 5 条，POS-27242 1 条）；POS-32954 因“POS NG 不适用”保留 skip 但不需要录制。点单页面提示词另新增 **50 条**一对一录制请求。
+订单操作回归当前共有 **6 条 skipped**：其中 **5 条需要录制**，归并为 **1 组录制请求**（报表 Fee/Unpaid 5 条）；POS-32954 因“POS NG 不适用”保留 skip 但不需要录制。点单页面提示词当前剩余 **45 条**一对一录制请求。
 
 ## 提交格式
 
@@ -39,31 +39,11 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 
 示例 test id 仅用于说明，必须以录制得到的真实值为准。
 
-### 2. POS-27242：修改手动加收后从编辑页按菜品移入子单
-
-当前卡点：原始场景要求在编辑已保存订单时将菜品拖动到新子单；现有实现却调用了“按菜品平分为 2 份”，业务路径不一致，缺少编辑页 Split 面板中目标子单和菜品移动的真实 DOM 契约。
-
-请录制以下完整过程：
-
-1. 准备一笔含两道普通菜和手动固定 `$10.00` 加收的 Dine In 无桌台订单并保存。
-2. 后台将该手动加收名称改为 `new_name_manu`，刷新 POS。
-3. 从 Recall 打开该订单并进入 Edit。
-4. 从编辑点单页进入 Split。
-5. 新建一个目标子单；若进入 Split 时已自动存在空目标子单，请保留其定位步骤。
-6. 将其中一道普通菜从源单拖动或移动到目标子单，不要使用 Even Items 平分。
-7. 保存分单结果并返回 Recall。
-8. 打开刚生成的目标子单，展开价格与加收明细。
-9. 断言目标子单仍显示历史名称 `manu_test_fixed`，并保留该子单按小计比例分摊的加收金额。
-
-请保留编辑页 Split 入口、源菜品、目标子单/接收区域、拖拽或移动动作、保存按钮、目标子单卡片和加收明细的原始 `data-testid`。若录制器只生成 `dragTo()` 或鼠标坐标操作，请同时提供移动前后截图。
-
 ## 点单页面提示词待补充
 
-以下 50 条需求与点单页面提示词覆盖矩阵严格一一对应。既有 `ORDER-PAGE-001`～`ORDER-PAGE-048` 保持原顺序和映射；两条重新分类的折扣场景追加为 `ORDER-PAGE-049`、`ORDER-PAGE-050`，不重编号既有条目。
+以下 45 条需求与点单页面提示词覆盖矩阵严格一一对应。已完成的 `ORDER-PAGE-002`～`ORDER-PAGE-006` 已移除；其余录制编号保持原顺序和映射，不重编号。
 
 录制提交格式统一沿用本文档顶部“提交格式”，不在各条目中重复。
-
-本次重新分类不得记录或引用用户刚删除的 POS-27242 附件内容；现有 POS-27242 录制请求保持不变。
 
 ### ORDER-PAGE-001：提示词 2 POS-15605 点单页面菜单--组 中文展示
 
@@ -76,66 +56,6 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 请保留证据：语言按钮、语言弹层选项/选中态、菜单组按钮的稳定 DOM，以及语言切换请求或本地持久化值和菜单响应中的组 ID/中英文名；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
 - 当前阻塞：缺少语言弹层选项/选中态、中文菜单组按钮和语言持久化或切换请求的真实契约，现有用例无法证明中文组名展示及默认语言恢复。
 - 录制返回后计划补充：`pages/home.page.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/language.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/home.page.ts` 负责语言切换/读取，`pages/order-dishes/order-dishes-menu.section.ts` 负责组列表读取，`flows/language.flow.ts` 负责首页进入与 finally 恢复。
-
-### ORDER-PAGE-002：提示词 3 POS-15641 点单页面菜单--类--组下多个类时，进行类切换
-
-- Jira：`POS-15641`。
-- 已知前置：To Go 订单、同一真实菜单组内至少两个可区分类别 A/B、各类别所属普通菜和可保存回查的订单数据；使用订单号精确进入 Recall。
-- 请从 POS 首页开始录制：
-  1. 最小录制路径：从 POS 首页进入 To Go，选择一个真实包含至少两个类别的菜单组，先选类别 A 再切到类别 B，确认当前类别与菜品区域变化，添加 B 类菜品、保存并在 Recall 回查；
-  2. 逐一展示上述完整路径中的中间弹窗、控件状态、页面转场、配置生效与恢复动作，不得省略标题对应的业务步骤；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 同时断言 B 类选中、A/B 切换后菜品集合变化及 Recall 菜品名称/价格。
-- 请保留证据：菜单响应中同组的两个类别 ID/名称/菜品归属、类别按钮选中态与菜品卡 DOM、保存订单请求/响应；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：现有候选只使用单一类别，缺少同一菜单组内 A/B 两类别的切换选中态、菜品集合变化和归属响应契约。
-- 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责类别列表/选中态/菜品读取，`flows/order-dishes.flow.ts` 负责双类别切换与下单回查。
-
-### ORDER-PAGE-003：提示词 4 Seperate the same dishes开关开启，订单送厨后编辑页面，选择菜品，点击加1，存单后检查订单上的税率正确
-
-- Jira：`POS-30543`。
-- 已知前置：Separate same dishes 原配置值及更新/恢复权限、堂食无桌订单、目标普通菜及其税配置、可用送厨链路；录制前保存开关原值，结束后恢复并刷新 POS。
-- 请从 POS 首页开始录制：
-  1. 最小录制路径：从 POS 首页前置开启 Separate same dishes 并刷新 POS，进入堂食无桌订单连续添加目标菜、读取税额 `$1.20`、送厨/保存，Recall 打开同一订单进入真实编辑页，对目标菜加 1 后再保存并回查税额 `$1.80`，最后恢复开关；
-  2. 逐一展示上述完整路径中的中间弹窗、控件状态、页面转场、配置生效与恢复动作，不得省略标题对应的业务步骤；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 在首次保存前断言 `$1.20`、编辑保存后 Recall 断言数量与 `$1.80`。
-- 请保留证据：配置查询/更新/恢复请求的配置名、ID、旧值/新值，分行菜品 DOM、Send/Save 与 Recall Edit DOM，订单保存/编辑响应中的数量和税额；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：缺少 Separate same dishes 开关的准确配置字段与恢复请求，以及订单送厨后从 Recall 进入真实编辑页、加 1 并回查税额的稳定契约。
-- 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-kitchen.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责开关及恢复，`pages/order-dishes/order-dishes-reads.section.ts` 负责数量/税额读取，`flows/order-kitchen.flow.ts` 负责送厨、Recall 编辑和 finally 恢复。
-
-### ORDER-PAGE-004：提示词 5 后台点单前确认客户信息，客户姓名必填，电话必填，点支付按钮后弹出输入电话号码和客户姓名的弹框
-
-- Jira：`POS-42889`。
-- 已知前置：“点单前确认客户信息”、姓名必填、电话必填三个配置项的原值及更新/恢复权限、堂食无桌订单、普通菜、唯一客户姓名和有效电话；结束后恢复三个配置项并刷新 POS。
-- 请从 POS 首页开始录制：
-  1. 最小录制路径：从 POS 首页前置开启“点单前确认客户信息”、姓名必填和电话必填，刷新后进入堂食无桌、加菜并点 Pay，分别触发缺姓名/电话提示，再填写完整信息确认进入 Payment，最后返回首页并恢复配置；
-  2. 逐一展示上述完整路径中的中间弹窗、控件状态、页面转场、配置生效与恢复动作，不得省略标题对应的业务步骤；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 断言缺字段时被阻止、完整填写后弹框消失且 Payment 加载。
-- 请保留证据：三个配置项的查询/更新/恢复请求和旧值/新值，客户弹框、姓名/电话输入、字段错误、确认按钮与 Payment 到达标识 DOM；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：缺少“点单前确认客户信息”、姓名必填、电话必填三个配置项，以及 Pay 后客户必填弹框、字段错误与 Payment 到达标识的真实契约。
-- 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-customer.dialog.ts`、`flows/order-customer.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责配置及恢复，`pages/order-dishes/order-dishes-customer.dialog.ts` 负责弹框读写/校验，`flows/order-customer.flow.ts` 负责编排支付前校验。
-
-### ORDER-PAGE-005：提示词 6 没有删菜权限的用户点单后删菜，弹出权限提示框提示没有权限，输入正确的密码可正常删菜
-
-- Jira：`POS-39750`。
-- 已知前置：一名无删菜权限员工、一名可授权删菜员工、两者可用口令和可恢复的角色权限；英文语言原状态、堂食无桌订单、普通菜、厨房送厨链路及可选 Void 原因；结束后恢复员工、权限和语言。
-- 请从 POS 首页开始录制：
-  1. 最小录制路径：从 POS 首页退出当前员工，以无删菜权限员工口令进入，切英文后新建堂食无桌、加菜并整单送厨，Recall 打开同一订单编辑并删除菜品，断言无权限提示，输入有权限口令后保存、选择 Void 原因，再回查菜品状态并恢复员工/语言/权限；
-  2. 逐一展示上述完整路径中的中间弹窗、控件状态、页面转场、配置生效与恢复动作，不得省略标题对应的业务步骤；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 断言未授权时不可删除、授权后目标菜状态符合需求。
-- 请保留证据：员工与角色权限查询/更新/恢复请求，送厨和订单更新响应，删除按钮、权限提示文本/口令输入、Void 原因弹框及菜品状态 DOM；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：缺少受限员工/授权员工权限配置与恢复请求、送厨菜品行级删除后的权限口令弹框、Void 原因和最终菜品状态契约。
-- 录制返回后计划补充：`pages/order-dishes/order-dishes-void.section.ts`、`flows/employee-permission.flow.ts`、`flows/order-kitchen.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-void.section.ts` 负责单行 Void/权限/原因 DOM，`flows/employee-permission.flow.ts` 负责员工切换、授权与 finally 恢复，`flows/order-kitchen.flow.ts` 负责送厨和 Recall 编辑。
-
-### ORDER-PAGE-006：提示词 10 open Food 点单，不选择任何税，可以成功完成付款
-
-- Jira：`POS-42011`。
-- 已知前置：堂食无桌订单、可录入名称与价格且允许保持无税的 Open Food、可用现金全额支付权限，以及用于 Recall 精确回查的订单号。
-- 请从 POS 首页开始录制：
-  1. 最小录制路径：从 POS 首页进入堂食无桌，打开 Open Food，输入名称/价格并明确保持“不选择任何税”，完成现金全额付款，按保存的订单号进入 Recall 并校验订单状态 `Paid`；
-  2. 逐一展示上述完整路径中的中间弹窗、控件状态、页面转场、配置生效与恢复动作，不得省略标题对应的业务步骤；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 断言 Open Food 税额为 0 且 Recall 订单状态为 `Paid`。
-- 请保留证据：Open Food 弹框税项控件/默认态 DOM、创建菜品或订单请求中的 taxId/税标志及响应税额、现金支付响应、Recall 订单状态 DOM；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：现有 Open Food API 没有“不选择任何税”的契约，缺少税项控件默认态、无税 payload、零税额与现金支付后 Paid 状态证据。
-- 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`flows/payment.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责 Open Food 税项选择/读取，`flows/order-dishes.flow.ts` 负责无税 Open Food 下单，现有 `flows/payment.flow.ts` 负责现金支付。
 
 ### ORDER-PAGE-007：提示词 11 连续创建两个不输入姓名的pick up订单，修改其中一个食客姓名，另一个不受影响
 

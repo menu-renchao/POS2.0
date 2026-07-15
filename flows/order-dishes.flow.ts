@@ -194,6 +194,16 @@ export class OrderDishesFlow {
     await orderDishesPage.addOpenFood(name, price);
   }
 
+  @step((_: OrderDishesPage, name: string, price: number) => `业务步骤：添加无税 Open Food 菜品 ${name}，价格 ${price}`)
+  async addOpenFoodItemWithoutTax(
+    orderDishesPage: OrderDishesPage,
+    name: string,
+    price: number,
+  ): Promise<void> {
+    await orderDishesPage.expectLoaded();
+    await orderDishesPage.addOpenFoodWithoutTax(name, price);
+  }
+
   @step('业务步骤：通用添加菜品到购物车')
   async addDishToCart(
     orderDishesPage: OrderDishesPage,

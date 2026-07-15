@@ -48,6 +48,20 @@ export class OrderDishesLocators {
   readonly openFoodPriceInput: Locator;
   readonly openFoodKeyboardCloseButton: Locator;
   readonly openFoodConfirmButton: Locator;
+  readonly openFoodNoTaxOption: Locator;
+  readonly notification: Locator;
+  readonly notificationConfirmButton: Locator;
+  readonly customerDialog: Locator;
+  readonly customerDialogHeading: Locator;
+  readonly customerNameInput: Locator;
+  readonly customerPhoneInput: Locator;
+  readonly customerConfirmButton: Locator;
+  readonly customerNameRequiredMessage: Locator;
+  readonly customerPhoneRequiredMessage: Locator;
+  readonly removeItemButton: Locator;
+  readonly kitchenVoidPermissionMessage: Locator;
+  readonly authorizationDigitButton: (digit: string) => Locator;
+  readonly authorizationConfirmButton: Locator;
   readonly specificationDialog: Locator;
   readonly specificationConfirmButton: Locator;
   readonly categoryOptionPanel: Locator;
@@ -117,9 +131,7 @@ export class OrderDishesLocators {
         .or(hostPage.getByRole('button', { name: 'Send' }))
         .first(),
     );
-    this.payButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
-      appFrame.getByRole('button', { name: 'Pay' }).or(hostPage.getByRole('button', { name: 'Pay' })).first(),
-    );
+    this.payButton = this.page.getByTestId('bottom-button-payOrderBtn');
     this.addLineButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
       appFrame
         .getByTestId('action-rail-button-addline')
@@ -201,6 +213,29 @@ export class OrderDishesLocators {
     this.openFoodPriceInput = this.page.getByRole('textbox', { name: '0.00' });
     this.openFoodKeyboardCloseButton = this.page.getByTestId('pos-keyboard-button-{close}');
     this.openFoodConfirmButton = this.page.getByTestId('open-food-confirm');
+    this.openFoodNoTaxOption = this.page.getByTestId('open-food-tax-3');
+    this.notification = this.page.getByTestId('notification');
+    this.notificationConfirmButton = this.page.getByTestId('notification-confirm-button');
+    this.customerDialog = this.page.locator('#customer-dialog');
+    this.customerDialogHeading = this.customerDialog.getByRole('heading', {
+      name: 'Customer Information',
+    });
+    this.customerNameInput = this.customerDialog.getByRole('textbox', { name: 'Name' });
+    this.customerPhoneInput = this.customerDialog.getByRole('textbox', { name: 'Phone No.' });
+    this.customerConfirmButton = this.customerDialog.getByRole('button', { name: 'Confirm' });
+    this.customerNameRequiredMessage = this.page.getByText("Name can't be empty", { exact: true });
+    this.customerPhoneRequiredMessage = this.page.getByText("Phone can't be empty", { exact: true });
+    this.removeItemButton = this.page.getByTestId('action-rail-button-rmvItem');
+    this.kitchenVoidPermissionMessage = this.page.getByText(
+      'You do not have permission VOID_KITCHEN_ITEM, please enter the password!',
+      { exact: true },
+    );
+    this.authorizationDigitButton = (digit: string) =>
+      this.page.getByRole('button', { name: `Number ${digit}`, exact: true });
+    this.authorizationConfirmButton = this.page.getByRole('button', {
+      name: 'confirm',
+      exact: true,
+    });
     this.specificationDialog = this.appFrame.getByRole('dialog', {
       name: 'Select Specifications',
     });

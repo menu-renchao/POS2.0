@@ -362,6 +362,23 @@ export class OrderDishesMenuSection {
       await expect(this.locators.openFoodConfirmButton).toBeHidden();
     }
 
+    @step((name: string, price: number) => `页面操作：添加不选择税的 Open Food 菜品 ${name}，价格 ${price}`)
+    async addOpenFoodWithoutTax(name: string, price: number): Promise<void> {
+      await this.host.expectLoaded();
+      await this.locators.openFoodButton.click();
+      await expect(this.locators.openFoodConfirmButton).toBeVisible();
+
+      await this.locators.openFoodNameInput.fill(name);
+      await this.locators.openFoodPriceInput.fill(price.toFixed(3));
+      await this.locators.openFoodKeyboardCloseButton.click();
+      await this.locators.openFoodNoTaxOption.click();
+      await waitForInputSettled(this.locators.openFoodPriceInput);
+      await this.locators.openFoodConfirmButton.click();
+      await expect(this.locators.notification).toContainText('No tax selected. Confirm to save?');
+      await this.locators.notificationConfirmButton.click();
+      await expect(this.locators.openFoodConfirmButton).toBeHidden();
+    }
+
     @step('页面操作：确认规格选择弹窗可见')
     async expectSpecificationDialogVisible(): Promise<void> {
       await expect(this.locators.specificationDialog).toBeVisible();
@@ -499,6 +516,27 @@ export class OrderDishesMenuSection {
       for (let index = 0; index < times; index += 1) {
         await removeButton.click();
       }
+    }
+
+    @step((dishName: string) => `页面操作：尝试删除已送厨菜品 ${dishName} 并校验权限提示`)
+    async requestSentDishRemovalAndExpectAuthorization(dishName: string): Promise<void> {
+      await this.selectOrderedDish(dishName);
+      await this.locators.removeItemButton.click();
+      await expect(this.locators.kitchenVoidPermissionMessage).toBeVisible();
+      await expect(this.locators.authorizationConfirmButton).toBeVisible();
+    }
+
+    @step('页面操作：输入授权员工口令并确认删菜授权')
+    async authorizePendingDishRemoval(passcode: string): Promise<void> {
+      if (!/^\d+$/.test(passcode)) {
+        throw new Error('删菜授权口令必须只包含数字。');
+      }
+
+      for (const digit of passcode) {
+        await this.locators.authorizationDigitButton(digit).click();
+      }
+      await this.locators.authorizationConfirmButton.click();
+      await expect(this.locators.authorizationConfirmButton).toBeHidden();
     }
 
     @step((dishName: string, quantity: number) => `页面操作：将已点菜品 ${dishName} 数量修改为 ${quantity}`)
