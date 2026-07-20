@@ -2,6 +2,7 @@ import { expect } from '@playwright/test';
 import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { HomeFlow } from '../../flows/home.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
+import { PaymentFlow } from '../../flows/payment.flow';
 import { RecallFlow } from '../../flows/recall.flow';
 import { SelectTableFlow } from '../../flows/select-table.flow';
 import { SplitOrderFlow } from '../../flows/split-order.flow';
@@ -389,6 +390,60 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
 
         await test.step('提交平分结果', async () => {
           await splitFlow.submitAndReturnPage(splitOrderPage);
+        });
+      },
+    );
+
+    test(
+      '[POS-16324] 应能在分单页现金支付一个子单并查看两个子单状态',
+      {
+        annotation: [jiraIssueAnnotation('POS-16324')],
+        tag: ['@现金支付'],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        test.setTimeout(90_000);
+        const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome(homePage, employeeLoginPage);
+        });
+
+        const splitOrderPage = await test.step('创建 To Go 订单并从点单页进入分单', async () => {
+          const orderPage = await new TakeoutFlow().startToGoOrder(ready);
+          await new OrderDishesFlow().addRegularDish(
+            orderPage,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          return await orderPage.openSplitOrder();
+        });
+        const splitFlow = new SplitOrderFlow();
+
+        await test.step('将普通菜1平分两份并把其中一份移入新子单', async () => {
+          await splitFlow.evenSplitDishOnSuborder(splitOrderPage, {
+            dishName: orderServiceDishes.regular.name,
+            splitCount: 2,
+            suborderIndex: '1',
+          });
+          await splitFlow.moveDishToNewSuborder(splitOrderPage, orderServiceDishes.regular.name);
+        });
+
+        await test.step('校验两个子单金额相等且总额守恒', async () => {
+          const snapshot = await splitOrderPage.readSnapshot();
+          expect(snapshot.suborders).toHaveLength(2);
+          expectUnpaidSuborders(snapshot);
+          expect(toCents(snapshot.suborders[0].total)).toBe(toCents(snapshot.suborders[1].total));
+          expect(toCents(suborderTotal(snapshot))).toBe(toCents(snapshot.total));
+        });
+        await test.step('现金支付第一个子单并点击 NO RECEIPT 关闭支付成功页', async () => {
+          const paymentPage = await splitOrderPage.openSuborderPayment(1);
+          await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
+          await splitOrderPage.expectLoaded();
+        });
+
+        await test.step('校验一个子单已支付且另一个子单仍未支付', async () => {
+          const paidSnapshot = await splitOrderPage.readSnapshot();
+          expect(paidSnapshot.suborders.filter((suborder) => suborder.paidStatus)).toHaveLength(1);
+          expect(paidSnapshot.suborders.filter((suborder) => !suborder.paidStatus)).toHaveLength(1);
+          expect(toCents(suborderTotal(paidSnapshot))).toBe(toCents(paidSnapshot.total));
         });
       },
     );

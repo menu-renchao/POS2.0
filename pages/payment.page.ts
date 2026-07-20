@@ -196,21 +196,28 @@ export class PaymentPage {
     await this.page.keyboard.press('Escape').catch(() => undefined);
   }
 
-  @step('页面操作：如支付成功页仍显示，则确认并关闭')
+  @step('页面操作：如支付成功页仍显示，则点击 NO RECEIPT 关闭')
   async confirmPaymentSuccessIfVisible(): Promise<void> {
     if (!(await this.isPaymentSuccessConfirmVisible())) {
       return;
     }
 
+    const buttonText = (await this.paymentSuccessConfirmButton.innerText())
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (buttonText.toUpperCase() !== 'NO RECEIPT') {
+      throw new Error(`支付成功页关闭按钮文案应为 NO RECEIPT，实际为：${buttonText}`);
+    }
+
     await this.paymentSuccessConfirmButton.click();
     await waitUntil(
-      async () => await this.isPaymentPanelVisible(),
-      (paymentPanelVisible) => !paymentPanelVisible,
+      async () => await this.isPaymentSuccessConfirmVisible(),
+      (successButtonVisible) => !successButtonVisible,
       {
-        timeout: 10_000,
-        message: 'Payment success panel did not close after confirmation.',
+        timeout: 5_000,
+        message: '点击 NO RECEIPT 后支付成功页未在超时内关闭。',
       },
-    ).catch(() => undefined);
+    );
   }
 
   @step('页面操作：关闭支付面板并返回订单详情')

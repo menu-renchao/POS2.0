@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { HomePage } from './home.page';
 import { OrderDishesPage } from './order-dishes.page';
+import { PaymentPage } from './payment.page';
 import { RecallPage } from './recall.page';
 import { readVisiblePosAlertText } from './shared/pos-alert';
 import { waitForInputSettled } from '../utils/input-stability';
@@ -52,6 +53,7 @@ export class SplitOrderPage {
   private readonly confirmButton: Locator;
   private readonly cancelButton: Locator;
   private readonly addSuborderButton: Locator;
+  private readonly suborderPayButton: (suborderIndex: number) => Locator;
   private readonly splitPanelModal: Locator;
   private readonly subordersContainer: Locator;
   private readonly totalValue: Locator;
@@ -81,15 +83,14 @@ export class SplitOrderPage {
     this.unsplitMenuItem = this.splitFrame.getByTestId('dropdown-item-unsplitBtn');
     this.unsplitButton = this.modal.getByRole('button', { name: /^Unsplit$|取消分单$/ }).first();
     this.moreButton = this.splitFrame.getByTestId('moreBtn');
-    this.confirmButton = this.modal
-      .locator('[data-testid="splitPanelModal-confirm-button"], [data-testid="split-panel-confirm"]')
-      .or(this.modal.getByRole('button', { name: CONFIRM_BUTTON_NAME }).first())
-      .first();
+    this.confirmButton = this.splitFrame.getByTestId('splitPanelModal-confirm-button');
     this.cancelButton = this.modal.getByRole('button', { name: CANCEL_BUTTON_NAME }).first();
     this.addSuborderButton = this.splitFrame
       .getByTestId('button-default')
       .filter({ hasText: 'Add Suborder' })
       .first();
+    this.suborderPayButton = (suborderIndex: number) =>
+      this.splitFrame.getByTestId(`payBtn-${suborderIndex}`);
     this.splitPanelModal = this.splitFrame.getByTestId('splitPanelModal');
     this.subordersContainer = this.modal;
     this.totalValue = this.modal.locator('._value_1lomb_35, [class*="_value_"]').first();
@@ -243,6 +244,18 @@ export class SplitOrderPage {
   async clickAddSuborder(): Promise<void> {
     await this.expectLoaded();
     await this.addSuborderButton.click();
+  }
+
+  @step((suborderIndex: number) => `页面操作：点击第 ${suborderIndex} 个子单的 Pay 并进入支付页面`)
+  async openSuborderPayment(suborderIndex: number): Promise<PaymentPage> {
+    await this.expectLoaded();
+    const payButton = this.suborderPayButton(suborderIndex);
+    await expect(payButton).toBeVisible();
+    await payButton.click();
+
+    const paymentPage = new PaymentPage(this.page);
+    await paymentPage.expectLoaded();
+    return paymentPage;
   }
 
   @step((suborderIndex: number) => `页面断言：分单面板展示第 ${suborderIndex} 个子单`)
