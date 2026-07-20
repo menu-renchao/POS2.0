@@ -2,7 +2,7 @@
 
 本文档记录当前自动化中缺少真实页面 DOM 契约、需要人工录制补充的场景。
 
-订单操作回归当前共有 **6 条 skipped**：其中 **5 条需要录制**，归并为 **1 组录制请求**（报表 Fee/Unpaid 5 条）；POS-32954 因“POS NG 不适用”保留 skip 但不需要录制。点单页面提示词当前剩余 **45 条**一对一录制请求。
+订单操作回归当前共有 **6 条 skipped**：其中 **5 条需要录制**，归并为 **1 组录制请求**（报表 Fee/Unpaid 5 条）；POS-32954 因“POS NG 不适用”保留 skip 但不需要录制。点单页面提示词当前剩余 **43 条**一对一录制请求。
 
 ## 提交格式
 
@@ -41,7 +41,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 
 ## 点单页面提示词待补充
 
-以下 45 条需求与点单页面提示词覆盖矩阵严格一一对应。已完成的 `ORDER-PAGE-002`～`ORDER-PAGE-006` 已移除；其余录制编号保持原顺序和映射，不重编号。
+以下 43 条需求与点单页面提示词覆盖矩阵严格一一对应。已完成的 `ORDER-PAGE-002`～`ORDER-PAGE-006`、`ORDER-PAGE-014`、`ORDER-PAGE-016` 已移除；其余录制编号保持原顺序和映射，不重编号。
 
 录制提交格式统一沿用本文档顶部“提交格式”，不在各条目中重复。
 
@@ -141,18 +141,6 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：缺少菜级一级/二级 option 的父子转场、选择顺序、保存 payload 和两页 additions 回显契约。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责两级菜级 option 选择/读取，`flows/order-dishes.flow.ts` 负责保存回查，`test-data/order-service.ts` 固化父子数据。
 
-### ORDER-PAGE-014：提示词 26 POS-16324 点单页点击分单后支付部分子单，查看订单信息
-
-- Jira：`POS-16324`。
-- 已知前置：可从 POS 首页进入真实桌台流程的员工上下文、可精确定位的桌台/订单和普通非套餐菜、可用分单与现金支付权限，以及可按母单号和子单号精确回查的 Recall 数据。
-- 请从 POS 首页开始录制：
-  1. 从 POS 首页进入真实桌台流程，创建并记录可精确定位的订单，添加一条可精确定位的普通非套餐菜；进入 Split，展示真实 drag source 和新子单 drop target，以鼠标/拖拽事件把目标菜拖入新子单，读取拖拽后的菜品归属，再提交分单并保留母单号、两个子单号和 itemId；
-  2. 对其中一个子单发起结账，复用产品真实现金支付路径完成该子单付款；返回 Recall，按母/子单号分别打开两个子单，并展示源步骤 `get first order background` 对应的首条订单背景 DOM、样式及其产品含义；
-  3. 在 Recall 最终读取并保留两个子单状态：已现金支付的子单严格为 `Paid`，未支付子单严格为 `New Order`；同时确认目标菜只归属拖拽目标子单，分单提交 payload 的母子单号/itemId 与页面一致。
-- 请保留证据：源订单、桌台和普通菜的稳定业务 ID 与 DOM；drag source/drop target 的原始 `data-testid`、role、label、可见文本、边界框、鼠标轨迹及 drag/drop/pointer 事件；拖拽前后菜品归属；分单提交请求/响应中的母单号、两个子单号和 itemId；目标子单现金支付请求/响应；Recall 两个子单的 `Paid`/`New Order` 状态、首条订单背景 DOM/样式；以及影响结果的关键网络请求。
-- 当前阻塞：现有 `SplitOrderFlow.moveDishToNewSuborder` 只点击选菜后新增子单，`moveDishes` 也通过点击和接收按钮移动，均不等价于源步骤要求的真实拖拽；缺少 drag source/drop target、边界/事件、拖后归属和分单提交母子单/itemId 契约。
-- 录制返回后计划补充：`pages/split-order.page.ts`、`flows/split-order.flow.ts`、`flows/payment.flow.ts`、`pages/recall/recall-order-details.dialog.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/split-order.page.ts` 只负责真实拖拽动作和拖后归属读取，`flows/split-order.flow.ts` 负责编排分单/提交并保存母子单标识，支付继续复用 `flows/payment.flow.ts`，Recall 详情继续复用现有子单状态读取能力。
-
 ### ORDER-PAGE-015：提示词 27 test_open_food_keyboard_multi_language
 
 - Jira：无。
@@ -164,18 +152,6 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 请保留证据：后台配置项名称、ID、旧值/新值与查询/更新/恢复请求，Open Food 弹框、语言切换控件、切换前后语言/布局标识、区分字符按键、Name 输入框、确认按钮和订单行稳定 DOM，以及菜单/草稿请求中的菜名；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
 - 当前阻塞：读取/切换 Open Food 屏幕键盘语言布局，并用该布局按键输入区分字符。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责配置及 finally 恢复，`pages/order-dishes/order-dishes-menu.section.ts` 负责键盘语言/布局读取、真实按键输入和名称读取，`flows/order-dishes.flow.ts` 负责编排。
-
-### ORDER-PAGE-016：提示词 29 POS-30575：delivery点单，输入用户信息，进入点单页面点击info,info信息预输入的一致
-
-- Jira：`POS-30575`。
-- 已知前置：Delivery 客户 name=`pos-test`、phone=`01234567890`、有效地址和备注，可进入点单页的员工上下文，以及本次 customerId/订单草稿可追踪的数据。
-- 请从 POS 首页开始录制：
-  1. `tests/py-migrate/order.service.spec.ts:395` 已证明 Delivery 输入内容保存后在 Recall 详情回显，但没有点击点单页 Info，也没有读取预填字段。最小录制路径：从 POS 首页进入 Delivery，输入 name=pos-test、phone=01234567890、地址和备注进入点单页，点击真实 Info 入口，逐项读取预填值并关闭后返回首页；当前缺失的准确 UI 动作是“点单页点击 Info 并读取客户信息弹框预填字段”；
-  2. 逐一展示上述完整路径中的中间弹窗、控件状态、页面转场、配置生效与恢复动作，不得省略标题对应的业务步骤；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 在保存前断言五项预填值等于输入。
-- 请保留证据：Delivery 输入与 Info 入口/弹框字段/关闭控件稳定 DOM，客户创建或订单草稿请求响应中的 customerId、姓名、电话、地址、备注；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：点单页点击 Info 并读取客户信息弹框预填字段。
-- 录制返回后计划补充：`pages/order-dishes/order-dishes-customer.dialog.ts`、`flows/takeout.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：Delivery Page 负责首次录入，`pages/order-dishes/order-dishes-customer.dialog.ts` 负责 Info 弹框动作/读取，`flows/takeout.flow.ts` 负责编排。
 
 ### ORDER-PAGE-017：提示词 30 POS-31045：选择的套餐子菜包含多个option，点单页面连续删除option正常
 
