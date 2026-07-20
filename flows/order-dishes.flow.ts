@@ -66,7 +66,45 @@ export type CustomModifierParams = {
   price?: number | string;
 };
 
+export type ComboDishOptionSelection = {
+  option: string;
+  suboption?: string;
+};
+
+export type ComboDishWithOptionsParams = {
+  comboName: string;
+  itemIndex?: number;
+  menuSelection: MenuSelection;
+  saleItemId: number;
+  sectionId: number;
+  selections: readonly ComboDishOptionSelection[];
+};
+
 export class OrderDishesFlow {
+  @step(
+    (_orderDishesPage: OrderDishesPage, params: ComboDishWithOptionsParams) =>
+      `业务步骤：添加套餐 ${params.comboName}，为套餐子菜选择多个 option`,
+  )
+  async addComboDishWithItemOptions(
+    orderDishesPage: OrderDishesPage,
+    params: ComboDishWithOptionsParams,
+  ): Promise<void> {
+    await orderDishesPage.expectLoaded();
+    await this.switchMenu(orderDishesPage, params.menuSelection);
+    await orderDishesPage.clickDish(params.comboName);
+    await orderDishesPage.selectComboItem(
+      params.sectionId,
+      params.saleItemId,
+      params.itemIndex ?? 0,
+    );
+
+    for (const selection of params.selections) {
+      await orderDishesPage.selectCategoryOption(selection.option, selection.suboption);
+    }
+
+    await orderDishesPage.confirmComboDialog();
+  }
+
   @step('业务步骤：添加普通菜品到购物车')
   async addRegularDish(
     orderDishesPage: OrderDishesPage,

@@ -77,11 +77,51 @@ export class OrderDishesReadsSection {
       }));
     }
 
+    @step((dishName: string) => `页面读取：读取已点菜品 ${dishName} 的数值价格`)
+    async readOrderedDishPrice(dishName: string): Promise<number> {
+      const orderedItem = (await this.readOrderedItems()).find((item) => item.name === dishName);
+      const priceText = orderedItem?.price;
+
+      if (!priceText) {
+        throw new Error(`点单页未读取到菜品 ${dishName} 的价格。`);
+      }
+
+      const price = Number(priceText.replace(/[$,]/g, ''));
+      if (Number.isNaN(price)) {
+        throw new Error(`菜品 ${dishName} 的价格无法解析为数值：${priceText}`);
+      }
+
+      return price;
+    }
+
+    @step(
+      (dishName: string, detailText: string) =>
+        `页面读取：检查已点菜品 ${dishName} 是否展示明细 ${detailText}`,
+    )
+    async isOrderedDishDetailVisible(dishName: string, detailText: string): Promise<boolean> {
+      return await this.locators
+        .orderedDishItemByName(dishName)
+        .getByText(detailText, { exact: true })
+        .isVisible()
+        .catch(() => false);
+    }
+
     private normalizeOrderedItemAdditions(
       additions: OrderedDishItemAddition[],
     ): OrderedDishItemAddition[] {
       return additions.flatMap((addition) => {
         const cleanedName = addition.name.replace(/DishLevelIcon/gi, ' ').replace(/\s+/g, ' ').trim();
+        const pricedParentWithChild = cleanedName.match(/^(.+?)\s+(\$[\d,.]+)\s+(.+)$/);
+
+        if (pricedParentWithChild) {
+          const [, parentName, parentPrice, childName] = pricedParentWithChild;
+
+          return [
+            { ...addition, name: parentName, price: addition.price ?? parentPrice },
+            { name: childName },
+          ];
+        }
+
         const splitNames = cleanedName
           .split(/\s+(?=(?:free|category)\s+(?:option|suboption))/i)
           .map((name) => name.trim())

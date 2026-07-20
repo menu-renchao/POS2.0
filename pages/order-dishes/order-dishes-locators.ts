@@ -44,6 +44,9 @@ export class OrderDishesLocators {
   readonly priceInput: Locator;
   readonly priceConfirmButton: Locator;
   readonly openFoodButton: Locator;
+  readonly searchMenuButton: Locator;
+  readonly searchMenuInput: Locator;
+  readonly searchMenuResultCard: (testId: string) => Locator;
   readonly openFoodNameInput: Locator;
   readonly openFoodPriceInput: Locator;
   readonly openFoodKeyboardCloseButton: Locator;
@@ -72,9 +75,13 @@ export class OrderDishesLocators {
   readonly categoryOptionPanel: Locator;
   readonly categoryOptionGrid: Locator;
   readonly categoryOptionSubGrid: Locator;
+  readonly itemOptionButton: (optionName: string) => Locator;
   readonly comboDialog: Locator;
   readonly comboConfirmButton: Locator;
+  readonly comboItemButton: (sectionId: number, saleItemId: number, itemIndex: number) => Locator;
+  readonly reduceSelectedOptionButton: Locator;
   readonly orderedDishItems: Locator;
+  readonly orderedDishItemByName: (dishName: string) => Locator;
   readonly cartBadge: Locator;
   readonly priceSummaryToggle: Locator;
   readonly priceSummaryDetailsContainer: Locator;
@@ -214,6 +221,9 @@ export class OrderDishesLocators {
     this.priceInput = this.priceDialog.getByRole('textbox', { name: 'Price' });
     this.priceConfirmButton = this.priceDialog.getByRole('button', { name: 'Confirm' });
     this.openFoodButton = this.page.getByTestId('icon-button-Open item');
+    this.searchMenuButton = this.page.getByTestId('icon-button-Search menu');
+    this.searchMenuInput = this.page.getByTestId('pos-ui-input');
+    this.searchMenuResultCard = (testId: string) => this.page.getByTestId(testId);
     this.openFoodNameInput = this.page.getByRole('textbox', { name: 'Name' });
     this.openFoodPriceInput = this.page.getByRole('textbox', { name: '0.00' });
     this.openFoodKeyboardCloseButton = this.page.getByTestId('pos-keyboard-button-{close}');
@@ -269,13 +279,23 @@ export class OrderDishesLocators {
       .first()
       .or(this.categoryOptionPanel);
     this.categoryOptionSubGrid = this.page.locator('[class*="_subGrid_"]').first();
-    this.comboDialog = this.appFrame.locator('aside[class*="_panel_"]').filter({
-      has: this.appFrame.getByRole('button', { name: 'Cancel', exact: true }),
-    }).first();
-    this.comboConfirmButton = this.comboDialog.locator('button', {
-      hasText: /^(Confirm|确认)$/,
-    }).first();
+    this.itemOptionButton = (optionName: string) =>
+      this.page.getByRole('button', { name: optionName, exact: true });
+    this.comboDialog = this.page.getByRole('complementary').filter({
+      has: this.page.getByRole('button', { name: 'Cancel', exact: true }),
+    });
+    this.comboConfirmButton = this.comboDialog.getByRole('button', {
+      name: 'Confirm',
+      exact: true,
+    });
+    this.comboItemButton = (sectionId: number, saleItemId: number, itemIndex: number) =>
+      this.page.locator(`[id="${sectionId}-${saleItemId}-${itemIndex}"]`);
+    this.reduceSelectedOptionButton = this.page.getByTestId('action-rail-button-reduce1opt');
     this.orderedDishItems = this.page.getByTestId('pos-ui-dish-item');
+    this.orderedDishItemByName = (dishName: string) =>
+      this.orderedDishItems.filter({
+        has: this.page.getByText(dishName, { exact: true }),
+      }).first();
     this.cartBadge = scoped('[data-testid="cart-badge"]');
     this.priceSummaryToggle = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
       appFrame

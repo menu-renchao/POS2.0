@@ -65,7 +65,7 @@ export class SplitOrderPage {
   private readonly posToast: Locator;
 
   constructor(private readonly page: Page) {
-    this.splitFrame = this.page.frameLocator('iframe[data-wujie-id="splitPanel"], #splitPanelContainer iframe');
+    this.splitFrame = this.page.frameLocator('#splitPanelContainer iframe');
 
     this.modal = this.splitFrame.getByRole('dialog').first();
     this.title = this.modal.getByRole('heading').first();

@@ -8,6 +8,7 @@ export const orderServiceMenu = {
 
 export const orderServiceDishes = {
   regular: {
+    expectedBasePrice: 8.8,
     saleItemId: 698,
     name: '普通菜1',
     menu: orderServiceMenu,
@@ -31,6 +32,33 @@ export const orderServiceCategoryOptions = {
     name: 'free option',
     suboptionName: 'free suboption',
   },
+  paidNested: {
+    name: 'A',
+    suboptionName: 'a1',
+    expectedDishPrice: 9.8,
+  },
+} as const;
+
+export const orderServiceComboOptionRemovalCase = {
+  comboName: '套餐1',
+  itemName: '普通菜1',
+  itemIndex: 0,
+  saleItemId: 698,
+  sectionId: 3,
+  initialOptions: ['A', 'a1', 'option1', 'free option'],
+  firstRemovalOptions: ['A', 'option1', 'free option'],
+  finalOptions: ['option1', 'free option'],
+  initialPrice: 31.6,
+  finalPrice: 30.6,
+} as const;
+
+export const orderServiceSearchMenuConfigurationCase = {
+  configurationName: 'SEARCH_MENU',
+  hiddenValue: false,
+  query: 'superman',
+  resultName: 'superman item4',
+  resultTestId: 'menu-item-card-dsh1_0_697',
+  visibleValue: true,
 } as const;
 
 export const orderServiceEditRecallTaxCase = {

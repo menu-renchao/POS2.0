@@ -104,6 +104,36 @@ export class OrderDishesMenuSection {
       await searchResult.click();
     }
 
+    @step((visible: boolean) => `页面断言：Search Menu 入口${visible ? '可见' : '不可见'}`)
+    async expectSearchMenuVisible(visible: boolean): Promise<void> {
+      if (visible) {
+        await expect(this.locators.searchMenuButton).toBeVisible();
+        return;
+      }
+
+      await expect(this.locators.searchMenuButton).toBeHidden();
+    }
+
+    @step((query: string) => `页面操作：打开 Search Menu 并搜索 ${query}`)
+    async openSearchMenuAndFill(query: string): Promise<void> {
+      await this.locators.searchMenuButton.click();
+      await expect(this.locators.searchMenuInput).toBeVisible();
+      await this.locators.searchMenuInput.fill(query);
+    }
+
+    @step(
+      (testId: string, expectedText: string) =>
+        `页面断言：Search Menu 结果 ${testId} 展示 ${expectedText}`,
+    )
+    async expectSearchMenuResult(testId: string, expectedText: string): Promise<void> {
+      await expect(this.locators.searchMenuResultCard(testId)).toContainText(expectedText);
+    }
+
+    @step((testId: string) => `页面操作：点击 Search Menu 结果 ${testId}`)
+    async clickSearchMenuResult(testId: string): Promise<void> {
+      await this.locators.searchMenuResultCard(testId).click();
+    }
+
     @step((groupName: string) => `页面操作：切换菜单组 ${groupName}`)
     async switchMenuGroup(groupName: string): Promise<void> {
       await this.host.expectLoaded();
@@ -403,13 +433,12 @@ export class OrderDishesMenuSection {
 
     @step((suboption: string) => `页面操作：检查分类二级 option ${suboption} 是否可见`)
     private async isCategorySubOptionVisible(suboption: string): Promise<boolean> {
-      const escapedSuboption = this.ctx.escapeRegExp(suboption);
-      const suboptionPattern = new RegExp(`^\\s*${escapedSuboption}\\s*(?:\\$[\\d,.]+)?\\s*$`);
+      return await this.locators.itemOptionButton(suboption).isVisible().catch(() => false);
+    }
 
-      return await this.page
-        .getByRole('button', { name: suboptionPattern })
-        .isVisible()
-        .catch(() => false);
+    @step((optionName: string) => `页面断言：菜品 option ${optionName} 可见`)
+    async expectItemOptionVisible(optionName: string): Promise<void> {
+      await expect(this.locators.itemOptionButton(optionName)).toBeVisible();
     }
 
     @step('页面操作：检查分类 option 面板是否可见')
@@ -448,8 +477,9 @@ export class OrderDishesMenuSection {
         : `页面操作：选择分类 option ${option}`,
     )
     async selectCategoryOption(option: string, suboption?: string): Promise<void> {
-      await this.expectCategoryOptionPanelVisible();
-      await (await this.resolveCategoryOptionButton(option)).click();
+      const optionButton = this.locators.itemOptionButton(option);
+      await expect(optionButton).toBeVisible();
+      await optionButton.click();
 
       if (suboption) {
         await waitUntil(
@@ -460,7 +490,7 @@ export class OrderDishesMenuSection {
             message: `分类二级 option ${suboption} 未在超时内可见。`,
           },
         );
-        await (await this.resolveCategorySubOptionButton(suboption)).click();
+        await this.locators.itemOptionButton(suboption).click();
       }
     }
 
@@ -496,6 +526,27 @@ export class OrderDishesMenuSection {
     @step('页面操作：确认套餐选择')
     async confirmComboDialog(): Promise<void> {
       await this.locators.comboConfirmButton.click();
+    }
+
+    @step(
+      (sectionId: number, saleItemId: number) =>
+        `页面操作：在套餐区域 ${sectionId} 选择菜品 ID ${saleItemId}`,
+    )
+    async selectComboItem(
+      sectionId: number,
+      saleItemId: number,
+      itemIndex: number = 0,
+    ): Promise<void> {
+      const comboItemButton = this.locators.comboItemButton(sectionId, saleItemId, itemIndex);
+      await expect(comboItemButton).toBeVisible();
+      await comboItemButton.click();
+    }
+
+    @step((dishName: string) => `页面操作：删除已点套餐 ${dishName} 当前选中的一个 option`)
+    async reduceSelectedComboOption(dishName: string): Promise<void> {
+      await this.selectOrderedDish(dishName);
+      await expect(this.locators.reduceSelectedOptionButton).toBeVisible();
+      await this.locators.reduceSelectedOptionButton.click();
     }
 
     @step((dishName: string, times: number) => `页面操作：将已点菜品 ${dishName} 减菜 ${times} 次`)

@@ -97,6 +97,7 @@ export class RecallOrderDetailsDialog {
   private readonly combineChargeConfirmButton: Locator;
   private readonly combineResultPriceSummaryToggle: Locator;
   private readonly firstOrderDishItem: Locator;
+  private readonly orderDishItemByName: (dishName: string) => Locator;
   private readonly moveDishesToExistingOrderButton: Locator;
   private readonly moveDishesToNewOrderButton: Locator;
   private readonly moveDishesTargetSelectionPrompt: Locator;
@@ -185,6 +186,10 @@ export class RecallOrderDetailsDialog {
       'shared-order-price-summary-toggle',
     );
     this.firstOrderDishItem = recallScopedTestId(this.orderDetailsDialog, 'pos-ui-dish-item');
+    this.orderDishItemByName = (dishName: string) =>
+      this.orderDetailsDialog
+        .getByRole('button', { name: new RegExp(escapeRegExp(dishName)) })
+        .first();
     this.moveDishesToExistingOrderButton = recallScopedTestId(
       this.page,
       'shared-order-detail-move-dishes-to-existing-order',
@@ -979,6 +984,36 @@ export class RecallOrderDetailsDialog {
   @step('页面读取：读取订单详情中的菜品明细')
   async readOrderItems(): Promise<RecallOrderItem[]> {
     return (await this.readOrderDetailsSnapshot()).items;
+  }
+
+  @step((dishName: string) => `页面读取：读取 Recall 订单详情中菜品 ${dishName} 的数值价格`)
+  async readOrderItemPrice(dishName: string): Promise<number> {
+    const item = (await this.readOrderDetailsSnapshot()).items.find(
+      (orderItem) => orderItem.name === dishName,
+    );
+    const priceText = item?.price;
+
+    if (!priceText) {
+      throw new Error(`Recall 订单详情未读取到菜品 ${dishName} 的价格。`);
+    }
+
+    const price = Number(priceText.replace(/[$,]/g, ''));
+    if (Number.isNaN(price)) {
+      throw new Error(`Recall 菜品 ${dishName} 的价格无法解析为数值：${priceText}`);
+    }
+
+    return price;
+  }
+
+  @step(
+    (dishName: string, detailText: string) =>
+      `页面读取：检查 Recall 菜品 ${dishName} 是否展示明细 ${detailText}`,
+  )
+  async isOrderItemDetailVisible(dishName: string, detailText: string): Promise<boolean> {
+    return await this.orderDishItemByName(dishName)
+      .getByText(detailText, { exact: true })
+      .isVisible()
+      .catch(() => false);
   }
 
   @step('页面读取：读取订单详情中的价格汇总')

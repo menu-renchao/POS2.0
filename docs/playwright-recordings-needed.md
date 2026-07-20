@@ -2,7 +2,7 @@
 
 本文档记录当前自动化中缺少真实页面 DOM 契约、需要人工录制补充的场景。
 
-订单操作回归当前共有 **6 条 skipped**：其中 **5 条需要录制**，归并为 **1 组录制请求**（报表 Fee/Unpaid 5 条）；POS-32954 因“POS NG 不适用”保留 skip 但不需要录制。点单页面提示词当前剩余 **43 条**一对一录制请求。
+订单操作回归当前共有 **6 条 skipped**：其中 **5 条需要录制**，归并为 **1 组录制请求**（报表 Fee/Unpaid 5 条）；POS-32954 因“POS NG 不适用”保留 skip 但不需要录制。点单页面提示词当前剩余 **38 条**一对一录制请求。
 
 ## 提交格式
 
@@ -41,7 +41,7 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 
 ## 点单页面提示词待补充
 
-以下 43 条需求与点单页面提示词覆盖矩阵严格一一对应。已完成或已转为非录制状态的条目均已移除；其余录制编号保持原顺序和映射，不重编号。
+以下 38 条需求与点单页面提示词覆盖矩阵严格一一对应。已完成或已转为非录制状态的条目均已移除；其余录制编号保持原顺序和映射，不重编号。
 
 录制提交格式统一沿用本文档顶部“提交格式”，不在各条目中重复。
 
@@ -93,18 +93,6 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：现有可选参数不能证明用户真实跳过类级二级 option，缺少二级区域、跳过/关闭动作及保存请求仅含一级 option 的契约。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责显式跳过二级 option 的页面动作，`flows/order-dishes.flow.ts` 负责类级 option 完整保存回查。
 
-### ORDER-PAGE-010：提示词 16 POS-15760 点单界面菜单--option 创建菜的option,包含二级option，点单时选择了菜的option，未选二级option
-
-- Jira：`POS-15760`。
-- 已知前置：To Go 订单、绑定菜级一级/二级 option 且二级允许跳过的真实菜品、一级 option 价格数据，以及可按订单号 Recall 回查的数据。
-- 请从 POS 首页开始录制：
-  1. 最小录制路径：从 POS 首页进入 To Go，选择带菜级 nested option 的真实菜品，选择一级菜级 option、跳过二级并保存，Recall 按订单号回查；
-  2. 逐一展示上述完整路径中的中间弹窗、控件状态、页面转场、配置生效与恢复动作，不得省略标题对应的业务步骤；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 断言只回显一级菜级 option 且价格正确。
-- 请保留证据：菜级 option 面板与二级区域/跳过控件 DOM，菜单响应的菜品-option 父子关系、订单请求中仅一级 option 的 payload、两页 additions DOM；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：缺少菜级 nested option 选择一级后显式跳过二级的页面动作，以及保存 payload 仅包含一级 option 的证据。
-- 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责菜级 option/跳过动作，`flows/order-dishes.flow.ts` 负责下单保存回查，`test-data/order-service.ts` 固化真实 ID/名称。
-
 ### ORDER-PAGE-011：提示词 17 POS-15761 点单界面菜单--option 创建菜的option，点单时选择了菜的option
 
 - Jira：`POS-15761`。
@@ -117,30 +105,6 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 当前阻塞：缺少单层菜级 option 面板/选中态、item-option 绑定关系和点单页与 Recall 回显价格的一致性契约。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责菜级 option 选择/读取，`flows/order-dishes.flow.ts` 负责保存回查，`test-data/order-service.ts` 固化真实菜品和 option。
 
-### ORDER-PAGE-012：提示词 18 POS-15762 点单界面菜单--option 创建菜的option，点单时未选择菜的option
-
-- Jira：`POS-15762`。
-- 已知前置：To Go 订单、绑定非必选菜级 option 且允许不选直接完成点单的真实菜品、option required/min 规则，以及可按订单号 Recall 回查的数据。
-- 请从 POS 首页开始录制：
-  1. 最小录制路径：从 POS 首页进入 To Go，选择带可选菜级 option 的真实菜品，不选任何 option，使用真实关闭/跳过动作完成点单、保存并按订单号在 Recall 回查；
-  2. 逐一展示上述完整路径中的中间弹窗、控件状态、页面转场、配置生效与恢复动作，不得省略标题对应的业务步骤；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 断言订单可保存且点单页/Recall 均无该菜 option。
-- 请保留证据：可选规则、面板关闭/跳过控件与无选中态 DOM，菜单响应中的 required/min 规则、订单请求无 option payload、两页无 additions DOM；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：缺少可选菜级 option 的真实关闭/跳过动作、无选中态，以及保存请求不携带 option 且订单仍可保存的契约。
-- 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责跳过/关闭与无选中读取，`flows/order-dishes.flow.ts` 负责保存回查，`test-data/order-service.ts` 固化可选规则数据。
-
-### ORDER-PAGE-013：提示词 19 POS-15763 点单界面菜单--option 创建菜的option,包含二级option，点单时选择了菜的option，和二级option
-
-- Jira：`POS-15763`。
-- 已知前置：To Go 订单、绑定菜级一级/二级 option 的真实菜品、两级 option 的父子关系与价格数据，以及可按订单号 Recall 回查的数据。
-- 请从 POS 首页开始录制：
-  1. 最小录制路径：从 POS 首页进入 To Go，选择带菜级 nested option 的真实菜品，依次选择一级和二级 option、保存并按订单号在 Recall 回查；
-  2. 逐一展示上述完整路径中的中间弹窗、控件状态、页面转场、配置生效与恢复动作，不得省略标题对应的业务步骤；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 断言点单页与 Recall 按实际顺序回显两级 option 且价格正确。
-- 请保留证据：一级/二级面板、父子切换和选中态 DOM，菜单响应的 item-option-suboption 关系、保存请求中的两级 option ID/顺序、两页 additions DOM；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：缺少菜级一级/二级 option 的父子转场、选择顺序、保存 payload 和两页 additions 回显契约。
-- 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`test-data/order-service.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责两级菜级 option 选择/读取，`flows/order-dishes.flow.ts` 负责保存回查，`test-data/order-service.ts` 固化父子数据。
-
 ### ORDER-PAGE-015：提示词 27 test_open_food_keyboard_multi_language
 
 - Jira：无。
@@ -152,18 +116,6 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 请保留证据：后台配置项名称、ID、旧值/新值与查询/更新/恢复请求，Open Food 弹框、语言切换控件、切换前后语言/布局标识、区分字符按键、Name 输入框、确认按钮和订单行稳定 DOM，以及菜单/草稿请求中的菜名；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
 - 当前阻塞：读取/切换 Open Food 屏幕键盘语言布局，并用该布局按键输入区分字符。
 - 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责配置及 finally 恢复，`pages/order-dishes/order-dishes-menu.section.ts` 负责键盘语言/布局读取、真实按键输入和名称读取，`flows/order-dishes.flow.ts` 负责编排。
-
-### ORDER-PAGE-017：提示词 30 POS-31045：选择的套餐子菜包含多个option，点单页面连续删除option正常
-
-- Jira：`POS-31045`。
-- 已知前置：堂食无桌订单、套餐 `diy_combo1_adjustable`、同一套餐子菜上的多个可删除 option，以及可区分套餐主菜、子菜和 option 的菜单数据。
-- 请从 POS 首页开始录制：
-  1. 最小录制路径：从 POS 首页进入堂食无桌，选择 diy_combo1_adjustable，在同一套餐子菜上选择多个 option 后确认，记录订单行 option 数量，连续点击每个 option 的真实删除控件并观察子菜保留、option 逐个消失，最后退出回首页；当前缺失的准确 UI 动作是“在点单订单行连续删除套餐子菜 option”；
-  2. 逐一展示上述完整路径中的中间弹窗、控件状态、页面转场、配置生效与恢复动作，不得省略标题对应的业务步骤；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 断言初始 option 列表、每次删除后的数量和最终子菜仍在但 options 为空。
-- 请保留证据：菜单响应中的套餐/子菜/option ID 关系，套餐选择面板、订单行层级、每个 option 行及删除控件的稳定 DOM，删除前后订单草稿状态或保存 payload；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：在点单订单行连续删除套餐子菜 option。
-- 录制返回后计划补充：`pages/order-dishes/order-dishes-menu.section.ts`、`pages/order-dishes/order-dishes-reads.section.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-menu.section.ts` 负责套餐选择与订单行 option 删除动作，`pages/order-dishes/order-dishes-reads.section.ts` 负责窄读取，`flows/order-dishes.flow.ts` 负责编排。
 
 ### ORDER-PAGE-018：提示词 31 POS-30762：切换pos菜单模式后，搜索检查，默认搜索菜品 Broccoli Garlic Sauce
 
@@ -224,18 +176,6 @@ await expect(page.getByTestId('unpaid-amount')).toBeVisible();
 - 请保留证据：堂食客户入口/输入框、Recall 卡片、Edit 按钮、点单页姓名区域稳定 DOM，订单创建/更新响应中的 orderNumber、customerId 和姓名；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
 - 当前阻塞：堂食录入客户姓名，以及 Recall 卡片和编辑点单页两处读取姓名。
 - 录制返回后计划补充：`pages/order-dishes/order-dishes-customer.dialog.ts`、`pages/recall/recall-reads.section.ts`、`flows/order-customer.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`pages/order-dishes/order-dishes-customer.dialog.ts` 负责堂食录入/编辑页读取，`pages/recall/recall-reads.section.ts` 负责卡片姓名读取，`flows/order-customer.flow.ts` 负责编排保存、精确定位和编辑。
-
-### ORDER-PAGE-023：提示词 36 POS-33447：Search Menu设置关闭，进入点单页面，页面不再展示搜索输入框，页面展示无违和 POS-33456：Search Menu设置开启，recall进入订单编辑页面，页面展示搜索输入框，可正常搜索，默认搜索菜品Broccoli Garlic Sauce
-
-- Jira：`POS-33447, POS-33456`。
-- 已知前置：Search Menu 开关原值及更新/恢复权限、堂食无桌订单、普通菜、可精确回开的订单号和搜索目标 `Broccoli Garlic Sauce`；需保留源步骤 `print` 的触发条件以确认其真实含义，结束后恢复开关并刷新 POS。
-- 请从 POS 首页开始录制：
-  1. 最小录制路径：从 POS 首页读取 Search Menu 原值，关闭后刷新并进入堂食无桌，断言搜索入口/输入框不存在后，按源步骤执行或观察 `print`，记录其真实入口、目标、提示和请求，再保存可编辑订单；返回首页开启 Search Menu 并刷新，从 Recall 精确打开该订单 Edit，断言搜索输入框出现，搜索并选择 Broccoli Garlic Sauce，最后恢复原开关；当前缺失的准确 UI 动作是“Search Menu 开关关闭/开启、Recall 编辑页搜索框隐藏/显示和搜索，以及源步骤 `print` 的真实含义与结果”；
-  2. 对源步骤 `print` 不预设“打印订单”“打印提示”或“调试输出”等含义；请在 Search Menu 关闭态完整录制实际可执行动作、提示/状态变化和网络请求，并明确无法执行时的页面状态；
-  3. 在最终断言所在页面读取并保留以下结果：`tests/py-migrate/order.service.spec.ts` 分别断言关闭态不可见、开启态可见且精确结果文本。
-- 请保留证据：配置项名称、ID、旧值/关/开值及查询/更新/恢复请求，搜索入口、输入、结果卡、Recall Edit 与 `print` 入口/结果稳定 DOM，订单号、菜单响应及打印相关请求；同时保留目标元素原始的 data-testid、role、label、可见文本，以及影响最终结果的关键网络请求、配置旧值/新值和恢复结果。
-- 当前阻塞：缺少 Search Menu 开关关闭/开启、Recall 编辑页搜索框隐藏/显示和搜索的稳定契约；源步骤 `print` 未说明目标与预期，必须通过录制确认该中间动作或状态，不能静默省略。
-- 录制返回后计划补充：`api/setup/system-configuration.setup.ts`、`pages/order-dishes/order-dishes-menu.section.ts`、`flows/recall.flow.ts`、`flows/order-dishes.flow.ts`、`tests/py-migrate/order.service.spec.ts` 中的以下职责：`api/setup/system-configuration.setup.ts` 负责开关恢复，`pages/order-dishes/order-dishes-menu.section.ts` 负责搜索可见性/输入/结果，`flows/recall.flow.ts` 负责按单进入编辑，`flows/order-dishes.flow.ts` 负责两种配置状态的点单编排。
 
 ### ORDER-PAGE-024：提示词 40 POS-34106 点单页面，礼品卡实体卡新增页面，手机号输入框，手机号输入正确，可新建卡成功
 

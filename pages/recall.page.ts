@@ -254,6 +254,18 @@ export class RecallPage {
     return this.orderDetails.readOrderDetailsSnapshot();
   }
 
+  async readOrderItemPrice(
+    ...args: Parameters<RecallOrderDetailsDialog['readOrderItemPrice']>
+  ): ReturnType<RecallOrderDetailsDialog['readOrderItemPrice']> {
+    return this.orderDetails.readOrderItemPrice(...args);
+  }
+
+  async isOrderItemDetailVisible(
+    ...args: Parameters<RecallOrderDetailsDialog['isOrderItemDetailVisible']>
+  ): ReturnType<RecallOrderDetailsDialog['isOrderItemDetailVisible']> {
+    return this.orderDetails.isOrderItemDetailVisible(...args);
+  }
+
   async readOrderDetailsText(): Promise<string> {
     return this.orderDetails.readOrderDetailsText();
   }
