@@ -70,7 +70,7 @@ export class TakeoutFlow {
       await orderDishesPage.customer.readCustomerInformationSnapshot(customerButtonLabel);
     await orderDishesPage.customer.saveCustomerInformation();
     const orderCustomerSummaryText =
-      await orderDishesPage.customer.readOrderCustomerSummaryText();
+      await orderDishesPage.customer.readOrderCustomerSummaryText(customerButtonLabel);
 
     return {
       customerInformation,

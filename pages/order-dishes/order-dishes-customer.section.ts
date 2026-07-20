@@ -74,9 +74,11 @@ export class OrderDishesCustomerSection {
   }
 
   @step('页面读取：读取点单页客户摘要文本')
-  async readOrderCustomerSummaryText(): Promise<string> {
+  async readOrderCustomerSummaryText(customerButtonLabel: string): Promise<string> {
     await this.host.expectLoaded();
-    return normalizeCustomerText(await this.locators.orderDishesRoot.innerText());
+    const addressSummary = this.locators.orderCustomerAddressSummary(customerButtonLabel);
+    await expect(addressSummary).toBeVisible();
+    return normalizeCustomerText(await addressSummary.innerText());
   }
 
   @step('页面操作：点击 Pay 并确认客户信息弹窗已显示')

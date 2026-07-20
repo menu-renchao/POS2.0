@@ -62,7 +62,7 @@ export class OrderDishesLocators {
   readonly customerInformationRegion: Locator;
   readonly customerInformationSaveButton: Locator;
   readonly customerInformationKeyboardCloseButton: Locator;
-  readonly orderDishesRoot: Locator;
+  readonly orderCustomerAddressSummary: (accessibleName: string) => Locator;
   readonly removeItemButton: Locator;
   readonly kitchenVoidPermissionMessage: Locator;
   readonly authorizationDigitButton: (digit: string) => Locator;
@@ -239,7 +239,10 @@ export class OrderDishesLocators {
     this.customerInformationKeyboardCloseButton = this.page.getByTestId(
       'pos-keyboard-button-{close}',
     );
-    this.orderDishesRoot = this.page.locator('#orderDishesRoot');
+    this.orderCustomerAddressSummary = (accessibleName: string) =>
+      this.customerInformationButton(accessibleName).locator(
+        '[class*="_customerDetailText_"]:not([class*="_customerNoteText_"])',
+      );
     this.removeItemButton = this.page.getByTestId('action-rail-button-rmvItem');
     this.kitchenVoidPermissionMessage = this.page.getByText(
       'You do not have permission VOID_KITCHEN_ITEM, please enter the password!',

@@ -105,11 +105,13 @@ export const orderServiceDeliveryInformationCase = {
   input: {
     address: 'huashengdun',
     customerName: 'baga',
+    note: 'POS-30575 客户信息预填',
     phoneNumber: '9322222222',
     street: '123',
   } satisfies DeliveryOrderParams,
   expected: {
-    customerButtonLabel: 'baga (932)222-2222 huashengdun, 123, Flushing, NY, 11355',
+    customerButtonLabel:
+      'baga (932)222-2222 huashengdun, 123, Flushing, NY, 11355 POS-30575 客户信息预填',
     informationText: '(932)222-2222huashengdun, Flushing, NY 11355',
     orderSummaryText: 'huashengdun, 123, Flushing, NY, 11355',
   },

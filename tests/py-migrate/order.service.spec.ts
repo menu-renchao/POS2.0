@@ -316,12 +316,15 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
         },
       );
 
-      await test.step('校验姓名、规范化电话、地址和 Apt 与首次输入一致', async () => {
+      await test.step('校验 Info 姓名、电话、地址及保存摘要 Apt 与首次输入一致', async () => {
         expect(deliveryResult.customerInformation.customerName).toBe(
           orderServiceDeliveryInformationCase.input.customerName,
         );
         expect(deliveryResult.customerInformation.normalizedPhone).toBe(
           orderServiceDeliveryInformationCase.input.phoneNumber,
+        );
+        expect(deliveryResult.customerInformation.informationText.replace(/\s+/g, '')).toContain(
+          orderServiceDeliveryInformationCase.input.customerName.replace(/\s+/g, ''),
         );
         expect(deliveryResult.customerInformation.informationText.replace(/\s+/g, '')).toContain(
           orderServiceDeliveryInformationCase.expected.informationText.replace(/\s+/g, ''),
@@ -349,6 +352,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
         );
         expect(orderDetails.customerInfo?.address).toContain(
           orderServiceDeliveryInformationCase.input.street,
+        );
+        expect(orderDetails.customerInfo?.note).toContain(
+          orderServiceDeliveryInformationCase.input.note,
         );
         expect(orderDetails.customerInfo?.phone.replace(/\D/g, '')).toContain(
           orderServiceDeliveryInformationCase.input.phoneNumber,
