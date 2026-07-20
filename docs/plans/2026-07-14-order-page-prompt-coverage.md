@@ -136,14 +136,14 @@ git diff --check
 ### 后续批次入口
 
 - 唯一范围入口为本矩阵 66 行；后续实现按矩阵编号追踪状态与证据。
-- 无需新录制的 12 条回归已全部实现并经真实 UI 验证；共享保存 helper 在保存后通过 `EmployeeLoginFlow.enterEmployeeContext` 恢复或确认员工上下文，再进入 Recall；当前 16 条 `已等价覆盖` 作为回归基线。
-- 50 条 `需要录制` 仅通过矩阵中的 `ORDER-PAGE-001`～`ORDER-PAGE-050` 进入 `docs/playwright-recordings-needed.md` 获取录制要求，录制返回后先回写本矩阵再进入实现批次；既有 `ORDER-PAGE-001`～`ORDER-PAGE-048` 保持原映射。
+- 当前 22 条 `已等价覆盖` 作为回归基线；共享保存 helper 在保存后通过 `EmployeeLoginFlow.enterEmployeeContext` 恢复或确认员工上下文，再进入 Recall。
+- 43 条 `需要录制` 仅通过矩阵中的录制编号进入 `docs/playwright-recordings-needed.md` 获取录制要求；录制返回后先回写本矩阵再进入实现批次，既有编号保持原映射、不重编号。另有 1 条 `环境阻塞`，按矩阵记录的恢复条件跟进。
 
 ## 汇总
 
 | 已等价覆盖 | 待补断言 | 可直接实现 | 需要录制 | 产品异常 | 环境阻塞 | 总数 |
 |---:|---:|---:|---:|---:|---:|---:|
-| 16 | 0 | 0 | 50 | 0 | 0 | 66 |
+| 22 | 0 | 0 | 43 | 0 | 1 | 66 |
 
 ## 明细
 
