@@ -24,8 +24,9 @@ test('应提供自定义 Codegen 与脚本测试入口', async () => {
   assert.equal(packageJson.scripts.codegen, 'node scripts/codegen.mjs');
   assert.equal(
     packageJson.scripts['test:scripts'],
-    'node --test tests/scripts/codegen.unit.test.mjs',
+    'node --test tests/scripts/codegen.unit.test.mjs tests/scripts/capture-case.unit.test.mjs',
   );
+  assert.equal(packageJson.scripts['capture:case'], 'node scripts/capture-case.mjs');
 });
 
 test('应抛出进入 Inspector 暂停前的浏览器断连异常', async () => {

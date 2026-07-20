@@ -3,6 +3,7 @@ allure-report/
 allure-results/
 playwright-report/
 test-results/
+playwright-captures/
 
 playwright/.auth/*.json
 !playwright/.auth/.gitkeep
