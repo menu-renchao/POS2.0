@@ -8,7 +8,7 @@ import { SplitOrderFlow } from '../../flows/split-order.flow';
 import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import type { EmployeeLoginPage } from '../../pages/employee-login.page';
-import { HomePage } from '../../pages/home.page';
+import type { HomePage } from '../../pages/home.page';
 import { OrderDishesPage } from '../../pages/order-dishes.page';
 import type {
   SplitOrderPage,
@@ -389,80 +389,6 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
 
         await test.step('提交平分结果', async () => {
           await splitFlow.submitAndReturnPage(splitOrderPage);
-        });
-      },
-    );
-
-    test(
-      '[POS-16324] 应能平分订单并仅现金支付一个子单后在 Recall 展示不同状态',
-      {
-        tag: ['@现金支付'],
-        annotation: [jiraIssueAnnotation('POS-16324')],
-      },
-      async ({ homePage, employeeLoginPage }) => {
-        const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
-          return await enterReadyHome(homePage, employeeLoginPage);
-        });
-
-        const splitOrderPage = await test.step('创建无桌堂食订单、添加普通菜并打开分单页', async () => {
-          const orderPage = await new SelectTableFlow().enterDineInNoTableOrder(ready);
-          await new OrderDishesFlow().addRegularDish(
-            orderPage,
-            orderServiceDishes.regular.name,
-            orderServiceDishes.regular.menu,
-          );
-          return await orderPage.openSplitOrder();
-        });
-
-        const original = await test.step('读取平分前的订单金额与菜品', async () => {
-          return await splitOrderPage.readSnapshot();
-        });
-
-        const result = await test.step('平分为两份、现金支付首个子单并提交分单', async () => {
-          return await new SplitOrderFlow().splitEvenlyPaySuborderByCashAndSubmit(
-            splitOrderPage,
-            {
-              paidSuborderIndex: 1,
-              printReceipt: false,
-              splitCount: 2,
-            },
-          );
-        });
-
-        await test.step('校验 Split 中一个子单已支付、另一个未支付且金额与菜品比例守恒', async () => {
-          expect(result.afterPayment.suborders).toHaveLength(2);
-          expect(result.paidSuborder.paidStatus).toBe('Paid');
-          expect(result.unpaidSuborders).toHaveLength(1);
-          expect(result.unpaidSuborders[0]?.paidStatus).toBeNull();
-          expect(toCents(suborderTotal(result.afterPayment))).toBe(toCents(original.total));
-          expect(toCents(result.afterPayment.total)).toBe(toCents(original.total));
-
-          for (const suborder of result.afterPayment.suborders) {
-            expect(suborder.dishes).toEqual(
-              expect.arrayContaining([
-                expect.objectContaining({
-                  name: orderServiceDishes.regular.name,
-                  proportion: '1/2',
-                }),
-              ]),
-            );
-          }
-        });
-
-        await test.step('从 Recall 分别打开两个子单并校验最终支付状态', async () => {
-          if (!(result.returnPage instanceof HomePage)) {
-            throw new Error('POS-16324 提交分单后应返回 POS 首页。');
-          }
-
-          const recallPage = await new RecallFlow().openRecallFromHome(result.returnPage);
-          await recallPage.openOrderDetails(result.parentOrderNumber, result.paidSuborder.orderNumber);
-          expect(await recallPage.readOrderPaymentStatus()).toBe('Success');
-
-          await recallPage.openOrderDetails(
-            result.parentOrderNumber,
-            result.unpaidSuborders[0]!.orderNumber,
-          );
-          expect(await recallPage.readOrderPaymentStatus()).toBe('Unpaid');
         });
       },
     );

@@ -1,7 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { HomePage } from './home.page';
 import { OrderDishesPage } from './order-dishes.page';
-import { PaymentPage } from './payment.page';
 import { RecallPage } from './recall.page';
 import { readVisiblePosAlertText } from './shared/pos-alert';
 import { waitForInputSettled } from '../utils/input-stability';
@@ -38,7 +37,6 @@ const REMOVE_DISH_ITEM_BUTTON_NAME = /^Remove dish item$/;
 
 export class SplitOrderPage {
   private readonly splitFrame: ReturnType<Page['frameLocator']>;
-  private readonly splitFrameElement: Locator;
   private readonly modal: Locator;
   private readonly title: Locator;
   private readonly evenOrderButton: Locator;
@@ -54,7 +52,6 @@ export class SplitOrderPage {
   private readonly confirmButton: Locator;
   private readonly cancelButton: Locator;
   private readonly addSuborderButton: Locator;
-  private readonly suborderPayButton: (suborderIndex: number) => Locator;
   private readonly splitPanelModal: Locator;
   private readonly subordersContainer: Locator;
   private readonly totalValue: Locator;
@@ -66,12 +63,9 @@ export class SplitOrderPage {
   private readonly combineDialog: Locator;
   private readonly combineConfirmButton: Locator;
   private readonly posToast: Locator;
-  private readonly orderSummary: Locator;
-  private readonly orderSummaryBackdrop: Locator;
 
   constructor(private readonly page: Page) {
     this.splitFrame = this.page.frameLocator('iframe[data-wujie-id="splitPanel"], #splitPanelContainer iframe');
-    this.splitFrameElement = this.page.locator('#splitPanelContainer iframe');
 
     this.modal = this.splitFrame.getByRole('dialog').first();
     this.title = this.modal.getByRole('heading').first();
@@ -96,8 +90,6 @@ export class SplitOrderPage {
       .getByTestId('button-default')
       .filter({ hasText: 'Add Suborder' })
       .first();
-    this.suborderPayButton = (suborderIndex: number) =>
-      this.splitFrame.getByTestId(`payBtn-${suborderIndex}`);
     this.splitPanelModal = this.splitFrame.getByTestId('splitPanelModal');
     this.subordersContainer = this.modal;
     this.totalValue = this.modal.locator('._value_1lomb_35, [class*="_value_"]').first();
@@ -129,8 +121,6 @@ export class SplitOrderPage {
       .getByRole('button', { name: CONFIRM_BUTTON_NAME })
       .first();
     this.posToast = this.page.locator('[data-testid^="pos-ui-toast-toast-"]').last();
-    this.orderSummary = this.page.locator('#ordersmryWrap');
-    this.orderSummaryBackdrop = this.page.locator('.mycover').filter({ visible: true });
   }
 
   @step((orderNumber?: string) =>
@@ -497,256 +487,6 @@ export class SplitOrderPage {
     await expect(this.combineDialog).toBeVisible();
     await this.combineConfirmButton.click();
     await expect(this.combineDialog).toBeHidden();
-  }
-
-  @step((suborderIndex: number) => `页面操作：从分单页打开第 ${suborderIndex} 个子单的支付页`)
-  async openSuborderPayment(suborderIndex: number): Promise<PaymentPage> {
-    if (!Number.isInteger(suborderIndex) || suborderIndex < 1) {
-      throw new Error(`子单序号必须是从 1 开始的整数，收到：${suborderIndex}`);
-    }
-
-    await this.expectLoaded();
-    await this.suborderPayButton(suborderIndex).click();
-
-    const paymentPage = new PaymentPage(this.page);
-    await paymentPage.expectLoaded();
-    return paymentPage;
-  }
-
-  @step('页面操作：提交分单并等待分单接口确认保存成功')
-  async submitAndWaitForSuccess(): Promise<void> {
-    await this.expectLoaded();
-    const [splitResponse] = await Promise.all([
-      this.page.waitForResponse(
-        (response) => {
-          const pathname = new URL(response.url()).pathname;
-          return (
-            response.request().method() === 'POST' &&
-            /^\/kpos\/api\/order\/\d+\/split$/.test(pathname)
-          );
-        },
-        { timeout: 15_000 },
-      ),
-      this.confirmButton.click(),
-    ]);
-
-    if (!splitResponse.ok()) {
-      throw new Error(
-        `分单接口失败：${splitResponse.status()} ${splitResponse.url()}`,
-      );
-    }
-
-    const responseBody = (await splitResponse.json()) as {
-      code?: unknown;
-      msg?: unknown;
-    };
-    if (responseBody.code !== 0) {
-      throw new Error(
-        `分单接口未确认成功：code=${String(responseBody.code)} msg=${String(responseBody.msg)}`,
-      );
-    }
-  }
-
-  @step('页面操作：点击已提交分单弹窗外的物理空白区域')
-  async clickBlankOutsideSubmittedSplitModal(): Promise<void> {
-    await this.expectLoaded();
-    const frameBox = await this.splitFrameElement.boundingBox();
-
-    if (!frameBox) {
-      throw new Error('无法读取 Split iframe 边界，不能安全点击物理空白区域。');
-    }
-
-    await this.clickPhysicalBackdropCandidates(
-      this.modal,
-      undefined,
-      { x: frameBox.x, y: frameBox.y },
-      async (point) => {
-        const modalHidden = await this.modal.isHidden().catch(() => true);
-        const splitPanelOwnsPoint = await this.page.evaluate((candidate) => {
-          const target = document.elementFromPoint(candidate.x, candidate.y);
-          return Boolean(target?.closest('#splitPanelContainer'));
-        }, point);
-        return modalHidden && !splitPanelOwnsPoint;
-      },
-      'Split 分单浮层',
-    );
-  }
-
-  @step('页面操作：等待并按需关闭订单摘要后返回可交互首页')
-  async dismissOrderSummaryIfNeededAndReturnHome(): Promise<HomePage> {
-    let summaryAbsentSince = Date.now();
-    const settledState = await waitUntil(
-      async () => {
-        const summaryVisible = await this.orderSummary.isVisible().catch(() => false);
-
-        if (summaryVisible) {
-          return 'summary-visible' as const;
-        }
-
-        return Date.now() - summaryAbsentSince >= 1_000
-          ? 'home-stable'
-          : 'settling';
-      },
-      (state) => state !== 'settling',
-      {
-        timeout: 3_000,
-        interval: 100,
-        message: 'Split 退出后订单摘要或稳定首页状态未及时出现。',
-      },
-    );
-
-    if (settledState === 'summary-visible') {
-      return await this.clickBlankOutsideOrderSummary();
-    }
-
-    const homePage = new HomePage(this.page);
-    await homePage.expectEmployeeReady();
-    return homePage;
-  }
-
-  @step('页面操作：点击订单摘要外的物理空白区域并返回可交互首页')
-  async clickBlankOutsideOrderSummary(): Promise<HomePage> {
-    await expect(this.orderSummary).toBeVisible({ timeout: 5_000 });
-    await expect(this.orderSummaryBackdrop).toBeVisible({ timeout: 5_000 });
-    await this.clickPhysicalBackdropCandidates(
-      this.orderSummaryBackdrop,
-      this.orderSummary,
-      { x: 0, y: 0 },
-      async () => await this.orderSummary.isHidden().catch(() => true),
-      '订单摘要浮层',
-    );
-    await expect(this.orderSummary).toBeHidden({ timeout: 5_000 });
-
-    const homePage = new HomePage(this.page);
-    await homePage.expectEmployeeReady();
-    return homePage;
-  }
-
-  @step(
-    (
-      _layer: Locator,
-      _content: Locator | undefined,
-      _frameOffset: { x: number; y: number },
-      _isDismissed: (point: { x: number; y: number }) => Promise<boolean>,
-      layerName: string,
-    ) => `页面操作：逐点点击${layerName}的物理空白候选区域`,
-  )
-  private async clickPhysicalBackdropCandidates(
-    layer: Locator,
-    explicitContent: Locator | undefined,
-    frameOffset: { x: number; y: number },
-    isDismissed: (point: { x: number; y: number }) => Promise<boolean>,
-    layerName: string,
-  ): Promise<void> {
-    const explicitContentBox = explicitContent
-      ? await explicitContent.boundingBox()
-      : null;
-    const backdropPoints = await layer.evaluate((layerElement, contentBox) => {
-      const layerRect = layerElement.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const layerArea = layerRect.width * layerRect.height;
-      const descendantRects = Array.from(layerElement.querySelectorAll<HTMLElement>('*'))
-        .map((element) => {
-          const rect = element.getBoundingClientRect();
-          return {
-            left: rect.left,
-            top: rect.top,
-            right: rect.right,
-            bottom: rect.bottom,
-            width: rect.width,
-            height: rect.height,
-            area: rect.width * rect.height,
-          };
-        })
-        .filter(
-          (rect) =>
-            rect.width >= 120 &&
-            rect.height >= 120 &&
-            rect.area < layerArea * 0.95 &&
-            rect.left >= layerRect.left &&
-            rect.top >= layerRect.top &&
-            rect.right <= layerRect.right &&
-            rect.bottom <= layerRect.bottom,
-        )
-        .sort((left, right) => right.area - left.area);
-      const explicitContentRect = contentBox
-        ? {
-            left: contentBox.x,
-            top: contentBox.y,
-            right: contentBox.x + contentBox.width,
-            bottom: contentBox.y + contentBox.height,
-          }
-        : null;
-      const contentRect = explicitContentRect ?? descendantRects[0] ?? {
-        left: layerRect.left,
-        top: layerRect.top,
-        right: layerRect.right,
-        bottom: layerRect.bottom,
-      };
-      const clamp = (value: number, min: number, max: number) =>
-        Math.max(min, Math.min(value, max));
-      const points: Array<{ x: number; y: number }> = [];
-      const pushPoint = (x: number, y: number) => {
-        points.push({
-          x: clamp(Math.round(x), 8, viewportWidth - 8),
-          y: clamp(Math.round(y), 8, viewportHeight - 8),
-        });
-      };
-
-      if (contentRect.left - layerRect.left >= 16) {
-        pushPoint(contentRect.left - 8, contentRect.top + 24);
-        pushPoint(contentRect.left - 8, contentRect.bottom - 24);
-      }
-      if (contentRect.top - layerRect.top >= 16) {
-        pushPoint(contentRect.left + 24, contentRect.top - 8);
-        pushPoint(contentRect.right - 24, contentRect.top - 8);
-      }
-      if (layerRect.right - contentRect.right >= 16) {
-        pushPoint(contentRect.right + 8, contentRect.top + 24);
-        pushPoint(contentRect.right + 8, contentRect.bottom - 24);
-      }
-      if (layerRect.bottom - contentRect.bottom >= 16) {
-        pushPoint(contentRect.left + 24, contentRect.bottom + 8);
-        pushPoint(contentRect.right - 24, contentRect.bottom + 8);
-      }
-
-      pushPoint(12, 12);
-      pushPoint(viewportWidth - 12, 12);
-      pushPoint(12, viewportHeight - 12);
-      pushPoint(viewportWidth - 12, viewportHeight - 12);
-      return points;
-    }, explicitContentBox);
-
-    for (const backdropPoint of backdropPoints) {
-      const hitsLayer = await layer
-        .evaluate((layerElement, point) => {
-          const target = document.elementFromPoint(point.x, point.y);
-          return Boolean(target && layerElement.contains(target));
-        }, backdropPoint)
-        .catch(() => false);
-
-      if (!hitsLayer) {
-        continue;
-      }
-
-      const physicalPoint = {
-        x: backdropPoint.x + frameOffset.x,
-        y: backdropPoint.y + frameOffset.y,
-      };
-      await this.page.mouse.click(physicalPoint.x, physicalPoint.y);
-      const dismissed = await waitUntil(
-        async () => await isDismissed(physicalPoint),
-        (value) => value,
-        { timeout: 500, interval: 50 },
-      ).catch(() => false);
-
-      if (dismissed) {
-        return;
-      }
-    }
-
-    throw new Error(`逐点点击物理空白区域后，${layerName}仍未退出。`);
   }
 
   @step('页面操作：提交分单并返回上一级页面对象')
