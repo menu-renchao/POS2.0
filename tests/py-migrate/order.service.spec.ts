@@ -16,6 +16,7 @@ import {
   buildOrderServicePickupCustomer,
   orderServiceCategoryOptions,
   orderServiceCustomers,
+  orderServiceDeliveryInformationCase,
   orderServiceDishes,
   orderServiceEditRecallTaxCase,
   orderServiceSplitTipsCase,
@@ -295,7 +296,7 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
   }
 
   test(
-    '[POS-30575] 应能创建 Delivery 订单并在 Recall 详情展示客户信息',
+    '[POS-30575] 应能在 Delivery 点单页 Info 和 Recall 中展示一致的客户信息',
     {
       annotation: [jiraIssueAnnotation('POS-30575')],
     },
@@ -304,28 +305,53 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
         return await enterReadyHome({ employeeLoginPage, homePage });
       });
 
-      const orderDishesPage = await test.step('填写 Delivery 客户信息并进入点单页', async () => {
-        return await new TakeoutFlow().startDeliveryOrder(readyHomePage, orderServiceCustomers.delivery);
+      const deliveryResult = await test.step(
+        '填写 Delivery 信息并读取点单页客户 Info 与摘要',
+        async () => {
+          return await new TakeoutFlow().startDeliveryOrderWithCustomerInformationSnapshot(
+            readyHomePage,
+            orderServiceDeliveryInformationCase.input,
+            orderServiceDeliveryInformationCase.expected.customerButtonLabel,
+          );
+        },
+      );
+
+      await test.step('校验姓名、规范化电话、地址和 Apt 与首次输入一致', async () => {
+        expect(deliveryResult.customerInformation.customerName).toBe(
+          orderServiceDeliveryInformationCase.input.customerName,
+        );
+        expect(deliveryResult.customerInformation.normalizedPhone).toBe(
+          orderServiceDeliveryInformationCase.input.phoneNumber,
+        );
+        expect(deliveryResult.customerInformation.informationText.replace(/\s+/g, '')).toContain(
+          orderServiceDeliveryInformationCase.expected.informationText.replace(/\s+/g, ''),
+        );
+        expect(deliveryResult.orderCustomerSummaryText.replace(/\s+/g, '')).toContain(
+          orderServiceDeliveryInformationCase.expected.orderSummaryText.replace(/\s+/g, ''),
+        );
       });
 
       await test.step('添加菜品、保存订单并在 Recall 校验客户信息', async () => {
         await new OrderDishesFlow().addRegularDish(
-          orderDishesPage,
+          deliveryResult.orderDishesPage,
           orderServiceDishes.regular.name,
           orderServiceDishes.regular.menu,
         );
 
-        const orderDetails = await saveOrderAndOpenLatestRecallDetails(orderDishesPage);
-
+        const orderDetails = await saveOrderAndOpenLatestRecallDetails(
+          deliveryResult.orderDishesPage,
+        );
         expect(orderDetails.customerInfo?.name).toContain(
-          orderServiceCustomers.delivery.customerName,
+          orderServiceDeliveryInformationCase.input.customerName,
         );
         expect(orderDetails.customerInfo?.address).toContain(
-          orderServiceCustomers.delivery.address,
+          orderServiceDeliveryInformationCase.input.address,
         );
-        expect(orderDetails.customerInfo?.note).toContain(orderServiceCustomers.delivery.note);
+        expect(orderDetails.customerInfo?.address).toContain(
+          orderServiceDeliveryInformationCase.input.street,
+        );
         expect(orderDetails.customerInfo?.phone.replace(/\D/g, '')).toContain(
-          orderServiceCustomers.delivery.phoneNumber,
+          orderServiceDeliveryInformationCase.input.phoneNumber,
         );
       });
     },

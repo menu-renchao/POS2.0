@@ -1,6 +1,7 @@
 import { DeliveryPage } from '../pages/delivery.page';
 import { HomePage } from '../pages/home.page';
 import { OrderDishesPage } from '../pages/order-dishes.page';
+import type { OrderDishesCustomerInformationSnapshot } from '../pages/order-dishes/order-dishes-customer.section';
 import { PickUpPage } from '../pages/pick-up.page';
 import { step } from '../utils/step';
 
@@ -17,6 +18,12 @@ export type DeliveryOrderParams = {
   street?: string;
   zipCode?: string;
   note?: string;
+};
+
+export type DeliveryOrderWithCustomerInformationResult = {
+  customerInformation: OrderDishesCustomerInformationSnapshot;
+  orderCustomerSummaryText: string;
+  orderDishesPage: OrderDishesPage;
 };
 
 export class TakeoutFlow {
@@ -49,6 +56,27 @@ export class TakeoutFlow {
     const orderDishesPage = await deliveryPage.clickStartOrder();
     await orderDishesPage.expectLoaded();
     return orderDishesPage;
+  }
+
+  @step('业务步骤：创建 Delivery 订单并读取点单页客户 Info 与保存后的摘要')
+  async startDeliveryOrderWithCustomerInformationSnapshot(
+    homePage: HomePage,
+    params: DeliveryOrderParams,
+    customerButtonLabel: string,
+  ): Promise<DeliveryOrderWithCustomerInformationResult> {
+    const orderDishesPage = await this.startDeliveryOrder(homePage, params);
+    await orderDishesPage.customer.openCustomerInformation(customerButtonLabel);
+    const customerInformation =
+      await orderDishesPage.customer.readCustomerInformationSnapshot(customerButtonLabel);
+    await orderDishesPage.customer.saveCustomerInformation();
+    const orderCustomerSummaryText =
+      await orderDishesPage.customer.readOrderCustomerSummaryText();
+
+    return {
+      customerInformation,
+      orderCustomerSummaryText,
+      orderDishesPage,
+    };
   }
 
   @step('业务步骤：按需填写 Pick Up 信息页中的可选字段')

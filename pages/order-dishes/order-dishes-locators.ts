@@ -58,6 +58,11 @@ export class OrderDishesLocators {
   readonly customerConfirmButton: Locator;
   readonly customerNameRequiredMessage: Locator;
   readonly customerPhoneRequiredMessage: Locator;
+  readonly customerInformationButton: (accessibleName: string) => Locator;
+  readonly customerInformationRegion: Locator;
+  readonly customerInformationSaveButton: Locator;
+  readonly customerInformationKeyboardCloseButton: Locator;
+  readonly orderDishesRoot: Locator;
   readonly removeItemButton: Locator;
   readonly kitchenVoidPermissionMessage: Locator;
   readonly authorizationDigitButton: (digit: string) => Locator;
@@ -225,6 +230,16 @@ export class OrderDishesLocators {
     this.customerConfirmButton = this.customerDialog.getByRole('button', { name: 'Confirm' });
     this.customerNameRequiredMessage = this.page.getByText("Name can't be empty", { exact: true });
     this.customerPhoneRequiredMessage = this.page.getByText("Phone can't be empty", { exact: true });
+    this.customerInformationButton = (accessibleName: string) =>
+      this.page.getByRole('button', { name: accessibleName, exact: true });
+    this.customerInformationRegion = this.page.getByLabel('客人信息', { exact: true });
+    this.customerInformationSaveButton = this.page
+      .getByRole('banner')
+      .getByRole('button', { name: 'Save', exact: true });
+    this.customerInformationKeyboardCloseButton = this.page.getByTestId(
+      'pos-keyboard-button-{close}',
+    );
+    this.orderDishesRoot = this.page.locator('#orderDishesRoot');
     this.removeItemButton = this.page.getByTestId('action-rail-button-rmvItem');
     this.kitchenVoidPermissionMessage = this.page.getByText(
       'You do not have permission VOID_KITCHEN_ITEM, please enter the password!',

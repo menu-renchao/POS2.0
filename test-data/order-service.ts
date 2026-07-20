@@ -101,6 +101,20 @@ export const orderServiceCustomers = {
   pickupPhoneNumber: '01234567890',
 } as const;
 
+export const orderServiceDeliveryInformationCase = {
+  input: {
+    address: 'huashengdun',
+    customerName: 'baga',
+    phoneNumber: '9322222222',
+    street: '123',
+  } satisfies DeliveryOrderParams,
+  expected: {
+    customerButtonLabel: 'baga (932)222-2222 huashengdun, 123, Flushing, NY, 11355',
+    informationText: '(932)222-2222huashengdun, Flushing, NY 11355',
+    orderSummaryText: 'huashengdun, 123, Flushing, NY, 11355',
+  },
+} as const;
+
 export function buildOrderServicePickupCustomer(): PickUpOrderParams {
   return {
     customerName: `pos-${Date.now()}`,

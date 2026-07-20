@@ -5,6 +5,16 @@ import { PaymentPage } from '../payment.page';
 import type { OrderDishesPageContext } from './order-dishes-page-context';
 import type { OrderDishesPageHost } from './order-dishes-page-host';
 
+export type OrderDishesCustomerInformationSnapshot = {
+  customerName: string;
+  informationText: string;
+  normalizedPhone: string;
+};
+
+function normalizeCustomerText(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
 export class OrderDishesCustomerSection {
   constructor(
     private readonly ctx: OrderDishesPageContext,
@@ -17,6 +27,56 @@ export class OrderDishesCustomerSection {
 
   private get locators() {
     return this.ctx.locators;
+  }
+
+  @step((customerButtonLabel: string) => `页面操作：打开客户信息 ${customerButtonLabel}`)
+  async openCustomerInformation(customerButtonLabel: string): Promise<void> {
+    await this.host.expectLoaded();
+    const customerInformationButton = this.locators.customerInformationButton(customerButtonLabel);
+    await expect(customerInformationButton).toBeVisible();
+    await customerInformationButton.click();
+
+    if (await this.locators.customerInformationKeyboardCloseButton.isVisible().catch(() => false)) {
+      await this.locators.customerInformationKeyboardCloseButton.click();
+    }
+
+    await expect(this.locators.customerInformationRegion).toBeVisible();
+  }
+
+  @step('页面读取：读取点单页客户按钮和客户信息区域文本')
+  async readCustomerInformationSnapshot(
+    customerButtonLabel: string,
+  ): Promise<OrderDishesCustomerInformationSnapshot> {
+    await expect(this.locators.customerInformationRegion).toBeVisible();
+    const customerButtonText = normalizeCustomerText(
+      await this.locators.customerInformationButton(customerButtonLabel).innerText(),
+    );
+    const formattedPhone = customerButtonText.match(/\(\d{3}\)\d{3}-\d{4}/)?.[0];
+
+    if (!formattedPhone) {
+      throw new Error(`客户按钮未显示可解析的格式化电话：${customerButtonText}`);
+    }
+
+    return {
+      customerName: customerButtonText.slice(0, customerButtonText.indexOf(formattedPhone)).trim(),
+      informationText: normalizeCustomerText(
+        await this.locators.customerInformationRegion.innerText(),
+      ),
+      normalizedPhone: formattedPhone.replace(/\D/g, ''),
+    };
+  }
+
+  @step('页面操作：保存点单页客户信息并关闭 Info 区域')
+  async saveCustomerInformation(): Promise<void> {
+    await expect(this.locators.customerInformationSaveButton).toBeVisible();
+    await this.locators.customerInformationSaveButton.click();
+    await expect(this.locators.customerInformationRegion).toBeHidden();
+  }
+
+  @step('页面读取：读取点单页客户摘要文本')
+  async readOrderCustomerSummaryText(): Promise<string> {
+    await this.host.expectLoaded();
+    return normalizeCustomerText(await this.locators.orderDishesRoot.innerText());
   }
 
   @step('页面操作：点击 Pay 并确认客户信息弹窗已显示')
