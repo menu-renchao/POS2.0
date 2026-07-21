@@ -4,12 +4,15 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const playwrightCli = resolve(repoRoot, 'node_modules', 'playwright', 'cli.js');
-const outputPath = resolve(repoRoot, '.jenkins', 'test-tree.json');
+const playwrightCli = resolve(repoRoot, 'node_modules', '@playwright', 'test', 'cli.js');
+const outputPath = process.env.JENKINS_TEST_TREE_OUTPUT
+  ? resolve(process.env.JENKINS_TEST_TREE_OUTPUT)
+  : resolve(repoRoot, '.jenkins', 'test-tree.json');
+const playwrightFilters = process.argv.slice(2);
 
 const result = spawnSync(
   process.execPath,
-  [playwrightCli, 'test', '--list', '--reporter=json'],
+  [playwrightCli, 'test', ...playwrightFilters, '--list', '--reporter=json'],
   {
     cwd: repoRoot,
     encoding: 'utf8',
