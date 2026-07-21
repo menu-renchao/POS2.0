@@ -101,7 +101,39 @@ properties([
                 fallbackScript: [
                     classpath: [],
                     sandbox: true,
-                    script: 'return ["all"]'
+                    script: '''
+                        def workspaceCandidates = []
+                        def envWorkspace = System.getenv('WORKSPACE')
+                        if (envWorkspace) {
+                            workspaceCandidates << envWorkspace
+                        }
+
+                        def jenkinsHome = System.getenv('JENKINS_HOME')
+                        def jobName = System.getenv('JOB_NAME')
+                        if (jenkinsHome && jobName) {
+                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
+                        }
+
+                        workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
+                        for (workspacePath in workspaceCandidates.unique()) {
+                            def suitePath = new File(workspacePath, 'tests/py-migrate')
+                            if (!suitePath.isDirectory()) {
+                                continue
+                            }
+
+                            def hasSpec = false
+                            suitePath.eachFileRecurse { testFile ->
+                                if (testFile.isFile() && testFile.name.endsWith('.spec.ts')) {
+                                    hasSpec = true
+                                }
+                            }
+                            if (hasSpec) {
+                                return ['all', 'py-migrate']
+                            }
+                        }
+
+                        return ['all']
+                    '''
                 ],
                 script: [
                     classpath: [],
@@ -133,31 +165,20 @@ properties([
                             }
 
                             for (workspacePath in workspaceCandidates.unique()) {
-                                def testsDir = new File(workspacePath, 'tests')
-                                if (!testsDir.isDirectory()) {
+                                def suitePath = new File(workspacePath, 'tests/py-migrate')
+                                if (!suitePath.isDirectory()) {
                                     continue
                                 }
 
-                                def suites = []
-                                testsDir.eachFile { suiteDir ->
-                                    if (!suiteDir.isDirectory()) {
-                                        return
-                                    }
-
-                                    def hasSpec = false
-                                    suiteDir.eachFileRecurse { testFile ->
-                                        if (testFile.isFile() && testFile.name.endsWith('.spec.ts')) {
-                                            hasSpec = true
-                                        }
-                                    }
-
-                                    if (hasSpec) {
-                                        suites << suiteDir.name
+                                def hasSpec = false
+                                suitePath.eachFileRecurse { testFile ->
+                                    if (testFile.isFile() && testFile.name.endsWith('.spec.ts')) {
+                                        hasSpec = true
                                     }
                                 }
 
-                                if (!suites.isEmpty()) {
-                                    return (['all'] + suites.sort()).unique()
+                                if (hasSpec) {
+                                    return ['all', 'py-migrate']
                                 }
                             }
 
@@ -234,7 +255,7 @@ properties([
                                 }
                             }
 
-                            def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
+                            def suitePath = 'tests/py-migrate'
                             for (workspacePath in workspaceCandidates.unique()) {
                                 def suiteDir = new File(workspacePath, suitePath)
                                 checkedPaths << suiteDir.path
@@ -328,9 +349,7 @@ properties([
                             def selectedFiles = selectedFilesValue instanceof Collection
                                 ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
                                 : selectedFilesValue.toString().split(',').collect { it.trim() }.findAll { it }
-                            if (selectedSuite != 'all') {
-                                selectedFiles = selectedFiles.findAll { it.startsWith("tests/${selectedSuite}/") }
-                            }
+                            selectedFiles = selectedFiles.findAll { it.startsWith('tests/py-migrate/') }
 
                             def parseCasesFromText = { String specText ->
                                 def cases = []
@@ -394,7 +413,7 @@ properties([
                                 }
                             }
 
-                            def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
+                            def suitePath = 'tests/py-migrate'
                             for (workspacePath in workspaceCandidates.unique()) {
                                 def specDir = new File(workspacePath, suitePath)
                                 checkedPaths << specDir.path
@@ -565,7 +584,7 @@ pipeline {
         // 生成用例树：用 Playwright 自己的 --list 结果产出 suite/file/case 联动数据。
         stage('Generate Test Tree') {
             steps {
-                bat 'npm run jenkins:test-tree'
+                bat 'npm run jenkins:test-tree -- tests/py-migrate --project=py-migrate'
             }
         }
 
@@ -591,25 +610,16 @@ pipeline {
 
                     // 解析运行目标：优先使用已选 spec 文件；未选文件时，all 跑全量，其余套件映射到 tests/<suite>。
                     def headedFlag = (!isTimerBuild && params.HEADED) ? ' --headed' : ''
-                    def selectedSuite = isTimerBuild ? 'all' : (params.TEST_SUITE ?: 'all')
-                    if (selectedSuite != 'all' && !selectedSuite.matches('[A-Za-z0-9_-]+')) {
-                        error "Invalid TEST_SUITE value: ${selectedSuite}"
-                    }
                     def selectedFilesValue = isTimerBuild ? '' : (params.TEST_FILE ?: '')
                     def selectedFiles = selectedFilesValue instanceof Collection
                         ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
                         : selectedFilesValue.toString().split('\\s*,\\s*').collect { it.trim() }.findAll { it }
                     for (selectedFile in selectedFiles) {
-                        if (!selectedFile.matches('tests/[A-Za-z0-9_./-]+\\.spec\\.ts')) {
-                            error "Invalid TEST_FILE value: ${selectedFile}"
-                        }
-                        if (selectedSuite != 'all' && !selectedFile.startsWith("tests/${selectedSuite}/")) {
-                            error "TEST_FILE is outside selected TEST_SUITE: ${selectedFile}"
+                        if (!selectedFile.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')) {
+                            error "Invalid UI TEST_FILE value: ${selectedFile}"
                         }
                     }
-                    def testTarget = selectedFiles
-                        ? selectedFiles.join(' ')
-                        : (selectedSuite == 'all' ? '' : "tests/${selectedSuite}")
+                    def testTarget = selectedFiles ? selectedFiles.join(' ') : 'tests/py-migrate'
 
                     // 解析多选用例：Active Choices 多选值可能是集合或逗号分隔字符串。
                     def selectedCases = isTimerBuild ? '' : (params.TEST_CASE_GREP ?: '')
@@ -657,7 +667,7 @@ pipeline {
                         ? " --grep \"${grepValue.replace('"', '\\"').replace('%', '%%')}\""
                         : ''
 
-                    bat "node node_modules/playwright/cli.js test ${testTarget}${headedFlag}${grepFlag}"
+                    bat "node node_modules/@playwright/test/cli.js test ${testTarget} --project=py-migrate${headedFlag}${grepFlag}"
                 }
             }
             post {
