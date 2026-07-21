@@ -24,7 +24,7 @@ test('应提供自定义 Codegen 与脚本测试入口', async () => {
   assert.equal(packageJson.scripts.codegen, 'node scripts/codegen.mjs');
   assert.equal(
     packageJson.scripts['test:scripts'],
-    'node --test tests/scripts/codegen.unit.test.mjs tests/scripts/capture-case.unit.test.mjs',
+    'node --test tests/scripts/codegen.unit.test.mjs tests/scripts/capture-case.unit.test.mjs tests/scripts/jenkinsfile-ui-scope.unit.test.mjs',
   );
   assert.equal(packageJson.scripts['capture:case'], 'node scripts/capture-case.mjs');
 });

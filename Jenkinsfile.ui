@@ -159,7 +159,10 @@ properties([
                                 if (treeFile.isFile()) {
                                     def tree = new groovy.json.JsonSlurperClassic().parseText(treeFile.getText('UTF-8'))
                                     if (tree.suites) {
-                                        return tree.suites.collect { it.toString() }
+                                        def suites = tree.suites.collect { it.toString() }.findAll { it in ['all', 'py-migrate'] }
+                                        if (suites) {
+                                            return suites
+                                        }
                                     }
                                 }
                             }
@@ -234,7 +237,14 @@ properties([
                             workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
 
                             selectedSuite = selectedSuite ?: 'all'
+                            selectedSuite = ['all', 'py-migrate'].contains(selectedSuite) ? selectedSuite : 'all'
                             def checkedPaths = []
+                            def isValidUiSpecPath = { String path ->
+                                path != null
+                                    && path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')
+                                    && !path.contains('//')
+                                    && path.split('/').every { segment -> segment != '.' && segment != '..' }
+                            }
                             def toChoiceMap = { items ->
                                 def choices = new LinkedHashMap()
                                 items.collect { it.toString() }.findAll { it }.unique().sort().each { choice ->
@@ -249,6 +259,7 @@ properties([
                                 if (treeFile.isFile()) {
                                     def tree = new groovy.json.JsonSlurperClassic().parseText(treeFile.getText('UTF-8'))
                                     def files = tree.files instanceof Map ? tree.files[selectedSuite] : []
+                                    files = files instanceof Collection ? files.findAll { isValidUiSpecPath(it.toString()) } : []
                                     if (files) {
                                         return toChoiceMap(files)
                                     }
@@ -338,7 +349,14 @@ properties([
                             workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
 
                             selectedSuite = selectedSuite ?: 'all'
+                            selectedSuite = ['all', 'py-migrate'].contains(selectedSuite) ? selectedSuite : 'all'
                             def checkedPaths = []
+                            def isValidUiSpecPath = { String path ->
+                                path != null
+                                    && path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')
+                                    && !path.contains('//')
+                                    && path.split('/').every { segment -> segment != '.' && segment != '..' }
+                            }
                             def toChoiceMap = { items ->
                                 def choices = new LinkedHashMap()
                                 items.collect { it.toString() }.findAll { it }.unique().sort().each { choice ->
@@ -349,7 +367,7 @@ properties([
                             def selectedFiles = selectedFilesValue instanceof Collection
                                 ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
                                 : selectedFilesValue.toString().split(',').collect { it.trim() }.findAll { it }
-                            selectedFiles = selectedFiles.findAll { it.startsWith('tests/py-migrate/') }
+                            selectedFiles = selectedFiles.findAll { isValidUiSpecPath(it) }
 
                             def parseCasesFromText = { String specText ->
                                 def cases = []
@@ -400,6 +418,7 @@ properties([
                                 def files = selectedFiles
                                     ? selectedFiles
                                     : (tree.files instanceof Map ? tree.files[selectedSuite] : [])
+                                files = files instanceof Collection ? files.findAll { isValidUiSpecPath(it.toString()) } : []
                                 def cases = []
                                 files.each { file ->
                                     def fileCases = tree.cases instanceof Map ? tree.cases[file.toString()] : []
@@ -425,7 +444,7 @@ properties([
                                 def cases = []
                                 def specFiles = []
                                 if (selectedFiles) {
-                                    selectedFiles.each { selectedFile ->
+                                    selectedFiles.findAll { isValidUiSpecPath(it) }.each { selectedFile ->
                                         def specFile = new File(workspacePath, selectedFile)
                                         checkedPaths << specFile.path
                                         if (specFile.isFile() && specFile.name.endsWith('.spec.ts')) {
@@ -608,14 +627,20 @@ pipeline {
                         echo 'Timer build detected. Running full default suite without file or case filters.'
                     }
 
-                    // 解析运行目标：优先使用已选 spec 文件；未选文件时，all 跑全量，其余套件映射到 tests/<suite>。
+                    // 解析运行目标：优先使用已选 UI spec 文件；未选文件时运行全部 py-migrate UI 测试。
                     def headedFlag = (!isTimerBuild && params.HEADED) ? ' --headed' : ''
+                    def isValidUiSpecPath = { String path ->
+                        path != null
+                            && path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')
+                            && !path.contains('//')
+                            && path.split('/').every { segment -> segment != '.' && segment != '..' }
+                    }
                     def selectedFilesValue = isTimerBuild ? '' : (params.TEST_FILE ?: '')
                     def selectedFiles = selectedFilesValue instanceof Collection
                         ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
                         : selectedFilesValue.toString().split('\\s*,\\s*').collect { it.trim() }.findAll { it }
                     for (selectedFile in selectedFiles) {
-                        if (!selectedFile.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')) {
+                        if (!isValidUiSpecPath(selectedFile)) {
                             error "Invalid UI TEST_FILE value: ${selectedFile}"
                         }
                     }
