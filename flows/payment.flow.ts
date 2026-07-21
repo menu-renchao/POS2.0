@@ -8,6 +8,7 @@ export type PaymentCompletionOptions = {
 
 export type PartialCashPaymentOptions = PaymentCompletionOptions & {
   amountInCents: number;
+  successButtonText?: 'Continue' | 'NO RECEIPT';
 };
 
 const testCreditCard = {
@@ -52,7 +53,11 @@ export class PaymentFlow {
     try {
       await paymentPage.fillAmountTendered(options.amountInCents);
       await paymentPage.clickPaymentTypeCash();
-      await this.finishPrintReceiptStep(paymentPage, options);
+      await this.finishPrintReceiptStep(
+        paymentPage,
+        options,
+        options.successButtonText ?? 'Continue',
+      );
       await paymentPage.closePaymentPanel();
     } catch (error) {
       await paymentPage.dismissPrintReceiptDialogIfVisible();
@@ -70,7 +75,11 @@ export class PaymentFlow {
     try {
       await paymentPage.fillAmountTendered(options.amountInCents);
       await paymentPage.clickPaymentTypeCash();
-      await this.finishPrintReceiptStep(paymentPage, options);
+      await this.finishPrintReceiptStep(
+        paymentPage,
+        options,
+        options.successButtonText ?? 'Continue',
+      );
       await paymentPage.expectLoaded();
     } catch (error) {
       await paymentPage.dismissPrintReceiptDialogIfVisible();
@@ -97,10 +106,35 @@ export class PaymentFlow {
     }
   }
 
+  @step('业务步骤：完成指定金额信用卡部分支付并返回订单详情')
+  async payPartialByCreditCard(
+    paymentPage: PaymentPage,
+    options: PartialCashPaymentOptions,
+  ): Promise<void> {
+    await paymentPage.expectLoaded();
+
+    try {
+      await paymentPage.fillAmountTendered(options.amountInCents);
+      await paymentPage.clickPaymentTypeCreditCard();
+      await paymentPage.fillCreditCardForm(testCreditCard);
+      await paymentPage.clickPay();
+      await this.finishPrintReceiptStep(
+        paymentPage,
+        options,
+        options.successButtonText ?? 'Continue',
+      );
+      await paymentPage.closePaymentPanel();
+    } catch (error) {
+      await paymentPage.dismissPrintReceiptDialogIfVisible();
+      throw error;
+    }
+  }
+
   @step('业务步骤：根据支付完成后的页面状态处理打印小票分支')
   private async finishPrintReceiptStep(
     paymentPage: PaymentPage,
     options: PaymentCompletionOptions,
+    successButtonText = 'NO RECEIPT',
   ): Promise<void> {
     const completionState = await waitUntil(
       async () => ({
@@ -120,7 +154,7 @@ export class PaymentFlow {
     }
 
     if (completionState.successConfirmVisible) {
-      await paymentPage.confirmPaymentSuccessIfVisible();
+      await paymentPage.confirmPaymentSuccessIfVisible(successButtonText);
       return;
     }
 

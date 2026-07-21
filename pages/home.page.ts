@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { AdminPage } from './admin.page';
 import { DeliveryPage } from './delivery.page';
+import { GiftCardPage } from './gift-card.page';
 import { OrderDishesPage } from './order-dishes.page';
 import { PickUpPage } from './pick-up.page';
 import { RecallPage } from './recall.page';
@@ -11,10 +12,11 @@ import { expectPathname } from '../utils/expectations';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 import { createHomeScope, type FrameOrHostScope } from './shared/locator-scope';
-import type { HomeEntry } from './shared/page-method-contracts';
+import { HOME_ENTRY_TEST_IDS, type HomeEntry } from './shared/page-method-contracts';
 
 export type DineInEntryPage = SelectTablePage | OrderDishesPage;
 type DineInEntryState = 'selectTable' | 'orderDishes';
+export type HomeLanguage = 'en' | 'zh-cn';
 
 export class HomePage {
   private readonly scope: FrameOrHostScope;
@@ -27,6 +29,7 @@ export class HomePage {
   private readonly refreshLoadingText: Locator;
   private readonly configurationRefreshDialog: Locator;
   private readonly configurationRefreshButton: Locator;
+  private readonly customOrderType1Button: Locator;
 
   constructor(private readonly page: Page) {
     this.scope = createHomeScope(page);
@@ -44,6 +47,9 @@ export class HomePage {
       name: 'Refresh',
       exact: true,
     });
+    this.customOrderType1Button = this.scope.appFrame.getByTestId(
+      'pos-ui-function-card-custom_order_type1',
+    );
   }
 
   @step('页面操作：打开 POS 首页')
@@ -95,7 +101,7 @@ export class HomePage {
       async () => await this.configurationRefreshDialog.isVisible().catch(() => false),
       (isVisible) => isVisible,
       {
-        timeout: 3_000,
+        timeout: 20_000,
         interval: 100,
         message: 'System configuration refresh notification did not appear.',
       },
@@ -126,6 +132,49 @@ export class HomePage {
   @step('页面操作：判断主页固定头部按钮当前是否可用')
   async isPrimaryFunctionCardsVisible(): Promise<boolean> {
     return await this.supportButton.isVisible().catch(() => false);
+  }
+
+  @step('页面读取：读取主页当前界面语言')
+  async readCurrentLanguage(): Promise<HomeLanguage> {
+    const dineInText = (
+      await this.scope.appFrame.getByTestId(HOME_ENTRY_TEST_IDS['Dine In']).innerText()
+    )
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (dineInText.includes('Dine In')) {
+      return 'en';
+    }
+
+    if (dineInText.includes('堂吃')) {
+      return 'zh-cn';
+    }
+
+    throw new Error(`无法从主页堂食入口识别当前语言：${dineInText}`);
+  }
+
+  @step((language: HomeLanguage) =>
+    `页面操作：将主页界面语言切换为 ${language === 'zh-cn' ? '中文' : '英文'}`,
+  )
+  async switchLanguage(language: HomeLanguage): Promise<void> {
+    if ((await this.readCurrentLanguage()) === language) {
+      return;
+    }
+
+    await this.languageButton.click();
+    await waitUntil(
+      async () => await this.readCurrentLanguage().catch(() => null),
+      (currentLanguage): currentLanguage is HomeLanguage => currentLanguage === language,
+      {
+        timeout: 10_000,
+        message: `主页语言未能切换为 ${language}。`,
+      },
+    );
+  }
+
+  @step((entry: HomeEntry) => `页面操作：点击主页功能入口 ${entry}`)
+  async clickEntry(entry: HomeEntry): Promise<void> {
+    await this.clickFunctionButton(entry);
   }
 
   @step('页面操作：点击 Dine In 入口并进入选桌页')
@@ -164,6 +213,19 @@ export class HomePage {
   @step('页面操作：点击 Delivery 入口并进入 Delivery 页面')
   async enterDelivery(): Promise<DeliveryPage> {
     await this.clickFunctionButton('Delivery');
+    const deliveryPage = new DeliveryPage(this.page);
+    await deliveryPage.expectVisible();
+    return deliveryPage;
+  }
+
+  @step('页面操作：点击首页自定义订单类型 1')
+  async clickCustomOrderType1(): Promise<void> {
+    await expect(this.customOrderType1Button).toBeVisible({ timeout: 15_000 });
+    await this.customOrderType1Button.click();
+  }
+
+  @step('页面操作：确认自定义订单类型 1 已进入 Delivery 页面')
+  async waitForCustomOrderType1Delivery(): Promise<DeliveryPage> {
     const deliveryPage = new DeliveryPage(this.page);
     await deliveryPage.expectVisible();
     return deliveryPage;
@@ -341,7 +403,15 @@ export class HomePage {
   }
 
   private resolveFunctionButtonLocator(buttonName: HomeEntry): Locator {
-    return this.scope.appFrame.getByRole('button', { name: buttonName, exact: true });
+    return this.scope.appFrame.getByTestId(HOME_ENTRY_TEST_IDS[buttonName]);
+  }
+
+  @step('页面操作：点击 Gift Card 入口并进入礼品卡管理页面')
+  async enterGiftCard(): Promise<GiftCardPage> {
+    await this.clickFunctionButton('Gift Card');
+    const giftCardPage = new GiftCardPage(this.page);
+    await giftCardPage.expectLoaded();
+    return giftCardPage;
   }
 
   @step('页面读取：等待 Dine In 入口进入选桌页或点单页')

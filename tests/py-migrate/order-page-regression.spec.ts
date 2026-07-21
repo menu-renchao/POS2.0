@@ -20,6 +20,8 @@ import {
   orderPageRegressionCases,
   orderServiceDishes,
   orderServiceMenu,
+  orderServiceModifyGlobalOptionCase,
+  orderServicePresetItemDiscountCases,
 } from '../../test-data/order-service';
 import { jiraIssueAnnotation } from '../../utils/jira';
 
@@ -296,7 +298,396 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
     },
   );
 
+  test(
+    '[POS-33600] 应能保存改价为 6.50 且数量为 2.55 的菜品和两份追加菜',
+    {
+      tag: ['@数量'],
+      annotation: [jiraIssueAnnotation('POS-33600')],
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(90_000);
+      const testCase = orderPageRegressionCases.pricedDecimalWithTwoAdditions;
+      const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
+        testCase.configuration,
+        { verify: true },
+      );
+
+      try {
+        const ready = await test.step('刷新 POS 并在开启小数数量后建立员工上下文', async () => {
+          return await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+            homePage,
+            employeeLoginPage,
+          );
+        });
+
+        const { orderPage, beforeSubtotal } = await test.step(
+          '创建 To Go 订单，将普通菜1改价为 6.50、数量改为 2.55，再添加两份普通菜2',
+          async () => {
+            const page = await new TakeoutFlow().startToGoOrder(ready);
+            const orderFlow = new OrderDishesFlow();
+            await orderFlow.addRegularDish(
+              page,
+              orderServiceDishes.regular.name,
+              orderServiceDishes.regular.menu,
+            );
+            await page.changeOrderedDishPrice(orderServiceDishes.regular.name, testCase.price);
+            await page.changeOrderedDishQuantity(orderServiceDishes.regular.name, testCase.quantity);
+
+            expect(toCents(await page.readOrderedDishPrice(orderServiceDishes.regular.name))).toBe(
+              testCase.expectedLineCents,
+            );
+
+            for (let index = 0; index < testCase.additionalDishCount; index += 1) {
+              await orderFlow.addRegularDish(
+                page,
+                orderServiceDishes.test.name,
+                orderServiceDishes.test.menu,
+              );
+            }
+
+            const orderedItems = await page.readOrderedItems();
+            const additionalQuantity = orderedItems
+              .filter((item) => item.name === orderServiceDishes.test.name)
+              .reduce((total, item) => total + Number(item.quantity), 0);
+            expect(additionalQuantity).toBe(testCase.additionalDishCount);
+
+            return {
+              orderPage: page,
+              beforeSubtotal: (await page.readPriceSummary()).Subtotal,
+            };
+          },
+        );
+
+        await test.step('保存后从 Recall 校验小数数量、行金额、追加数量和小计均持久化', async () => {
+          const { details, recallPage } = await saveAndReadRecallDetails(
+            orderPage,
+            employeeLoginPage,
+          );
+          const decimalDish = details.items.find(
+            (item) => item.name === orderServiceDishes.regular.name,
+          );
+          const additionalQuantity = details.items
+            .filter((item) => item.name === orderServiceDishes.test.name)
+            .reduce((total, item) => total + Number(item.quantity), 0);
+
+          expect(decimalDish?.quantity).toBe(String(testCase.quantity));
+          expect(
+            toCents(await recallPage.readOrderItemPrice(orderServiceDishes.regular.name)),
+          ).toBe(testCase.expectedLineCents);
+          expect(additionalQuantity).toBe(testCase.additionalDishCount);
+          expect(toCents(details.priceSummary.Subtotal)).toBe(toCents(beforeSubtotal));
+        });
+      } finally {
+        await restoreConfiguration();
+      }
+    },
+  );
+
+  test(
+    '[POS-35129] 应能保存数量为 2.55 的菜品并在 Recall 保持数量和价格',
+    {
+      tag: ['@数量'],
+      annotation: [jiraIssueAnnotation('POS-35129')],
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(90_000);
+      const testCase = orderPageRegressionCases.decimalRecallPersistence;
+      const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
+        testCase.configuration,
+        { verify: true },
+      );
+
+      try {
+        const ready = await test.step('刷新 POS 并在开启小数数量后建立员工上下文', async () => {
+          return await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+            homePage,
+            employeeLoginPage,
+          );
+        });
+
+        const { orderPage, beforeSubtotal } = await test.step(
+          '创建 To Go 订单并将普通菜1数量修改为 2.55',
+          async () => {
+            const page = await new TakeoutFlow().startToGoOrder(ready);
+            await new OrderDishesFlow().addRegularDish(
+              page,
+              orderServiceDishes.regular.name,
+              orderServiceDishes.regular.menu,
+            );
+            await page.changeOrderedDishQuantity(
+              orderServiceDishes.regular.name,
+              testCase.quantity,
+            );
+
+            expect(toCents(await page.readOrderedDishPrice(orderServiceDishes.regular.name))).toBe(
+              testCase.expectedLineCents,
+            );
+
+            return {
+              orderPage: page,
+              beforeSubtotal: (await page.readPriceSummary()).Subtotal,
+            };
+          },
+        );
+
+        await test.step('保存后按订单号从 Recall 校验数量、价格和小计持久化', async () => {
+          const { details, recallPage } = await saveAndReadRecallDetails(
+            orderPage,
+            employeeLoginPage,
+          );
+          const recalledDish = details.items.find(
+            (item) => item.name === orderServiceDishes.regular.name,
+          );
+
+          expect(recalledDish?.quantity).toBe(String(testCase.quantity));
+          expect(
+            toCents(await recallPage.readOrderItemPrice(orderServiceDishes.regular.name)),
+          ).toBe(testCase.expectedLineCents);
+          expect(toCents(details.priceSummary.Subtotal)).toBe(toCents(beforeSubtotal));
+        });
+      } finally {
+        await restoreConfiguration();
+      }
+    },
+  );
+
+  test(
+    '[POS-35660] 开启相同菜合并后应能为小数数量菜品添加两份全局调味',
+    {
+      tag: ['@数量'],
+      annotation: [jiraIssueAnnotation('POS-35660')],
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(90_000);
+      const testCase = orderPageRegressionCases.decimalModifierPersistence;
+      const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
+        testCase.configuration,
+        { verify: true },
+      );
+
+      try {
+        const ready = await test.step('开启同状态菜合并和小数数量配置并刷新 POS', async () => {
+          return await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+            homePage,
+            employeeLoginPage,
+          );
+        });
+
+        const { orderPage, beforeSubtotal } = await test.step(
+          '创建 To Go 订单，将普通菜1改价为 7.95、数量改为 2.3，并添加两份加柴',
+          async () => {
+            const page = await new TakeoutFlow().startToGoOrder(ready);
+            const orderFlow = new OrderDishesFlow();
+            await orderFlow.addRegularDish(
+              page,
+              orderServiceDishes.regular.name,
+              orderServiceDishes.regular.menu,
+            );
+            await page.changeOrderedDishPrice(orderServiceDishes.regular.name, testCase.price);
+            await page.changeOrderedDishQuantity(
+              orderServiceDishes.regular.name,
+              testCase.quantity,
+            );
+
+            expect(toCents(await page.readOrderedDishPrice(orderServiceDishes.regular.name))).toBe(
+              testCase.expectedLineCents,
+            );
+
+            const modifierResult = await orderFlow.changeGlobalOptionQuantity(page, {
+              closeAfter: true,
+              dishName: orderServiceDishes.regular.name,
+              operations: [{ type: 'count', quantity: testCase.modifierQuantity }],
+              optionName: orderServiceModifyGlobalOptionCase.optionName,
+            });
+            expect(modifierResult.quantities).toEqual([1, testCase.modifierQuantity]);
+
+            const orderedDish = (await page.readOrderedItems()).find(
+              (item) => item.name === orderServiceDishes.regular.name,
+            );
+            expect(orderedDish?.quantity).toBe(String(testCase.quantity));
+            expect(
+              await page.readOrderedDishAdditionQuantity(
+                orderServiceDishes.regular.name,
+                orderServiceModifyGlobalOptionCase.optionName,
+              ),
+            ).toBe(testCase.modifierQuantity);
+
+            return {
+              orderPage: page,
+              beforeSubtotal: (await page.readPriceSummary()).Subtotal,
+            };
+          },
+        );
+
+        await test.step('保存后从 Recall 校验小数数量、调味数量、价格和小计', async () => {
+          const { details, recallPage } = await saveAndReadRecallDetails(
+            orderPage,
+            employeeLoginPage,
+          );
+          const recalledDish = details.items.find(
+            (item) => item.name === orderServiceDishes.regular.name,
+          );
+          const recalledModifier = recalledDish?.additions.find((addition) =>
+            addition.name.startsWith(orderServiceModifyGlobalOptionCase.optionName),
+          );
+
+          expect(recalledDish?.quantity).toBe(String(testCase.quantity));
+          expect(recalledModifier?.quantity).toBe(testCase.modifierQuantity);
+          expect(
+            toCents(await recallPage.readOrderItemPrice(orderServiceDishes.regular.name)),
+          ).toBe(testCase.expectedLineCents);
+          expect(toCents(details.priceSummary.Subtotal)).toBe(toCents(beforeSubtotal));
+        });
+      } finally {
+        await restoreConfiguration();
+      }
+    },
+  );
+
   test.describe('折扣与备注回归', () => {
+    test(
+      '[POS-42886] 应能在菜品改价弹窗选择预置单菜折扣并保存',
+      {
+        annotation: [jiraIssueAnnotation('POS-42886')],
+      },
+      async ({ apiSetup, homePage, employeeLoginPage }) => {
+        const testCase = orderServicePresetItemDiscountCases.regularPrice;
+        const discount = await test.step('通过 API 创建本次测试使用的 10% 预置折扣', async () => {
+          return await apiSetup.discount.create({
+            rate: testCase.discountRate,
+            rateType: 2,
+          });
+        });
+        const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome(homePage, employeeLoginPage);
+        });
+        const orderPage = await test.step('创建堂食无桌订单并添加普通菜1', async () => {
+          const page = await new SelectTableFlow().enterDineInNoTableOrder(ready);
+          await new OrderDishesFlow().addRegularDish(
+            page,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          expect(toCents((await page.readPriceSummary()).Subtotal)).toBe(
+            toCents(orderServiceDishes.regular.expectedBasePrice),
+          );
+          return page;
+        });
+
+        await test.step('从 Price 弹窗选择 10% 单菜折扣并使用主管口令授权', async () => {
+          await new OrderDishesFlow().applyPresetItemDiscount(orderPage, {
+            authorizationPasscode: testCase.authorizationPasscode,
+            discountName: discount.name,
+            dishName: orderServiceDishes.regular.name,
+          });
+          expect(toCents((await orderPage.readPriceSummary()).Subtotal)).toBe(
+            toCents(testCase.expectedSubtotal),
+          );
+        });
+
+        await test.step('保存订单并校验单菜折扣请求及 Recall 结果', async () => {
+          const savedOrder = await orderPage.saveOrderWithReference();
+          const savedItem = savedOrder.orderItems.find(
+            (item) => Number(item.saleItemId) === orderServiceDishes.regular.saleItemId,
+          );
+          expect(savedItem).toMatchObject({
+            discountName: discount.name,
+            discountRate: testCase.discountRate,
+            discountRateType: 2,
+            originalSalePrice: orderServiceDishes.regular.expectedBasePrice,
+            price: orderServiceDishes.regular.expectedBasePrice,
+            totalAmount: testCase.expectedSubtotal,
+          });
+
+          const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+            savedOrder.homePage,
+            employeeLoginPage,
+          );
+          const recallPage = await new RecallFlow().openRecallFromHome(readyHomePage);
+          await recallPage.openOrderDetails(savedOrder.orderNumber);
+          const details = await recallPage.readOrderDetailsSnapshot();
+          expect(toCents(details.priceSummary.Subtotal)).toBe(toCents(testCase.expectedSubtotal));
+          expect(
+            details.items
+              .find((item) => item.name === orderServiceDishes.regular.name)
+              ?.additions.map((addition) => addition.name.trim()),
+          ).toContain(discount.name);
+        });
+      },
+    );
+
+    test(
+      '[POS-28674] 特殊价格菜品应用 50% 单菜折扣后应按产品规则舍入并保存',
+      {
+        annotation: [
+          jiraIssueAnnotation('POS-28674'),
+          jiraIssueAnnotation('POS-28534'),
+        ],
+      },
+      async ({ apiSetup, homePage, employeeLoginPage }) => {
+        const testCase = orderServicePresetItemDiscountCases.specialPrice;
+        const discount = await test.step('通过 API 创建本次测试使用的 50% 预置折扣', async () => {
+          return await apiSetup.discount.create({
+            rate: testCase.discountRate,
+            rateType: 2,
+          });
+        });
+        const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome(homePage, employeeLoginPage);
+        });
+        const orderPage = await test.step('创建堂食无桌订单并添加普通菜1', async () => {
+          const page = await new SelectTableFlow().enterDineInNoTableOrder(ready);
+          await new OrderDishesFlow().addRegularDish(
+            page,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          return page;
+        });
+
+        await test.step('在 Price 弹窗输入 5.85 并选择 50% 单菜折扣后授权', async () => {
+          await new OrderDishesFlow().applyPresetItemDiscount(orderPage, {
+            authorizationPasscode: testCase.authorizationPasscode,
+            discountName: discount.name,
+            dishName: orderServiceDishes.regular.name,
+            price: testCase.price,
+          });
+          expect(toCents((await orderPage.readPriceSummary()).Subtotal)).toBe(
+            toCents(testCase.expectedSubtotal),
+          );
+        });
+
+        await test.step('保存订单并校验特殊价格、折扣字段及 Recall 舍入结果', async () => {
+          const savedOrder = await orderPage.saveOrderWithReference();
+          const savedItem = savedOrder.orderItems.find(
+            (item) => Number(item.saleItemId) === orderServiceDishes.regular.saleItemId,
+          );
+          expect(savedItem).toMatchObject({
+            discountName: discount.name,
+            discountRate: testCase.discountRate,
+            discountRateType: 2,
+            originalSalePrice: orderServiceDishes.regular.expectedBasePrice,
+            price: testCase.price,
+            totalAmount: testCase.expectedSubtotal,
+          });
+
+          const readyHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+            savedOrder.homePage,
+            employeeLoginPage,
+          );
+          const recallPage = await new RecallFlow().openRecallFromHome(readyHomePage);
+          await recallPage.openOrderDetails(savedOrder.orderNumber);
+          const details = await recallPage.readOrderDetailsSnapshot();
+          expect(toCents(details.priceSummary.Subtotal)).toBe(toCents(testCase.expectedSubtotal));
+          expect(
+            details.items
+              .find((item) => item.name === orderServiceDishes.regular.name)
+              ?.additions.map((addition) => addition.name.trim()),
+          ).toContain(discount.name);
+        });
+      },
+    );
+
     test(
       '[POS-42888] 应能通过 Modify 添加备注并在 Recall 保留',
       {

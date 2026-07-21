@@ -1,4 +1,5 @@
 import { type DeliveryOrderParams, type PickUpOrderParams } from '../flows/takeout.flow';
+import { createShortTestName } from '../api/core/test-data-id';
 
 export const orderServiceMenu = {
   alternateGroup: 'Group 001',
@@ -21,6 +22,37 @@ export const orderServiceDishes = {
     name: '普通菜2',
     menu: orderServiceMenu,
   },
+  alternateCategory: {
+    name: 'superman item4',
+    menu: {
+      category: 'Category 001',
+      group: 'Group 001',
+    },
+  },
+} as const;
+
+export const orderServiceCustomDeliveryPrintCase = {
+  customOrderType: {
+    displayName: 'Custom Delivery',
+    name: 'CUSTOM_ORDER_TYPE1',
+    shortName: 'CD',
+  },
+  customer: {
+    address: '100 Main St',
+    customerName: 'pos-test',
+    phoneNumber: '01234567890',
+  },
+  dishes: [orderServiceDishes.regular, orderServiceDishes.test],
+} as const;
+
+export const orderServiceSplitChildDiscountCase = {
+  orderLines: [
+    orderServiceDishes.regular,
+    orderServiceDishes.regular,
+    orderServiceDishes.test,
+  ],
+  movedDishName: orderServiceDishes.test.name,
+  targetSuborderIndex: 1,
 } as const;
 
 export const orderServiceCategoryOptions = {
@@ -59,6 +91,216 @@ export const orderServiceSearchMenuConfigurationCase = {
   resultName: 'superman item4',
   resultTestId: 'menu-item-card-dsh1_0_697',
   visibleValue: true,
+} as const;
+
+export const orderServiceComboSubItemPriceCase = {
+  changedPrice: 5.5,
+  comboName: orderServiceComboOptionRemovalCase.comboName,
+  initialSubItemPrice: orderServiceDishes.regular.expectedBasePrice,
+  itemIndex: orderServiceComboOptionRemovalCase.itemIndex,
+  saleItemId: orderServiceComboOptionRemovalCase.saleItemId,
+  sectionId: orderServiceComboOptionRemovalCase.sectionId,
+} as const;
+
+export const orderServiceComboSubItemNotePermissionCase = {
+  authorizationPasscode: '11',
+  comboName: orderServiceComboSubItemPriceCase.comboName,
+  comboSaleItemId: 1173,
+  itemIndex: orderServiceComboSubItemPriceCase.itemIndex,
+  note: '备注信息',
+  optionName: orderServiceCategoryOptions.priced.name,
+  saleItemId: orderServiceComboSubItemPriceCase.saleItemId,
+  sectionId: orderServiceComboSubItemPriceCase.sectionId,
+} as const;
+
+export const orderServiceComboParentOptionCase = {
+  comboName: orderServiceComboOptionRemovalCase.comboName,
+  comboSubItem: {
+    itemIndex: 1,
+    name: orderServiceDishes.test.name,
+    saleItemId: 699,
+    sectionId: orderServiceComboOptionRemovalCase.sectionId,
+  },
+  parentOption: orderServiceCategoryOptions.priced.name,
+  ordinaryDish: orderServiceDishes.regular,
+  ordinaryOption: orderServiceCategoryOptions.paidNested,
+} as const;
+
+export function buildOrderServiceMenuProductModeCase() {
+  const seed = Math.random().toString(36).slice(2, 8);
+  const emenuSearchQuery = 'All you can eat item';
+  const posSearchQuery = 'Broccoli Garlic Sauce';
+
+  return {
+    configurationName: 'MENU_PRODUCT_MODE',
+    emenuCategoryName: createShortTestName({
+      prefix: 'EM',
+      domain: 'CATEGORY',
+      maxLength: 24,
+      seed,
+    }),
+    emenuDishName: `${emenuSearchQuery}_${seed.slice(0, 3)}`,
+    emenuGroupName: createShortTestName({
+      prefix: 'EM',
+      domain: 'MENU_GROUP',
+      maxLength: 24,
+      seed,
+    }),
+    emenuMenuId: 2,
+    emenuMode: 'EMENU',
+    emenuSearchQuery,
+    posCategoryId: 68,
+    posDishName: `${posSearchQuery}_${seed.slice(0, 2)}`,
+    posMenuGroupId: 45,
+    posMenuId: 1,
+    posMode: 'POS',
+    posSearchQuery,
+    price: 1,
+  } as const;
+}
+
+export const orderServiceChineseInitialSearchCase = {
+  query: 'ptc',
+  resultName: '普通菜1',
+  resultTestId: 'menu-item-card-dsh0_0_698',
+} as const;
+
+export const orderServiceOpenFoodChineseKeyboardCase = {
+  configurationName: 'DEFAULT_KEYBOARD_TYPE',
+  configurationValue: '0',
+  initialLanguage: 'EN',
+  name: '你',
+  pinyinKeys: ['n', 'i'],
+  price: 1,
+  switchedLanguage: '中',
+} as const;
+
+export function buildOrderServiceCategoryPosNameCase() {
+  const seed = Math.random().toString(36).slice(2, 8);
+
+  return {
+    backendName: createShortTestName({
+      prefix: 'AT',
+      domain: 'CATEGORY_NAME_A',
+      maxLength: 24,
+      seed,
+    }),
+    dishName: createShortTestName({
+      prefix: 'AT',
+      domain: 'CATEGORY_DISH',
+      maxLength: 24,
+      seed,
+    }),
+    menuGroupId: 45,
+    menuGroupName: orderServiceMenu.group,
+    menuId: 1,
+    posName: createShortTestName({
+      prefix: 'POS',
+      domain: 'CATEGORY_NAME_B',
+      maxLength: 24,
+      seed,
+    }),
+    price: 1,
+  } as const;
+}
+
+export function buildOrderServiceRequiredCategoryCase() {
+  const seed = Math.random().toString(36).slice(2, 8);
+
+  return {
+    backendName: createShortTestName({
+      prefix: 'AT',
+      domain: 'REQUIRED_CATEGORY',
+      maxLength: 24,
+      seed,
+    }),
+    dishName: createShortTestName({
+      prefix: 'AT',
+      domain: 'REQUIRED_DISH',
+      maxLength: 24,
+      seed,
+    }),
+    menuGroupId: 45,
+    menuGroupName: orderServiceMenu.group,
+    menuId: 1,
+    posName: createShortTestName({
+      prefix: 'REQ',
+      domain: 'CATEGORY',
+      maxLength: 24,
+      seed,
+    }),
+    price: 1,
+  } as const;
+}
+
+export function buildOrderServiceOrderChargeExcludedCategoryCase() {
+  const seed = Math.random().toString(36).slice(2, 8);
+
+  return {
+    backendName: createShortTestName({
+      prefix: 'AT',
+      domain: 'NO_ORDER_CHARGE',
+      maxLength: 24,
+      seed,
+    }),
+    dishNames: [
+      createShortTestName({
+        prefix: 'AT',
+        domain: 'NO_CHARGE_DISH_A',
+        maxLength: 24,
+        seed,
+      }),
+      createShortTestName({
+        prefix: 'AT',
+        domain: 'NO_CHARGE_DISH_B',
+        maxLength: 24,
+        seed,
+      }),
+    ],
+    dishPrices: [4, 6],
+    menuGroupId: 45,
+    menuGroupName: orderServiceMenu.group,
+    menuId: 1,
+    percentageCharge: 10,
+    posName: createShortTestName({
+      prefix: 'NOCHG',
+      domain: 'CATEGORY',
+      maxLength: 24,
+      seed,
+    }),
+  } as const;
+}
+
+export const orderServiceSameNameAndNumberSearchCase = {
+  categoryId: 68,
+  itemNumber: 'AA',
+  menuGroupId: 45,
+  menuId: 1,
+  name: 'AA',
+  price: 10,
+} as const;
+
+export const orderServiceModifyGlobalOptionCase = {
+  addExpectedQuantities: [1, 2],
+  countExpectedQuantities: [1, 5, 0],
+  countQuantity: 5,
+  optionName: '加柴',
+  reduceExpectedQuantities: [1, 2, 1, 0],
+  reduceStartQuantity: 2,
+} as const;
+
+export const orderServiceSavedComboSubItemModifyCase = {
+  comboName: orderServiceComboOptionRemovalCase.comboName,
+  displayAllItems: [
+    { itemIndex: 0, name: orderServiceDishes.regular.name, saleItemId: 698 },
+    { itemIndex: 1, name: orderServiceDishes.test.name, saleItemId: 699 },
+  ],
+  modifierName: orderServiceModifyGlobalOptionCase.optionName,
+  parentOption: orderServiceCategoryOptions.priced.name,
+  sectionId: orderServiceComboOptionRemovalCase.sectionId,
+  targetItemIndex: 1,
+  targetSaleItemId: 699,
+  targetSubItemName: orderServiceDishes.test.name,
 } as const;
 
 export const orderServiceEditRecallTaxCase = {
@@ -152,6 +394,36 @@ export function buildOrderServicePickupCustomer(): PickUpOrderParams {
   };
 }
 
+export function buildAnonymousPickupEditCustomer(): {
+  customerButtonLabel: string;
+  customerName: string;
+  phoneNumber: string;
+} {
+  const customerName = `pos-pickup-${Date.now()}`;
+  const phoneNumber = '9322222222';
+
+  return {
+    customerButtonLabel: `${customerName} (932)222-2222`,
+    customerName,
+    phoneNumber,
+  };
+}
+
+export function buildOrderServiceDineInCustomer(): {
+  customerButtonLabel: string;
+  customerName: string;
+  phoneNumber: string;
+} {
+  const customerName = `pos-dine-in-${Date.now()}`;
+  const phoneNumber = '9322222222';
+
+  return {
+    customerButtonLabel: `${customerName} (932)222-2222`,
+    customerName,
+    phoneNumber,
+  };
+}
+
 export function buildRequiredPaymentCustomer(): { name: string; phone: string } {
   return {
     name: `AT${Date.now().toString().slice(-10)}`,
@@ -168,8 +440,94 @@ export function buildOpenFoodWithoutTaxCase(): { name: string; price: number } {
 
 export const orderServiceKitchenVoidPermissionCase = {
   authorizationPasscode: '11',
+  delayInMillis: 3_600_000,
   expectedVoidMarker: 'VOIDED',
 } as const;
+
+export const orderServiceSameDishSeparateCase = {
+  configuration: {
+    BREAK_OR_COMBIN_SAME_DISHES: true,
+    COMBINE_THE_SAME_DISHES: '0',
+  },
+  expectedLineCount: 3,
+  expectedQuantityPerLine: '1',
+} as const;
+
+export const orderServiceSameDishStatusCombineCase = {
+  configuration: {
+    BREAK_OR_COMBIN_SAME_DISHES: false,
+    COMBINE_THE_SAME_DISHES: '1',
+  },
+  expectedLineCount: 2,
+  newDishAdds: 2,
+  pendingQuantity: '2',
+  sentQuantity: '1',
+} as const;
+
+export const orderServiceSameDishKitchenCombineCase = {
+  configuration: {
+    BREAK_OR_COMBIN_SAME_DISHES: false,
+    COMBINE_THE_SAME_DISHES: '2',
+  },
+  expectedDishNameColor: 'rgb(130, 0, 20)',
+  expectedKitchenQuantity: 1,
+  expectedLineCount: 1,
+  expectedTotalQuantity: '2',
+  newDishAdds: 1,
+} as const;
+
+export const orderServiceReduceCategoryCase = {
+  configuration: {
+    AUTOMATICALLY_REDIRECT_AFTER_REDUCE_ITEMS: false,
+  },
+  expectedCategory: orderServiceDishes.alternateCategory.menu.category,
+} as const;
+
+export const orderServiceDecimalReduceCase = {
+  configuration: {
+    ORDER_COUNT_CAN_BE_DECIMAL: true,
+  },
+  expectedAfterFirstReduce: '0.25',
+  initialQuantity: 1.25,
+} as const;
+
+export const orderServiceDecimalSplitCase = {
+  configuration: {
+    ORDER_COUNT_CAN_BE_DECIMAL: true,
+  },
+  expectedLinePrice: 22.44,
+  quantity: 2.55,
+} as const;
+
+export const orderServicePresetItemDiscountCases = {
+  regularPrice: {
+    authorizationPasscode: '11',
+    discountRate: 10,
+    expectedSubtotal: 7.92,
+  },
+  specialPrice: {
+    authorizationPasscode: '11',
+    discountRate: 50,
+    expectedSubtotal: 2.92,
+    price: 5.85,
+  },
+} as const;
+
+export function buildOrderServicePhysicalGiftCardCase(): {
+  cardNumber: string;
+  customerName: string;
+  expectedPhoneNumber: string;
+  phoneNumber: string;
+} {
+  const suffix = Date.now().toString().slice(-9);
+
+  return {
+    cardNumber: `990${suffix}`,
+    customerName: `AT Gift ${suffix.slice(-6)}`,
+    expectedPhoneNumber: '(254)429-6158',
+    phoneNumber: '2544296158',
+  };
+}
 
 export const orderServiceSplitOperationCase = {
   amountSplitFirstAmount: 2,
@@ -227,4 +585,27 @@ export const orderPageRegressionCases = {
   splitByAmount: { changedPrice: 10.6, amounts: [2, 8.6] },
   combineDecimal: { quantity: 2.55 },
   pricedDecimal: { price: 6.5, quantity: 1.5, expectedLineCents: 975 },
+  pricedDecimalWithTwoAdditions: {
+    additionalDishCount: 2,
+    configuration: { ORDER_COUNT_CAN_BE_DECIMAL: true },
+    expectedLineCents: 1658,
+    price: 6.5,
+    quantity: 2.55,
+  },
+  decimalRecallPersistence: {
+    configuration: { ORDER_COUNT_CAN_BE_DECIMAL: true },
+    expectedLineCents: 2244,
+    quantity: 2.55,
+  },
+  decimalModifierPersistence: {
+    configuration: {
+      BREAK_OR_COMBIN_SAME_DISHES: false,
+      COMBINE_THE_SAME_DISHES: '1',
+      ORDER_COUNT_CAN_BE_DECIMAL: true,
+    },
+    expectedLineCents: 1829,
+    modifierQuantity: 2,
+    price: 7.95,
+    quantity: 2.3,
+  },
 } as const;

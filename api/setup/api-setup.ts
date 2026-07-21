@@ -1,5 +1,8 @@
 import type { AdminConfigApiClient } from '../clients/admin-config-api.client';
+import type { KitchenApiClient } from '../clients/kitchen-api.client';
+import type { LayoutConfigApiClient } from '../clients/layout-config-api.client';
 import type { MenuApiClient } from '../clients/menu-api.client';
+import type { OrderTypeApiClient } from '../clients/order-type-api.client';
 import type { SaleItemApiClient } from '../clients/sale-item-api.client';
 import type { SystemConfigurationApiClient } from '../clients/system-configuration-api.client';
 import type { ResourceRegistry } from '../core/resource-registry';
@@ -26,10 +29,18 @@ import {
   type SystemConfigurationSetupService,
 } from './system-configuration.setup';
 import { createStaffSetupService, type StaffSetupService } from './staff.setup';
+import { createKitchenSetupService, type KitchenSetupService } from './kitchen.setup';
+import {
+  createCustomOrderTypeSetupService,
+  type CustomOrderTypeSetupService,
+} from './custom-order-type.setup';
 
 export type ApiSetupFactoryOptions = {
   adminConfigApi: AdminConfigApiClient;
+  kitchenApi?: KitchenApiClient;
+  layoutConfigApi?: LayoutConfigApiClient;
   systemConfigurationApi?: SystemConfigurationApiClient;
+  orderTypeApi?: OrderTypeApiClient;
   menuApi?: MenuApiClient;
   saleItemApi?: SaleItemApiClient;
   resourceRegistry: ResourceRegistry;
@@ -45,6 +56,8 @@ export type ApiSetup = {
   saleItem: SaleItemSetupService;
   systemConfiguration: SystemConfigurationSetupService;
   staff: StaffSetupService;
+  kitchen: KitchenSetupService;
+  customOrderType: CustomOrderTypeSetupService;
 };
 
 export function createApiSetup(options: ApiSetupFactoryOptions): ApiSetup {
@@ -58,5 +71,7 @@ export function createApiSetup(options: ApiSetupFactoryOptions): ApiSetup {
     saleItem: createSaleItemSetupService(options),
     systemConfiguration: createSystemConfigurationSetupService(options),
     staff: createStaffSetupService(options),
+    kitchen: createKitchenSetupService(options),
+    customOrderType: createCustomOrderTypeSetupService(options),
   };
 }

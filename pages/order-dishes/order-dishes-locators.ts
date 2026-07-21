@@ -20,6 +20,11 @@ export class OrderDishesLocators {
   readonly page: Page;
   readonly appFrame: FrameLocator;
   readonly backButton: Locator;
+  readonly guestCountButton: Locator;
+  readonly guestCountDialog: Locator;
+  readonly guestCountClearButton: Locator;
+  readonly guestCountNumberButton: (guestCount: number) => Locator;
+  readonly guestCountConfirmButton: Locator;
   readonly headerRecallButton: Locator;
   readonly sendButton: Locator;
   readonly payButton: Locator;
@@ -27,12 +32,26 @@ export class OrderDishesLocators {
   readonly selectedDishAddButton: Locator;
   readonly changePriceButton: Locator;
   readonly changePriceConfirmButton: Locator;
+  readonly itemPriceDiscountDialog: Locator;
+  readonly itemPriceChangeButton: Locator;
+  readonly itemPriceDiscountConfirmButton: Locator;
+  readonly itemPriceDiscountValue: Locator;
+  readonly itemPriceDiscountNumberButton: (digit: string) => Locator;
+  readonly itemPriceDiscountDoubleZeroButton: Locator;
+  readonly itemPriceDiscountOption: (discountName: string) => Locator;
+  readonly itemPriceAuthorizationForm: Locator;
+  readonly itemPriceAuthorizationDigitButton: (digit: string) => Locator;
+  readonly itemPriceAuthorizationConfirmButton: Locator;
   readonly countButton: Locator;
   readonly countText: Locator;
   readonly firstAvailableDishButton: Locator;
   readonly menuGroupCard: (groupName: string) => Locator;
   readonly selectedMenuGroupName: Locator;
   readonly menuCategoryCards: Locator;
+  readonly menuCategoryCard: (categoryName: string) => Locator;
+  readonly selectedMenuCategoryName: Locator;
+  readonly menuItemCards: Locator;
+  readonly menuItemButtonByName: (dishName: string) => Locator;
   readonly countDialog: Locator;
   readonly countDialogInput: Locator;
   readonly countDialogConfirmButton: Locator;
@@ -44,12 +63,18 @@ export class OrderDishesLocators {
   readonly priceInput: Locator;
   readonly priceConfirmButton: Locator;
   readonly openFoodButton: Locator;
+  readonly openFoodDialog: Locator;
   readonly searchMenuButton: Locator;
+  readonly chineseSearchMenuButton: Locator;
   readonly searchMenuInput: Locator;
   readonly searchMenuResultCard: (testId: string) => Locator;
+  readonly searchMenuResultCardsByNameAndNumber: (name: string, itemNumber: string) => Locator;
   readonly openFoodNameInput: Locator;
   readonly openFoodPriceInput: Locator;
   readonly openFoodKeyboardCloseButton: Locator;
+  readonly openFoodKeyboardLanguageButton: Locator;
+  readonly openFoodKeyboardLetterButton: (letter: string) => Locator;
+  readonly openFoodKeyboardCandidateButton: (candidate: string) => Locator;
   readonly openFoodConfirmButton: Locator;
   readonly openFoodNoTaxOption: Locator;
   readonly notification: Locator;
@@ -61,8 +86,12 @@ export class OrderDishesLocators {
   readonly customerConfirmButton: Locator;
   readonly customerNameRequiredMessage: Locator;
   readonly customerPhoneRequiredMessage: Locator;
+  readonly emptyCustomerInformationButton: Locator;
   readonly customerInformationButton: (accessibleName: string) => Locator;
   readonly customerInformationRegion: Locator;
+  readonly customerInformationPageHeading: Locator;
+  readonly customerInformationNameInput: Locator;
+  readonly customerInformationPhoneInput: Locator;
   readonly customerInformationSaveButton: Locator;
   readonly customerInformationKeyboardCloseButton: Locator;
   readonly orderCustomerAddressSummary: (accessibleName: string) => Locator;
@@ -70,6 +99,13 @@ export class OrderDishesLocators {
   readonly kitchenVoidPermissionMessage: Locator;
   readonly authorizationDigitButton: (digit: string) => Locator;
   readonly authorizationConfirmButton: Locator;
+  readonly noteButton: Locator;
+  readonly notePermissionMessage: Locator;
+  readonly noteAuthorizationForm: Locator;
+  readonly noteAuthorizationDigitButton: (digit: string) => Locator;
+  readonly noteAuthorizationConfirmButton: Locator;
+  readonly noteInput: Locator;
+  readonly noteConfirmButton: Locator;
   readonly specificationDialog: Locator;
   readonly specificationConfirmButton: Locator;
   readonly categoryOptionPanel: Locator;
@@ -79,9 +115,13 @@ export class OrderDishesLocators {
   readonly comboDialog: Locator;
   readonly comboConfirmButton: Locator;
   readonly comboItemButton: (sectionId: number, saleItemId: number, itemIndex: number) => Locator;
+  readonly comboSubItemBySaleItemId: (comboName: string, saleItemId: number) => Locator;
+  readonly comboSubItemPriceBySaleItemId: (comboName: string, saleItemId: number) => Locator;
   readonly reduceSelectedOptionButton: Locator;
   readonly orderedDishItems: Locator;
+  readonly orderedDishItemsByName: (dishName: string) => Locator;
   readonly orderedDishItemByName: (dishName: string) => Locator;
+  readonly orderedDishNameByName: (dishName: string) => Locator;
   readonly cartBadge: Locator;
   readonly priceSummaryToggle: Locator;
   readonly priceSummaryDetailsContainer: Locator;
@@ -90,7 +130,6 @@ export class OrderDishesLocators {
   readonly headerMoreButton: Locator;
   readonly inventoryMenuItem: Locator;
   readonly reduceButton: Locator;
-  readonly exitButton: Locator;
   readonly exitConfirmButton: Locator;
   readonly inventoryAlertItems: Locator;
   readonly moreActionButton: Locator;
@@ -98,6 +137,16 @@ export class OrderDishesLocators {
   readonly modifyButton: Locator;
   readonly modifyPanel: Locator;
   readonly modifyBackButton: Locator;
+  readonly modifyOptionButton: (optionName: string) => Locator;
+  readonly selectedModifyOptionAddButton: Locator;
+  readonly selectedModifyOptionCountButton: Locator;
+  readonly selectedModifyOptionReduceButton: Locator;
+  readonly modifyOptionCountDialog: Locator;
+  readonly modifyOptionCountCancelButton: Locator;
+  readonly modifyOptionCountDisplay: Locator;
+  readonly modifyOptionCountClearButton: Locator;
+  readonly modifyOptionCountNumberButton: (digit: string) => Locator;
+  readonly modifyOptionCountConfirmButton: Locator;
   readonly customModifierNameInput: Locator;
   readonly customModifierPriceInput: Locator;
   readonly customModifierAddButton: Locator;
@@ -111,6 +160,8 @@ export class OrderDishesLocators {
   readonly customChargeConfirmButton: Locator;
   readonly customChargeCancelButton: Locator;
   readonly customChargeValueInput: Locator;
+  readonly configurationRefreshDialog: Locator;
+  readonly configurationRefreshButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -118,13 +169,19 @@ export class OrderDishesLocators {
     this.appFrame = this.scope.appFrame;
     const scoped = (selector: string) => scopedLocator(this.scope, selector);
 
-    this.backButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
-      appFrame
-        .getByTestId('icon-button-Back')
-        .or(appFrame.getByRole('button', { name: /^Back$/ }))
-        .or(hostPage.getByTestId('icon-button-Back'))
-        .or(hostPage.getByRole('button', { name: /^Back$/ }))
-        .first(),
+    this.backButton = this.page.getByTestId('button-back');
+    this.guestCountButton = this.page.getByTestId('guestCount-button');
+    this.guestCountDialog = this.page.getByRole('dialog', {
+      name: 'Party Size',
+      exact: true,
+    });
+    this.guestCountClearButton = this.guestCountDialog.getByTestId(
+      'pos-ui-numeric-input-clear',
+    );
+    this.guestCountNumberButton = (guestCount: number) =>
+      this.guestCountDialog.getByTestId(`pos-ui-numeric-input-number-${guestCount}`);
+    this.guestCountConfirmButton = this.guestCountDialog.getByTestId(
+      'pos-ui-numeric-input-confirm-button',
     );
     this.headerRecallButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
       appFrame.getByRole('button', { name: /Recall/ }).or(hostPage.getByRole('button', { name: /Recall/ })).first(),
@@ -182,6 +239,39 @@ export class OrderDishesLocators {
         .or(hostPage.getByTestId('preset-currency-keypad-input-confirm-button'))
         .first(),
     );
+    this.itemPriceChangeButton = this.page.getByTestId('action-rail-button-chgPrc');
+    this.itemPriceDiscountDialog = this.page.getByRole('dialog', { name: 'Price', exact: true });
+    this.itemPriceDiscountConfirmButton = this.itemPriceDiscountDialog.getByTestId(
+      'preset-numeric-input-modal-confirm-button',
+    );
+    this.itemPriceDiscountValue = this.itemPriceDiscountDialog.getByTestId(
+      'preset-currency-keypad-input-input',
+    );
+    this.itemPriceDiscountNumberButton = (digit: string) =>
+      this.itemPriceDiscountDialog.getByTestId(`preset-currency-keypad-input-number-${digit}`);
+    this.itemPriceDiscountDoubleZeroButton = this.itemPriceDiscountDialog.getByTestId(
+      'preset-currency-keypad-input-double-zero',
+    );
+    this.itemPriceDiscountOption = (discountName: string) =>
+      this.itemPriceDiscountDialog.getByRole('button', {
+        name: discountName,
+        exact: true,
+      });
+    this.itemPriceAuthorizationForm = this.page.getByRole('form', {
+      name: 'Enter Your Passcode',
+    });
+    this.itemPriceAuthorizationDigitButton = (digit: string) =>
+      this.itemPriceAuthorizationForm.getByRole('button', {
+        name: `Number ${digit}`,
+        exact: true,
+      });
+    this.itemPriceAuthorizationConfirmButton = this.itemPriceAuthorizationForm.getByRole(
+      'button',
+      {
+        name: 'confirm',
+        exact: true,
+      },
+    );
     this.countButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
       appFrame
         .getByRole('button', { name: /^(Count|数量)$/ })
@@ -200,9 +290,15 @@ export class OrderDishesLocators {
     this.selectedMenuGroupName = this.page
       .locator('[data-testid^="menu-group-card-"][class*="_selected_"]')
       .first();
-    this.menuCategoryCards = scoped(
-      '[data-testid^="menu-category-card-"], [data-test-id^="menu-category-card-"]',
+    this.menuCategoryCards = this.page.locator('[data-testid^="menu-category-card-"]');
+    this.menuCategoryCard = (categoryName: string) =>
+      this.menuCategoryCards.filter({ hasText: categoryName }).first();
+    this.selectedMenuCategoryName = this.page.locator(
+      '[data-testid^="menu-category-card-"][class*="_selected_"]',
     );
+    this.menuItemCards = this.page.locator('[data-testid^="menu-item-card-"]');
+    this.menuItemButtonByName = (dishName: string) =>
+      this.page.getByRole('button', { name: dishName, exact: true });
     this.countDialog = scoped('[data-testid="dish-count-modal"], [data-testid="option-count-modal"]');
     this.countDialogInput = this.countDialog.locator('input').first();
     this.countDialogConfirmButton = this.countDialog.getByRole('button', {
@@ -221,12 +317,29 @@ export class OrderDishesLocators {
     this.priceInput = this.priceDialog.getByRole('textbox', { name: 'Price' });
     this.priceConfirmButton = this.priceDialog.getByRole('button', { name: 'Confirm' });
     this.openFoodButton = this.page.getByTestId('icon-button-Open item');
+    this.openFoodDialog = this.page.getByTestId('pos-ui-modal');
     this.searchMenuButton = this.page.getByTestId('icon-button-Search menu');
+    this.chineseSearchMenuButton = this.page.getByRole('button', {
+      name: '搜索菜单',
+      exact: true,
+    });
     this.searchMenuInput = this.page.getByTestId('pos-ui-input');
     this.searchMenuResultCard = (testId: string) => this.page.getByTestId(testId);
-    this.openFoodNameInput = this.page.getByRole('textbox', { name: 'Name' });
-    this.openFoodPriceInput = this.page.getByRole('textbox', { name: '0.00' });
+    this.searchMenuResultCardsByNameAndNumber = (name: string, itemNumber: string) =>
+      this.page.getByRole('button', {
+        name: `${name}.${itemNumber}`,
+        exact: true,
+      });
+    this.openFoodNameInput = this.openFoodDialog
+      .getByTestId('pos-ui-autocomplete-input')
+      .first();
+    this.openFoodPriceInput = this.openFoodDialog.getByTestId('pos-ui-input');
     this.openFoodKeyboardCloseButton = this.page.getByTestId('pos-keyboard-button-{close}');
+    this.openFoodKeyboardLanguageButton = this.page.getByTestId('pos-keyboard-button-globe');
+    this.openFoodKeyboardLetterButton = (letter: string) =>
+      this.page.getByTestId(`pos-keyboard-button-${letter}`);
+    this.openFoodKeyboardCandidateButton = (candidate: string) =>
+      this.page.getByRole('button', { name: candidate, exact: true });
     this.openFoodConfirmButton = this.page.getByTestId('open-food-confirm');
     this.openFoodNoTaxOption = this.page.getByTestId('open-food-tax-3');
     this.notification = this.page.getByTestId('notification');
@@ -240,9 +353,23 @@ export class OrderDishesLocators {
     this.customerConfirmButton = this.customerDialog.getByRole('button', { name: 'Confirm' });
     this.customerNameRequiredMessage = this.page.getByText("Name can't be empty", { exact: true });
     this.customerPhoneRequiredMessage = this.page.getByText("Phone can't be empty", { exact: true });
+    this.emptyCustomerInformationButton = this.page.getByRole('button', {
+      name: 'AddIcon Customer',
+      exact: true,
+    });
     this.customerInformationButton = (accessibleName: string) =>
       this.page.getByRole('button', { name: accessibleName, exact: true });
     this.customerInformationRegion = this.page.getByLabel('客人信息', { exact: true });
+    this.customerInformationPageHeading = this.page
+      .getByRole('banner')
+      .getByText('Information', { exact: true });
+    this.customerInformationNameInput = this.page.getByPlaceholder('Name', {
+      exact: true,
+    });
+    this.customerInformationPhoneInput = this.page.getByPlaceholder(
+      'Phone number',
+      { exact: true },
+    );
     this.customerInformationSaveButton = this.page
       .getByRole('banner')
       .getByRole('button', { name: 'Save', exact: true });
@@ -264,6 +391,25 @@ export class OrderDishesLocators {
       name: 'confirm',
       exact: true,
     });
+    this.noteButton = this.page.getByTestId('action-rail-button-addnote');
+    this.notePermissionMessage = this.page.getByText(
+      'You do not have permission NOTE, please enter the password!',
+      { exact: true },
+    );
+    this.noteAuthorizationForm = this.page.getByRole('form', {
+      name: 'Enter Your Passcode',
+    });
+    this.noteAuthorizationDigitButton = (digit: string) =>
+      this.noteAuthorizationForm.getByRole('button', {
+        name: `Number ${digit}`,
+        exact: true,
+      });
+    this.noteAuthorizationConfirmButton = this.noteAuthorizationForm.getByRole('button', {
+      name: 'confirm',
+      exact: true,
+    });
+    this.noteInput = this.page.getByPlaceholder('Note', { exact: true });
+    this.noteConfirmButton = this.page.getByTestId('note-action-modal-confirm-button');
     this.specificationDialog = this.appFrame.getByRole('dialog', {
       name: 'Select Specifications',
     });
@@ -290,12 +436,19 @@ export class OrderDishesLocators {
     });
     this.comboItemButton = (sectionId: number, saleItemId: number, itemIndex: number) =>
       this.page.locator(`[id="${sectionId}-${saleItemId}-${itemIndex}"]`);
+    this.comboSubItemBySaleItemId = (comboName: string, saleItemId: number) =>
+      this.orderedDishItemByName(comboName).getByTestId(`dish-item-subitem-combo-${saleItemId}`);
+    this.comboSubItemPriceBySaleItemId = (comboName: string, saleItemId: number) =>
+      this.comboSubItemBySaleItemId(comboName, saleItemId).getByText(/^\$[\d,.]+$/).first();
     this.reduceSelectedOptionButton = this.page.getByTestId('action-rail-button-reduce1opt');
     this.orderedDishItems = this.page.getByTestId('pos-ui-dish-item');
-    this.orderedDishItemByName = (dishName: string) =>
+    this.orderedDishItemsByName = (dishName: string) =>
       this.orderedDishItems.filter({
         has: this.page.getByText(dishName, { exact: true }),
-      }).first();
+      });
+    this.orderedDishItemByName = (dishName: string) => this.orderedDishItemsByName(dishName).first();
+    this.orderedDishNameByName = (dishName: string) =>
+      this.orderedDishItemByName(dishName).getByText(dishName, { exact: true });
     this.cartBadge = scoped('[data-testid="cart-badge"]');
     this.priceSummaryToggle = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
       appFrame
@@ -317,18 +470,7 @@ export class OrderDishesLocators {
       'xpath=following-sibling::*[1]',
     );
     this.priceSummaryTotalContainer = this.priceSummaryToggle.locator('xpath=following-sibling::*[2]');
-    this.saveOrderButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
-      appFrame
-        .locator('[data-testid="bottom-button-saveOrderBtn"], [data-test-id="bottom-button-saveOrderBtn"]')
-        .or(
-          hostPage.locator(
-            '[data-testid="bottom-button-saveOrderBtn"], [data-test-id="bottom-button-saveOrderBtn"]',
-          ),
-        )
-        .or(appFrame.getByRole('button', { name: /^(Save|保存)$/ }))
-        .or(hostPage.getByRole('button', { name: /^(Save|保存)$/ }))
-        .first(),
-    );
+    this.saveOrderButton = this.page.getByTestId('bottom-button-saveOrderBtn');
     this.headerMoreButton = this.page
       .getByTestId('icon-button-more')
       .or(this.appFrame.getByTestId('icon-button-more'));
@@ -341,12 +483,6 @@ export class OrderDishesLocators {
         .or(hostPage.getByRole('button', { name: /^Reduce$/ }))
         .first(),
     ).or(scoped('#reduce1icon'));
-    this.exitButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
-      appFrame
-        .getByRole('button', { name: /^Back$/ })
-        .or(hostPage.getByRole('button', { name: /^Back$/ }))
-        .first(),
-    ).or(scoped('#odBack'));
     this.exitConfirmButton = scoped('#exit-edit-submit');
     this.inventoryAlertItems = this.page
       .getByText('Insufficient stock, please modify the order.', { exact: true })
@@ -369,6 +505,35 @@ export class OrderDishesLocators {
     this.modifyBackButton = this.modifyPanel
       .locator('[aria-label="onLeftIcon"], [aria-label="Back"], [aria-label="返回"]')
       .first();
+    this.modifyOptionButton = (optionName: string) =>
+      this.page.getByRole('button', { name: optionName, exact: true });
+    this.selectedModifyOptionAddButton = this.page.getByTestId(
+      'action-rail-button-add1opt',
+    );
+    this.selectedModifyOptionCountButton = this.page.getByTestId(
+      'action-rail-button-chgNumopt',
+    );
+    this.selectedModifyOptionReduceButton = this.page.getByTestId(
+      'action-rail-button-reduce1opt',
+    );
+    this.modifyOptionCountDialog = this.page.getByTestId('option-count-modal');
+    this.modifyOptionCountCancelButton = this.modifyOptionCountDialog.getByRole('button', {
+      name: 'Cancel',
+      exact: true,
+    });
+    this.modifyOptionCountDisplay = this.modifyOptionCountDialog.getByTestId(
+      'option-count-modal-numeric-input-input',
+    );
+    this.modifyOptionCountClearButton = this.modifyOptionCountDialog.getByTestId(
+      'option-count-modal-numeric-input-clear',
+    );
+    this.modifyOptionCountNumberButton = (digit: string) =>
+      this.modifyOptionCountDialog.getByTestId(
+        `option-count-modal-numeric-input-number-${digit}`,
+      );
+    this.modifyOptionCountConfirmButton = this.modifyOptionCountDialog.getByTestId(
+      'option-count-modal-numeric-input-confirm-button',
+    );
     this.customModifierNameInput = this.modifyPanel
       .getByPlaceholder(/^(Enter custom modifier|输入自定义调味)$/)
       .first();
@@ -416,5 +581,12 @@ export class OrderDishesLocators {
     this.customChargeValueInput = this.customChargeDialog
       .locator('input[type="text"], input')
       .first();
+    this.configurationRefreshDialog = this.page.getByRole('alertdialog', {
+      name: 'Notification',
+    });
+    this.configurationRefreshButton = this.configurationRefreshDialog.getByRole('button', {
+      name: 'Refresh',
+      exact: true,
+    });
   }
 }

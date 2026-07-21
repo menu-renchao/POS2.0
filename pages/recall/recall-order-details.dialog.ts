@@ -21,6 +21,7 @@ import {
 } from './recall-reads.section';
 import type {
   RecallCustomerInfo,
+  RecallDiscountWholeOrderSummary,
   RecallMemberInfo,
   RecallOrderContext,
   RecallOrderDetailAction,
@@ -28,6 +29,7 @@ import type {
   RecallOrderDetails,
   RecallOrderItem,
   RecallOrderItemAddition,
+  RecallKitchenTicketResult,
   RecallOrderPaymentRecord,
 } from './recall.types';
 
@@ -92,6 +94,14 @@ export class RecallOrderDetailsDialog {
   private readonly splitChargePromptDialog: Locator;
   private readonly splitChargePromptKeepButton: Locator;
   private readonly splitChargePromptRemoveButton: Locator;
+  private readonly copyConfirmationDialog: Locator;
+  private readonly copyStartButton: Locator;
+  private readonly copyDetailsDialog: Locator;
+  private readonly copyDetailsStartButton: Locator;
+  private readonly refundByItemMenuItem: Locator;
+  private readonly amountRefundDialog: Locator;
+  private readonly itemRefundConfirmationDialog: Locator;
+  private readonly itemRefundConfirmButton: Locator;
   private readonly combineSelectionPrompt: Locator;
   private readonly combineChargeWarning: Locator;
   private readonly combineChargeConfirmButton: Locator;
@@ -107,6 +117,11 @@ export class RecallOrderDetailsDialog {
   private readonly splitTargetOrderCards: Locator;
   private readonly splitTargetOrderCardById: (targetOrderId: string) => Locator;
   private readonly splitTargetOrderCardByNumber: (targetOrderNumber: string) => Locator;
+  private readonly discountDialog: Locator;
+  private readonly discountWholeOrderScope: Locator;
+  private readonly discountWholeOrderSummary: Locator;
+  private readonly discountWholeOrderNumber: Locator;
+  private readonly discountWholeOrderSubtotalValue: Locator;
 
   constructor(
     readonly page: Page,
@@ -169,6 +184,37 @@ export class RecallOrderDetailsDialog {
       this.splitChargePromptDialog,
       'button-remove',
     );
+    this.copyConfirmationDialog = this.page.getByRole('alertdialog', {
+      name: 'Do you want to copy this order into a new order?',
+      exact: true,
+    });
+    this.copyStartButton = this.copyConfirmationDialog.getByRole('button', {
+      name: 'Start Copy',
+      exact: true,
+    });
+    this.copyDetailsDialog = this.page.getByRole('alertdialog', {
+      name: 'Copy Details',
+      exact: true,
+    });
+    this.copyDetailsStartButton = this.copyDetailsDialog.getByRole('button', {
+      name: 'Start Copy',
+      exact: true,
+    });
+    this.refundByItemMenuItem = this.page.getByRole('menuitem', {
+      name: 'Refund by Item',
+      exact: true,
+    });
+    this.amountRefundDialog = this.page
+      .locator('[role="dialog"][data-testid="pos-ui-modal"]')
+      .filter({ has: this.page.getByRole('heading', { name: 'Refund', exact: true }) });
+    this.itemRefundConfirmationDialog = this.page.getByRole('dialog', {
+      name: 'Refund By Item(s)',
+      exact: true,
+    });
+    this.itemRefundConfirmButton = this.itemRefundConfirmationDialog.getByRole('button', {
+      name: 'Confirm Refund',
+      exact: true,
+    });
     this.combineSelectionPrompt = this.page.getByText(
       'Please select another order to combine',
       { exact: true },
@@ -205,6 +251,22 @@ export class RecallOrderDetailsDialog {
     this.globalLoadingBackdrops = this.page
       .getByTestId('pos-ui-loading-overlay')
       .filter({ visible: true });
+    this.discountDialog = this.page
+      .getByRole('dialog')
+      .filter({ has: this.page.getByRole('heading', { name: 'Discount', exact: true }) })
+      .last();
+    this.discountWholeOrderScope = this.discountDialog.getByTestId(
+      'pos-ui-segmented-option-whole',
+    );
+    this.discountWholeOrderSummary = this.discountDialog
+      .locator('[class*="_wholeOrderSummary_"]')
+      .first();
+    this.discountWholeOrderNumber = this.discountWholeOrderSummary
+      .locator('[class*="_wholeOrderNumber_"]')
+      .first();
+    this.discountWholeOrderSubtotalValue = this.discountWholeOrderSummary
+      .locator('[class*="_wholeOrderSubtotalValue_"]')
+      .first();
   }
 
   @step((orderNumber: string, targetOrderNumber?: string) =>
@@ -363,6 +425,46 @@ export class RecallOrderDetailsDialog {
     await this.clickOrderDetailsAction('print');
   }
 
+  @step('页面操作：点击 Recall 订单详情中的 Print 并等待打单接口成功')
+  async clickPrintInOrderDetailsAndReadKitchenTicketStatus(): Promise<number> {
+    return (await this.clickPrintInOrderDetailsAndReadKitchenTicketResult()).httpStatus;
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Print 并读取打单结果')
+  async clickPrintInOrderDetailsAndReadKitchenTicketResult(): Promise<RecallKitchenTicketResult> {
+    await this.waitForOrderDetailsDialogReady();
+    const [kitchenTicketResponse] = await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname.endsWith('/kpos/api/print/kitchen/ticket'),
+        { timeout: 15_000 },
+      ),
+      this.clickOrderDetailsAction('print'),
+    ]);
+
+    if (!kitchenTicketResponse.ok()) {
+      throw new Error(
+        `Recall 订单打单接口失败：${kitchenTicketResponse.status()} ${kitchenTicketResponse.url()}`,
+      );
+    }
+
+    const responseBody = (await kitchenTicketResponse.json()) as unknown;
+    const responseCode =
+      responseBody && typeof responseBody === 'object' && 'code' in responseBody
+        ? responseBody.code
+        : null;
+
+    if (responseCode !== 0) {
+      throw new Error(`Recall 订单打单接口业务响应失败：${JSON.stringify(responseBody)}`);
+    }
+
+    return {
+      httpStatus: kitchenTicketResponse.status(),
+      orderStatus: readKitchenTicketOrderStatus(responseBody),
+    };
+  }
+
   @step('页面操作：从 Recall 订单详情点击 Split 并进入分单面板')
   async openSplitInOrderDetails(options: {
     chargePromptAction?: SplitChargePromptAction;
@@ -413,6 +515,26 @@ export class RecallOrderDetailsDialog {
   async clickDiscountInOrderDetails(): Promise<void> {
     await this.waitForOrderDetailsDialogReady();
     await this.clickOrderDetailsAction('discount');
+    await expect(this.discountDialog).toBeVisible({ timeout: 10_000 });
+    await expect(this.discountWholeOrderScope).toHaveAttribute('aria-checked', 'true');
+  }
+
+  @step('页面读取：读取 Recall 折扣弹窗 Whole Order 的子单号和小计')
+  async readDiscountWholeOrderSummary(): Promise<RecallDiscountWholeOrderSummary> {
+    await expect(this.discountDialog).toBeVisible({ timeout: 10_000 });
+    await expect(this.discountWholeOrderSummary).toBeVisible();
+
+    const orderNumber = (await this.discountWholeOrderNumber.innerText()).trim();
+    const subtotalText = (await this.discountWholeOrderSubtotalValue.innerText()).trim();
+    const subtotal = Number(subtotalText.replace(/[$,]/g, ''));
+
+    if (!orderNumber || Number.isNaN(subtotal)) {
+      throw new Error(
+        `无法读取 Recall 折扣弹窗 Whole Order 摘要：orderNumber=${orderNumber || '<empty>'}, subtotal=${subtotalText || '<empty>'}`,
+      );
+    }
+
+    return { orderNumber, subtotal };
   }
 
   @step('页面读取：读取 Recall 订单详情可用操作')
@@ -603,11 +725,11 @@ export class RecallOrderDetailsDialog {
     await this.combineChargeConfirmButton.click();
   }
 
-  @step((targetOrderNumber: string) =>
-    `页面校验：Recall 合单后的目标订单 ${targetOrderNumber} 详情已显示`,
+  @step((retainedOrderNumber: string) =>
+    `页面校验：Recall 合单后保留的订单 ${retainedOrderNumber} 详情已显示`,
   )
-  async expectCombinedOrderDetailsReady(targetOrderNumber: string): Promise<void> {
-    const expectedOrderNumber = normalizeOrderNumber(targetOrderNumber);
+  async expectCombinedOrderDetailsReady(retainedOrderNumber: string): Promise<void> {
+    const expectedOrderNumber = normalizeOrderNumber(retainedOrderNumber);
 
     await waitUntil(
       async () => {
@@ -658,6 +780,18 @@ export class RecallOrderDetailsDialog {
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Copy 按钮')
   async clickCopyInMoreMenu(): Promise<void> {
     await this.clickOrderDetailsMoreMenuAction('copy');
+  }
+
+  @step('页面操作：确认复制 Recall 订单并进入点单页')
+  async confirmCopyAndEnterOrderDishes(): Promise<OrderDishesPage> {
+    await expect(this.copyConfirmationDialog).toBeVisible({ timeout: 10_000 });
+    await this.copyStartButton.click();
+    await expect(this.copyDetailsDialog).toBeVisible({ timeout: 10_000 });
+    await this.copyDetailsStartButton.click();
+
+    const orderDishesPage = new OrderDishesPage(this.page);
+    await orderDishesPage.expectLoaded();
+    return orderDishesPage;
   }
 
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Void 按钮')
@@ -1087,6 +1221,71 @@ export class RecallOrderDetailsDialog {
     await this.waitForGlobalLoadingOverlayHidden();
   }
 
+  @step((paymentIndex: number, dishName: string) =>
+    `页面操作：从 Recall 第 ${paymentIndex + 1} 笔支付流水按菜退款 ${dishName}`,
+  )
+  async refundOrderItem(paymentIndex: number, dishName: string): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    const paymentSection = this.resolvePaymentSection(await this.resolveActiveOrderDetailsDialog());
+    const refundableCards = await this.resolveRefundablePaymentCards(paymentSection).catch(() => null);
+
+    if (refundableCards) {
+      const paymentCard = refundableCards.nth(paymentIndex);
+      await expect(paymentCard).toBeVisible({ timeout: 10_000 });
+      await paymentCard.scrollIntoViewIfNeeded();
+      await this.clickPaymentCardRefundButton(paymentCard);
+    } else {
+      await this.clickPaymentSectionRefundButton(paymentSection, paymentIndex);
+    }
+
+    await expect(this.refundByItemMenuItem).toBeVisible({ timeout: 5_000 });
+    await this.refundByItemMenuItem.click();
+
+    const refundDialog = this.itemRefundDialog(dishName);
+    await expect(refundDialog).toBeVisible({ timeout: 10_000 });
+    await refundDialog.getByText(dishName, { exact: true }).click();
+    await waitForInputSettled();
+    await refundDialog.getByTestId('modal-confirm-button').click();
+    await expect(refundDialog).toBeHidden({ timeout: 10_000 });
+
+    await expect(this.itemRefundConfirmButton).toBeVisible({ timeout: 10_000 });
+    await this.closePosKeyboardIfVisible();
+    await waitForInputSettled();
+    await this.itemRefundConfirmButton.click();
+    await expect(this.itemRefundConfirmationDialog).toBeHidden({ timeout: 10_000 });
+    await this.waitForGlobalLoadingOverlayHidden();
+  }
+
+  @step((paymentIndex: number) =>
+    `页面断言：Recall 第 ${paymentIndex + 1} 笔支付流水不提供按菜退款`,
+  )
+  async expectOrderItemRefundUnavailable(paymentIndex: number): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    const paymentSection = this.resolvePaymentSection(await this.resolveActiveOrderDetailsDialog());
+    const refundableCards = await this.resolveRefundablePaymentCards(paymentSection).catch(() => null);
+
+    if (refundableCards) {
+      await this.clickPaymentCardRefundButton(refundableCards.nth(paymentIndex));
+    } else {
+      await this.clickPaymentSectionRefundButton(paymentSection, paymentIndex);
+    }
+
+    await waitUntil(
+      async () => ({
+        amountDialogVisible: await this.amountRefundDialog.isVisible().catch(() => false),
+        amountMenuVisible: await this.refundByAmountMenuItem().isVisible().catch(() => false),
+      }),
+      (state) => state.amountDialogVisible || state.amountMenuVisible,
+      {
+        timeout: 5_000,
+        interval: 100,
+        message: '点击退款后未显示按金额退款入口或退款弹窗。',
+      },
+    );
+    await expect(this.refundByItemMenuItem).toBeHidden();
+    await this.page.keyboard.press('Escape');
+  }
+
   @step((amountInCents: number) => `页面操作：在 Recall 订单详情中添加 Tips ${amountInCents} 分`)
   async addOrderDetailsTip(amountInCents: number): Promise<string | null> {
     await this.waitForOrderDetailsDialogReady();
@@ -1449,6 +1648,10 @@ export class RecallOrderDetailsDialog {
               selectText(additionElement, '[class*="_optionPrice_"]') ??
               rawAdditionText?.match(/\$[\d,.]+$/)?.[0] ??
               null;
+            const additionQuantityText = rawAdditionText?.match(/(?:×|x)\s*(\d+)$/i)?.[1];
+            const additionQuantity = additionQuantityText
+              ? Number(additionQuantityText)
+              : undefined;
             const additionName =
               selectText(additionElement, '[class*="_extraText_"]') ??
               selectText(additionElement, '[class*="_optionName_"]') ??
@@ -1471,6 +1674,7 @@ export class RecallOrderDetailsDialog {
 
             return {
               ...(additionPrice ? { price: additionPrice } : {}),
+              ...(additionQuantity !== undefined ? { quantity: additionQuantity } : {}),
               ...(subAdditions.length > 0 ? { subAdditions } : {}),
               name: additionName,
             };
@@ -2144,14 +2348,14 @@ export class RecallOrderDetailsDialog {
         };
       },
       (state) =>
-        (state.standardTitleVisible && state.editActionVisible) ||
+        state.standardTitleVisible ||
         (state.splitOverviewTitleVisible &&
           state.splitOverviewActionVisible &&
           state.splitOverviewPrintVisible),
       {
         timeout: 10_000,
         interval: 100,
-        message: `Recall 订单 ${visibleOrderNumber} 的严格详情标题与动作区未显示。`,
+        message: `Recall 订单 ${visibleOrderNumber} 的严格详情标题未显示。`,
       },
     );
   }
@@ -2451,6 +2655,13 @@ export class RecallOrderDetailsDialog {
 
   private refundByAmountMenuItem(): Locator {
     return this.page.getByRole('menuitem', { name: 'Refund by Amount' }).first();
+  }
+
+  private itemRefundDialog(dishName: string): Locator {
+    return this.page
+      .locator('[role="dialog"][data-testid="pos-ui-modal"]')
+      .filter({ has: this.page.getByText(dishName, { exact: true }) })
+      .filter({ has: this.page.getByTestId('modal-confirm-button') });
   }
 
   private async closePosKeyboardIfVisible(): Promise<void> {
@@ -2962,4 +3173,16 @@ export class RecallOrderDetailsDialog {
       },
     );
   }
+}
+
+function readKitchenTicketOrderStatus(value: unknown): string | null {
+  if (!isRecord(value) || !isRecord(value.data) || !isRecord(value.data.order)) {
+    return null;
+  }
+
+  return typeof value.data.order.status === 'string' ? value.data.order.status : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

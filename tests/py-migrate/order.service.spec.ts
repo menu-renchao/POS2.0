@@ -1,7 +1,9 @@
 import { expect } from '@playwright/test';
 import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { HomeFlow } from '../../flows/home.flow';
+import { OrderCustomerFlow } from '../../flows/order-customer.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
+import { OrderPermissionFlow } from '../../flows/order-permission.flow';
 import { PaymentFlow } from '../../flows/payment.flow';
 import { RecallFlow } from '../../flows/recall.flow';
 import { SelectTableFlow } from '../../flows/select-table.flow';
@@ -13,13 +15,29 @@ import { HomePage } from '../../pages/home.page';
 import { OrderDishesPage } from '../../pages/order-dishes.page';
 import { RecallPage } from '../../pages/recall.page';
 import {
-  buildOrderServicePickupCustomer,
+  buildAnonymousPickupEditCustomer,
+  buildOrderServiceCategoryPosNameCase,
+  buildOrderServiceOrderChargeExcludedCategoryCase,
+  buildOrderServiceMenuProductModeCase,
+  buildOrderServiceRequiredCategoryCase,
+  buildOrderServiceDineInCustomer,
   orderServiceCategoryOptions,
+  orderServiceChineseInitialSearchCase,
   orderServiceComboOptionRemovalCase,
+  orderServiceComboParentOptionCase,
+  orderServiceComboSubItemPriceCase,
+  orderServiceComboSubItemNotePermissionCase,
+  orderServiceCustomDeliveryPrintCase,
   orderServiceCustomers,
   orderServiceDeliveryInformationCase,
   orderServiceDishes,
   orderServiceEditRecallTaxCase,
+  orderServiceMenu,
+  orderServiceModifyGlobalOptionCase,
+  orderServiceOpenFoodChineseKeyboardCase,
+  orderServiceSavedComboSubItemModifyCase,
+  orderServiceSameNameAndNumberSearchCase,
+  orderServiceSplitChildDiscountCase,
   orderServiceSplitTipsCase,
   orderServiceSearchMenuConfigurationCase,
 } from '../../test-data/order-service';
@@ -438,7 +456,1043 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
   );
 
   test(
-    '[POS-31409] 应能创建带姓名的 Pick Up 订单并在 Recall 详情展示客户姓名',
+    '[POS-36286] Delivery 填写客户信息进入点单页后应能无提示直接退出',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-36286')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      test.setTimeout(90_000);
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
+      });
+
+      const orderDishesPage = await test.step('填写 Delivery 客户及地址信息并进入点单页', async () => {
+        return await new TakeoutFlow().startDeliveryOrder(
+          readyHomePage,
+          orderServiceCustomers.delivery,
+        );
+      });
+
+      await test.step('点击返回后不出现确认提示并直接回到 POS 首页', async () => {
+        const returnedHomePage = await orderDishesPage.exitOrderPageWithoutConfirmation();
+        await returnedHomePage.expectPrimaryFunctionCardsVisible();
+      });
+    },
+  );
+
+  test(
+    '[POS-15605 POS-15737] 切换中文后应展示中文菜单组和类别',
+    {
+      tag: ['@点单'],
+      annotation: jiraIssueAnnotations(['POS-15605', 'POS-15737']),
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      const readyHomePage = await test.step('进入 POS 主页并切换为中文', async () => {
+        const readyPage = await enterReadyHome({ employeeLoginPage, homePage });
+        await readyPage.switchLanguage('zh-cn');
+        expect(await readyPage.readCurrentLanguage()).toBe('zh-cn');
+        return readyPage;
+      });
+
+      let orderDishesPage: OrderDishesPage | undefined;
+
+      try {
+        orderDishesPage = await test.step('进入 To Go 点单页读取当前菜单组和类别', async () => {
+          return await new TakeoutFlow().startToGoOrder(readyHomePage, employeeLoginPage);
+        });
+
+        await test.step('确认菜单组和类别均展示配置的中文名称', async () => {
+          expect(await orderDishesPage?.readSelectedMenuGroupName()).toBe(
+            orderServiceMenu.group,
+          );
+          expect(await orderDishesPage?.readSelectedMenuCategoryName()).toBe(
+            orderServiceMenu.category,
+          );
+        });
+      } finally {
+        const returnedHomePage = orderDishesPage
+          ? await orderDishesPage.exitOrderPageWithoutConfirmation()
+          : readyHomePage;
+        await returnedHomePage.switchLanguage('en');
+        expect(await returnedHomePage.readCurrentLanguage()).toBe('en');
+      }
+    },
+  );
+
+  test(
+    '[POS-43827] 中文界面按菜品拼音首字母搜索应返回对应菜品',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-43827')],
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(150_000);
+      const restoreSearchMenuConfiguration =
+        await apiSetup.systemConfiguration.updateByName(
+          orderServiceSearchMenuConfigurationCase.configurationName,
+          orderServiceSearchMenuConfigurationCase.visibleValue,
+          { verify: true },
+        );
+
+      try {
+        const readyHomePage = await test.step('刷新 POS 并将界面切换为中文', async () => {
+          const readyPage = await enterReadyHome({ employeeLoginPage, homePage });
+          await readyPage.clickRefresh();
+          await readyPage.confirmDelayedConfigurationRefresh();
+          await readyPage.switchLanguage('zh-cn');
+          expect(await readyPage.readCurrentLanguage()).toBe('zh-cn');
+          return readyPage;
+        });
+
+        const orderDishesPage = await test.step('进入 To Go 并按 ptc 搜索普通菜1', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(
+            readyHomePage,
+            employeeLoginPage,
+          );
+          await page.openChineseSearchMenuAndFill(orderServiceChineseInitialSearchCase.query);
+          await page.expectSearchMenuResult(
+            orderServiceChineseInitialSearchCase.resultTestId,
+            orderServiceChineseInitialSearchCase.resultName,
+          );
+          await page.clickSearchMenuResult(orderServiceChineseInitialSearchCase.resultTestId);
+          return page;
+        });
+
+        const savedOrder = await test.step('确认目标菜进入订单并保存', async () => {
+          const orderedItems = await orderDishesPage.readOrderedItems();
+          expect(orderedItems.map((item) => item.name)).toContain(
+            orderServiceChineseInitialSearchCase.resultName,
+          );
+          return await orderDishesPage.saveOrderWithReference();
+        });
+
+        await test.step('恢复英文界面', async () => {
+          await savedOrder.homePage.switchLanguage('en');
+          expect(await savedOrder.homePage.readCurrentLanguage()).toBe('en');
+        });
+      } finally {
+        await restoreSearchMenuConfiguration();
+      }
+    },
+  );
+
+  test(
+    '[POS-42097] 点单页面类别应展示配置的 POS NAME',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-42097')],
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(120_000);
+      const categoryCase = buildOrderServiceCategoryPosNameCase();
+
+      await test.step('创建后台名称与 POS NAME 不同的临时类别和菜品', async () => {
+        const createdCategory = await apiSetup.category.create({
+          displayName: categoryCase.backendName,
+          menuGroupId: categoryCase.menuGroupId,
+          menuId: categoryCase.menuId,
+          name: categoryCase.backendName,
+          posName: categoryCase.posName,
+        });
+        await apiSetup.saleItem.create({
+          categoryId: createdCategory.id,
+          displayName: categoryCase.dishName,
+          menuGroupId: categoryCase.menuGroupId,
+          menuId: categoryCase.menuId,
+          name: categoryCase.dishName,
+          posName: categoryCase.dishName,
+          price: categoryCase.price,
+        });
+      });
+
+      const readyHomePage = await test.step('进入 POS 主页并刷新菜单数据', async () => {
+        const readyPage = await enterReadyHome({ employeeLoginPage, homePage });
+        await readyPage.clickRefresh();
+        await readyPage.confirmDelayedConfigurationRefresh();
+        return readyPage;
+      });
+
+      const orderDishesPage = await test.step('进入 To Go 并切换到目标菜单组', async () => {
+        const page = await new TakeoutFlow().startToGoOrder(readyHomePage, employeeLoginPage);
+        await page.switchMenuGroup(categoryCase.menuGroupName);
+        return page;
+      });
+
+      await test.step('确认类别卡展示 POS NAME 而不是后台名称', async () => {
+        const categoryNames = await orderDishesPage.readMenuCategoryNames();
+        expect(categoryNames).toContain(categoryCase.posName);
+        expect(categoryNames).not.toContain(categoryCase.backendName);
+
+        await orderDishesPage.switchMenuCategory(categoryCase.posName);
+        expect(await orderDishesPage.readSelectedMenuCategoryName()).toBe(categoryCase.posName);
+      });
+
+      await test.step('确认选择 POS NAME 类别后显示关联菜品', async () => {
+        const dishNames = await orderDishesPage.readCurrentCategoryDishNames();
+        expect(dishNames.length).toBeGreaterThan(0);
+      });
+    },
+  );
+
+  test(
+    '[POS-42060] 未满足必选类别时应阻止保存并自动跳转到该类别',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-42060')],
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(120_000);
+      const requiredCase = buildOrderServiceRequiredCategoryCase();
+
+      await test.step('创建必选类别及其关联菜品', async () => {
+        const category = await apiSetup.category.create({
+          displayName: requiredCase.backendName,
+          menuGroupId: requiredCase.menuGroupId,
+          menuId: requiredCase.menuId,
+          name: requiredCase.backendName,
+          posName: requiredCase.posName,
+          requireCategory: true,
+        });
+        await apiSetup.saleItem.create({
+          categoryId: category.id,
+          displayName: requiredCase.dishName,
+          menuGroupId: requiredCase.menuGroupId,
+          menuId: requiredCase.menuId,
+          name: requiredCase.dishName,
+          posName: requiredCase.dishName,
+          price: requiredCase.price,
+        });
+      });
+
+      const readyHomePage = await test.step('进入 POS 主页并刷新菜单数据', async () => {
+        const readyPage = await enterReadyHome({ employeeLoginPage, homePage });
+        await readyPage.clickRefresh();
+        await readyPage.confirmDelayedConfigurationRefresh();
+        return readyPage;
+      });
+
+      const orderDishesPage = await test.step('进入 To Go 并只添加普通类别菜品', async () => {
+        const page = await new TakeoutFlow().startToGoOrder(readyHomePage, employeeLoginPage);
+        await new OrderDishesFlow().addRegularDish(
+          page,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
+        return page;
+      });
+
+      await test.step('确认保存被阻止且自动跳转到未满足的必选类别', async () => {
+        await orderDishesPage.clickSaveOrder();
+        await orderDishesPage.expectLoaded();
+        expect(await orderDishesPage.readSelectedMenuCategoryName()).toBe(requiredCase.posName);
+      });
+
+      await test.step('添加必选类别菜品后应能正常保存', async () => {
+        await orderDishesPage.clickFirstCurrentCategoryDish();
+        await orderDishesPage.saveOrderWithReference();
+      });
+    },
+  );
+
+  test(
+    '[POS-42958] 未启用整单折扣适用性的类别菜品不应参与整单比例加收',
+    {
+      tag: ['@点单', '@加收'],
+      annotation: [jiraIssueAnnotation('POS-42958')],
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(120_000);
+      const chargeCase = buildOrderServiceOrderChargeExcludedCategoryCase();
+
+      await test.step('创建不参与整单折扣的类别及两道菜品', async () => {
+        const category = await apiSetup.category.create({
+          applicableToOrderDiscount: false,
+          discountAllowed: true,
+          displayName: chargeCase.backendName,
+          menuGroupId: chargeCase.menuGroupId,
+          menuId: chargeCase.menuId,
+          name: chargeCase.backendName,
+          posName: chargeCase.posName,
+        });
+        const categoryData = (await apiSetup.category.read(category.id)) as {
+          menuCategory?: { applicableToOrderDiscount?: boolean };
+        };
+        expect(categoryData.menuCategory?.applicableToOrderDiscount).toBe(false);
+
+        for (let index = 0; index < chargeCase.dishNames.length; index += 1) {
+          await apiSetup.saleItem.create({
+            categoryId: category.id,
+            displayName: chargeCase.dishNames[index],
+            menuGroupId: chargeCase.menuGroupId,
+            menuId: chargeCase.menuId,
+            name: chargeCase.dishNames[index],
+            posName: chargeCase.dishNames[index],
+            price: chargeCase.dishPrices[index],
+          });
+        }
+      });
+
+      const readyHomePage = await test.step('进入 POS 主页并刷新菜单数据', async () => {
+        const readyPage = await enterReadyHome({ employeeLoginPage, homePage });
+        await readyPage.clickRefresh();
+        await readyPage.confirmDelayedConfigurationRefresh();
+        return readyPage;
+      });
+
+      const orderDishesPage = await test.step('添加目标类别全部菜品及参与加收的对照菜', async () => {
+        const page = await new TakeoutFlow().startToGoOrder(readyHomePage, employeeLoginPage);
+        await page.switchMenu(chargeCase.menuGroupName, chargeCase.posName);
+
+        for (const dishName of chargeCase.dishNames) {
+          await page.clickCurrentCategoryDish(dishName);
+        }
+
+        await new OrderDishesFlow().addRegularDish(
+          page,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
+        return page;
+      });
+
+      await test.step('确认目标类别的两道菜均未进入整单比例加收基数', async () => {
+        const beforeSummary = await orderDishesPage.readPriceSummary();
+        expect(beforeSummary.Subtotal).toBeCloseTo(
+          chargeCase.dishPrices.reduce((sum, price) => sum + price, 0) +
+            orderServiceDishes.regular.expectedBasePrice,
+          2,
+        );
+
+        await new OrderDishesFlow().applyCustomCharge(orderDishesPage, {
+          scope: 'whole',
+          type: 'percentage',
+          value: chargeCase.percentageCharge,
+        });
+
+        const afterSummary = await orderDishesPage.readPriceSummary();
+        const expectedCharge =
+          orderServiceDishes.regular.expectedBasePrice * chargeCase.percentageCharge / 100;
+        expect(afterSummary.Charge).toBeCloseTo(expectedCharge, 2);
+        expect(afterSummary.Subtotal).toBeCloseTo(beforeSummary.Subtotal + expectedCharge, 2);
+      });
+
+      await orderDishesPage.saveOrderWithReference();
+    },
+  );
+
+  test(
+    '[POS-30762] 切换 POS 与 EMENU 菜单模式后应能搜索对应菜单菜品',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-30762')],
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(150_000);
+      const modeCase = buildOrderServiceMenuProductModeCase();
+      const originalConfigurationIndex = await apiSetup.systemConfiguration.listIndex();
+      const originalMode = originalConfigurationIndex.get(modeCase.configurationName)?.value;
+      const originalSearchMenu = originalConfigurationIndex.get(
+        orderServiceSearchMenuConfigurationCase.configurationName,
+      )?.value;
+
+      if (originalMode === undefined || originalSearchMenu === undefined) {
+        throw new Error('未能读取菜单模式或搜索菜单配置原值。');
+      }
+
+      await apiSetup.systemConfiguration.updateManyByName(
+        {
+          [modeCase.configurationName]: modeCase.posMode,
+          [orderServiceSearchMenuConfigurationCase.configurationName]: true,
+        },
+        { verify: true },
+      );
+      let returnedHomePage: HomePage | undefined;
+      let finalOrderDishesPage: OrderDishesPage | undefined;
+
+      try {
+        await test.step('分别创建 POS 与 EMENU 模式的目标搜索菜品', async () => {
+          await apiSetup.saleItem.create({
+            categoryId: modeCase.posCategoryId,
+            displayName: modeCase.posDishName,
+            menuGroupId: modeCase.posMenuGroupId,
+            menuId: modeCase.posMenuId,
+            name: modeCase.posDishName,
+            posName: modeCase.posDishName,
+            price: modeCase.price,
+          });
+
+          const emenuGroup = await apiSetup.menuGroup.create({
+            menuId: modeCase.emenuMenuId,
+            name: modeCase.emenuGroupName,
+          });
+          const emenuCategory = await apiSetup.category.create({
+            displayName: modeCase.emenuCategoryName,
+            menuGroupId: emenuGroup.id,
+            menuId: modeCase.emenuMenuId,
+            name: modeCase.emenuCategoryName,
+            posName: modeCase.emenuCategoryName,
+          });
+          await apiSetup.saleItem.create({
+            categoryId: emenuCategory.id,
+            displayName: modeCase.emenuDishName,
+            menuGroupId: emenuGroup.id,
+            menuId: modeCase.emenuMenuId,
+            name: modeCase.emenuDishName,
+            posName: modeCase.emenuDishName,
+            price: modeCase.price,
+          });
+        });
+
+        const readyHomePage = await test.step('以 POS 菜单模式刷新主页', async () => {
+          const readyPage = await enterReadyHome({ employeeLoginPage, homePage });
+          await readyPage.clickRefresh();
+          await readyPage.confirmDelayedConfigurationRefresh();
+          return readyPage;
+        });
+
+        returnedHomePage = await test.step('POS 模式应能搜索 Broccoli Garlic Sauce', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(
+            readyHomePage,
+            employeeLoginPage,
+          );
+          await page.openSearchMenuAndFill(modeCase.posSearchQuery);
+          await page.expectSearchMenuResultByName(modeCase.posDishName);
+          return await page.exitOrderPageWithoutConfirmation();
+        });
+
+        await apiSetup.systemConfiguration.updateByName(
+          modeCase.configurationName,
+          modeCase.emenuMode,
+          { verify: true },
+        );
+        await returnedHomePage.clickRefresh();
+        await returnedHomePage.confirmDelayedConfigurationRefresh();
+
+        finalOrderDishesPage = await test.step('EMENU 模式应能搜索 All you can eat item', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(
+            returnedHomePage!,
+            employeeLoginPage,
+          );
+          await page.openSearchMenuAndFill(modeCase.emenuSearchQuery);
+          await page.expectSearchMenuResultByName(modeCase.emenuDishName);
+          return page;
+        });
+      } finally {
+        await apiSetup.systemConfiguration.updateManyByName(
+          {
+            [modeCase.configurationName]: String(originalMode),
+            [orderServiceSearchMenuConfigurationCase.configurationName]: String(originalSearchMenu),
+          },
+          { verify: true },
+        );
+
+        if (finalOrderDishesPage) {
+          await finalOrderDishesPage.confirmConfigurationRefresh();
+        }
+      }
+    },
+  );
+
+  test(
+    '[ORDER-PAGE-015] Open Food 屏幕键盘应能切换中文并输入候选字',
+    { tag: ['@点单'] },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(120_000);
+      const keyboardCase = orderServiceOpenFoodChineseKeyboardCase;
+      const restoreKeyboardConfiguration =
+        await apiSetup.systemConfiguration.updateByName(
+          keyboardCase.configurationName,
+          keyboardCase.configurationValue,
+          { verify: true },
+        );
+      let returnedHomePage: HomePage | undefined;
+
+      try {
+        const readyHomePage = await test.step('刷新 POS 使屏幕键盘配置生效', async () => {
+          const readyPage = await enterReadyHome({ employeeLoginPage, homePage });
+          await readyPage.clickRefresh();
+          await readyPage.confirmDelayedConfigurationRefresh();
+          return readyPage;
+        });
+        const orderDishesPage = await new TakeoutFlow().startToGoOrder(
+          readyHomePage,
+          employeeLoginPage,
+        );
+
+        await test.step('切换 Open Food 屏幕键盘为中文并输入候选字', async () => {
+          await orderDishesPage.openOpenFoodDialog();
+          expect(await orderDishesPage.readOpenFoodKeyboardLanguage()).toBe(
+            keyboardCase.initialLanguage,
+          );
+          await orderDishesPage.switchOpenFoodKeyboardLanguage();
+          expect(await orderDishesPage.readOpenFoodKeyboardLanguage()).toBe(
+            keyboardCase.switchedLanguage,
+          );
+          await orderDishesPage.pressOpenFoodKeyboardLetters(keyboardCase.pinyinKeys);
+          await orderDishesPage.selectOpenFoodKeyboardCandidate(keyboardCase.name);
+          expect(await orderDishesPage.readOpenFoodName()).toBe(keyboardCase.name);
+          await orderDishesPage.fillOpenFoodPriceAndConfirm(keyboardCase.price);
+        });
+
+        await test.step('确认中文名称进入订单行并保存', async () => {
+          const orderedItems = await orderDishesPage.readOrderedItems();
+          expect(orderedItems.map((item) => item.name)).toContain(keyboardCase.name);
+          const savedOrder = await orderDishesPage.saveOrderWithReference();
+          returnedHomePage = savedOrder.homePage;
+        });
+      } finally {
+        await restoreKeyboardConfiguration();
+
+        if (returnedHomePage) {
+          await returnedHomePage.clickRefresh();
+          await returnedHomePage.confirmDelayedConfigurationRefresh();
+        }
+      }
+    },
+  );
+
+  test(
+    '[POS-42061] 套餐子菜应支持独立改价并更新套餐总价',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-42061')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      test.setTimeout(60_000);
+      const priceCase = orderServiceComboSubItemPriceCase;
+      const readyHomePage = await enterReadyHome({ employeeLoginPage, homePage });
+      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+
+      await test.step('添加包含目标子菜的套餐', async () => {
+        await new OrderDishesFlow().addComboDishWithItemOptions(orderDishesPage, {
+          comboName: priceCase.comboName,
+          itemIndex: priceCase.itemIndex,
+          menuSelection: orderServiceDishes.regular.menu,
+          saleItemId: priceCase.saleItemId,
+          sectionId: priceCase.sectionId,
+          selections: [{ option: orderServiceCategoryOptions.priced.name }],
+        });
+      });
+
+      await test.step('选中套餐子菜并改价后校验子菜与套餐总价', async () => {
+        const beforeComboPrice = await orderDishesPage.readOrderedDishPrice(priceCase.comboName);
+        expect(
+          await orderDishesPage.readComboSubItemPrice(
+            priceCase.comboName,
+            priceCase.saleItemId,
+          ),
+        ).toBeCloseTo(priceCase.initialSubItemPrice, 2);
+
+        await orderDishesPage.changeComboSubItemPrice(
+          priceCase.comboName,
+          priceCase.saleItemId,
+          priceCase.changedPrice,
+        );
+
+        expect(
+          await orderDishesPage.readComboSubItemPrice(
+            priceCase.comboName,
+            priceCase.saleItemId,
+          ),
+        ).toBeCloseTo(priceCase.changedPrice, 2);
+        expect(await orderDishesPage.readOrderedDishPrice(priceCase.comboName)).toBeCloseTo(
+          beforeComboPrice - priceCase.initialSubItemPrice + priceCase.changedPrice,
+          2,
+        );
+      });
+
+      await orderDishesPage.saveOrderWithReference();
+    },
+  );
+
+  test(
+    '[POS-37804] 无 Note 权限员工为套餐子菜添加备注时应要求授权',
+    {
+      tag: ['@点单', '@套餐', '@调味'],
+      annotation: jiraIssueAnnotations(['POS-37804', 'POS-36081']),
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(90_000);
+      const noteCase = orderServiceComboSubItemNotePermissionCase;
+      const restrictedEmployee = await test.step('创建不含 Note 权限的一次性员工', async () => {
+        return await apiSetup.staff.createWithoutNotePermission();
+      });
+      const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+        homePage,
+        employeeLoginPage,
+        restrictedEmployee.passcode,
+      );
+      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+
+      await test.step('添加包含目标子菜的套餐', async () => {
+        await new OrderDishesFlow().addComboDishWithItemOptions(orderDishesPage, {
+          comboName: noteCase.comboName,
+          itemIndex: noteCase.itemIndex,
+          menuSelection: orderServiceDishes.regular.menu,
+          saleItemId: noteCase.saleItemId,
+          sectionId: noteCase.sectionId,
+          selections: [{ option: noteCase.optionName }],
+        });
+      });
+
+      await test.step('选中套餐子菜并校验权限提示后使用主管口令授权添加 Note', async () => {
+        await new OrderPermissionFlow().addNoteToComboSubItemWithAuthorization(
+          orderDishesPage,
+          noteCase.comboName,
+          noteCase.saleItemId,
+          noteCase.authorizationPasscode,
+          noteCase.note,
+        );
+      });
+
+      const savedOrder = await test.step('保存并确认 Note 写入套餐子菜层级', async () => {
+        const result = await orderDishesPage.saveOrderWithReference();
+        const comboItem = result.orderItems.find(
+          (item) => String(item.saleItemId) === String(noteCase.comboSaleItemId),
+        );
+        const comboSubItem = comboItem?.comboSubItems.find(
+          (item) => String(item.saleItemId) === String(noteCase.saleItemId),
+        );
+        const noteOptions =
+          comboSubItem?.options.filter((option) => option.type === 'NOTE') ?? [];
+
+        expect(comboItem, '保存请求应包含套餐主菜').toBeTruthy();
+        expect(comboItem?.displayText, '套餐主菜自身不应写入子菜 Note').toBe('');
+        expect(noteOptions).toEqual([{ name: noteCase.note, type: 'NOTE' }]);
+        return result;
+      });
+
+      await test.step('Recall 精确回查套餐并确认备注已持久化', async () => {
+        const recallFlow = new RecallFlow();
+        const recallPage = await recallFlow.openRecallFromHome(savedOrder.homePage);
+        const details = await recallFlow.viewOrderDetails(recallPage, savedOrder.orderNumber);
+        const comboItem = details.items.find((item) => item.name === noteCase.comboName);
+
+        expect(comboItem, 'Recall 应展示目标套餐').toBeTruthy();
+        expect(comboItem?.additions.map((addition) => addition.name)).toContain(noteCase.note);
+      });
+    },
+  );
+
+  test(
+    '[POS-43823] 选择无 option 套餐子菜后应返回主菜并可选择 option',
+    {
+      tag: ['@点单', '@调味', '@套餐'],
+      annotation: [jiraIssueAnnotation('POS-43823')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      test.setTimeout(60_000);
+      const comboCase = orderServiceComboParentOptionCase;
+      const readyHomePage = await enterReadyHome({ employeeLoginPage, homePage });
+      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+
+      await test.step('选择无 option 套餐子菜并返回主菜 option 面板', async () => {
+        await orderDishesPage.clickDish(comboCase.comboName);
+        await orderDishesPage.selectComboItem(
+          comboCase.comboSubItem.sectionId,
+          comboCase.comboSubItem.saleItemId,
+          comboCase.comboSubItem.itemIndex,
+        );
+        await orderDishesPage.expectItemOptionVisible(comboCase.parentOption);
+        await orderDishesPage.selectCategoryOption(comboCase.parentOption);
+        await orderDishesPage.confirmComboDialog();
+      });
+
+      await test.step('添加带自身 option 的普通菜作为归属对照', async () => {
+        await orderDishesPage.clickDish(comboCase.ordinaryDish.name);
+        await orderDishesPage.selectCategoryOption(
+          comboCase.ordinaryOption.name,
+          comboCase.ordinaryOption.suboptionName,
+        );
+      });
+
+      await test.step('校验套餐主菜 option 与普通菜 option 互不混淆并保存', async () => {
+        const orderedItems = await orderDishesPage.readOrderedItems();
+        const comboItem = orderedItems.find((item) => item.name === comboCase.comboName);
+        const ordinaryItem = orderedItems.find(
+          (item) => item.name === comboCase.ordinaryDish.name,
+        );
+        const comboAdditionNames = comboItem?.additions.map((addition) => addition.name) ?? [];
+        const ordinaryAdditionNames =
+          ordinaryItem?.additions.map((addition) => addition.name) ?? [];
+        const comboSubItem = comboItem?.additions.find(
+          (addition) => addition.name === comboCase.comboSubItem.name,
+        );
+
+        expect(comboItem, '订单应包含目标套餐').toBeTruthy();
+        expect(comboAdditionNames).toEqual([
+          comboCase.comboSubItem.name,
+          comboCase.parentOption,
+        ]);
+        expect(comboSubItem?.subAdditions ?? []).toEqual([]);
+        expect(ordinaryItem, '订单应包含普通菜对照项').toBeTruthy();
+        expect(ordinaryAdditionNames).toEqual([
+          comboCase.ordinaryOption.name,
+          comboCase.ordinaryOption.suboptionName,
+        ]);
+        expect(ordinaryAdditionNames).not.toContain(comboCase.parentOption);
+
+        await orderDishesPage.saveOrderWithReference();
+      });
+    },
+  );
+
+  test(
+    '[POS-43956] 已保存套餐应能编辑子菜并保留 display-all 与 max 选择结果',
+    {
+      tag: ['@点单', '@套餐', '@调味'],
+      annotation: [jiraIssueAnnotation('POS-43956')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      test.setTimeout(90_000);
+      const comboCase = orderServiceSavedComboSubItemModifyCase;
+      const readyHomePage = await enterReadyHome({ employeeLoginPage, homePage });
+      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+
+      const savedOrder = await test.step('一次展示全部候选子菜并按 max 规则保存套餐', async () => {
+        await orderDishesPage.clickDish(comboCase.comboName);
+        for (const item of comboCase.displayAllItems) {
+          await orderDishesPage.expectComboItemVisible(
+            comboCase.sectionId,
+            item.saleItemId,
+            item.itemIndex,
+          );
+        }
+        await orderDishesPage.selectComboItem(
+          comboCase.sectionId,
+          comboCase.targetSaleItemId,
+          comboCase.targetItemIndex,
+        );
+        await orderDishesPage.expectItemOptionVisible(comboCase.parentOption);
+        await orderDishesPage.selectCategoryOption(comboCase.parentOption);
+        await orderDishesPage.confirmComboDialog();
+
+        const comboItem = (await orderDishesPage.readOrderedItems()).find(
+          (item) => item.name === comboCase.comboName,
+        );
+        expect(
+          comboItem?.additions.filter(
+            (addition) => addition.name === comboCase.targetSubItemName,
+          ),
+        ).toHaveLength(1);
+        return await orderDishesPage.saveOrderWithReference();
+      });
+
+      const updatedOrder = await test.step('从 Recall 编辑已保存订单并修改套餐子菜', async () => {
+        const recallPage = await new RecallFlow().openRecallFromHome(savedOrder.homePage);
+        const editingPage = await new RecallFlow().editOrder(
+          recallPage,
+          savedOrder.orderNumber,
+        );
+        await editingPage.selectComboSubItem(
+          comboCase.comboName,
+          comboCase.targetSaleItemId,
+        );
+        await editingPage.openModifyForSelectedItem();
+        await editingPage.selectModifyOption(comboCase.modifierName);
+        await editingPage.closeModifyPanel();
+
+        const editedComboItem = (await editingPage.readOrderedItems()).find(
+          (item) => item.name === comboCase.comboName,
+        );
+        expect(
+          editedComboItem?.additions.some((addition) =>
+            addition.name.includes(comboCase.modifierName),
+          ),
+        ).toBe(true);
+        return await editingPage.saveOrderWithReference();
+      });
+
+      await test.step('再次 Recall 校验子菜、主菜 option 与调味均已保存', async () => {
+        const recallPage = await new RecallFlow().openRecallFromHome(updatedOrder.homePage);
+        const details = await new RecallFlow().viewOrderDetails(
+          recallPage,
+          updatedOrder.orderNumber,
+        );
+        const comboItem = details.items.find((item) => item.name === comboCase.comboName);
+        const additionNames = comboItem?.additions.map((addition) => addition.name) ?? [];
+
+        expect(comboItem, 'Recall 应展示目标套餐').toBeTruthy();
+        expect(
+          additionNames.filter((name) => name === comboCase.targetSubItemName),
+        ).toHaveLength(1);
+        expect(additionNames).toContain(comboCase.parentOption);
+        expect(additionNames).toContain(comboCase.modifierName);
+      });
+    },
+  );
+
+  test(
+    '[POS-36254] 按菜分单后子单折扣界面应显示当前子单整单金额',
+    {
+      tag: ['@点单', '@分单', '@加收'],
+      annotation: [jiraIssueAnnotation('POS-36254')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      test.setTimeout(90_000);
+      const splitCase = orderServiceSplitChildDiscountCase;
+      const readyHomePage = await enterReadyHome({ employeeLoginPage, homePage });
+      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+      const orderFlow = new OrderDishesFlow();
+
+      await test.step('创建包含三条普通菜的无桌堂食订单', async () => {
+        for (const dish of splitCase.orderLines) {
+          await orderFlow.addRegularDish(orderDishesPage, dish.name, dish.menu);
+        }
+      });
+
+      const splitResult = await test.step('点击菜品并通过 Add Suborder 建立子单', async () => {
+        const splitOrderPage = await orderDishesPage.openSplitOrder();
+        const splitFlow = new SplitOrderFlow();
+        await splitFlow.moveDishToNewSuborder(splitOrderPage, splitCase.movedDishName);
+        const snapshot = await splitOrderPage.readSnapshot();
+        const movedDishSuborder = snapshot.suborders.find((suborder) =>
+          suborder.dishes.some((dish) => dish.name === splitCase.movedDishName),
+        );
+
+        expect(snapshot.suborders, '按菜分单后应形成两个子单').toHaveLength(2);
+        expect(movedDishSuborder, '新子单应包含被点击移动的菜品').toBeTruthy();
+        expect(movedDishSuborder?.dishes.map((dish) => dish.name)).toEqual([
+          splitCase.movedDishName,
+        ]);
+
+        const returnedPage = await splitFlow.submitAndReturnPage(splitOrderPage);
+        return {
+          movedDishSuborderNumber: movedDishSuborder?.orderNumber ?? '',
+          recallPage: await enterRecallFromReturnedPage(returnedPage),
+        };
+      });
+
+      const targetDetails = await test.step('在 Recall 精确打开移动菜品所在子单并读取金额', async () => {
+        const recallFlow = new RecallFlow();
+        const orderNumber = await recallFlow.readLatestVisibleOrderNumber(splitResult.recallPage);
+        await splitResult.recallPage.openOrderDetails(orderNumber);
+        const targetOrderNumbers = await splitResult.recallPage.readTargetOrderNumbers();
+        const targetOrderNumber = targetOrderNumbers[splitCase.targetSuborderIndex];
+
+        expect(targetOrderNumbers, 'Recall 应展示两个分单子单').toHaveLength(2);
+        expect(targetOrderNumber, '应能解析新增子单引用').toBeTruthy();
+
+        await splitResult.recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+        const details = await splitResult.recallPage.readOrderDetailsSnapshot();
+
+        expect(details.orderNumber.replace(/^#/, '')).toBe(
+          splitResult.movedDishSuborderNumber.replace(/^#/, ''),
+        );
+        expect(details.items.map((item) => item.name)).toEqual([splitCase.movedDishName]);
+        expect(details.priceSummary.Subtotal).toBeGreaterThan(0);
+
+        return { details, orderNumber, targetOrderNumber };
+      });
+
+      await test.step('打开子单 Discount 并校验 Whole Order 为当前子单金额', async () => {
+        await splitResult.recallPage.clickDiscountInOrderDetails();
+        const wholeOrderSummary =
+          await splitResult.recallPage.readDiscountWholeOrderSummary();
+
+        expect(wholeOrderSummary.orderNumber).toBe(targetDetails.details.orderNumber);
+        expect(wholeOrderSummary.subtotal).toBeCloseTo(
+          targetDetails.details.priceSummary.Subtotal,
+          2,
+        );
+      });
+    },
+  );
+
+  test(
+    '[POS-22640] 自定义 Delivery 应能保存订单并打单成功',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-22640')],
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(90_000);
+      const customDeliveryCase = orderServiceCustomDeliveryPrintCase;
+
+      const configured = await test.step('启用并映射自定义订单类型 1 为 Delivery', async () => {
+        return await apiSetup.customOrderType.configureDelivery({
+          name: customDeliveryCase.customOrderType.name,
+          displayName: customDeliveryCase.customOrderType.displayName,
+          shortName: customDeliveryCase.customOrderType.shortName,
+        });
+      });
+
+      expect(configured.orderType.orderType).toBe('DELIVERY');
+      expect(configured.layout.hide).toBe(false);
+      expect(configured.layout.layoutType).toBe('BODY');
+
+      const readyHomePage = await enterReadyHome({ employeeLoginPage, homePage });
+      await readyHomePage.clickRefresh();
+
+      const orderDishesPage = await test.step('从自定义类型入口录入 Delivery 信息并添加菜品', async () => {
+        const page = await new TakeoutFlow().startCustomDeliveryOrderType1(
+          readyHomePage,
+          employeeLoginPage,
+          customDeliveryCase.customer,
+        );
+        const orderFlow = new OrderDishesFlow();
+
+        for (const dish of customDeliveryCase.dishes) {
+          await orderFlow.addRegularDish(page, dish.name, dish.menu);
+        }
+
+        return page;
+      });
+
+      const savedOrder = await test.step('保存并确认请求使用自定义订单类型', async () => {
+        const result = await orderDishesPage.saveOrderWithReference();
+        expect(result.orderType).toBe(customDeliveryCase.customOrderType.name);
+        return result;
+      });
+
+      const recallFlow = new RecallFlow();
+      const recallPage = await recallFlow.openRecallFromHome(savedOrder.homePage);
+
+      await test.step('Recall 精确回查自定义 Delivery 的客户和菜品', async () => {
+        const details = await recallFlow.viewOrderDetails(recallPage, savedOrder.orderNumber);
+
+        expect(details.customerInfo?.name).toBe(customDeliveryCase.customer.customerName);
+        expect(details.customerInfo?.phone.replace(/\D/g, '')).toBe(
+          customDeliveryCase.customer.phoneNumber,
+        );
+        expect(details.items.map((item) => item.name)).toEqual(
+          customDeliveryCase.dishes.map((dish) => dish.name),
+        );
+      });
+
+      await test.step('从 Recall 点击 Print 并确认打单接口成功', async () => {
+        const status = await recallFlow.printOrderAndReadKitchenTicketStatus(
+          recallPage,
+          savedOrder.orderNumber,
+        );
+        expect(status).toBe(200);
+      });
+    },
+  );
+
+  test(
+    '[POS-36255] 菜品名称与编号相同时搜索结果应只展示一次',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-36255')],
+    },
+    async ({ apiSetup, homePage, employeeLoginPage }) => {
+      test.setTimeout(120_000);
+      const searchCase = orderServiceSameNameAndNumberSearchCase;
+      const restoreSearchMenuConfiguration =
+        await apiSetup.systemConfiguration.updateByName(
+          orderServiceSearchMenuConfigurationCase.configurationName,
+          orderServiceSearchMenuConfigurationCase.visibleValue,
+          { verify: true },
+        );
+
+      try {
+        await test.step('创建名称和编号均为 AA 的临时菜品', async () => {
+          await apiSetup.saleItem.create({
+            categoryId: searchCase.categoryId,
+            itemNumber: searchCase.itemNumber,
+            menuGroupId: searchCase.menuGroupId,
+            menuId: searchCase.menuId,
+            name: searchCase.name,
+            posName: searchCase.name,
+            price: searchCase.price,
+          });
+        });
+
+        const readyHomePage = await test.step('进入 POS 主页并刷新菜单数据', async () => {
+          const readyPage = await enterReadyHome({ employeeLoginPage, homePage });
+          await readyPage.clickRefresh();
+          await readyPage.confirmDelayedConfigurationRefresh();
+          return readyPage;
+        });
+
+        const orderDishesPage = await test.step('进入 To Go 并搜索 AA', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(
+            readyHomePage,
+            employeeLoginPage,
+          );
+          await page.openSearchMenuAndFill(searchCase.name);
+          return page;
+        });
+
+        await test.step('确认同一菜品不会因名称和编号同时命中而重复展示', async () => {
+          const resultCount = await orderDishesPage.readSearchMenuResultCountByNameAndNumber(
+            searchCase.name,
+            searchCase.itemNumber,
+          );
+
+          expect(resultCount).toBe(1);
+        });
+      } finally {
+        await restoreSearchMenuConfiguration();
+      }
+    },
+  );
+
+  test(
+    '[POS-42943] 修改一笔匿名 Pick Up 订单的客户姓名不应影响另一笔订单',
+    {
+      tag: ['@点单'],
+      annotation: [jiraIssueAnnotation('POS-42943')],
+    },
+    async ({ homePage, employeeLoginPage }) => {
+      test.setTimeout(120_000);
+      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+        return await enterReadyHome({ employeeLoginPage, homePage });
+      });
+
+      const firstOrder = await test.step('创建第一笔匿名 Pick Up 订单', async () => {
+        const orderDishesPage = await new TakeoutFlow().startPickUpOrder(readyHomePage);
+        await new OrderDishesFlow().addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.regular.name,
+          orderServiceDishes.regular.menu,
+        );
+        return await orderDishesPage.saveOrderWithReference();
+      });
+
+      const secondOrder = await test.step('创建第二笔匿名 Pick Up 订单', async () => {
+        const orderDishesPage = await new TakeoutFlow().startPickUpOrder(firstOrder.homePage);
+        await new OrderDishesFlow().addRegularDish(
+          orderDishesPage,
+          orderServiceDishes.test.name,
+          orderServiceDishes.test.menu,
+        );
+        return await orderDishesPage.saveOrderWithReference();
+      });
+
+      const customer = buildAnonymousPickupEditCustomer();
+      const editedHomePage = await test.step('只为第一笔订单补充客户姓名和电话', async () => {
+        const recallPage = await new RecallFlow().openRecallFromHome(secondOrder.homePage);
+        const editingPage = await new RecallFlow().editOrder(
+          recallPage,
+          firstOrder.orderNumber,
+        );
+        await new OrderCustomerFlow().addCustomerInformationToOrder(editingPage, customer);
+        return (await editingPage.saveOrderWithReference()).homePage;
+      });
+
+      await test.step('按精确订单号确认两笔订单客户信息相互隔离', async () => {
+        const recallPage = await new RecallFlow().openRecallFromHome(editedHomePage);
+        const recallFlow = new RecallFlow();
+        const firstDetails = await recallFlow.viewOrderDetails(
+          recallPage,
+          firstOrder.orderNumber,
+        );
+        const secondDetails = await recallFlow.viewOrderDetails(
+          recallPage,
+          secondOrder.orderNumber,
+        );
+
+        expect(firstDetails.customerInfo?.name).toBe(customer.customerName);
+        expect(secondDetails.customerInfo?.name?.trim() ?? '').toBe('');
+      });
+    },
+  );
+
+  test(
+    '[POS-31409] 应能在无姓名堂食订单补充客户信息并在 Recall 详情及编辑页展示',
     {
       tag: ['@smoke'],
       annotation: [jiraIssueAnnotation('POS-31409')],
@@ -447,22 +1501,40 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
         return await enterReadyHome({ employeeLoginPage, homePage });
       });
-      const customer = buildOrderServicePickupCustomer();
+      const customer = buildOrderServiceDineInCustomer();
 
-      const orderDishesPage = await test.step('填写 Pick Up 姓名并进入点单页', async () => {
-        return await new TakeoutFlow().startPickUpOrder(readyHomePage, customer);
+      const orderDishesPage = await test.step('进入无桌堂食并补充客户信息', async () => {
+        const page = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+        const customerButtonText = await new OrderCustomerFlow().addCustomerInformationToOrder(
+          page,
+          customer,
+        );
+
+        expect(customerButtonText).toBe(customer.customerButtonLabel);
+        return page;
       });
 
-      await test.step('添加菜品、保存订单并在 Recall 校验客户姓名', async () => {
+      await test.step('保存订单并校验 Recall 详情卡片和 Edit 点单页客户信息', async () => {
         await new OrderDishesFlow().addRegularDish(
           orderDishesPage,
           orderServiceDishes.regular.name,
           orderServiceDishes.regular.menu,
         );
 
-        const orderDetails = await saveOrderAndOpenLatestRecallDetails(orderDishesPage);
+        const recallPage = await saveOrderAndOpenRecallPage(orderDishesPage);
+        const orderDetails = await new RecallFlow().viewFirstVisibleOrderDetails(recallPage);
 
-        expect(orderDetails.customerInfo?.name).toContain(customer.customerName);
+        expect(orderDetails.customerInfo?.name).toBe(customer.customerName);
+        expect(orderDetails.customerInfo?.phone.replace(/\D/g, '')).toBe(customer.phoneNumber);
+
+        const editingPage = await new RecallFlow().editFirstVisibleOrder(recallPage);
+        await editingPage.openCustomerInformationPage(customer.customerButtonLabel);
+        const editingCustomer = await editingPage.readCustomerInformationPageIdentity();
+
+        expect(editingCustomer.customerName).toBe(customer.customerName);
+        expect(editingCustomer.normalizedPhone).toBe(customer.phoneNumber);
+        await editingPage.saveCustomerInformationPage();
+        await editingPage.exitOrderPage();
       });
     },
   );
@@ -880,6 +1952,156 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
     },
   );
 
+  test.describe('Modify 全局选项数量调整', () => {
+    test(
+      '[POS-31662] 应能通过 Add 增加全局选项数量并保持 Modify 面板可见',
+      {
+        annotation: [jiraIssueAnnotation('POS-31662')],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
+        });
+
+        const orderDishesPage = await test.step('进入 To Go 并添加普通菜', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(
+            readyHomePage,
+            employeeLoginPage,
+          );
+          await new OrderDishesFlow().addRegularDish(
+            page,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          return page;
+        });
+
+        await test.step('选择全局选项并通过 Add 增加数量', async () => {
+          const result = await new OrderDishesFlow().changeGlobalOptionQuantity(
+            orderDishesPage,
+            {
+              dishName: orderServiceDishes.regular.name,
+              operations: [{ type: 'add' }],
+              optionName: orderServiceModifyGlobalOptionCase.optionName,
+            },
+          );
+
+          expect(result.quantities).toEqual(
+            orderServiceModifyGlobalOptionCase.addExpectedQuantities,
+          );
+          expect(result.modifyPanelVisible).toEqual(
+            orderServiceModifyGlobalOptionCase.addExpectedQuantities.map(() => true),
+          );
+          await orderDishesPage.closeModifyPanel();
+        });
+      },
+    );
+
+    test(
+      '[POS-31663] 应能通过 Count 设置全局选项数量并在归零后移除选项',
+      {
+        annotation: [
+          jiraIssueAnnotation('POS-31663'),
+          jiraIssueAnnotation('POS-50142'),
+        ],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
+        });
+
+        const orderDishesPage = await test.step('进入 To Go 并添加普通菜', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(
+            readyHomePage,
+            employeeLoginPage,
+          );
+          await new OrderDishesFlow().addRegularDish(
+            page,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          return page;
+        });
+
+        await test.step('通过 Count 将全局选项设为 5 后再归零', async () => {
+          const result = await new OrderDishesFlow().changeGlobalOptionQuantity(
+            orderDishesPage,
+            {
+              dishName: orderServiceDishes.regular.name,
+              operations: [
+                { type: 'count', quantity: orderServiceModifyGlobalOptionCase.countQuantity },
+                { type: 'count', quantity: 0 },
+              ],
+              optionName: orderServiceModifyGlobalOptionCase.optionName,
+            },
+          );
+
+          expect(result.quantities).toEqual(
+            orderServiceModifyGlobalOptionCase.countExpectedQuantities,
+          );
+          expect(result.modifyPanelVisible).toEqual(
+            orderServiceModifyGlobalOptionCase.countExpectedQuantities.map(() => true),
+          );
+          await orderDishesPage.closeModifyPanel();
+        });
+      },
+    );
+
+    test(
+      '[POS-31664] 应能通过 Reduce 将全局选项从 2 逐次减至移除',
+      {
+        annotation: [
+          jiraIssueAnnotation('POS-31664'),
+          jiraIssueAnnotation('POS-50141'),
+        ],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
+        });
+
+        const orderDishesPage = await test.step('进入 To Go 并添加普通菜', async () => {
+          const page = await new TakeoutFlow().startToGoOrder(
+            readyHomePage,
+            employeeLoginPage,
+          );
+          await new OrderDishesFlow().addRegularDish(
+            page,
+            orderServiceDishes.regular.name,
+            orderServiceDishes.regular.menu,
+          );
+          return page;
+        });
+
+        await test.step('将全局选项设为 2 并通过 Reduce 逐次减至移除', async () => {
+          const result = await new OrderDishesFlow().changeGlobalOptionQuantity(
+            orderDishesPage,
+            {
+              dishName: orderServiceDishes.regular.name,
+              operations: [
+                {
+                  type: 'count',
+                  quantity: orderServiceModifyGlobalOptionCase.reduceStartQuantity,
+                },
+                { type: 'reduce' },
+                { type: 'reduce' },
+              ],
+              optionName: orderServiceModifyGlobalOptionCase.optionName,
+            },
+          );
+
+          expect(result.quantities).toEqual(
+            orderServiceModifyGlobalOptionCase.reduceExpectedQuantities,
+          );
+          expect(result.modifyPanelVisible).toEqual(
+            orderServiceModifyGlobalOptionCase.reduceExpectedQuantities.map(() => true),
+          );
+          await orderDishesPage.closeModifyPanel();
+        });
+      },
+    );
+  });
+
   test.describe('option 选择回显', () => {
     test(
       '[POS-15760] 应能只选择菜品一级选项并跳过二级选项后在 Recall 正确回显',
@@ -891,22 +2113,22 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
           return await enterReadyHome({ employeeLoginPage, homePage });
         });
 
-        await test.step('选择普通菜1的免费一级选项并保留二级选项未选择', async () => {
+        await test.step('选择普通菜1的菜品级一级选项并保留二级选项未选择', async () => {
           const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
           await new OrderDishesFlow().addRegularDish(
             orderDishesPage,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
           );
-          await orderDishesPage.selectCategoryOption(orderServiceCategoryOptions.freeNested.name);
+          await orderDishesPage.selectCategoryOption(orderServiceCategoryOptions.paidNested.name);
           await orderDishesPage.expectItemOptionVisible(
-            orderServiceCategoryOptions.freeNested.suboptionName,
+            orderServiceCategoryOptions.paidNested.suboptionName,
           );
           await assertDishOptionsRoundTrip(
             orderDishesPage,
             orderServiceDishes.regular.name,
-            [orderServiceCategoryOptions.freeNested.name],
-            orderServiceDishes.regular.expectedBasePrice,
+            [orderServiceCategoryOptions.paidNested.name],
+            orderServiceCategoryOptions.paidNested.expectedDishPrice,
           );
         });
       },
@@ -941,9 +2163,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
     );
 
     test(
-      '[POS-15763] 应能选择菜品一级和二级选项并在 Recall 正确回显',
+      '[POS-15761 POS-15763] 应能选择菜品一级和二级选项并在 Recall 正确回显',
       {
-        annotation: [jiraIssueAnnotation('POS-15763')],
+        annotation: jiraIssueAnnotations(['POS-15761', 'POS-15763']),
       },
       async ({ homePage, employeeLoginPage }) => {
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
@@ -1124,9 +2346,30 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
     );
 
     test(
-      '[POS-15643 POS-15758 POS-15759] 应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显',
+      '[POS-15759] 应能选择分类一级 option 并跳过二级 option 后在 Recall 正确回显',
       {
-        annotation: jiraIssueAnnotations(['POS-15643', 'POS-15758', 'POS-15759']),
+        annotation: [jiraIssueAnnotation('POS-15759')],
+      },
+      async ({ homePage, employeeLoginPage }) => {
+        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
+          return await enterReadyHome({ employeeLoginPage, homePage });
+        });
+
+        await test.step('选择分类一级 option 并保留二级 option 未选择', async () => {
+          const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
+          await assertCategoryOptionOrderRoundTrip(
+            orderDishesPage,
+            orderServiceDishes.categoryOption.name,
+            orderServiceCategoryOptions.freeNested.name,
+          );
+        });
+      },
+    );
+
+    test(
+      '[POS-15643 POS-15758] 应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显',
+      {
+        annotation: jiraIssueAnnotations(['POS-15643', 'POS-15758']),
       },
       async ({ homePage, employeeLoginPage }) => {
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {

@@ -13,6 +13,11 @@ export type SplitOrderDishSnapshot = {
   proportion: string | null;
 };
 
+export type SplitOrderDishDisplay = {
+  price: number;
+  quantity: string;
+};
+
 export type SplitOrderSuborderSnapshot = {
   dishes: SplitOrderDishSnapshot[];
   orderNumber: string;
@@ -64,6 +69,8 @@ export class SplitOrderPage {
   private readonly splitInputCancelButton: Locator;
   private readonly combineDialog: Locator;
   private readonly combineConfirmButton: Locator;
+  private readonly blankOrdersDialog: Locator;
+  private readonly removeBlankOrdersButton: Locator;
   private readonly posToast: Locator;
 
   constructor(private readonly page: Page) {
@@ -121,6 +128,14 @@ export class SplitOrderPage {
     this.combineConfirmButton = this.combineDialog
       .getByRole('button', { name: CONFIRM_BUTTON_NAME })
       .first();
+    this.blankOrdersDialog = this.splitFrame.getByRole('alertdialog', {
+      name: 'Blank Orders Detected',
+      exact: true,
+    });
+    this.removeBlankOrdersButton = this.blankOrdersDialog.getByRole('button', {
+      name: 'Remove & Proceed',
+      exact: true,
+    });
     this.posToast = this.page.locator('[data-testid^="pos-ui-toast-toast-"]').last();
   }
 
@@ -407,6 +422,72 @@ export class SplitOrderPage {
     );
   }
 
+  @step((orderNumber: string, dishName: string) => `页面读取：读取子单 ${orderNumber} 中菜品 ${dishName} 的数量和价格`)
+  async readDishDisplay(orderNumber: string, dishName: string): Promise<SplitOrderDishDisplay> {
+    await this.expectLoaded();
+    const display = await this.modal.evaluate(
+      (modal, payload: { dishName: string; orderNumber: string }) => {
+        const normalizeText = (value: string | null | undefined): string =>
+          String(value ?? '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const orderLabelText = `#${payload.orderNumber}`;
+        const attributedSuborder = modal.querySelector<HTMLElement>(
+          `[data-testid="split-suborder"][data-order-number="${payload.orderNumber}"], [class*="_suborderContainer_"][data-order-number="${payload.orderNumber}"], [class*="_suborderCard_"][data-order-number="${payload.orderNumber}"]`,
+        );
+        const orderLabel = Array.from(modal.querySelectorAll<HTMLElement>('*')).find(
+          (element) => normalizeText(element.textContent) === orderLabelText,
+        );
+        let suborder = attributedSuborder;
+        let currentElement = orderLabel ?? null;
+
+        while (!suborder && currentElement) {
+          const currentText = normalizeText(currentElement.textContent);
+          if (currentText.includes(orderLabelText) && currentText.includes('Print') && currentText.includes('Pay')) {
+            suborder = currentElement;
+            break;
+          }
+          currentElement = currentElement.parentElement;
+        }
+
+        if (!suborder) {
+          return null;
+        }
+
+        const dish = Array.from(
+          suborder.querySelectorAll<HTMLElement>('[data-testid="pos-ui-dish-item"]'),
+        ).find(
+          (element) =>
+            normalizeText(element.querySelector('[class*="_dishName_"]')?.textContent) ===
+            payload.dishName,
+        );
+
+        if (!dish) {
+          return null;
+        }
+
+        return {
+          priceText: normalizeText(dish.querySelector('[class*="_dishPrice_"]')?.textContent),
+          quantityText: normalizeText(dish.querySelector('[class*="_quantity_"]')?.textContent),
+        };
+      },
+      { dishName, orderNumber: this.normalizeOrderNumber(orderNumber) },
+    );
+
+    if (!display) {
+      throw new Error(`无法定位子单 ${orderNumber} 中的菜品 ${dishName}。`);
+    }
+
+    const { priceText, quantityText } = display;
+    const price = Number(priceText.replace(/[$,]/g, ''));
+
+    if (!quantityText || Number.isNaN(price)) {
+      throw new Error(`无法读取子单 ${orderNumber} 中菜品 ${dishName} 的数量或价格。`);
+    }
+
+    return { price, quantity: quantityText };
+  }
+
   @step((orderNumber: string, dishName: string) => `页面操作：点击子单 ${orderNumber} 中菜品 ${dishName} 的删除按钮`)
   async clickRemoveDish(orderNumber: string, dishName: string): Promise<void> {
     await this.expectLoaded();
@@ -508,17 +589,24 @@ export class SplitOrderPage {
     const previousUrl = this.page.url();
     await this.confirmButton.click();
 
-    await waitUntil(
+    const submitState = await waitUntil(
       async () => ({
+        blankOrdersVisible: await this.blankOrdersDialog.isVisible().catch(() => false),
         isHidden: await this.modal.isHidden().catch(() => false),
         url: this.page.url(),
       }),
-      (state) => state.isHidden || state.url !== previousUrl,
+      (state) => state.blankOrdersVisible || state.isHidden || state.url !== previousUrl,
       {
         timeout: 5_000,
-        message: 'Split order submit did not close the panel or change the page state in time.',
+        message: '提交分单后未出现空子单确认，也未关闭分单面板或切换页面。',
       },
-    ).catch(() => null);
+    );
+
+    if (submitState.blankOrdersVisible) {
+      await expect(this.removeBlankOrdersButton).toBeVisible();
+      await this.removeBlankOrdersButton.click();
+      await expect(this.blankOrdersDialog).toBeHidden({ timeout: 10_000 });
+    }
 
     await this.waitForReturnPageState(previousUrl);
     return this.resolveReturnPage();
@@ -739,10 +827,13 @@ export class SplitOrderPage {
           : this.parseRequiredSnapshotAmount(snapshot.remain, '剩余金额'),
       suborders: snapshot.suborders.map((suborder) => ({
         ...suborder,
-        total: this.parseRequiredSnapshotAmount(
-          suborder.total,
-          `子单 ${suborder.orderNumber} 总额`,
-        ),
+        total:
+          suborder.total === null && suborder.dishes.length === 0
+            ? 0
+            : this.parseRequiredSnapshotAmount(
+                suborder.total,
+                `子单 ${suborder.orderNumber} 总额`,
+              ),
       })),
       title: snapshot.title,
       total: this.parseRequiredSnapshotAmount(snapshot.total, '订单总额'),

@@ -32,6 +32,7 @@ export class PaymentPage {
   private readonly paymentFlow: Locator;
   private readonly tipsButton: Locator;
   private readonly tipsConfirmButton: Locator;
+  private readonly tipSuggestionButtons: Locator;
 
   constructor(private readonly page: Page) {
     this.contractRoot = this.page.getByTestId('payment-page');
@@ -46,6 +47,9 @@ export class PaymentPage {
     this.tipsConfirmButton = this.paymentFrame.getByTestId(
       'preset-numeric-input-modal-confirm-button',
     );
+    this.tipSuggestionButtons = this.paymentFrame.getByRole('button', {
+      name: /^\d+(?:\.\d+)?%$/,
+    });
   }
 
   @step('页面操作：确认支付页面已经加载完成')
@@ -127,6 +131,22 @@ export class PaymentPage {
     await this.tipsConfirmButton.click();
   }
 
+  @step('页面读取：打开 Tips 并读取建议小费百分比列表')
+  async readSuggestedTipPercentages(): Promise<number[]> {
+    await this.expectLoaded();
+    await this.tipsButton.click();
+    await expect(this.tipSuggestionButtons.first()).toBeVisible({ timeout: 5_000 });
+    const labels = await this.tipSuggestionButtons.allTextContents();
+
+    return labels.map((label) => {
+      const percentage = Number(label.replace('%', '').trim());
+      if (!Number.isFinite(percentage)) {
+        throw new Error(`无法解析建议小费百分比：${label}`);
+      }
+      return percentage;
+    });
+  }
+
   @step((text: string) => `页面断言：Payment 支付流程展示 ${text}`)
   async expectPaymentFlowText(text: string): Promise<void> {
     await expect(this.paymentFlow).toContainText(text);
@@ -196,8 +216,10 @@ export class PaymentPage {
     await this.page.keyboard.press('Escape').catch(() => undefined);
   }
 
-  @step('页面操作：如支付成功页仍显示，则点击 NO RECEIPT 关闭')
-  async confirmPaymentSuccessIfVisible(): Promise<void> {
+  @step((expectedButtonText = 'NO RECEIPT') =>
+    `页面操作：如支付成功页仍显示，则点击 ${expectedButtonText} 关闭`,
+  )
+  async confirmPaymentSuccessIfVisible(expectedButtonText = 'NO RECEIPT'): Promise<void> {
     if (!(await this.isPaymentSuccessConfirmVisible())) {
       return;
     }
@@ -205,8 +227,10 @@ export class PaymentPage {
     const buttonText = (await this.paymentSuccessConfirmButton.innerText())
       .replace(/\s+/g, ' ')
       .trim();
-    if (buttonText.toUpperCase() !== 'NO RECEIPT') {
-      throw new Error(`支付成功页关闭按钮文案应为 NO RECEIPT，实际为：${buttonText}`);
+    if (buttonText.toUpperCase() !== expectedButtonText.toUpperCase()) {
+      throw new Error(
+        `支付成功页关闭按钮文案应为 ${expectedButtonText}，实际为：${buttonText}`,
+      );
     }
 
     await this.paymentSuccessConfirmButton.click();
@@ -215,7 +239,7 @@ export class PaymentPage {
       (successButtonVisible) => !successButtonVisible,
       {
         timeout: 5_000,
-        message: '点击 NO RECEIPT 后支付成功页未在超时内关闭。',
+        message: `点击 ${expectedButtonText} 后支付成功页未在超时内关闭。`,
       },
     );
   }

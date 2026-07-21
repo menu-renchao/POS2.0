@@ -8,6 +8,12 @@ import { PaymentPage } from '../payment.page';
 import { SplitOrderPage } from '../split-order.page';
 import type { OrderDishesPageContext } from './order-dishes-page-context';
 import type { OrderDishesLocators } from './order-dishes-locators';
+import type {
+  SavedComboOptionReference,
+  SavedComboSubItemReference,
+  SavedOrderItemReference,
+  SentOrderItemReference,
+} from './order-dishes.types';
 
 export class OrderDishesPageNavigation {
   constructor(
@@ -40,7 +46,12 @@ export class OrderDishesPageNavigation {
     }
 
     @step('页面操作：保存订单并读取保存接口返回的精确订单号')
-    async saveOrderWithReference(): Promise<{ homePage: HomePage; orderNumber: string }> {
+    async saveOrderWithReference(): Promise<{
+      homePage: HomePage;
+      orderItems: SavedOrderItemReference[];
+      orderNumber: string;
+      orderType: string;
+    }> {
       await this.host.expectLoaded();
       const saveOrderButton = await this.resolveSaveOrderButton();
       const [saveRequest] = await Promise.all([
@@ -82,10 +93,41 @@ export class OrderDishesPageNavigation {
         throw new Error('保存订单接口响应缺少非空字符串 data.order.orderNumber。');
       }
 
+      const requestBody = saveRequest.postDataJSON() as unknown;
+      const requestOrder =
+        requestBody && typeof requestBody === 'object' && 'order' in requestBody
+          ? requestBody.order
+          : null;
+      const orderType =
+        requestOrder && typeof requestOrder === 'object' && 'type' in requestOrder
+          ? requestOrder.type
+          : null;
+
+      if (typeof orderType !== 'string' || orderType.trim().length === 0) {
+        throw new Error('保存订单请求缺少非空字符串 order.type。');
+      }
+
+      const rawOrderItems = readSavedOrderItems(requestOrder);
+
+      if (!Array.isArray(rawOrderItems)) {
+        const availableFields = isRecord(requestOrder)
+          ? Object.keys(requestOrder).sort().join(', ')
+          : '无';
+        throw new Error(
+          `保存订单请求缺少 order.subOrders[].orderItems 数组；order 可用字段：${availableFields}。`,
+        );
+      }
+      const orderItems = rawOrderItems.map(toSavedOrderItemReference);
+
       await this.dismissPostSaveDialogsIfNeeded();
       const homePage = new HomePage(this.page);
       await homePage.expectEmployeeReady();
-      return { homePage, orderNumber: orderNumber.trim() };
+      return {
+        homePage,
+        orderItems,
+        orderNumber: orderNumber.trim(),
+        orderType: orderType.trim(),
+      };
     }
 
     @step('页面操作：点击 Send 送厨订单')
@@ -96,7 +138,11 @@ export class OrderDishesPageNavigation {
     }
 
     @step('页面操作：点击 Send 送厨订单并读取保存接口返回的精确订单号')
-    async sendOrderWithReference(): Promise<{ homePage: HomePage; orderNumber: string }> {
+    async sendOrderWithReference(): Promise<{
+      homePage: HomePage;
+      orderItems: SentOrderItemReference[];
+      orderNumber: string;
+    }> {
       await this.host.expectLoaded();
       const [saveRequest] = await Promise.all([
         this.page.waitForRequest(
@@ -114,16 +160,32 @@ export class OrderDishesPageNavigation {
       }
 
       const responseBody = (await saveResponse.json()) as {
-        data?: { order?: { orderNumber?: unknown } };
+        data?: {
+          order?: {
+            orderItems?: Array<{ displayName?: unknown; id?: unknown }>;
+            orderNumber?: unknown;
+          };
+        };
       };
       const orderNumber = responseBody.data?.order?.orderNumber;
       if (typeof orderNumber !== 'string' || orderNumber.trim().length === 0) {
         throw new Error('送厨订单接口响应缺少非空字符串 data.order.orderNumber。');
       }
+      const rawOrderItems = responseBody.data?.order?.orderItems;
+      if (!Array.isArray(rawOrderItems)) {
+        throw new Error('送厨订单接口响应缺少 data.order.orderItems。');
+      }
+      const orderItems = rawOrderItems.map((item) => {
+        if (typeof item.id !== 'number' || typeof item.displayName !== 'string') {
+          throw new Error('送厨订单接口响应包含无效的订单菜引用。');
+        }
+
+        return { displayName: item.displayName, id: item.id };
+      });
 
       const homePage = new HomePage(this.page);
       await homePage.expectEmployeeReady();
-      return { homePage, orderNumber: orderNumber.trim() };
+      return { homePage, orderItems, orderNumber: orderNumber.trim() };
     }
 
     @step('页面操作：点击 Save 保存订单但不假设页面跳转')
@@ -131,6 +193,22 @@ export class OrderDishesPageNavigation {
       await this.host.expectLoaded();
       await (await this.resolveSaveOrderButton()).click();
       await this.dismissPostSaveDialogsIfNeeded();
+    }
+
+    @step('页面操作：在点单页确认系统配置刷新')
+    async confirmConfigurationRefresh(): Promise<void> {
+      await waitUntil(
+        async () => await this.locators.configurationRefreshDialog.isVisible().catch(() => false),
+        (isVisible) => isVisible,
+        {
+          timeout: 20_000,
+          interval: 100,
+          message: '点单页未出现系统配置刷新通知。',
+        },
+      );
+      await this.locators.configurationRefreshButton.click();
+      await expect(this.locators.configurationRefreshDialog).toBeHidden({ timeout: 15_000 });
+      await this.host.expectLoaded();
     }
 
     @step('页面读取：读取库存不足提示文案')
@@ -158,19 +236,23 @@ export class OrderDishesPageNavigation {
     @step('页面操作：退出点单页')
     async exitOrderPage(): Promise<void> {
       await this.host.expectLoaded();
-      const exitButton = await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByRole('button', { name: /^Back$/ }).first(),
-          this.locators.appFrame.getByRole('button', { name: /^Back$/ }).first(),
-          this.ctx.scopedLocator('#odBack'),
-        ],
-        'Unable to find order-dishes exit button.',
-      );
-      await exitButton.click();
+      await this.locators.backButton.click();
 
       if (await this.locators.exitConfirmButton.isVisible().catch(() => false)) {
         await this.locators.exitConfirmButton.click();
       }
+    }
+
+    @step('页面操作：从点单页直接退出并确认未出现退出提示')
+    async exitOrderPageWithoutConfirmation(): Promise<HomePage> {
+      await this.host.expectLoaded();
+      await this.locators.backButton.click();
+      await expect(this.locators.exitConfirmButton).toBeHidden();
+
+      const homePage = new HomePage(this.page);
+      await homePage.expectLoaded();
+      await homePage.expectPrimaryFunctionCardsVisible();
+      return homePage;
     }
 
     @step('页面操作：从点单页顶部点击 Recall 入口')
@@ -258,15 +340,7 @@ export class OrderDishesPageNavigation {
     }
 
     private async resolveBackButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByTestId('icon-button-Back').first(),
-          this.locators.appFrame.getByRole('button', { name: /^Back$/ }).first(),
-          this.page.getByTestId('icon-button-Back').first(),
-          this.page.getByRole('button', { name: /^Back$/ }).first(),
-        ],
-        'Unable to find order-dishes Back button.',
-      );
+      return this.locators.backButton;
     }
 
     private async resolveHeaderRecallButton(): Promise<Locator> {
@@ -361,4 +435,107 @@ export class OrderDishesPageNavigation {
         });
       }
     }
+}
+
+function toSavedOrderItemReference(value: unknown): SavedOrderItemReference {
+  if (!isRecord(value)) {
+    throw new Error('保存订单请求包含无效的订单菜结构。');
+  }
+
+  const { saleItemId, displayText, comboOrderDetails } = value;
+  if (typeof saleItemId !== 'number' && typeof saleItemId !== 'string') {
+    throw new Error('保存订单请求中的订单菜缺少 saleItemId。');
+  }
+
+  const comboSections =
+    isRecord(comboOrderDetails) && Array.isArray(comboOrderDetails.comboSections)
+      ? comboOrderDetails.comboSections
+      : [];
+  const comboSubItems = comboSections.flatMap((section) => {
+    if (!isRecord(section) || !Array.isArray(section.orderItems)) {
+      return [];
+    }
+
+    return section.orderItems.map(toSavedComboSubItemReference);
+  });
+
+  return {
+    saleItemId,
+    displayText: typeof displayText === 'string' ? displayText : '',
+    originalSalePrice: toOptionalNumber(value.originalSalePrice),
+    price: toOptionalNumber(value.price),
+    totalAmount: toOptionalNumber(value.totalAmount),
+    discount: toOptionalNumber(value.discount),
+    discountName: typeof value.discountName === 'string' ? value.discountName : null,
+    discountRate: toOptionalNumber(value.discountRate),
+    discountRateType: toOptionalNumber(value.discountRateType),
+    comboSubItems,
+  };
+}
+
+function readSavedOrderItems(order: unknown): unknown[] | null {
+  if (!isRecord(order)) {
+    return null;
+  }
+
+  if (Array.isArray(order.orderItems)) {
+    return order.orderItems;
+  }
+
+  if (!Array.isArray(order.subOrders)) {
+    return null;
+  }
+
+  const subOrderItems: unknown[] = [];
+  let foundOrderItems = false;
+
+  for (const subOrder of order.subOrders) {
+    if (!isRecord(subOrder) || !Array.isArray(subOrder.orderItems)) {
+      continue;
+    }
+
+    foundOrderItems = true;
+    subOrderItems.push(...subOrder.orderItems);
+  }
+
+  return foundOrderItems ? subOrderItems : null;
+}
+
+function toOptionalNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function toSavedComboSubItemReference(value: unknown): SavedComboSubItemReference {
+  if (!isRecord(value)) {
+    throw new Error('保存订单请求包含无效的套餐子菜结构。');
+  }
+
+  const { saleItemId, options } = value;
+  if (typeof saleItemId !== 'number' && typeof saleItemId !== 'string') {
+    throw new Error('保存订单请求中的套餐子菜缺少 saleItemId。');
+  }
+
+  return {
+    saleItemId,
+    options: Array.isArray(options)
+      ? options.map(toSavedComboOptionReference)
+      : [],
+  };
+}
+
+function toSavedComboOptionReference(value: unknown): SavedComboOptionReference {
+  if (!isRecord(value)) {
+    throw new Error('保存订单请求包含无效的套餐子菜 option 结构。');
+  }
+
+  const { optionName, optionType } = value;
+  if (typeof optionName !== 'string' || typeof optionType !== 'string') {
+    throw new Error('保存订单请求中的套餐子菜 option 缺少名称或类型。');
+  }
+
+  return { name: optionName, type: optionType };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

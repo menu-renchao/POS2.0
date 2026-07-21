@@ -3,6 +3,7 @@ import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 import { OrderDishesPage } from './order-dishes.page';
 import { PaymentPage } from './payment.page';
+import { PagingPage } from './paging.page';
 import { SplitOrderPage } from './split-order.page';
 import { RecallFilterBarSection } from './recall/recall-filter-bar.section';
 import { RecallOrderDetailsDialog } from './recall/recall-order-details.dialog';
@@ -10,6 +11,7 @@ import { RecallVoidDialog } from './recall/recall-void.dialog';
 
 export type {
   RecallCustomerInfo,
+  RecallDiscountWholeOrderSummary,
   RecallMemberInfo,
   RecallOrderContext,
   RecallOrderDetailAction,
@@ -18,16 +20,19 @@ export type {
   RecallOrderDetails,
   RecallOrderItem,
   RecallOrderItemAddition,
+  RecallKitchenTicketResult,
   RecallOrderPaymentRecord,
 } from './recall/recall.types';
 
 import type {
   RecallCustomerInfo,
+  RecallDiscountWholeOrderSummary,
   RecallMemberInfo,
   RecallOrderContext,
   RecallOrderDetailActions,
   RecallOrderDetails,
   RecallOrderItem,
+  RecallKitchenTicketResult,
   RecallOrderPaymentRecord,
 } from './recall/recall.types';
 
@@ -36,6 +41,7 @@ export class RecallPage {
   public readonly orderDetails: RecallOrderDetailsDialog;
   public readonly voidDialog: RecallVoidDialog;
   private readonly newOrderButton: Locator;
+  private readonly pagingButton: Locator;
   private readonly exitRecallButton: Locator;
 
   constructor(private readonly page: Page) {
@@ -43,6 +49,7 @@ export class RecallPage {
     this.orderDetails = new RecallOrderDetailsDialog(page, this.filterBar);
     this.voidDialog = new RecallVoidDialog(page, this.orderDetails);
     this.newOrderButton = this.page.locator('[data-testid="recall2-header-new-order"]:visible');
+    this.pagingButton = this.page.getByTestId('recall2-header-paging');
     this.exitRecallButton = this.page
       .locator('.rcreturnbx_bth_exit')
       .or(this.page.getByRole('button', { name: /^Back$/i }))
@@ -51,6 +58,14 @@ export class RecallPage {
 
   async expectLoaded(): Promise<void> {
     return this.filterBar.expectLoaded();
+  }
+
+  @step('页面操作：从 Recall 头部进入 Paging 页面')
+  async enterPaging(): Promise<PagingPage> {
+    await this.pagingButton.click();
+    const pagingPage = new PagingPage(this.page);
+    await pagingPage.expectLoaded();
+    return pagingPage;
   }
 
   async selectPaymentStatus(
@@ -221,6 +236,18 @@ export class RecallPage {
     return this.orderDetails.refundPaymentRecord(...args);
   }
 
+  async refundOrderItem(
+    ...args: Parameters<RecallOrderDetailsDialog['refundOrderItem']>
+  ): Promise<void> {
+    return this.orderDetails.refundOrderItem(...args);
+  }
+
+  async expectOrderItemRefundUnavailable(
+    ...args: Parameters<RecallOrderDetailsDialog['expectOrderItemRefundUnavailable']>
+  ): ReturnType<RecallOrderDetailsDialog['expectOrderItemRefundUnavailable']> {
+    return this.orderDetails.expectOrderItemRefundUnavailable(...args);
+  }
+
   async readPaymentCardTip(
     ...args: Parameters<RecallOrderDetailsDialog['readPaymentCardTip']>
   ): Promise<string | null> {
@@ -290,6 +317,16 @@ export class RecallPage {
     return this.orderDetails.clickPrintInOrderDetails();
   }
 
+  @step('页面操作：点击 Recall 订单详情中的 Print 并读取打单接口状态')
+  async clickPrintInOrderDetailsAndReadKitchenTicketStatus(): Promise<number> {
+    return await this.orderDetails.clickPrintInOrderDetailsAndReadKitchenTicketStatus();
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Print 并读取打单结果')
+  async clickPrintInOrderDetailsAndReadKitchenTicketResult(): Promise<RecallKitchenTicketResult> {
+    return await this.orderDetails.clickPrintInOrderDetailsAndReadKitchenTicketResult();
+  }
+
   @step('页面操作：从 Recall 订单详情点击 Split 并进入分单面板')
   async openSplitInOrderDetails(
     options?: Parameters<RecallOrderDetailsDialog['openSplitInOrderDetails']>[0],
@@ -300,6 +337,11 @@ export class RecallPage {
   @step('页面操作：点击 Recall 订单详情中的 Discount 按钮')
   async clickDiscountInOrderDetails(): Promise<void> {
     return this.orderDetails.clickDiscountInOrderDetails();
+  }
+
+  @step('页面读取：读取 Recall 折扣弹窗 Whole Order 的子单号和小计')
+  async readDiscountWholeOrderSummary(): Promise<RecallDiscountWholeOrderSummary> {
+    return this.orderDetails.readDiscountWholeOrderSummary();
   }
 
   @step('页面操作：点击 Recall 订单详情中的 More 按钮')
@@ -416,6 +458,11 @@ export class RecallPage {
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Copy 按钮')
   async clickCopyInMoreMenu(): Promise<void> {
     return this.orderDetails.clickCopyInMoreMenu();
+  }
+
+  @step('页面操作：确认复制 Recall 订单并进入点单页')
+  async confirmCopyAndEnterOrderDishes(): Promise<OrderDishesPage> {
+    return this.orderDetails.confirmCopyAndEnterOrderDishes();
   }
 
   @step('页面操作：点击 Recall 订单详情 More 菜单中的 Void 按钮')

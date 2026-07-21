@@ -10,8 +10,10 @@ export type MenuGroupApiRequest = MenuApiRequest & {
 };
 
 export type CategoryApiRequest = MenuApiRequest & {
+  groupId: ApiEntityId;
   menuId: ApiEntityId;
   menuGroupId: ApiEntityId;
+  posName: string;
 };
 
 export type GlobalOptionCategoryApiRequest = MenuApiRequest & {
@@ -27,6 +29,7 @@ export type GlobalOptionApiRequest = MenuApiRequest & {
 };
 
 export type SaleItemApiRequest = MenuApiRequest & {
+  itemNumber?: string;
   menuCategoryId: ApiEntityId;
   posName: string;
   price: number;
@@ -81,12 +84,16 @@ export function buildCategoryRequest(
   const name = buildApiTestName('CATEGORY', MENU_API_NAME_LIMITS.category, seed);
 
   return {
+    groupId: menuGroupId,
     menuId,
     menuGroupId,
     name,
+    posName: name,
+    shortName: name,
     displayName: name,
-    sequence: 1,
+    displayPriority: 1,
     enabled: true,
+    productLine: DEFAULT_MENU_PRODUCT,
   };
 }
 

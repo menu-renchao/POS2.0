@@ -6,6 +6,7 @@ import {
   type OrderDishesSnapshot,
   type OrderedDishItem,
   type OrderedDishItemAddition,
+  type OrderedDishRowState,
   type OrderPriceSummary,
 } from './order-dishes.types';
 import type { OrderDishesPageContext } from './order-dishes-page-context';
@@ -95,6 +96,23 @@ export class OrderDishesReadsSection {
     }
 
     @step(
+      (comboName: string, saleItemId: number) =>
+        `页面读取：读取套餐 ${comboName} 的子菜 ID ${saleItemId} 数值价格`,
+    )
+    async readComboSubItemPrice(comboName: string, saleItemId: number): Promise<number> {
+      const priceText = await this.locators
+        .comboSubItemPriceBySaleItemId(comboName, saleItemId)
+        .innerText();
+      const price = Number(priceText.replace(/[$,]/g, ''));
+
+      if (Number.isNaN(price)) {
+        throw new Error(`套餐 ${comboName} 子菜 ${saleItemId} 的价格无法解析：${priceText}`);
+      }
+
+      return price;
+    }
+
+    @step(
       (dishName: string, detailText: string) =>
         `页面读取：检查已点菜品 ${dishName} 是否展示明细 ${detailText}`,
     )
@@ -104,6 +122,71 @@ export class OrderDishesReadsSection {
         .getByText(detailText, { exact: true })
         .isVisible()
         .catch(() => false);
+    }
+
+    @step((dishName: string) => `页面断言：已点菜品 ${dishName} 已从订单中移除`)
+    async expectOrderedDishAbsent(dishName: string): Promise<void> {
+      await expect(this.locators.orderedDishItemsByName(dishName)).toBeHidden();
+    }
+
+    @step((dishName: string) => `页面读取：读取同名菜品 ${dishName} 各订单行的数量和送厨状态`)
+    async readOrderedDishRowStates(dishName: string): Promise<OrderedDishRowState[]> {
+      await this.host.expectLoaded();
+      const texts = await this.locators.orderedDishItemsByName(dishName).allInnerTexts();
+
+      return texts.map((text) => {
+        const normalizedText = text.replace(/\s+/g, ' ').trim();
+        const quantity = normalizedText.match(/^(\d+(?:\.\d+)?)\s/)?.[1];
+        const kitchenQuantityText = normalizedText.match(/\b(\d+(?:\.\d+)?)\s+sent\b/)?.[1];
+        if (!quantity) {
+          throw new Error(`菜品 ${dishName} 订单行缺少可解析数量：${normalizedText}`);
+        }
+
+        return {
+          kitchenQuantity: kitchenQuantityText ? Number(kitchenQuantityText) : null,
+          quantity,
+          sentToKitchen: /\bSent in\b/.test(normalizedText),
+          text: normalizedText,
+        };
+      });
+    }
+
+    @step((dishName: string) => `页面读取：读取已点菜品 ${dishName} 菜名的显示颜色`)
+    async readOrderedDishNameColor(dishName: string): Promise<string> {
+      await this.host.expectLoaded();
+      return await this.locators.orderedDishNameByName(dishName).evaluate(
+        (element) => getComputedStyle(element).color,
+      );
+    }
+
+    @step(
+      (dishName: string, additionName: string) =>
+        `页面读取：读取菜品 ${dishName} 的附加项 ${additionName} 数量`,
+    )
+    async readOrderedDishAdditionQuantity(
+      dishName: string,
+      additionName: string,
+    ): Promise<number> {
+      const orderedItem = (await this.readOrderedItems()).find((item) => item.name === dishName);
+      const addition = orderedItem?.additions.find(
+        (item) => item.name === additionName || item.name.startsWith(`${additionName} ×`),
+      );
+
+      if (!addition) {
+        return 0;
+      }
+
+      if (addition.name === additionName) {
+        return 1;
+      }
+
+      const quantity = Number(addition.name.slice(`${additionName} ×`.length));
+
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        throw new Error(`无法从附加项文本 ${addition.name} 解析有效数量。`);
+      }
+
+      return quantity;
     }
 
     private normalizeOrderedItemAdditions(

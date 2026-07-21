@@ -359,27 +359,27 @@ const autoChargeEditCases: readonly ChargeEditCase[] = [
 const blockedAutoChargeEditReasons = new Map<string, string>([
   [
     'POS-27170',
-    '实测保存前订单 API 含 auto_test_fixed $10；后台改名后重新编辑订单未显示 new_name_auto，仅剩环境自动加收 213 $1.06。',
+    '使用隔离唯一名称创建自动固定 $10 加收；后台改名后重新编辑订单未显示改名后的目标加收，仅剩环境自动加收。',
   ],
   [
     'POS-27171',
-    '实测后台将自动固定 $10 加收改为 10% 后，重新编辑的小计为 $8.80，但目标加收重算为 $1.06，未按小计计算为 $0.88。',
+    '使用隔离唯一名称将自动固定 $10 加收改为 10% 后，重新编辑订单未显示目标自动加收。',
   ],
   [
     'POS-27172',
-    '实测后台将自动 10% 加收改为固定 $10 后，重新编辑目标加收未生效，仅应用环境 213 的 12% 加收 $1.06。',
+    '使用隔离唯一名称将自动 10% 加收改为固定 $10 后，重新编辑订单未显示目标自动加收。',
   ],
   [
     'POS-27173',
-    '实测后台将自动固定加收由 $10 改为 $20 后，重新编辑目标加收未生效，仅应用环境 213 的 12% 加收 $1.06。',
+    '使用隔离唯一名称将自动固定加收由 $10 改为 $20 后，重新编辑订单未显示目标自动加收。',
   ],
   [
     'POS-27174',
-    '实测后台将自动百分比加收由 10% 改为 20% 后，重新编辑目标加收未生效，仅应用环境 213 的 12% 加收 $1.06，未重算为 $1.76。',
+    '使用隔离唯一名称将自动百分比加收由 10% 改为 20% 后，重新编辑订单未显示目标自动加收。',
   ],
   [
     'POS-27177',
-    'API 读回目标配置仍为固定 $10 且 taxed=true；重新编辑后目标加收丢失，仅应用环境 213 的 12% 加收 $1.06。',
+    '使用隔离唯一名称将自动加收改为计税后，重新编辑订单未显示目标自动加收。',
   ],
 ]);
 
@@ -673,6 +673,130 @@ const combineChargeRecalculationCases: readonly CombineChargeRecalculationCase[]
   },
 ];
 
+function annotateKnownProductFailure(reason: string | undefined): void {
+  if (!reason) {
+    return;
+  }
+
+  test.info().annotations.push({
+    type: '已知产品问题',
+    description: reason,
+  });
+}
+
+function createIsolatedChargeEditCase(chargeCase: ChargeEditCase): ChargeEditCase {
+  const initialName = createShortTestName({
+    prefix: 'AC',
+    domain: chargeCase.issue,
+    maxLength: 16,
+  });
+  const renamesCharge =
+    chargeCase.updateCharge?.name !== undefined &&
+    chargeCase.updateCharge.name !== chargeCase.initialCharge.name;
+  const updatedName = renamesCharge
+    ? createShortTestName({
+        prefix: 'AU',
+        domain: chargeCase.issue,
+        maxLength: 16,
+      })
+    : initialName;
+  const expectedChargeName =
+    chargeCase.expectedChargeName === chargeCase.initialCharge.name
+      ? initialName
+      : chargeCase.expectedChargeName === chargeCase.updateCharge?.name
+        ? updatedName
+        : chargeCase.expectedChargeName;
+
+  return {
+    ...chargeCase,
+    initialCharge: {
+      ...chargeCase.initialCharge,
+      name: initialName,
+    },
+    expectedChargeName,
+    ...(chargeCase.updateCharge
+      ? {
+          updateCharge: {
+            ...chargeCase.updateCharge,
+            name: updatedName,
+          },
+        }
+      : {}),
+  };
+}
+
+function createIsolatedChargeFollowUpCase(
+  chargeCase: ChargeFollowUpCase,
+): ChargeFollowUpCase {
+  const initialName = createShortTestName({
+    prefix: 'FC',
+    domain: chargeCase.issue,
+    maxLength: 16,
+  });
+  const renamesCharge = chargeCase.updateCharge.name !== chargeCase.initialCharge.name;
+  const updatedName = renamesCharge
+    ? createShortTestName({
+        prefix: 'FU',
+        domain: chargeCase.issue,
+        maxLength: 16,
+      })
+    : initialName;
+  const expectedChargeName =
+    chargeCase.expectedChargeName === chargeCase.initialCharge.name
+      ? initialName
+      : chargeCase.expectedChargeName === chargeCase.updateCharge.name
+        ? updatedName
+        : chargeCase.expectedChargeName;
+
+  return {
+    ...chargeCase,
+    initialCharge: {
+      ...chargeCase.initialCharge,
+      name: initialName,
+    },
+    updateCharge: {
+      ...chargeCase.updateCharge,
+      name: updatedName,
+    },
+    expectedChargeName,
+  };
+}
+
+function createIsolatedChargeCopyCase(chargeCase: ChargeCopyCase): ChargeCopyCase {
+  const initialName = createShortTestName({
+    prefix: 'CC',
+    domain: chargeCase.issue,
+    maxLength: 16,
+  });
+  const renamesCharge = chargeCase.updateCharge.name !== chargeCase.initialCharge.name;
+  const updatedName = renamesCharge
+    ? createShortTestName({
+        prefix: 'CU',
+        domain: chargeCase.issue,
+        maxLength: 16,
+      })
+    : initialName;
+  const expectedChargeName =
+    chargeCase.expectedChargeName === chargeCase.initialCharge.name
+      ? initialName
+      : chargeCase.expectedChargeName === chargeCase.updateCharge.name
+        ? updatedName
+        : chargeCase.expectedChargeName;
+
+  return {
+    ...chargeCase,
+    initialCharge: {
+      ...chargeCase.initialCharge,
+      name: initialName,
+    },
+    updateCharge: {
+      ...chargeCase.updateCharge,
+      name: updatedName,
+    },
+    expectedChargeName,
+  };
+}
+
 async function enterReadyHome({
   employeeLoginPage,
   homePage,
@@ -716,7 +840,6 @@ async function addTwoRegularDishes(orderDishesPage: OrderDishesPage): Promise<vo
 
 async function addSharedAndSeatDishes(orderDishesPage: OrderDishesPage): Promise<void> {
   const orderDishesFlow = new OrderDishesFlow();
-  await orderDishesPage.changeGuestCount(2);
   await orderDishesPage.selectSharedSeat();
   await orderDishesFlow.addRegularDish(
     orderDishesPage,
@@ -735,7 +858,9 @@ async function createSeatSplitRecallOrder(
   readyHomePage: HomePage,
   options: { addTip?: boolean; tipAmountInCents?: number } = {},
 ): Promise<{ recallPage: RecallPage; targets: SplitOrderTargets }> {
-  const orderDishesPage = await enterDineInNoTableOrder(readyHomePage);
+  const selectTablePage = await readyHomePage.enterDineIn();
+  const { orderDishesPage } = await new SelectTableFlow()
+    .selectAnyAvailableTableAndEnterOrderDishes(selectTablePage, 2);
   await addSharedAndSeatDishes(orderDishesPage);
 
   if (options.addTip || options.tipAmountInCents !== undefined) {
@@ -1541,26 +1666,23 @@ async function copySavedOrderAfterConfigurationRefresh(
   homePage: HomePage,
   employeeLoginPage: EmployeeLoginPage,
   orderNumber: string,
-): Promise<RecallPage> {
+): Promise<OrderDishesPage> {
   const recallPage = await openRecallAfterConfigurationRefresh(homePage, employeeLoginPage);
   return await new RecallFlow().openCopyFromMore(recallPage, orderNumber);
 }
 
 async function readCopiedOrderChargeAmount(
-  recallPage: RecallPage,
+  orderDishesPage: OrderDishesPage,
   chargeName: string,
 ): Promise<{
   amount: number | null;
   summary: Record<string, number> | null;
 }> {
-  await new RecallFlow().clearSearchConditions(recallPage);
-  const copiedOrderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
-  await recallPage.openOrderDetails(copiedOrderNumber);
-  const summary = await recallPage.readDisplayedOrderPriceSummary();
-  const detailsText = await recallPage.readOrderDetailsText();
-  await recallPage.closeOrderDetailsDialog();
+  const summary = await orderDishesPage.readPriceSummary();
+  const chargeSnapshot = await readOrderDishesChargeSnapshot(orderDishesPage);
+  const amount = parseChargeAmountText(readWholeChargeAmountText(chargeSnapshot, chargeName));
 
-  return { amount: readChargeAmountFromDetailsText(detailsText, chargeName), summary };
+  return { amount, summary };
 }
 
 function readChargeAmountFromDetailsText(detailsText: string, chargeName: string): number | null {
@@ -2094,9 +2216,8 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       annotation: [jiraIssueAnnotation('POS-19365')],
     },
     async ({ homePage, employeeLoginPage, systemConfigurationApi }) => {
-      test.fail(
-        true,
-        '当前产品未对“已支付共享菜后作废另一子单”返回 POS-19365 预期阻断提示，保留用例作为预期失败覆盖。',
+      annotateKnownProductFailure(
+        '当前产品未对“已支付共享菜后作废另一子单”返回 POS-19365 预期阻断提示，用例保持普通 Failed。',
       );
 
       const readyHomePage = await test.step('进入 POS 主页并打开座位显示配置', async () => {
@@ -2126,7 +2247,13 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           },
         );
 
-        expect(blockingMessage).toContain(orderServiceSplitOperationCase.sharedItemVoidBlockingMessage);
+        expect(
+          blockingMessage,
+          '已支付共享菜后作废另一子单应返回阻断提示',
+        ).not.toBeNull();
+        expect(blockingMessage!).toContain(
+          orderServiceSplitOperationCase.sharedItemVoidBlockingMessage,
+        );
       });
     },
   );
@@ -2190,9 +2317,8 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       annotation: [jiraIssueAnnotation('POS-19371')],
     },
     async ({ homePage, employeeLoginPage, systemConfigurationApi }) => {
-      test.fail(
-        true,
-        '当前产品在半支付座位分单点击 Unsplit 后未返回 POS-19371 预期阻断提示，保留用例作为预期失败覆盖。',
+      annotateKnownProductFailure(
+        '当前产品在半支付座位分单点击 Unsplit 后未返回 POS-19371 预期阻断提示，用例保持普通 Failed。',
       );
 
       const readyHomePage = await test.step('进入 POS 主页并打开座位显示配置', async () => {
@@ -2224,7 +2350,13 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         await splitOrderFlow.cancelSplit(splitOrderPage);
         const blockingMessage = await splitOrderFlow.readBlockingMessage(splitOrderPage);
 
-        expect(blockingMessage).toContain(orderServiceSplitOperationCase.splitHalfPaidBlockingMessage);
+        expect(
+          blockingMessage,
+          '半支付座位分单撤销分单时应返回阻断提示',
+        ).not.toBeNull();
+        expect(blockingMessage!).toContain(
+          orderServiceSplitOperationCase.splitHalfPaidBlockingMessage,
+        );
       });
     },
   );
@@ -2898,8 +3030,11 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       });
 
       const copiedOrderTotal = await test.step('从 Recall 复制订单并读取复制后总额', async () => {
-        await new RecallFlow().openCopyFromMore(savedOrder.recallPage, savedOrder.orderNumber);
-        return savedOrder.afterModifierTotal;
+        const copiedOrderPage = await new RecallFlow().openCopyFromMore(
+          savedOrder.recallPage,
+          savedOrder.orderNumber,
+        );
+        return (await copiedOrderPage.readPriceSummary())['Total(Cash)'];
       });
 
       await test.step('校验复制前后订单总额保持一致', async () => {
@@ -3108,7 +3243,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       },
       async ({ homePage, employeeLoginPage, apiSetup, orderApi }) => {
         const blockedReason = blockedManualChargeEditReasons.get(chargeCase.issue);
-        test.fail(Boolean(blockedReason), blockedReason);
+        annotateKnownProductFailure(blockedReason);
 
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
           return await enterReadyHome({ employeeLoginPage, homePage });
@@ -3219,7 +3354,11 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           );
 
           if (chargeCase.expectedChargeAvailable) {
-            expect(editedAmount).toBeCloseTo(
+            expect(
+              editedAmount,
+              `编辑订单后应显示加收 ${chargeCase.expectedChargeName}`,
+            ).not.toBeNull();
+            expect(editedAmount!).toBeCloseTo(
               resolveExpectedChargeAmount(chargeCase.expectedChargeAmount, editedOrder.summary),
               2,
             );
@@ -3237,7 +3376,8 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
     );
   }
 
-  for (const chargeCase of autoChargeEditCases) {
+  for (const sourceChargeCase of autoChargeEditCases) {
+    const chargeCase = createIsolatedChargeEditCase(sourceChargeCase);
     test(
       chargeCase.title,
       {
@@ -3246,7 +3386,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       },
       async ({ homePage, employeeLoginPage, apiSetup, orderApi }) => {
         const blockedReason = blockedAutoChargeEditReasons.get(chargeCase.issue);
-        test.fail(Boolean(blockedReason), blockedReason);
+        annotateKnownProductFailure(blockedReason);
 
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
           return await enterReadyHome({ employeeLoginPage, homePage });
@@ -3309,7 +3449,11 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           );
 
           if (chargeCase.expectedChargeAvailable) {
-            expect(editedAmount).toBeCloseTo(
+            expect(
+              editedAmount,
+              `编辑订单后应显示自动加收 ${chargeCase.expectedChargeName}`,
+            ).not.toBeNull();
+            expect(editedAmount!).toBeCloseTo(
               resolveExpectedChargeAmount(chargeCase.expectedChargeAmount, editedOrder.summary),
               2,
             );
@@ -3329,10 +3473,10 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
 
   const expectedFailureChargeFollowUpIssues = new Map<ChargeFollowUpCase['issue'], string>([
     ['POS-27192', '自动加收配置修改后从编辑页保存会丢失新加收，需产品修复后再启用。'],
-    ['POS-27248', '自动加收配置修改后从编辑页平分订单会丢失加收，需产品修复后再启用。'],
   ]);
 
-  for (const chargeCase of chargeFollowUpCases) {
+  for (const sourceChargeCase of chargeFollowUpCases) {
+    const chargeCase = createIsolatedChargeFollowUpCase(sourceChargeCase);
     test(
       chargeCase.title,
       {
@@ -3341,7 +3485,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       },
       async ({ homePage, employeeLoginPage, apiSetup, orderApi }) => {
         const expectedFailureReason = expectedFailureChargeFollowUpIssues.get(chargeCase.issue);
-        test.fail(Boolean(expectedFailureReason), expectedFailureReason);
+        annotateKnownProductFailure(expectedFailureReason);
 
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
           return await enterReadyHome({ employeeLoginPage, homePage });
@@ -3373,14 +3517,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         });
 
         await test.step('更新后台加收配置并准备后续订单操作', async () => {
-          const updateCharge =
-            chargeCase.issue === 'POS-27242'
-              ? {
-                  ...chargeCase.updateCharge,
-                  name: createShortTestName({ prefix: 'AT', domain: 'CHGU', maxLength: 16 }),
-                }
-              : chargeCase.updateCharge;
-          await apiSetup.charge.update(chargeResource.id, updateCharge);
+          await apiSetup.charge.update(chargeResource.id, chargeCase.updateCharge);
         });
 
         if (chargeCase.operation === 'detail-send') {
@@ -3532,7 +3669,11 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         });
 
         await test.step('校验后续操作后的加收金额', async () => {
-          expect(editedCharge.amount).toBeCloseTo(
+          expect(
+            editedCharge.amount,
+            `后续操作后应显示加收 ${chargeCase.expectedChargeName}`,
+          ).not.toBeNull();
+          expect(editedCharge.amount!).toBeCloseTo(
             resolveExpectedChargeAmount(chargeCase.expectedChargeAmount, editedCharge.summary),
             2,
           );
@@ -3542,14 +3683,13 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
   }
 
   const blockedChargeCopyIssues = new Map<ChargeCopyCase['issue'], string>([
-    ['POS-27257', '复制自动加收订单后仍保留旧加收名称和金额，未按后台新配置重算。'],
-    ['POS-27259', '复制自动加收订单后仍保留旧加收，未按后台人数条件移除。'],
+    ['POS-27257', '复制自动加收订单后未显示后台更新后的加收名称和金额。'],
     ['POS-27271', 'Delivery 源订单保存前未生成目标自动加收 auto_test1，无法进入修改 minMileage 后复制订单的断言。'],
-    ['POS-27286', '复制自动加收订单后未按后台触发方式改为手动而移除旧加收。'],
-    ['POS-27288', '复制手动加收订单后仍保留旧加收，未按后台订单类型条件移除。'],
+    ['POS-27288', '创建源订单时确认目标手动加收后 Charge 弹窗未关闭且加收未生效，无法进入复制后的订单类型断言。'],
   ]);
 
-  for (const chargeCase of chargeCopyCases) {
+  for (const sourceChargeCase of chargeCopyCases) {
+    const chargeCase = createIsolatedChargeCopyCase(sourceChargeCase);
     test(
       chargeCase.title,
       {
@@ -3558,7 +3698,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       },
       async ({ homePage, employeeLoginPage, apiSetup, orderApi }) => {
         const blockedReason = blockedChargeCopyIssues.get(chargeCase.issue);
-        test.fail(Boolean(blockedReason), blockedReason);
+        annotateKnownProductFailure(blockedReason);
 
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
           return await enterReadyHome({ employeeLoginPage, homePage });
@@ -3586,7 +3726,11 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           const initialAmount = parseChargeAmountText(
             readWholeChargeAmountText(savedOrder.beforeChargeSnapshot, initialChargeName),
           );
-          expect(initialAmount).toBeCloseTo(
+          expect(
+            initialAmount,
+            `源订单保存前应显示加收 ${initialChargeName}`,
+          ).not.toBeNull();
+          expect(initialAmount!).toBeCloseTo(
             resolveExpectedChargeAmount(
               chargeCase.initialCharge.rateType === 2 ? 'percent10' : '10.00',
               savedOrder.beforeSummary,
@@ -3599,7 +3743,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           await apiSetup.charge.update(chargeResource.id, chargeCase.updateCharge);
         });
 
-        const copiedRecallPage = await test.step('刷新 POS 后从 Recall 详情复制源订单', async () => {
+        const copiedOrderPage = await test.step('刷新 POS 后从 Recall 详情复制源订单', async () => {
           return await copySavedOrderAfterConfigurationRefresh(
             homePage,
             employeeLoginPage,
@@ -3608,7 +3752,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         });
 
         const copiedCharge = await test.step('读取复制后新订单的加收明细', async () => {
-          return await readCopiedOrderChargeAmount(copiedRecallPage, chargeCase.expectedChargeName);
+          return await readCopiedOrderChargeAmount(copiedOrderPage, chargeCase.expectedChargeName);
         });
 
         await test.step('校验复制订单后的加收明细符合后台配置变更', async () => {
@@ -4175,7 +4319,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       },
       async ({ homePage, employeeLoginPage, apiSetup, orderApi }) => {
         test.fixme(Boolean(recordingBlockedReason), recordingBlockedReason);
-        test.fail(Boolean(expectedFailureReason), expectedFailureReason);
+        annotateKnownProductFailure(expectedFailureReason);
 
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
           return await enterReadyHome({ employeeLoginPage, homePage });
@@ -4550,8 +4694,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       annotation: [jiraIssueAnnotation('POS-32963')],
     },
     async ({ homePage, employeeLoginPage }) => {
-      test.fail(
-        true,
+      annotateKnownProductFailure(
         '实测 100 元按 1.015% 加收显示 1.01，未按规则进位为 1.02，等待产品修复。',
       );
 
@@ -4589,9 +4732,8 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
       annotation: [jiraIssueAnnotation('POS-33063')],
     },
     async ({ homePage, employeeLoginPage, apiSetup }) => {
-      test.fail(
-        true,
-        '已修正 DINE_IN 枚举、预置刷新顺序并处理延迟配置通知，但点单页仍只生成环境加收 213，测试创建的自动服务加收未稳定生效。',
+      annotateKnownProductFailure(
+        '开启税额计算包含加收后，服务加收实际为 $0.88，未按 Subtotal + Tax 的 10% 计算为 $0.97。',
       );
 
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {

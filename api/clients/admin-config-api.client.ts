@@ -24,6 +24,11 @@ export class AdminConfigApiClient {
     return this.post('/api/staff/member/delete', data);
   }
 
+  /** 根据员工口令和功能 ID 实时校验权限。 */
+  checkPrivilege(data: ApiRequestData): Promise<APIResponse> {
+    return this.post('/api/admin/privilege/check', data);
+  }
+
   /**
    * HTTP method: GET；Swagger 原始 path：`/api/admin/role/list`。
    * 用途：查询角色列表。

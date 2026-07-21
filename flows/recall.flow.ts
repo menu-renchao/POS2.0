@@ -231,6 +231,36 @@ export class RecallFlow {
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
     targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并确认打单成功`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并确认打单成功`,
+  )
+  async printOrderAndReadKitchenTicketStatus(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<number> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.clickPrintInOrderDetailsAndReadKitchenTicketStatus();
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并读取打单结果`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并读取打单结果`,
+  )
+  async printOrderAndReadKitchenTicketResult(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): ReturnType<RecallPage['clickPrintInOrderDetailsAndReadKitchenTicketResult']> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.clickPrintInOrderDetailsAndReadKitchenTicketResult();
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
       ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并进入分单面板`
       : `业务步骤：从 Recall 打开订单 ${orderNumber} 并进入分单面板`,
   )
@@ -364,7 +394,7 @@ export class RecallFlow {
   }
 
   @step((_: RecallPage, sourceOrderNumber: string, targetOrderNumber: string) =>
-    `业务步骤：从 Recall 将订单 ${sourceOrderNumber} 合并到订单 ${targetOrderNumber}`,
+    `业务步骤：从 Recall 将订单 ${sourceOrderNumber} 与订单 ${targetOrderNumber} 合并`,
   )
   async combineOrders(
     recallPage: RecallPage,
@@ -377,7 +407,7 @@ export class RecallFlow {
     await recallPage.expectCombineTargetSelectionReady();
     await recallPage.clickCombineTargetOrder(targetOrderNumber);
     await recallPage.confirmCombineChargeWarningIfNeeded();
-    await recallPage.expectCombinedOrderDetailsReady(targetOrderNumber);
+    await recallPage.expectCombinedOrderDetailsReady(sourceOrderNumber);
     return recallPage;
   }
 
@@ -454,11 +484,11 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<OrderDishesPage> {
     await recallPage.expectLoaded();
     await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
     await recallPage.clickCopyInMoreMenu();
-    return recallPage;
+    return await recallPage.confirmCopyAndEnterOrderDishes();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -554,8 +584,8 @@ export class RecallFlow {
     }
 
     const cleanupRecallPage = cleanupReturnPage
-      ? await this.enterRecallFromSplitReturnPage(cleanupReturnPage, homePage)
-      : await this.enterRecallFromSplitReturnPage(recallPage, homePage);
+      ? await this.openRecallFromSplitReturnPage(cleanupReturnPage, homePage)
+      : await this.openRecallFromSplitReturnPage(recallPage, homePage);
     await cleanupRecallPage.expectLoaded();
     await cleanupRecallPage.openOrderDetails(orderNumber);
     const targetOrderNumbers = options.requireSplitChildren
@@ -585,7 +615,7 @@ export class RecallFlow {
   }
 
   @step('业务步骤：从分单提交返回页进入 Recall')
-  private async enterRecallFromSplitReturnPage(
+  async openRecallFromSplitReturnPage(
     returnedPage: SplitOrderReturnPage,
     homePage: HomePage,
   ): Promise<RecallPage> {
@@ -627,6 +657,19 @@ export class RecallFlow {
         },
       );
     }
+  }
+
+  @step((_: RecallPage, orderNumber: string, dishName: string) =>
+    `业务步骤：从 Recall 订单 ${orderNumber} 对菜品 ${dishName} 发起按菜退款`,
+  )
+  async refundOrderItem(
+    recallPage: RecallPage,
+    orderNumber: string,
+    dishName: string,
+  ): Promise<void> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber);
+    await recallPage.refundOrderItem(0, dishName);
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>

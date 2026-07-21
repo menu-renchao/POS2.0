@@ -7,11 +7,26 @@ export type RestrictedVoidEmployeeSeed = {
   request: ApiRequestData;
 };
 
+export type RestrictedNoteEmployeeSeed = RestrictedVoidEmployeeSeed;
+
 export function buildRestrictedVoidEmployeeSeed(): RestrictedVoidEmployeeSeed {
+  return buildRestrictedEmployeeSeed('VOID', 3);
+}
+
+export function buildRestrictedNoteEmployeeSeed(
+  roleId: string | number,
+): RestrictedNoteEmployeeSeed {
+  return buildRestrictedEmployeeSeed('NOTE', roleId);
+}
+
+function buildRestrictedEmployeeSeed(
+  domain: string,
+  roleId: string | number,
+): RestrictedVoidEmployeeSeed {
   const timestamp = Date.now().toString();
   const name = createShortTestName({
     prefix: 'AT',
-    domain: 'VOID',
+    domain,
     maxLength: 16,
     seed: timestamp.slice(-6),
   });
@@ -30,8 +45,8 @@ export function buildRestrictedVoidEmployeeSeed(): RestrictedVoidEmployeeSeed {
         requireInputCashTips: false,
         user: {
           passcode,
-          roleIds: [3],
-          roles: [{ id: 3 }],
+          roleIds: [roleId],
+          roles: [{ id: roleId }],
           functionIds: [],
           functions: [],
         },

@@ -99,12 +99,20 @@ export function createSystemConfigurationSetupService(
       await service.updateManyByName({ [name]: value }, options),
     updateManyByName: async (values, options = {}) => {
       const index = await loadIndex();
-      const entries = Object.entries(values).map(([name, value]) =>
+      const requestedEntries = Object.entries(values).map(([name, value]) =>
         buildUpdateEntry(resolveIndexEntry(index, name), value),
       );
+      const entries = requestedEntries.filter((entry) => {
+        const currentValue = resolveIndexEntry(index, entry.name).value;
+        return String(currentValue) !== String(entry.value);
+      });
       const oldEntries = entries.map((entry) =>
         buildUpdateEntry(resolveIndexEntry(index, entry.name), resolveIndexEntry(index, entry.name).value),
       );
+
+      if (entries.length === 0) {
+        return async () => {};
+      }
 
       await updateEntries(entries, options);
 

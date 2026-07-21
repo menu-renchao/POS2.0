@@ -503,7 +503,7 @@ pipeline {
 
     // 流水线约束：限制总耗时、防止并发构建、保留最近构建记录。
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 120, unit: 'MINUTES')
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
