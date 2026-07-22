@@ -31,6 +31,7 @@ export class OrderDishesLocators {
   readonly addLineButton: Locator;
   readonly selectedDishAddButton: Locator;
   readonly changePriceButton: Locator;
+  readonly changePriceClearButton: Locator;
   readonly changePriceConfirmButton: Locator;
   readonly itemPriceDiscountDialog: Locator;
   readonly itemPriceChangeButton: Locator;
@@ -233,6 +234,7 @@ export class OrderDishesLocators {
         .or(hostPage.getByTestId('action-rail-button-chgPrc'))
         .first(),
     );
+    this.changePriceClearButton = this.page.getByTestId('preset-currency-keypad-input-clear');
     this.changePriceConfirmButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
       appFrame
         .getByTestId('preset-currency-keypad-input-confirm-button')

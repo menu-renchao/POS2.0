@@ -31,6 +31,7 @@ export class RecallFilterBarSection {
   private readonly searchDialogSubmitButton: Locator;
   private readonly searchDialogKeyboardCloseButton: Locator;
   private readonly activeFilterTags: Locator;
+  private readonly orderCardGrid: Locator;
   readonly orderListContainer: Locator;
 
   constructor(readonly page: Page) {
@@ -70,6 +71,7 @@ export class RecallFilterBarSection {
     this.activeFilterTags = this.page.locator(
       '[data-testid^="recall2-filter-tag-"]:not([data-testid^="recall2-filter-tag-label"]):not([data-testid^="recall2-filter-tag-value"]):visible',
     );
+    this.orderCardGrid = this.page.getByTestId('recall2-order-card-grid');
     this.orderListContainer = this.page.getByTestId('recall2-order-list-container');
   }
 
@@ -210,11 +212,27 @@ export class RecallFilterBarSection {
 
   @step('页面读取：读取当前可见订单号列表')
   async readVisibleOrderNumbers(): Promise<string[]> {
+    if (await this.orderCardGrid.isVisible().catch(() => false)) {
+      const cardOrderNumbers = await this.orderCardGrid.evaluate((orderCardGridElement) => {
+        const matchedOrderNumbers =
+          (orderCardGridElement as HTMLElement).innerText.match(/#\d+/g) ?? [];
+        return [...new Set<string>(matchedOrderNumbers)];
+      });
+
+      if (cardOrderNumbers.length > 0) {
+        return cardOrderNumbers;
+      }
+    }
+
     if (await this.orderListContainer.isVisible().catch(() => false)) {
-      return await this.orderListContainer.evaluate((orderListElement) => {
+      const listOrderNumbers = await this.orderListContainer.evaluate((orderListElement) => {
         const matchedOrderNumbers = (orderListElement as HTMLElement).innerText.match(/#\d+/g) ?? [];
         return [...new Set<string>(matchedOrderNumbers)];
       });
+
+      if (listOrderNumbers.length > 0) {
+        return listOrderNumbers;
+      }
     }
 
     return await this.page.evaluate(() => {
@@ -245,6 +263,17 @@ export class RecallFilterBarSection {
     }
 
     return latestOrderNumber;
+  }
+
+  @step((orderNumber: string) => `页面读取：读取 Recall 订单 ${orderNumber} 的卡片文本`)
+  async readOrderCardText(orderNumber: string): Promise<string> {
+    const normalizedOrderNumber = orderNumber.trim().replace(/^#/, '');
+    const orderCard = this.orderCardGrid
+      .locator('[data-testid^="recall2-order-card-"]')
+      .filter({ has: this.page.getByText(`#${normalizedOrderNumber}`, { exact: true }) });
+
+    await expect(orderCard).toHaveCount(1);
+    return (await orderCard.innerText()).replace(/\s+/g, ' ').trim();
   }
 
   @step('页面读取：读取当前手动搜索关键字')

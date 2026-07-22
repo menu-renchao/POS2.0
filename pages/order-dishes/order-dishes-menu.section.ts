@@ -315,6 +315,7 @@ export class OrderDishesMenuSection {
         (buttonElement as HTMLElement).click();
       });
       await this.expectCurrencyKeypadVisible();
+      await this.clickCurrencyKeypadClear();
       await this.enterCurrencyKeypadAmount(price);
       await waitForInputSettled(undefined, 250);
       const confirmButton = await this.resolveCurrencyKeypadConfirmButton();
@@ -692,6 +693,7 @@ export class OrderDishesMenuSection {
       await expect(changePriceButton).toBeEnabled();
       await changePriceButton.click();
       await this.expectCurrencyKeypadVisible();
+      await this.clickCurrencyKeypadClear();
       await this.enterCurrencyKeypadAmount(price);
       await waitForInputSettled(undefined, 250);
       const confirmButton = await this.resolveCurrencyKeypadConfirmButton();
@@ -838,6 +840,12 @@ export class OrderDishesMenuSection {
       for (const keypadInput of keypadInputs) {
         await (await this.resolveCurrencyKeypadButton(keypadInput)).click();
       }
+    }
+
+    @step('页面操作：清空菜品价格输入框')
+    private async clickCurrencyKeypadClear(): Promise<void> {
+      await expect(this.locators.changePriceClearButton).toBeVisible({ timeout: 5_000 });
+      await this.locators.changePriceClearButton.click();
     }
 
     private async resolveCurrencyKeypadButton(keypadInput: string): Promise<Locator> {

@@ -174,6 +174,12 @@ export function createChargeSetupService(options: AdminConfigSetupOptions): Char
         const id = readResourceId(charge, '自动加收');
         const name = typeof charge.name === 'string' ? charge.name : String(id);
         const registryType = 'charge-configuration';
+        const chargeWithOrderType = {
+          ...charge,
+          id,
+          chargeId: id,
+          orderType: 'DINE_IN',
+        };
 
         if (!options.resourceRegistry.has(registryType, id)) {
           options.resourceRegistry.register({
@@ -184,7 +190,7 @@ export function createChargeSetupService(options: AdminConfigSetupOptions): Char
             cleanup: async () => {
               await expectOkEnvelope(
                 await options.adminConfigApi.saveCharge({
-                  charge: { ...charge, id, chargeId: id },
+                  charge: chargeWithOrderType,
                 }),
               );
             },
@@ -193,7 +199,7 @@ export function createChargeSetupService(options: AdminConfigSetupOptions): Char
 
         await expectOkEnvelope(
           await options.adminConfigApi.saveCharge({
-            charge: { ...charge, id, chargeId: id, active: false },
+            charge: { ...chargeWithOrderType, active: false },
           }),
         );
       }

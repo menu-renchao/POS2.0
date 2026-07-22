@@ -9,7 +9,7 @@ export type MysqlConfig = {
 };
 
 export type MysqlConnectionLike = {
-  query: (sql: string) => Promise<unknown>;
+  query: (sql: string, values?: unknown[]) => Promise<unknown>;
   end: () => Promise<unknown>;
 };
 
@@ -43,6 +43,22 @@ export class MysqlDb {
 
     try {
       await connection.query(sql);
+    } finally {
+      await connection.end();
+    }
+  }
+
+  async queryRows<T>(sql: string, values: unknown[] = []): Promise<T[]> {
+    const connection = await this.connectionFactory(this.connectionOptions());
+
+    try {
+      const result = await connection.query(sql, values);
+
+      if (!Array.isArray(result) || !Array.isArray(result[0])) {
+        throw new Error('MySQL query did not return a row collection.');
+      }
+
+      return result[0] as T[];
     } finally {
       await connection.end();
     }

@@ -6,6 +6,9 @@ import { PaymentPage } from './payment.page';
 import { PagingPage } from './paging.page';
 import { SplitOrderPage } from './split-order.page';
 import { RecallFilterBarSection } from './recall/recall-filter-bar.section';
+import { RecallDateFilterSection } from './recall/recall-date-filter.section';
+import { RecallListSection } from './recall/recall-list.section';
+import { RecallSummarySection } from './recall/recall-summary.section';
 import { RecallOrderDetailsDialog } from './recall/recall-order-details.dialog';
 import { RecallVoidDialog } from './recall/recall-void.dialog';
 
@@ -38,6 +41,9 @@ import type {
 
 export class RecallPage {
   public readonly filterBar: RecallFilterBarSection;
+  public readonly dateFilter: RecallDateFilterSection;
+  public readonly list: RecallListSection;
+  public readonly summary: RecallSummarySection;
   public readonly orderDetails: RecallOrderDetailsDialog;
   public readonly voidDialog: RecallVoidDialog;
   private readonly newOrderButton: Locator;
@@ -46,6 +52,9 @@ export class RecallPage {
 
   constructor(private readonly page: Page) {
     this.filterBar = new RecallFilterBarSection(page);
+    this.dateFilter = new RecallDateFilterSection(page);
+    this.list = new RecallListSection(page);
+    this.summary = new RecallSummarySection(page);
     this.orderDetails = new RecallOrderDetailsDialog(page, this.filterBar);
     this.voidDialog = new RecallVoidDialog(page, this.orderDetails);
     this.newOrderButton = this.page.locator('[data-testid="recall2-header-new-order"]:visible');
@@ -136,12 +145,55 @@ export class RecallPage {
     return this.filterBar.readLatestVisibleOrderNumber();
   }
 
+  @step('页面读取：读取指定 Recall 订单卡片文本')
+  async readOrderCardText(
+    ...args: Parameters<RecallFilterBarSection['readOrderCardText']>
+  ): ReturnType<RecallFilterBarSection['readOrderCardText']> {
+    return this.filterBar.readOrderCardText(...args);
+  }
+
   async readManualSearchKeyword(): Promise<string> {
     return this.filterBar.readManualSearchKeyword();
   }
 
   async readActiveFilterTexts(): Promise<string[]> {
     return this.filterBar.readActiveFilterTexts();
+  }
+
+  @step('页面操作：选择 Recall 日期预设')
+  async selectDatePreset(
+    ...args: Parameters<RecallDateFilterSection['selectPreset']>
+  ): ReturnType<RecallDateFilterSection['selectPreset']> {
+    return this.dateFilter.selectPreset(...args);
+  }
+
+  @step('页面读取：读取 Recall 当前日期范围')
+  async readSelectedDateRange(): ReturnType<RecallDateFilterSection['readSelectedRange']> {
+    return this.dateFilter.readSelectedRange();
+  }
+
+  @step('页面操作：将 Recall 订单切换为列表视图')
+  async switchToListView(): ReturnType<RecallListSection['switchToListView']> {
+    return this.list.switchToListView();
+  }
+
+  @step('页面操作：点击 Recall 列表字段排序')
+  async clickListSort(
+    ...args: Parameters<RecallListSection['clickSort']>
+  ): ReturnType<RecallListSection['clickSort']> {
+    return this.list.clickSort(...args);
+  }
+
+  @step('页面读取：读取 Recall 列表字段的可见值')
+  async readVisibleListColumnValues(
+    ...args: Parameters<RecallListSection['readVisibleColumnValues']>
+  ): ReturnType<RecallListSection['readVisibleColumnValues']> {
+    return this.list.readVisibleColumnValues(...args);
+  }
+
+  @step('页面读取：读取 Recall 查询结果的订单总数')
+  async readOrderCount(): Promise<number> {
+    return this.summary.readOrderCount();
   }
 
   async openOrderDetails(
@@ -272,9 +324,37 @@ export class RecallPage {
     return this.orderDetails.addPaymentCardTip(...args);
   }
 
+  @step((paymentIndex: number, amountInCents: number) =>
+    `页面操作：为第 ${paymentIndex + 1} 笔支付流水添加 Tips ${amountInCents} 分`,
+  )
+  async addPaymentRecordTip(
+    ...args: Parameters<RecallOrderDetailsDialog['addPaymentRecordTip']>
+  ): Promise<string | null> {
+    return this.orderDetails.addPaymentRecordTip(...args);
+  }
+
+  @step((paymentIndex: number) =>
+    `页面读取：读取第 ${paymentIndex + 1} 笔支付流水的 Tips 金额`,
+  )
+  async readPaymentRecordTipAmount(
+    ...args: Parameters<RecallOrderDetailsDialog['readPaymentRecordTipAmount']>
+  ): Promise<number | null> {
+    return this.orderDetails.readPaymentRecordTipAmount(...args);
+  }
+
   @step((serverName: string) => `页面操作：将 Recall 订单服务员切换为 ${serverName}`)
   async changeOrderServer(serverName: string): Promise<void> {
     return this.orderDetails.changeOrderServer(serverName);
+  }
+
+  @step((driverName: string) => `页面操作：将 Recall 订单司机切换为 ${driverName}`)
+  async changeOrderDriver(driverName: string): Promise<void> {
+    return this.orderDetails.changeOrderDriver(driverName);
+  }
+
+  @step('页面读取：读取 Recall 订单当前司机')
+  async readOrderDriverName(): Promise<string> {
+    return this.orderDetails.readOrderDriverName();
   }
 
   async readOrderDetailsSnapshot(): Promise<RecallOrderDetails> {

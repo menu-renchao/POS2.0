@@ -22,13 +22,51 @@ export type CreatedRestrictedEmployee = SetupResource & Pick<RestrictedVoidEmplo
 export type CreatedNoteRestrictedEmployee = SetupResource &
   Pick<RestrictedNoteEmployeeSeed, 'passcode'>;
 
+export type RoleDiscountCapRates = Record<string, number>;
+export type RoleDiscountCapRateRestore = () => Promise<void>;
+
+export type RoleDiscountCapRateUpdateOptions = {
+  verify?: boolean;
+};
+
 export type StaffSetupService = {
   createWithoutKitchenVoidPermission: () => Promise<CreatedRestrictedEmployee>;
   createWithoutNotePermission: () => Promise<CreatedNoteRestrictedEmployee>;
+  readRoleDiscountCapRates: (roleNames: readonly string[]) => Promise<RoleDiscountCapRates>;
+  updateRoleDiscountCapRates: (
+    rates: RoleDiscountCapRates,
+    options?: RoleDiscountCapRateUpdateOptions,
+  ) => Promise<RoleDiscountCapRateRestore>;
 };
 
 export function createStaffSetupService(options: StaffSetupOptions): StaffSetupService {
-  return {
+  const readRoles = async (): Promise<RoleRecord[]> => {
+    const rolesBody = await expectOkEnvelope(await options.adminConfigApi.listRoles());
+    const roles = Array.isArray(rolesBody.data) ? rolesBody.data : [];
+    return roles.map(toRoleRecord).filter((role): role is RoleRecord => role !== undefined);
+  };
+
+  const updateRates = async (rates: RoleDiscountCapRates): Promise<void> => {
+    const requestedEntries = Object.entries(rates);
+    validateRoleDiscountCapRates(requestedEntries);
+    const roles = await readRoles();
+
+    for (const [roleName, discountCapRate] of requestedEntries) {
+      const role = resolveRoleByName(roles, roleName);
+      await expectOkEnvelope(
+        await options.adminConfigApi.saveRole({
+          role: {
+            id: role.id,
+            name: role.name,
+            discountCapRate,
+            function: role.functionIds.map((id) => ({ id })),
+          },
+        }),
+      );
+    }
+  };
+
+  const service: StaffSetupService = {
     createWithoutKitchenVoidPermission: async () => {
       const seed = buildRestrictedVoidEmployeeSeed();
       const resource = await createSetupResource({
@@ -109,7 +147,107 @@ export function createStaffSetupService(options: StaffSetupOptions): StaffSetupS
 
       return { ...employee, passcode: seed.passcode };
     },
+    readRoleDiscountCapRates: async (roleNames) => {
+      const roles = await readRoles();
+      return Object.fromEntries(
+        roleNames.map((roleName) => {
+          const role = resolveRoleByName(roles, roleName);
+          return [roleName, role.discountCapRate];
+        }),
+      );
+    },
+    updateRoleDiscountCapRates: async (rates, updateOptions = {}) => {
+      const roleNames = Object.keys(rates);
+      const originalRates = await service.readRoleDiscountCapRates(roleNames);
+      await updateRates(rates);
+
+      if (updateOptions.verify) {
+        await verifyRoleDiscountCapRates(service, rates);
+      }
+
+      return async () => {
+        await updateRates(originalRates);
+
+        if (updateOptions.verify) {
+          await verifyRoleDiscountCapRates(service, originalRates);
+        }
+      };
+    },
   };
+
+  return service;
+}
+
+type RoleRecord = {
+  id: string | number;
+  name: string;
+  discountCapRate: number;
+  functionIds: Array<string | number>;
+};
+
+function toRoleRecord(value: unknown): RoleRecord | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const { id, name, discountCapRate, function: roleFunctions } = value;
+  if (
+    (typeof id !== 'number' && typeof id !== 'string') ||
+    typeof name !== 'string' ||
+    typeof discountCapRate !== 'number' ||
+    !Array.isArray(roleFunctions)
+  ) {
+    return undefined;
+  }
+
+  const functionIds = roleFunctions
+    .map((roleFunction) => (isRecord(roleFunction) ? roleFunction.id : undefined))
+    .filter((functionId): functionId is string | number =>
+      typeof functionId === 'number' || typeof functionId === 'string',
+    );
+
+  return { id, name, discountCapRate, functionIds };
+}
+
+function resolveRoleByName(roles: RoleRecord[], roleName: string): RoleRecord {
+  const role = roles.find((candidate) => candidate.name === roleName);
+
+  if (!role) {
+    throw new Error(`未找到员工角色：${roleName}`);
+  }
+
+  return role;
+}
+
+function validateRoleDiscountCapRates(entries: Array<[string, number]>): void {
+  if (entries.length === 0) {
+    throw new Error('至少需要提供一个员工角色最大折扣配置。');
+  }
+
+  for (const [roleName, discountCapRate] of entries) {
+    if (!roleName.trim()) {
+      throw new Error('员工角色名称不能为空。');
+    }
+
+    if (!Number.isFinite(discountCapRate) || discountCapRate < 0 || discountCapRate > 100) {
+      throw new Error(`员工角色 ${roleName} 的最大折扣必须在 0 到 100 之间。`);
+    }
+  }
+}
+
+async function verifyRoleDiscountCapRates(
+  service: StaffSetupService,
+  expectedRates: RoleDiscountCapRates,
+): Promise<void> {
+  const actualRates = await service.readRoleDiscountCapRates(Object.keys(expectedRates));
+
+  for (const [roleName, expectedRate] of Object.entries(expectedRates)) {
+    if (actualRates[roleName] !== expectedRate) {
+      throw new Error(
+        `员工角色 ${roleName} 最大折扣更新后校验失败，期望 ${expectedRate}，实际 ${String(actualRates[roleName])}。`,
+      );
+    }
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

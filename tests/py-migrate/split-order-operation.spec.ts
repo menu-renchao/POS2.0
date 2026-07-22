@@ -135,6 +135,7 @@ const manualFixedCharge: ChargeSetupOverrides = {
   triggerMode: 2,
   taxed: false,
   type: 'DEFAULT',
+  orderType: 'dine in',
 };
 
 const manualPercentCharge: ChargeSetupOverrides = {
@@ -144,6 +145,7 @@ const manualPercentCharge: ChargeSetupOverrides = {
   triggerMode: 2,
   taxed: false,
   type: 'DEFAULT',
+  orderType: 'dine in',
 };
 
 const manualChargeEditCases: readonly ChargeEditCase[] = [
@@ -269,6 +271,7 @@ const autoFixedCharge: ChargeSetupOverrides = {
   triggerMode: 1,
   taxed: false,
   type: 'DEFAULT',
+  orderType: 'dine in',
 };
 
 const autoPercentCharge: ChargeSetupOverrides = {
@@ -278,6 +281,7 @@ const autoPercentCharge: ChargeSetupOverrides = {
   triggerMode: 1,
   taxed: false,
   type: 'DEFAULT',
+  orderType: 'dine in',
 };
 
 const autoChargeEditCases: readonly ChargeEditCase[] = [
@@ -455,6 +459,7 @@ const copyAutoFixedCharge: ChargeSetupOverrides = {
   triggerMode: 1,
   taxed: false,
   type: 'DEFAULT',
+  orderType: 'dine in',
 };
 
 const chargeCopyCases: readonly ChargeCopyCase[] = [
@@ -491,9 +496,14 @@ const chargeCopyCases: readonly ChargeCopyCase[] = [
   {
     issue: 'POS-27271',
     title: '[POS-27271] 应能在复制 Delivery 订单时移除不满足里程条件的自动加收',
-    initialCharge: { ...copyAutoFixedCharge, type: 'DELIVERY' },
+    initialCharge: { ...copyAutoFixedCharge, orderType: 'delivery', type: 'DELIVERY' },
     source: 'delivery-auto',
-    updateCharge: { ...copyAutoFixedCharge, minMileage: 999, type: 'DELIVERY' },
+    updateCharge: {
+      ...copyAutoFixedCharge,
+      minMileage: 999,
+      orderType: 'delivery',
+      type: 'DELIVERY',
+    },
     expectedChargeName: copyAutoChargeName,
     expectedChargeAmount: '10.00',
     expectedChargeAvailable: false,
@@ -627,7 +637,12 @@ const combineChargeRecalculationCases: readonly CombineChargeRecalculationCase[]
     title: '[POS-32016] 应能在合单重新计算加收时按合单后金额计算满足条件的 Delivery 加收',
     recalculate: true,
     scenario: 'single-auto',
-    charge: { ...autoPercentCharge, sharedTip: true, type: 'DELIVERY' },
+    charge: {
+      ...autoPercentCharge,
+      orderType: 'delivery',
+      sharedTip: true,
+      type: 'DELIVERY',
+    },
     firstOrderType: 'delivery',
     expectedChargeName: autoPercentChargeName,
     expectedChargeAmount: 'percent10',
@@ -639,7 +654,12 @@ const combineChargeRecalculationCases: readonly CombineChargeRecalculationCase[]
     title: '[POS-32017] 应能在合单重新计算加收时移除不满足条件的 Delivery 加收',
     recalculate: true,
     scenario: 'single-auto',
-    charge: { ...autoPercentCharge, sharedTip: true, type: 'DELIVERY' },
+    charge: {
+      ...autoPercentCharge,
+      orderType: 'delivery',
+      sharedTip: true,
+      type: 'DELIVERY',
+    },
     firstOrderType: 'delivery',
     targetOrderType: 'dine-in',
     expectedChargeName: autoPercentChargeName,

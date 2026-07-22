@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { OrderDishesChargeSection } from './order-dishes/order-dishes-charge.section';
 import { OrderDishesCustomerSection } from './order-dishes/order-dishes-customer.section';
 import { OrderDishesDiscountSection } from './order-dishes/order-dishes-discount.section';
+import { OrderDishesDriverSection } from './order-dishes/order-dishes-driver.section';
 import { OrderDishesMenuSection } from './order-dishes/order-dishes-menu.section';
 import { OrderDishesModifierSection } from './order-dishes/order-dishes-modifier.section';
 import { OrderDishesNoteSection } from './order-dishes/order-dishes-note.section';
@@ -34,6 +35,7 @@ export class OrderDishesPage implements OrderDishesPageHost {
   public readonly charge: OrderDishesChargeSection;
   public readonly customer: OrderDishesCustomerSection;
   public readonly discount: OrderDishesDiscountSection;
+  public readonly driver: OrderDishesDriverSection;
   public readonly reads: OrderDishesReadsSection;
   public readonly tips: OrderDishesTipSection;
 
@@ -48,6 +50,7 @@ export class OrderDishesPage implements OrderDishesPageHost {
     this.charge = new OrderDishesChargeSection(this.ctx, this);
     this.customer = new OrderDishesCustomerSection(this.ctx, this);
     this.discount = new OrderDishesDiscountSection(this.ctx, this);
+    this.driver = new OrderDishesDriverSection(this.ctx);
     this.reads = new OrderDishesReadsSection(this.ctx, this);
     this.tips = new OrderDishesTipSection(this.ctx, this);
   }
@@ -94,6 +97,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
 
   openSearchMenuAndFill(...args: Parameters<OrderDishesMenuSection['openSearchMenuAndFill']>): ReturnType<OrderDishesMenuSection['openSearchMenuAndFill']> {
     return this.menu.openSearchMenuAndFill(...args);
+  }
+
+  selectDriver(...args: Parameters<OrderDishesDriverSection['selectDriver']>): ReturnType<OrderDishesDriverSection['selectDriver']> {
+    return this.driver.selectDriver(...args);
   }
 
   openChineseSearchMenuAndFill(...args: Parameters<OrderDishesMenuSection['openChineseSearchMenuAndFill']>): ReturnType<OrderDishesMenuSection['openChineseSearchMenuAndFill']> {

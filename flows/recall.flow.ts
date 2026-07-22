@@ -14,6 +14,11 @@ import {
   type RecallPaymentType,
   type RecallProductLine,
 } from '../test-data/recall-search-options';
+import type {
+  RecallDatePreset,
+  RecallDateRange,
+  RecallSortableColumn,
+} from '../test-data/recall-list';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 
@@ -227,6 +232,39 @@ export class RecallFlow {
     await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
     await recallPage.clickPrintInOrderDetails();
     return recallPage;
+  }
+
+  @step((_recallPage: RecallPage, preset: RecallDatePreset) =>
+    `业务步骤：应用 Recall 日期预设 ${preset} 并读取日期范围`,
+  )
+  async applyDatePreset(
+    recallPage: RecallPage,
+    preset: RecallDatePreset,
+  ): Promise<RecallDateRange> {
+    await recallPage.expectLoaded();
+    await recallPage.selectDatePreset(preset);
+    return await recallPage.readSelectedDateRange();
+  }
+
+  @step((_recallPage: RecallPage, column: RecallSortableColumn) =>
+    `业务步骤：在 Recall 列表连续切换 ${column} 列的排序方向`,
+  )
+  async readBothSortDirections(
+    recallPage: RecallPage,
+    column: RecallSortableColumn,
+  ): Promise<{
+    first: { direction: 'ascending' | 'descending'; values: string[] };
+    second: { direction: 'ascending' | 'descending'; values: string[] };
+  }> {
+    await recallPage.expectLoaded();
+    await recallPage.switchToListView();
+    const firstDirection = await recallPage.clickListSort(column);
+    const firstValues = await recallPage.readVisibleListColumnValues(column);
+    const secondDirection = await recallPage.clickListSort(column);
+    const secondValues = await recallPage.readVisibleListColumnValues(column);
+    const first = { direction: firstDirection, values: firstValues };
+    const second = { direction: secondDirection, values: secondValues };
+    return { first, second };
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
