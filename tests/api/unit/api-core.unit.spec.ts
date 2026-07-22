@@ -114,9 +114,9 @@ test.describe('API 核心工具', () => {
     expect(
       attachments.find((item) => item.name === 'API POST api/client/session/login')?.body,
     ).toContain('"x-client-sn": "mansuper"');
-    expect(attachments.find((item) => item.name === 'API POST api/login')?.body).toContain(
-      '"passcode": "11"',
-    );
+    const staffLoginAttachment = attachments.find((item) => item.name === 'API POST api/login')?.body;
+    expect(staffLoginAttachment).toContain('"passcode": "[REDACTED]"');
+    expect(staffLoginAttachment).not.toContain('"passcode": "11"');
   });
 
   test('应能在 kpos baseURL 下把相对 API 路径请求到 kpos 目录', async () => {

@@ -36,6 +36,18 @@
 - `API_BASE_URL`：接口根地址，默认 `http://192.168.0.247:22080/kpos`。
 - `API_AUTH_MODE`：可省略；如显式配置，只允许 `apiLogin` 或 `api_login`。
 
+## API 请求日志
+
+API 请求和响应会以摘要形式写入 Allure 附件。成功响应默认最多记录 64 KiB，HTTP 状态码大于等于 400 的失败响应默认最多记录 256 KiB；超限正文按 UTF-8 字节安全截断，并保留原始大小、预览大小和 SHA-256。二进制响应只记录元数据，不内联正文。
+
+日志会脱敏 Cookie、Authorization、密码、员工口令、token 和 session key 等凭据，也不会重复记录请求上下文的完整 `storageState`。
+
+可通过以下环境变量调整预览预算，单位均为 UTF-8 字节；设为 `0` 可省略对应正文预览，配置为负数、非整数或非法文本时会回退默认值：
+
+- `API_LOG_REQUEST_PREVIEW_BYTES`：请求参数预览上限，默认 `32768`。
+- `API_LOG_RESPONSE_PREVIEW_BYTES`：成功响应预览上限，默认 `65536`。
+- `API_LOG_FAILURE_PREVIEW_BYTES`：失败响应预览上限，默认 `262144`。
+
 ## Jenkins 独立流水线
 
 API 测试使用根目录 `Jenkinsfile.api` 作为独立 Jenkins Pipeline 入口，避免和 UI 流水线混跑。

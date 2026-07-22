@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext, type APIResponse } from '@playwri
 import { createLoggedApiRequestContext } from '../../../api/core/api-request-logger';
 
 test.describe('API 请求日志附件', () => {
-  test('应把请求参数、Cookie 和响应内容写入 Allure 附件', async ({}, testInfo) => {
+  test('应在 Allure 附件中记录请求响应摘要并脱敏凭据', async ({}, testInfo) => {
     const response = createApiResponse({
       status: 201,
       headers: {
@@ -13,21 +13,6 @@ test.describe('API 请求日志附件', () => {
     });
     const context = {
       post: async () => response,
-      storageState: async () => ({
-        cookies: [
-          {
-            name: 'licenseAuthKey',
-            value: 'cookie-secret',
-            domain: '127.0.0.1',
-            path: '/kpos',
-            expires: -1,
-            httpOnly: false,
-            secure: false,
-            sameSite: 'Lax',
-          },
-        ],
-        origins: [],
-      }),
     } as unknown as APIRequestContext;
     const loggedContext = createLoggedApiRequestContext(context, testInfo, {
       baseURL: 'http://127.0.0.1:22080/kpos/',
@@ -38,7 +23,7 @@ test.describe('API 请求日志附件', () => {
       },
       name: 'api-test-context',
     });
-    const actualResponse = await loggedContext.post('api/example/save', {
+    const actualResponse = await loggedContext.post('api/example/save?passcode=url-secret', {
       data: {
         user: 'root',
         password: 'request-secret',
@@ -55,11 +40,17 @@ test.describe('API 请求日志附件', () => {
     expect(attachment?.contentType).toBe('application/json');
     expect(attachment?.body).toBeInstanceOf(Buffer);
 
-    const attachmentBody = JSON.parse(attachment?.body?.toString('utf8') ?? '{}');
+    const attachmentText = attachment?.body?.toString('utf8') ?? '{}';
+    const attachmentBody = JSON.parse(attachmentText);
+    expect(attachmentText).not.toContain('request-secret');
+    expect(attachmentText).not.toContain('response-secret');
+    expect(attachmentText).not.toContain('manual-cookie=visible');
+    expect(attachmentText).not.toContain('response-cookie');
+    expect(attachmentText).not.toContain('url-secret');
     expect(attachmentBody).toEqual(
       expect.objectContaining({
         method: 'POST',
-        url: 'api/example/save',
+        url: 'api/example/save?passcode=[REDACTED]',
         context: {
           baseURL: 'http://127.0.0.1:22080/kpos/',
           extraHTTPHeaders: {
@@ -70,38 +61,151 @@ test.describe('API 请求日志附件', () => {
           name: 'api-test-context',
         },
         request: expect.objectContaining({
-          options: expect.objectContaining({
+          truncated: false,
+          content: expect.objectContaining({
             data: {
               user: 'root',
-              password: 'request-secret',
+              password: '[REDACTED]',
             },
             headers: {
-              Cookie: 'manual-cookie=visible',
+              Cookie: '[REDACTED]',
             },
-          }),
-          storageState: expect.objectContaining({
-            cookies: [
-              expect.objectContaining({
-                name: 'licenseAuthKey',
-                value: 'cookie-secret',
-              }),
-            ],
           }),
         }),
         response: expect.objectContaining({
           status: 201,
           headers: expect.objectContaining({
-            'set-cookie': 'JSESSIONID=response-cookie',
+            'set-cookie': '[REDACTED]',
           }),
-          bodyText: '{"code":0,"msg":"ok","password":"response-secret"}',
-          bodyJson: {
-            code: 0,
-            msg: 'ok',
-            password: 'response-secret',
-          },
+          body: expect.objectContaining({
+            truncated: false,
+            format: 'json',
+            content: {
+              code: 0,
+              msg: 'ok',
+              password: '[REDACTED]',
+            },
+          }),
         }),
       }),
     );
+    expect(attachmentBody.request).not.toHaveProperty('storageState');
+    expect(attachmentBody.response).not.toHaveProperty('bodyJson');
+    expect(attachmentBody.response).not.toHaveProperty('bodyText');
+  });
+
+  test('超限响应应按 UTF-8 字节安全截断并记录原始大小', async ({}, testInfo) => {
+    const responseBody = JSON.stringify({
+      password: 'response-secret',
+      message: '中文内容'.repeat(100),
+    });
+    const response = createApiResponse({
+      status: 200,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+      body: responseBody,
+    });
+    const context = {
+      get: async () => response,
+    } as unknown as APIRequestContext;
+    const loggedContext = createLoggedApiRequestContext(context, testInfo, {}, { maxResponseBytes: 80 });
+
+    await loggedContext.get('api/large-response');
+
+    const attachment = testInfo.attachments.find((item) => item.name.includes('GET api/large-response'));
+    const attachmentBody = JSON.parse(attachment?.body?.toString('utf8') ?? '{}');
+    const responseLog = attachmentBody.response.body;
+    expect(responseLog.originalBytes).toBe(Buffer.byteLength(responseBody));
+    expect(responseLog.previewBytes).toBeLessThanOrEqual(80);
+    expect(responseLog.truncated).toBe(true);
+    expect(responseLog.format).toBe('text');
+    expect(responseLog.content).toContain('...[TRUNCATED]');
+    expect(responseLog.content).not.toContain('\uFFFD');
+    expect(responseLog.content).not.toContain('response-secret');
+    expect(responseLog.sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  test('失败响应应使用独立的较大预览预算', async ({}, testInfo) => {
+    const responseBody = '失败详情'.repeat(10);
+    const response = createApiResponse({
+      status: 500,
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+      body: responseBody,
+    });
+    const context = {
+      get: async () => response,
+    } as unknown as APIRequestContext;
+    const loggedContext = createLoggedApiRequestContext(
+      context,
+      testInfo,
+      {},
+      {
+        maxResponseBytes: 8,
+        maxFailureResponseBytes: 256,
+      },
+    );
+
+    await loggedContext.get('api/failed-response');
+
+    const attachment = testInfo.attachments.find((item) => item.name.includes('GET api/failed-response'));
+    const attachmentBody = JSON.parse(attachment?.body?.toString('utf8') ?? '{}');
+    expect(attachmentBody.response.body).toEqual(
+      expect.objectContaining({
+        originalBytes: Buffer.byteLength(responseBody),
+        previewBytes: Buffer.byteLength(responseBody),
+        truncated: false,
+        content: responseBody,
+      }),
+    );
+  });
+
+  test('二进制响应应只记录元数据而不内联正文', async ({}, testInfo) => {
+    const response = createApiResponse({
+      status: 200,
+      headers: { 'content-type': 'application/octet-stream' },
+      body: '\u0000\u0001binary-content',
+    });
+    const context = {
+      get: async () => response,
+    } as unknown as APIRequestContext;
+    const loggedContext = createLoggedApiRequestContext(context, testInfo);
+
+    await loggedContext.get('api/binary-response');
+
+    const attachment = testInfo.attachments.find((item) => item.name.includes('GET api/binary-response'));
+    const attachmentBody = JSON.parse(attachment?.body?.toString('utf8') ?? '{}');
+    expect(attachmentBody.response.body).toEqual(
+      expect.objectContaining({
+        originalBytes: Buffer.byteLength('\u0000\u0001binary-content'),
+        previewBytes: 0,
+        truncated: true,
+        format: 'binary',
+        content: '[BINARY CONTENT OMITTED]',
+      }),
+    );
+  });
+
+  test('超限请求参数应脱敏后再截断', async ({}, testInfo) => {
+    const response = createApiResponse({ status: 204, headers: {}, body: '' });
+    const context = {
+      post: async () => response,
+    } as unknown as APIRequestContext;
+    const loggedContext = createLoggedApiRequestContext(context, testInfo, {}, { maxRequestBytes: 64 });
+
+    await loggedContext.post('api/large-request', {
+      data: {
+        password: 'request-secret',
+        content: '请求内容'.repeat(100),
+      },
+    });
+
+    const attachment = testInfo.attachments.find((item) => item.name.includes('POST api/large-request'));
+    const attachmentText = attachment?.body?.toString('utf8') ?? '{}';
+    const attachmentBody = JSON.parse(attachmentText);
+    expect(attachmentBody.request.truncated).toBe(true);
+    expect(attachmentBody.request.previewBytes).toBeLessThanOrEqual(64);
+    expect(attachmentBody.request.content).toContain('...[TRUNCATED]');
+    expect(attachmentBody.request.content).not.toContain('\uFFFD');
+    expect(attachmentText).not.toContain('request-secret');
   });
 
   test('附件写入失败时应保留原始接口错误', async () => {
@@ -110,7 +214,6 @@ test.describe('API 请求日志附件', () => {
       get: async () => {
         throw requestError;
       },
-      storageState: async () => ({ cookies: [], origins: [] }),
     } as unknown as APIRequestContext;
     const attachTarget = {
       attach: async () => {
@@ -143,6 +246,6 @@ function createApiResponse(options: {
   return {
     status: () => options.status,
     headers: () => options.headers,
-    text: async () => options.body,
+    body: async () => Buffer.from(options.body, 'utf8'),
   } as unknown as APIResponse;
 }
