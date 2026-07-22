@@ -2,15 +2,18 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { OrderDishesPage } from './order-dishes.page';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
+import { SelectTableCardsSection } from './select-table/select-table-cards.section';
 
 export type SelectedTableRecord = {
   areaName: string;
+  tableId?: string;
   tableNumber: string;
 };
 
 type TableEntryState = 'guestCountDialog' | 'orderDishes';
 
 export class SelectTablePage {
+  public readonly cards: SelectTableCardsSection;
   private readonly newOrderButton: Locator;
   private readonly areaButtons: Locator;
   private readonly tableButtons: Locator;
@@ -19,6 +22,7 @@ export class SelectTablePage {
   private readonly loadingTablesStatus: Locator;
 
   constructor(private readonly page: Page) {
+    this.cards = new SelectTableCardsSection(page);
     this.newOrderButton = this.page.getByRole('button', { name: /New order/i });
     this.areaButtons = this.page.locator('button[aria-pressed]');
     this.tableButtons = this.page.getByRole('button').filter({
@@ -227,6 +231,19 @@ export class SelectTablePage {
     }
 
     return matchedTableNumber[1];
+  }
+
+  @step('页面读取：读取桌台卡片的内部桌台 ID')
+  async readTableId(table: Locator): Promise<string> {
+    const tableId = await table.evaluate((tableElement) =>
+      tableElement.closest('[data-table-id]')?.getAttribute('data-table-id'),
+    );
+
+    if (!tableId) {
+      throw new Error('桌台卡片缺少 data-table-id。');
+    }
+
+    return tableId;
   }
 
   private resolveAreaLocator(areaName: string): Locator {

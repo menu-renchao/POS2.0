@@ -25,6 +25,10 @@ type OccupiedTableOrderRow = {
   table_id: number | string;
 };
 
+type LatestTableOrderRow = {
+  order_num: number | string;
+};
+
 function toMysqlDate(date: string): string {
   const [month, day, year] = date.split('/');
 
@@ -213,6 +217,27 @@ export class RecallDatabaseFlow {
     }
 
     return tableId;
+  }
+
+  @step((tableId: string) => `业务步骤：读取桌台 ${tableId} 最新一笔订单的订单号`)
+  async readLatestOrderNumberForTable(tableId: string): Promise<string> {
+    const rows = await this.db.queryRows<LatestTableOrderRow>(
+      [
+        'SELECT order_num',
+        'FROM kpos.order_bill',
+        'WHERE table_id = ?',
+        'ORDER BY id DESC',
+        'LIMIT 1',
+      ].join(' '),
+      [tableId],
+    );
+    const orderNumber = String(rows[0]?.order_num ?? '').trim();
+
+    if (!orderNumber) {
+      throw new Error(`数据库中未找到桌台 ${tableId} 的最新订单号。`);
+    }
+
+    return orderNumber;
   }
 
 }
