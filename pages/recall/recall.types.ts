@@ -25,6 +25,7 @@ export type RecallOrderPaymentRecord = {
 export type RecallOrderItemAddition = {
   name: string;
   price?: string;
+  quantity?: number;
   subAdditions?: RecallOrderItemAddition[];
 };
 
@@ -41,6 +42,8 @@ export type RecallOrderDetailAction =
   | 'edit'
   | 'send'
   | 'print'
+  | 'reprint'
+  | 'resend'
   | 'pay'
   | 'split'
   | 'discount'
@@ -56,6 +59,7 @@ export type RecallOrderDetailsMoreAction =
   | 'tips'
   | 'paging'
   | 'callOff'
+  | 'clearTable'
   | 'copy'
   | 'void'
   | 'sort';
@@ -70,4 +74,19 @@ export type RecallOrderDetails = {
   items: RecallOrderItem[];
   priceSummary: Record<string, number>;
   availableActions: RecallOrderDetailActions;
+};
+
+export type RecallKitchenTicketResult = {
+  httpStatus: number;
+  orderStatus: string | null;
+};
+
+export type RecallResendResult = {
+  httpStatus: number;
+  selectedDishes: string[];
+};
+
+export type RecallDiscountWholeOrderSummary = {
+  orderNumber: string;
+  subtotal: number;
 };

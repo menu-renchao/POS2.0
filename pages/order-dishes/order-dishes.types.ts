@@ -5,6 +5,41 @@ export type OrderedDishItem = {
   price: string | null;
 };
 
+export type SentOrderItemReference = {
+  displayName: string;
+  id: number;
+};
+
+export type SavedComboOptionReference = {
+  name: string;
+  type: string;
+};
+
+export type SavedComboSubItemReference = {
+  saleItemId: number | string;
+  options: SavedComboOptionReference[];
+};
+
+export type SavedOrderItemReference = {
+  saleItemId: number | string;
+  displayText: string;
+  originalSalePrice: number | null;
+  price: number | null;
+  totalAmount: number | null;
+  discount: number | null;
+  discountName: string | null;
+  discountRate: number | null;
+  discountRateType: number | null;
+  comboSubItems: SavedComboSubItemReference[];
+};
+
+export type OrderedDishRowState = {
+  kitchenQuantity: number | null;
+  quantity: string;
+  sentToKitchen: boolean;
+  text: string;
+};
+
 export type OrderedDishItemAddition = {
   name: string;
   price?: string;

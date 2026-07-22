@@ -298,6 +298,8 @@ export class OrderDishesChargeSection {
     @step('页面操作：确认加收并关闭弹窗')
     async confirmChargeDialog(): Promise<void> {
       await this.expectChargeDialogVisible();
+      await waitForInputSettled(undefined, 250);
+      await expect(this.locators.confirmChargeButton).toBeEnabled();
       await this.locators.confirmChargeButton.click();
       await expect(this.locators.chargeDialog).toBeHidden();
       this.persistedChargeState = this.cloneChargeState(this.ensureChargeDraft());

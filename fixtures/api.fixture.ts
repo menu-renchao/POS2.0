@@ -1,11 +1,15 @@
 import { test as base, type APIRequestContext } from '@playwright/test';
 import { AdminConfigApiClient } from '../api/clients/admin-config-api.client';
 import { MenuApiClient } from '../api/clients/menu-api.client';
+import { KitchenApiClient } from '../api/clients/kitchen-api.client';
+import { LayoutConfigApiClient } from '../api/clients/layout-config-api.client';
 import { OrderApiClient } from '../api/clients/order-api.client';
+import { OrderTypeApiClient } from '../api/clients/order-type-api.client';
 import { PaymentApiClient } from '../api/clients/payment-api.client';
 import { SaleItemApiClient } from '../api/clients/sale-item-api.client';
 import { SpuApiClient } from '../api/clients/spu-api.client';
 import { SystemConfigurationApiClient } from '../api/clients/system-configuration-api.client';
+import { PrintConfigApiClient } from '../api/clients/print-config-api.client';
 import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
 import { createApiRequestContext } from '../api/core/api-context';
 import { ResourceRegistry } from '../api/core/resource-registry';
@@ -16,12 +20,16 @@ type ApiFixtures = {
   apiRequest: APIRequestContext;
   resourceRegistry: ResourceRegistry;
   menuApi: MenuApiClient;
+  kitchenApi: KitchenApiClient;
+  layoutConfigApi: LayoutConfigApiClient;
   saleItemApi: SaleItemApiClient;
   spuApi: SpuApiClient;
   orderApi: OrderApiClient;
+  orderTypeApi: OrderTypeApiClient;
   paymentApi: PaymentApiClient;
   adminConfigApi: AdminConfigApiClient;
   systemConfigurationApi: SystemConfigurationApiClient;
+  printConfigApi: PrintConfigApiClient;
   apiSetup: ApiSetup;
 };
 
@@ -66,6 +74,12 @@ export const test = base.extend<ApiFixtures>({
   menuApi: async ({ apiRequest }, use) => {
     await use(new MenuApiClient(apiRequest));
   },
+  kitchenApi: async ({ apiRequest }, use) => {
+    await use(new KitchenApiClient(apiRequest));
+  },
+  layoutConfigApi: async ({ apiRequest }, use) => {
+    await use(new LayoutConfigApiClient(apiRequest));
+  },
   saleItemApi: async ({ apiRequest }, use) => {
     await use(new SaleItemApiClient(apiRequest));
   },
@@ -74,6 +88,9 @@ export const test = base.extend<ApiFixtures>({
   },
   orderApi: async ({ apiRequest }, use) => {
     await use(new OrderApiClient(apiRequest));
+  },
+  orderTypeApi: async ({ apiRequest }, use) => {
+    await use(new OrderTypeApiClient(apiRequest));
   },
   paymentApi: async ({ apiRequest }, use) => {
     await use(new PaymentApiClient(apiRequest));
@@ -84,15 +101,32 @@ export const test = base.extend<ApiFixtures>({
   systemConfigurationApi: async ({ apiRequest }, use) => {
     await use(new SystemConfigurationApiClient(apiRequest));
   },
+  printConfigApi: async ({ apiRequest }, use) => {
+    await use(new PrintConfigApiClient(apiRequest));
+  },
   apiSetup: async (
-    { adminConfigApi, systemConfigurationApi, menuApi, saleItemApi, resourceRegistry },
+    {
+      adminConfigApi,
+      kitchenApi,
+      layoutConfigApi,
+      orderTypeApi,
+      systemConfigurationApi,
+      printConfigApi,
+      menuApi,
+      saleItemApi,
+      resourceRegistry,
+    },
     use,
   ) => {
     try {
       await use(
         createApiSetup({
           adminConfigApi,
+          kitchenApi,
+          layoutConfigApi,
+          orderTypeApi,
           systemConfigurationApi,
+          printConfigApi,
           menuApi,
           saleItemApi,
           resourceRegistry,

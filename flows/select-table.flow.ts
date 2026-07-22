@@ -43,17 +43,65 @@ export class SelectTableFlow {
       }
 
       const tableNumber = await selectTablePage.readTableNumber(selectedTable);
+      const tableId = await selectTablePage.readTableId(selectedTable);
       await selectTablePage.clickTable(selectedTable);
 
       return {
         selectedTable: {
           areaName,
+          tableId,
           tableNumber,
         },
       };
     }
 
     throw new Error('No available table found across all visible areas on the select-table page.');
+  }
+
+  @step('业务步骤：切换到其他区域并选择一张可用空桌')
+  async selectAvailableTableInAnotherArea(
+    selectTablePage: SelectTablePage,
+  ): Promise<TableSelectionResult> {
+    await selectTablePage.expectLoaded();
+    const currentAreaName = await selectTablePage.getCurrentAreaName();
+    const targetAreaNames = (await selectTablePage.readAreaNames()).filter(
+      (areaName) => areaName !== currentAreaName,
+    );
+
+    for (const areaName of targetAreaNames) {
+      await selectTablePage.selectArea(areaName);
+      const availableTables = await selectTablePage.getAvailableTables();
+      const selectedTable = availableTables[0];
+
+      if (!selectedTable) {
+        continue;
+      }
+
+      const tableNumber = await selectTablePage.readTableNumber(selectedTable);
+      const tableId = await selectTablePage.readTableId(selectedTable);
+      await selectTablePage.clickTable(selectedTable);
+
+      return {
+        selectedTable: { areaName, tableId, tableNumber },
+      };
+    }
+
+    throw new Error(`除当前区域 ${currentAreaName} 外没有可用空桌。`);
+  }
+
+  @step('业务步骤：检查所有桌台区域是否至少存在一张空桌')
+  async hasAnyAvailableTable(selectTablePage: SelectTablePage): Promise<boolean> {
+    await selectTablePage.expectLoaded();
+
+    for (const areaName of await selectTablePage.readAreaNames()) {
+      await selectTablePage.selectArea(areaName);
+
+      if ((await selectTablePage.getAvailableTables()).length > 0) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   @step(
@@ -69,11 +117,13 @@ export class SelectTableFlow {
     await selectTablePage.selectArea(areaName);
 
     const table = await selectTablePage.findTableByNumber(tableNumber);
+    const tableId = await selectTablePage.readTableId(table);
     await selectTablePage.clickTable(table);
 
     return {
       selectedTable: {
         areaName,
+        tableId,
         tableNumber,
       },
     };
@@ -108,6 +158,71 @@ export class SelectTableFlow {
     };
   }
 
+  @step(
+    (_orderDishesPage: OrderDishesPage, currentTableNumber: string, guestCount: number) =>
+      `业务步骤：将当前桌台 ${currentTableNumber} 换到任意其他空桌并保留 ${guestCount} 位客人`,
+  )
+  async changeToAnyAvailableTable(
+    orderDishesPage: OrderDishesPage,
+    currentTableNumber: string,
+    guestCount: number,
+  ): Promise<TableOrderEntryResult> {
+    await orderDishesPage.openChangeTable(currentTableNumber);
+    const targetTableNumbers = await orderDishesPage.readAvailableChangeTableNumbers();
+    const targetTableNumber = targetTableNumbers.find(
+      (tableNumber) => tableNumber !== currentTableNumber,
+    );
+
+    if (!targetTableNumber) {
+      throw new Error(`当前桌台 ${currentTableNumber} 没有其他可用的换桌目标。`);
+    }
+
+    await orderDishesPage.selectChangeTableTarget(targetTableNumber);
+    await orderDishesPage.confirmChangeTable(targetTableNumber);
+    await orderDishesPage.expectGuestCount(guestCount);
+    const selectedTable = {
+      areaName: '换桌',
+      tableNumber: targetTableNumber,
+    };
+
+    return {
+      orderDishesPage,
+      selectedTable,
+    };
+  }
+
+  @step(
+    (_homePage: HomePage, selectedTable: SelectedTableRecord, guestCount: number) =>
+      `业务步骤：在桌台 ${selectedTable.tableNumber} 上追加一笔 ${guestCount} 人订单`,
+  )
+  async enterAdditionalOrderForTable(
+    homePage: HomePage,
+    selectedTable: SelectedTableRecord,
+    guestCount: number,
+  ): Promise<OrderDishesPage> {
+    const tableId = this.requireTableId(selectedTable);
+    const selectTablePage = await homePage.enterDineIn();
+    await selectTablePage.selectArea(selectedTable.areaName);
+    await selectTablePage.cards.clickAddOrder(tableId);
+    const orderDishesPage = await selectTablePage.enterOrderDishesAfterSelectingTable(guestCount);
+    await orderDishesPage.expectLoaded();
+    return orderDishesPage;
+  }
+
+  @step(
+    (_homePage: HomePage, selectedTable: SelectedTableRecord) =>
+      `业务步骤：打开桌台 ${selectedTable.tableNumber} 的全部订单`,
+  )
+  async openOrdersForTable(
+    homePage: HomePage,
+    selectedTable: SelectedTableRecord,
+  ): Promise<SelectTablePage> {
+    const selectTablePage = await homePage.enterDineIn();
+    await selectTablePage.selectArea(selectedTable.areaName);
+    await selectTablePage.cards.openTableOrders(selectedTable.tableNumber);
+    return selectTablePage;
+  }
+
   @step('业务步骤：跳过选桌并通过 New order 直接进入点单页')
   async skipTableSelectionAndEnterOrderDishes(
     selectTablePage: SelectTablePage,
@@ -116,5 +231,13 @@ export class SelectTableFlow {
     const orderDishesPage = await selectTablePage.clickNewOrder();
     await orderDishesPage.expectLoaded();
     return orderDishesPage;
+  }
+
+  private requireTableId(selectedTable: SelectedTableRecord): string {
+    if (!selectedTable.tableId) {
+      throw new Error(`桌台 ${selectedTable.tableNumber} 缺少内部桌台 ID。`);
+    }
+
+    return selectedTable.tableId;
   }
 }

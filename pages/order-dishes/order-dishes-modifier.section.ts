@@ -24,6 +24,11 @@ export class OrderDishesModifierSection {
     @step((dishName: string) => `页面操作：选中已点菜品 ${dishName} 并打开 Modify 面板`)
     async openModifyForOrderedDish(dishName: string): Promise<void> {
       await this.selectOrderedDish(dishName);
+      await this.openModifyForSelectedItem();
+    }
+
+    @step('页面操作：为当前选中的菜品打开 Modify 面板')
+    async openModifyForSelectedItem(): Promise<void> {
       await (await this.resolveModifyButton()).click();
       await this.expectModifyPanelVisible();
     }
@@ -33,14 +38,56 @@ export class OrderDishesModifierSection {
       await expect(this.locators.modifyPanel).toBeVisible();
     }
 
+    @step('页面读取：检查 Modify 面板是否可见')
+    async isModifyPanelVisible(): Promise<boolean> {
+      return await this.locators.modifyPanel.isVisible();
+    }
+
     @step('页面操作：点击 Modify 面板返回按钮关闭调味页面')
     async closeModifyPanel(): Promise<void> {
       if (!(await this.locators.modifyPanel.isVisible().catch(() => false))) {
         return;
       }
 
+      if (await this.locators.modifyOptionCountDialog.isVisible().catch(() => false)) {
+        await this.locators.modifyOptionCountCancelButton.click();
+        await expect(this.locators.modifyOptionCountDialog).toBeHidden();
+      }
+
       await this.locators.modifyBackButton.click();
       await expect(this.locators.modifyPanel).toBeHidden();
+    }
+
+    @step('页面操作：点击 Modify 面板外的空白区域关闭调味页面')
+    async closeModifyPanelByClickingBlank(): Promise<void> {
+      await this.expectModifyPanelVisible();
+      const panelBox = await this.locators.modifyPanel.boundingBox();
+      const viewport = this.page.viewportSize();
+
+      if (!panelBox || !viewport) {
+        throw new Error('无法读取 Modify 面板或页面视口尺寸，不能定位面板外空白区域。');
+      }
+
+      const panelRight = panelBox.x + panelBox.width;
+      const leftBlankWidth = panelBox.x;
+      const rightBlankWidth = viewport.width - panelRight;
+      if (leftBlankWidth < 2 && rightBlankWidth < 2) {
+        throw new Error('Modify 面板两侧均没有可点击的面板外空白区域。');
+      }
+
+      const clickPoint = {
+        x:
+          leftBlankWidth >= rightBlankWidth
+            ? Math.max(1, leftBlankWidth / 2)
+            : Math.min(viewport.width - 1, panelRight + rightBlankWidth / 2),
+        y: Math.min(
+          viewport.height - 1,
+          Math.max(1, panelBox.y + panelBox.height * 0.7),
+        ),
+      };
+
+      await this.page.mouse.click(clickPoint.x, clickPoint.y);
+      await expect(this.locators.modifyPanel).toBeHidden({ timeout: 5_000 });
     }
 
     @step((action: string) => `页面操作：选择调味动作 ${action}`)
@@ -58,7 +105,41 @@ export class OrderDishesModifierSection {
     @step((option: string) => `页面操作：选择系统预置调味 ${option}`)
     async selectModifyOption(option: string): Promise<void> {
       await this.expectModifyPanelVisible();
-      await (await this.resolveModifyOptionButton(option)).click();
+      await this.locators.modifyOptionButton(option).click();
+    }
+
+    @step('页面操作：将当前选中的全局选项数量增加 1')
+    async addSelectedModifyOption(): Promise<void> {
+      await this.expectModifyPanelVisible();
+      await this.locators.selectedModifyOptionAddButton.click();
+    }
+
+    @step((quantity: number) => `页面操作：将当前选中的全局选项数量修改为 ${quantity}`)
+    async changeSelectedModifyOptionCount(quantity: number): Promise<void> {
+      if (!Number.isInteger(quantity) || quantity < 0) {
+        throw new Error(`全局选项数量必须是非负整数，实际为 ${quantity}。`);
+      }
+
+      await this.expectModifyPanelVisible();
+      await this.locators.selectedModifyOptionCountButton.click();
+      await expect(this.locators.modifyOptionCountDialog).toBeVisible();
+      await this.locators.modifyOptionCountClearButton.click();
+
+      for (const digit of String(quantity)) {
+        await this.locators.modifyOptionCountNumberButton(digit).click();
+      }
+
+      await expect(this.locators.modifyOptionCountDisplay).toHaveText(String(quantity));
+      await waitForInputSettled(this.locators.modifyOptionCountDisplay);
+      await expect(this.locators.modifyOptionCountConfirmButton).toBeEnabled({ timeout: 5_000 });
+      await this.locators.modifyOptionCountConfirmButton.click();
+      await expect(this.locators.modifyOptionCountDialog).toBeHidden();
+    }
+
+    @step('页面操作：将当前选中的全局选项数量减少 1')
+    async reduceSelectedModifyOption(): Promise<void> {
+      await this.expectModifyPanelVisible();
+      await this.locators.selectedModifyOptionReduceButton.click();
     }
 
     @step((price: ModifierPriceSelection) => `页面操作：选择调味价格 ${price.kind === 'preset' ? price.value : `自定义 ${price.value}`}`)
@@ -172,27 +253,6 @@ export class OrderDishesModifierSection {
           ),
         ],
         `Unable to find Modify ${sectionName} button: ${buttonName}.`,
-      );
-    }
-
-    private async resolveModifyOptionButton(optionName: string): Promise<Locator> {
-      const optionSection = this.resolveModifySection('Option');
-      const escapedOptionName = this.ctx.escapeRegExp(optionName);
-      const optionNamePattern = new RegExp(`^\\s*${escapedOptionName}\\s*(?:\\$[\\d,.]+)?\\s*$`);
-
-      return await this.ctx.resolveVisibleLocator(
-        [
-          optionSection.getByRole('button', { name: optionNamePattern }).first(),
-          optionSection
-            .locator('[data-testid^="modifier-option-"], [data-test-id^="modifier-option-"]')
-            .filter({ hasText: optionNamePattern })
-            .first(),
-          optionSection
-            .locator('[class*="_optionCard_"]')
-            .filter({ hasText: optionNamePattern })
-            .first(),
-        ],
-        `Unable to find Modify option button: ${optionName}.`,
       );
     }
 

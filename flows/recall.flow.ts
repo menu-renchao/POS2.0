@@ -5,7 +5,7 @@ import {
 import { HomePage } from '../pages/home.page';
 import { OrderDishesPage } from '../pages/order-dishes.page';
 import { PaymentPage } from '../pages/payment.page';
-import { SplitOrderPage } from '../pages/split-order.page';
+import { type SplitOrderReturnPage, SplitOrderPage } from '../pages/split-order.page';
 import {
   type RecallManualSearchTag,
   type RecallOrderStatus,
@@ -14,6 +14,11 @@ import {
   type RecallPaymentType,
   type RecallProductLine,
 } from '../test-data/recall-search-options';
+import type {
+  RecallDatePreset,
+  RecallDateRange,
+  RecallSortableColumn,
+} from '../test-data/recall-list';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
 
@@ -35,6 +40,10 @@ export type RecallSearchParams = {
 export type RecallVoidOptions = {
   reason?: string;
   restoreInventory?: boolean;
+};
+
+export type RecallPersistedOrderCleanupOptions = RecallVoidOptions & {
+  requireSplitChildren: boolean;
 };
 
 export class RecallFlow {
@@ -225,6 +234,105 @@ export class RecallFlow {
     return recallPage;
   }
 
+  @step((_recallPage: RecallPage, preset: RecallDatePreset) =>
+    `业务步骤：应用 Recall 日期预设 ${preset} 并读取日期范围`,
+  )
+  async applyDatePreset(
+    recallPage: RecallPage,
+    preset: RecallDatePreset,
+  ): Promise<RecallDateRange> {
+    await recallPage.expectLoaded();
+    await recallPage.selectDatePreset(preset);
+    return await recallPage.readSelectedDateRange();
+  }
+
+  @step((_recallPage: RecallPage, column: RecallSortableColumn) =>
+    `业务步骤：在 Recall 列表连续切换 ${column} 列的排序方向`,
+  )
+  async readBothSortDirections(
+    recallPage: RecallPage,
+    column: RecallSortableColumn,
+  ): Promise<{
+    first: { direction: 'ascending' | 'descending'; values: string[] };
+    second: { direction: 'ascending' | 'descending'; values: string[] };
+  }> {
+    await recallPage.expectLoaded();
+    await recallPage.switchToListView();
+    const firstDirection = await recallPage.clickListSort(column);
+    const firstValues = await recallPage.readVisibleListColumnValues(column);
+    const secondDirection = await recallPage.clickListSort(column);
+    const secondValues = await recallPage.readVisibleListColumnValues(column);
+    const first = { direction: firstDirection, values: firstValues };
+    const second = { direction: secondDirection, values: secondValues };
+    return { first, second };
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并确认打单成功`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并确认打单成功`,
+  )
+  async printOrderAndReadKitchenTicketStatus(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<number> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.clickPrintInOrderDetailsAndReadKitchenTicketStatus();
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并读取打单结果`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并读取打单结果`,
+  )
+  async printOrderAndReadKitchenTicketResult(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): ReturnType<RecallPage['clickPrintInOrderDetailsAndReadKitchenTicketResult']> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.clickPrintInOrderDetailsAndReadKitchenTicketResult();
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并打印小票`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并打印小票`,
+  )
+  async printReceiptAndReadStatus(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<number> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.clickPrintInOrderDetailsAndReadReceiptStatus();
+  }
+
+  @step((_: RecallPage, orderNumber: string) => `业务步骤：重打 Recall 订单 ${orderNumber} 的收据`)
+  async reprintReceiptAndReadStatus(
+    recallPage: RecallPage,
+    orderNumber: string,
+  ): Promise<number> {
+    await recallPage.openOrderDetails(orderNumber);
+    return await recallPage.clickReprintInOrderDetailsAndReadReceiptStatus();
+  }
+
+  @step((_: RecallPage, orderNumber: string, dishNames: readonly string[]) =>
+    `业务步骤：对 Recall 订单 ${orderNumber} 的菜品 ${dishNames.join('、')} 执行 Resend`,
+  )
+  async resendDishes(
+    recallPage: RecallPage,
+    orderNumber: string,
+    dishNames: readonly string[],
+  ): ReturnType<RecallPage['resendDishes']> {
+    await recallPage.openOrderDetails(orderNumber);
+    return await recallPage.resendDishes(dishNames);
+  }
+
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
     targetOrderNumber
       ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并进入分单面板`
@@ -360,7 +468,7 @@ export class RecallFlow {
   }
 
   @step((_: RecallPage, sourceOrderNumber: string, targetOrderNumber: string) =>
-    `业务步骤：从 Recall 将订单 ${sourceOrderNumber} 合并到订单 ${targetOrderNumber}`,
+    `业务步骤：从 Recall 将订单 ${sourceOrderNumber} 与订单 ${targetOrderNumber} 合并`,
   )
   async combineOrders(
     recallPage: RecallPage,
@@ -450,11 +558,11 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<OrderDishesPage> {
     await recallPage.expectLoaded();
     await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
     await recallPage.clickCopyInMoreMenu();
-    return recallPage;
+    return await recallPage.confirmCopyAndEnterOrderDishes();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -489,6 +597,119 @@ export class RecallFlow {
     return await recallPage.attemptVoidCurrentOrder(options);
   }
 
+  @step(
+    (_: RecallPage, orderNumber: string, targetOrderNumbers: string[]) =>
+      `业务步骤：从 Recall 作废分单 ${orderNumber} 的 ${targetOrderNumbers.length} 个子单`,
+  )
+  private async voidSplitChildren(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumbers: string[],
+    options: RecallVoidOptions = {},
+  ): Promise<void> {
+    await recallPage.expectLoaded();
+    if (targetOrderNumbers.length < 2) {
+      throw new Error(`分单 ${orderNumber} 清理时未读取到至少两个子单。`);
+    }
+
+    for (const targetOrderNumber of targetOrderNumbers) {
+      await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+      await recallPage.voidCurrentOrder(options);
+    }
+  }
+
+  @step((_: RecallPage, orderNumber: string) => `业务步骤：从 Recall 作废未分单母单 ${orderNumber}`)
+  private async voidUnsplitOrder(
+    recallPage: RecallPage,
+    orderNumber: string,
+    options: RecallVoidOptions = {},
+  ): Promise<void> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber);
+    await recallPage.voidCurrentOrder(options);
+  }
+
+  @step(
+    (
+      _homePage: HomePage,
+      _recallPage: RecallPage,
+      orderNumber: string,
+      _pendingSplitOrderPage: SplitOrderPage | undefined,
+      _returnedPage: SplitOrderReturnPage | undefined,
+      options: RecallPersistedOrderCleanupOptions,
+    ) =>
+      `业务步骤：按${options.requireSplitChildren ? '已持久化子单' : '允许折回母单'}结构清理订单 ${orderNumber}`,
+  )
+  async cleanupPersistedSplitOrder(
+    homePage: HomePage,
+    recallPage: RecallPage,
+    orderNumber: string,
+    pendingSplitOrderPage: SplitOrderPage | undefined,
+    returnedPage: SplitOrderReturnPage | undefined,
+    options: RecallPersistedOrderCleanupOptions,
+  ): Promise<void> {
+    let cleanupReturnPage = returnedPage;
+
+    if (pendingSplitOrderPage) {
+      cleanupReturnPage = await pendingSplitOrderPage.submitAndReturnPage().catch(async () => {
+        await pendingSplitOrderPage.clickCancelSplit().catch(() => undefined);
+        return await pendingSplitOrderPage.submitAndReturnPage().catch(() => undefined);
+      });
+    }
+
+    const cleanupRecallPage = cleanupReturnPage
+      ? await this.openRecallFromSplitReturnPage(cleanupReturnPage, homePage)
+      : await this.openRecallFromSplitReturnPage(recallPage, homePage);
+    await cleanupRecallPage.expectLoaded();
+    await cleanupRecallPage.openOrderDetails(orderNumber);
+    const targetOrderNumbers = options.requireSplitChildren
+      ? await waitUntil(
+          async () => await cleanupRecallPage.readTargetOrderNumbers(),
+          (orderNumbers) => orderNumbers.length >= 2,
+          {
+            timeout: 10_000,
+            interval: 100,
+            message: `Recall 订单 ${orderNumber} 未展示至少两个持久化子单。`,
+          },
+        )
+      : await cleanupRecallPage.readTargetOrderNumbers();
+
+    if (targetOrderNumbers.length > 0) {
+      await cleanupRecallPage.openOrderDetails(orderNumber, targetOrderNumbers[0]);
+    }
+
+    await cleanupRecallPage.clickClearTableInMoreMenu();
+
+    if (targetOrderNumbers.length > 0) {
+      await this.voidSplitChildren(cleanupRecallPage, orderNumber, targetOrderNumbers, options);
+      return;
+    }
+
+    await this.voidUnsplitOrder(cleanupRecallPage, orderNumber, options);
+  }
+
+  @step('业务步骤：从分单提交返回页进入 Recall')
+  async openRecallFromSplitReturnPage(
+    returnedPage: SplitOrderReturnPage,
+    homePage: HomePage,
+  ): Promise<RecallPage> {
+    try {
+      if (returnedPage instanceof RecallPage) {
+        await returnedPage.expectLoaded();
+        return returnedPage;
+      }
+
+      if (returnedPage instanceof OrderDishesPage) {
+        return await returnedPage.clickRecall();
+      }
+
+      return await returnedPage.enterRecall();
+    } catch {
+      await homePage.expectPrimaryFunctionCardsVisible();
+      return await homePage.enterRecall();
+    }
+  }
+
   @step('业务步骤：对当前 Recall 订单详情中的所有正向支付流水发起退款')
   async refundAllPaymentRecords(recallPage: RecallPage): Promise<void> {
     await recallPage.expectLoaded();
@@ -510,6 +731,19 @@ export class RecallFlow {
         },
       );
     }
+  }
+
+  @step((_: RecallPage, orderNumber: string, dishName: string) =>
+    `业务步骤：从 Recall 订单 ${orderNumber} 对菜品 ${dishName} 发起按菜退款`,
+  )
+  async refundOrderItem(
+    recallPage: RecallPage,
+    orderNumber: string,
+    dishName: string,
+  ): Promise<void> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber);
+    await recallPage.refundOrderItem(0, dishName);
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>

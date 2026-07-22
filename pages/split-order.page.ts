@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { HomePage } from './home.page';
 import { OrderDishesPage } from './order-dishes.page';
+import { PaymentPage } from './payment.page';
 import { RecallPage } from './recall.page';
 import { readVisiblePosAlertText } from './shared/pos-alert';
 import { waitForInputSettled } from '../utils/input-stability';
@@ -12,19 +13,24 @@ export type SplitOrderDishSnapshot = {
   proportion: string | null;
 };
 
+export type SplitOrderDishDisplay = {
+  price: number;
+  quantity: string;
+};
+
 export type SplitOrderSuborderSnapshot = {
   dishes: SplitOrderDishSnapshot[];
   orderNumber: string;
   paidStatus: string | null;
   seats: string[];
-  total: string | null;
+  total: number;
 };
 
 export type SplitOrderSnapshot = {
-  remain: string | null;
+  remain: number | null;
   suborders: SplitOrderSuborderSnapshot[];
   title: string;
-  total: string | null;
+  total: number;
 };
 
 export type SplitOrderReturnPage = HomePage | OrderDishesPage | RecallPage;
@@ -52,6 +58,7 @@ export class SplitOrderPage {
   private readonly confirmButton: Locator;
   private readonly cancelButton: Locator;
   private readonly addSuborderButton: Locator;
+  private readonly suborderPayButton: (suborderIndex: number) => Locator;
   private readonly splitPanelModal: Locator;
   private readonly subordersContainer: Locator;
   private readonly totalValue: Locator;
@@ -62,10 +69,12 @@ export class SplitOrderPage {
   private readonly splitInputCancelButton: Locator;
   private readonly combineDialog: Locator;
   private readonly combineConfirmButton: Locator;
+  private readonly blankOrdersDialog: Locator;
+  private readonly removeBlankOrdersButton: Locator;
   private readonly posToast: Locator;
 
   constructor(private readonly page: Page) {
-    this.splitFrame = this.page.frameLocator('iframe[data-wujie-id="splitPanel"], #splitPanelContainer iframe');
+    this.splitFrame = this.page.frameLocator('#splitPanelContainer iframe');
 
     this.modal = this.splitFrame.getByRole('dialog').first();
     this.title = this.modal.getByRole('heading').first();
@@ -81,15 +90,14 @@ export class SplitOrderPage {
     this.unsplitMenuItem = this.splitFrame.getByTestId('dropdown-item-unsplitBtn');
     this.unsplitButton = this.modal.getByRole('button', { name: /^Unsplit$|取消分单$/ }).first();
     this.moreButton = this.splitFrame.getByTestId('moreBtn');
-    this.confirmButton = this.modal
-      .locator('[data-testid="splitPanelModal-confirm-button"], [data-testid="split-panel-confirm"]')
-      .or(this.modal.getByRole('button', { name: CONFIRM_BUTTON_NAME }).first())
-      .first();
+    this.confirmButton = this.splitFrame.getByTestId('splitPanelModal-confirm-button');
     this.cancelButton = this.modal.getByRole('button', { name: CANCEL_BUTTON_NAME }).first();
     this.addSuborderButton = this.splitFrame
       .getByTestId('button-default')
       .filter({ hasText: 'Add Suborder' })
       .first();
+    this.suborderPayButton = (suborderIndex: number) =>
+      this.splitFrame.getByTestId(`payBtn-${suborderIndex}`);
     this.splitPanelModal = this.splitFrame.getByTestId('splitPanelModal');
     this.subordersContainer = this.modal;
     this.totalValue = this.modal.locator('._value_1lomb_35, [class*="_value_"]').first();
@@ -111,10 +119,23 @@ export class SplitOrderPage {
     this.splitInputCancelButton = this.splitInputDialog
       .getByRole('button', { name: CANCEL_BUTTON_NAME })
       .first();
-    this.combineDialog = this.splitFrame.locator('.splitCombineModal, [role="dialog"]').last();
+    this.combineDialog = this.splitFrame.getByRole('dialog').filter({
+      has: this.splitFrame.getByRole('heading', {
+        name: 'Combine Suborders',
+        exact: true,
+      }),
+    });
     this.combineConfirmButton = this.combineDialog
       .getByRole('button', { name: CONFIRM_BUTTON_NAME })
       .first();
+    this.blankOrdersDialog = this.splitFrame.getByRole('alertdialog', {
+      name: 'Blank Orders Detected',
+      exact: true,
+    });
+    this.removeBlankOrdersButton = this.blankOrdersDialog.getByRole('button', {
+      name: 'Remove & Proceed',
+      exact: true,
+    });
     this.posToast = this.page.locator('[data-testid^="pos-ui-toast-toast-"]').last();
   }
 
@@ -238,6 +259,18 @@ export class SplitOrderPage {
   async clickAddSuborder(): Promise<void> {
     await this.expectLoaded();
     await this.addSuborderButton.click();
+  }
+
+  @step((suborderIndex: number) => `页面操作：点击第 ${suborderIndex} 个子单的 Pay 并进入支付页面`)
+  async openSuborderPayment(suborderIndex: number): Promise<PaymentPage> {
+    await this.expectLoaded();
+    const payButton = this.suborderPayButton(suborderIndex);
+    await expect(payButton).toBeVisible();
+    await payButton.click();
+
+    const paymentPage = new PaymentPage(this.page);
+    await paymentPage.expectLoaded();
+    return paymentPage;
   }
 
   @step((suborderIndex: number) => `页面断言：分单面板展示第 ${suborderIndex} 个子单`)
@@ -389,6 +422,72 @@ export class SplitOrderPage {
     );
   }
 
+  @step((orderNumber: string, dishName: string) => `页面读取：读取子单 ${orderNumber} 中菜品 ${dishName} 的数量和价格`)
+  async readDishDisplay(orderNumber: string, dishName: string): Promise<SplitOrderDishDisplay> {
+    await this.expectLoaded();
+    const display = await this.modal.evaluate(
+      (modal, payload: { dishName: string; orderNumber: string }) => {
+        const normalizeText = (value: string | null | undefined): string =>
+          String(value ?? '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const orderLabelText = `#${payload.orderNumber}`;
+        const attributedSuborder = modal.querySelector<HTMLElement>(
+          `[data-testid="split-suborder"][data-order-number="${payload.orderNumber}"], [class*="_suborderContainer_"][data-order-number="${payload.orderNumber}"], [class*="_suborderCard_"][data-order-number="${payload.orderNumber}"]`,
+        );
+        const orderLabel = Array.from(modal.querySelectorAll<HTMLElement>('*')).find(
+          (element) => normalizeText(element.textContent) === orderLabelText,
+        );
+        let suborder = attributedSuborder;
+        let currentElement = orderLabel ?? null;
+
+        while (!suborder && currentElement) {
+          const currentText = normalizeText(currentElement.textContent);
+          if (currentText.includes(orderLabelText) && currentText.includes('Print') && currentText.includes('Pay')) {
+            suborder = currentElement;
+            break;
+          }
+          currentElement = currentElement.parentElement;
+        }
+
+        if (!suborder) {
+          return null;
+        }
+
+        const dish = Array.from(
+          suborder.querySelectorAll<HTMLElement>('[data-testid="pos-ui-dish-item"]'),
+        ).find(
+          (element) =>
+            normalizeText(element.querySelector('[class*="_dishName_"]')?.textContent) ===
+            payload.dishName,
+        );
+
+        if (!dish) {
+          return null;
+        }
+
+        return {
+          priceText: normalizeText(dish.querySelector('[class*="_dishPrice_"]')?.textContent),
+          quantityText: normalizeText(dish.querySelector('[class*="_quantity_"]')?.textContent),
+        };
+      },
+      { dishName, orderNumber: this.normalizeOrderNumber(orderNumber) },
+    );
+
+    if (!display) {
+      throw new Error(`无法定位子单 ${orderNumber} 中的菜品 ${dishName}。`);
+    }
+
+    const { priceText, quantityText } = display;
+    const price = Number(priceText.replace(/[$,]/g, ''));
+
+    if (!quantityText || Number.isNaN(price)) {
+      throw new Error(`无法读取子单 ${orderNumber} 中菜品 ${dishName} 的数量或价格。`);
+    }
+
+    return { price, quantity: quantityText };
+  }
+
   @step((orderNumber: string, dishName: string) => `页面操作：点击子单 ${orderNumber} 中菜品 ${dishName} 的删除按钮`)
   async clickRemoveDish(orderNumber: string, dishName: string): Promise<void> {
     await this.expectLoaded();
@@ -490,17 +589,24 @@ export class SplitOrderPage {
     const previousUrl = this.page.url();
     await this.confirmButton.click();
 
-    await waitUntil(
+    const submitState = await waitUntil(
       async () => ({
+        blankOrdersVisible: await this.blankOrdersDialog.isVisible().catch(() => false),
         isHidden: await this.modal.isHidden().catch(() => false),
         url: this.page.url(),
       }),
-      (state) => state.isHidden || state.url !== previousUrl,
+      (state) => state.blankOrdersVisible || state.isHidden || state.url !== previousUrl,
       {
         timeout: 5_000,
-        message: 'Split order submit did not close the panel or change the page state in time.',
+        message: '提交分单后未出现空子单确认，也未关闭分单面板或切换页面。',
       },
-    ).catch(() => null);
+    );
+
+    if (submitState.blankOrdersVisible) {
+      await expect(this.removeBlankOrdersButton).toBeVisible();
+      await this.removeBlankOrdersButton.click();
+      await expect(this.blankOrdersDialog).toBeHidden({ timeout: 10_000 });
+    }
 
     await this.waitForReturnPageState(previousUrl);
     return this.resolveReturnPage();
@@ -714,7 +820,24 @@ export class SplitOrderPage {
       throw new Error('Unable to read the split order snapshot because the split panel was not found.');
     }
 
-    return snapshot;
+    return {
+      remain:
+        snapshot.remain === null
+          ? null
+          : this.parseRequiredSnapshotAmount(snapshot.remain, '剩余金额'),
+      suborders: snapshot.suborders.map((suborder) => ({
+        ...suborder,
+        total:
+          suborder.total === null && suborder.dishes.length === 0
+            ? 0
+            : this.parseRequiredSnapshotAmount(
+                suborder.total,
+                `子单 ${suborder.orderNumber} 总额`,
+              ),
+      })),
+      title: snapshot.title,
+      total: this.parseRequiredSnapshotAmount(snapshot.total, '订单总额'),
+    };
   }
 
   @step((orderNumber: string, dishName: string) => `页面读取：读取子单 ${orderNumber} 中菜品 ${dishName} 的平分比例`)
@@ -1081,11 +1204,12 @@ export class SplitOrderPage {
   }
 
   private resolveCombineOrder(orderNumber: string): Locator {
-    return this.combineDialog
-      .locator(
-        `[data-testid="combine-order"][data-order-number="${orderNumber}"], [data-order-number="${orderNumber}"]`,
-      )
-      .first();
+    const normalizedOrderNumber = this.normalizeOrderNumber(orderNumber);
+    const buttonName = new RegExp(
+      `^#${this.escapeRegExp(normalizedOrderNumber)}\\s+Total\\s+\\$`,
+    );
+
+    return this.combineDialog.getByRole('button', { name: buttonName });
   }
 
   private async readSuborderTotal(suborder: Locator): Promise<string | null> {
@@ -1167,6 +1291,20 @@ export class SplitOrderPage {
   private parseSplitDishProportionFromText(text: string): string | null {
     const matchedProportion = text.match(/(?:^|\s)(1\/\d+)(?!\d)/);
     return matchedProportion?.[1] ?? null;
+  }
+
+  private parseRequiredSnapshotAmount(value: string | null, label: string): number {
+    if (value === null) {
+      throw new Error(`分单页面快照缺少${label}。`);
+    }
+
+    const amount = Number(value);
+
+    if (!Number.isFinite(amount)) {
+      throw new Error(`分单页面快照中的${label}不是有效数字：${value}`);
+    }
+
+    return amount;
   }
 
   private normalizeOrderNumber(value: string | null | undefined): string {

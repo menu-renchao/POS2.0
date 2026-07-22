@@ -51,7 +51,7 @@ test.describe('API client 路径工具', () => {
     const client = new AdminConfigApiClient(request as never);
 
     await client.listCharges({ keyword: 'AT_CHG' });
-    await client.saveCharge({ charge: { name: 'AT_CHG' } });
+    await client.saveCharge({ charge: { name: 'AT_CHG', orderType: 'DINE_IN' } });
     await client.deleteCharge({ chargeId: 1201 });
 
     expect(calls).toEqual([
@@ -59,7 +59,7 @@ test.describe('API client 路径工具', () => {
       {
         method: 'POST',
         path: 'api/charge/save',
-        options: { data: { charge: { name: 'AT_CHG' } } },
+        options: { data: { charge: { name: 'AT_CHG', orderType: 'DINE_IN' } } },
       },
       {
         method: 'POST',

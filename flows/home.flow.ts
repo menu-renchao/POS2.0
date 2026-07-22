@@ -19,4 +19,16 @@ export class HomeFlow {
     await this.openHome(homePage);
     return await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage, password);
   }
+
+  @step('业务步骤：刷新系统配置后建立员工上下文')
+  async openHomeAfterConfigurationRefreshWithEmployeeContext(
+    homePage: HomePage,
+    employeeLoginPage: EmployeeLoginPage,
+    password = '11',
+  ): Promise<HomePage> {
+    await this.openHome(homePage);
+    await homePage.clickRefresh();
+    await homePage.confirmDelayedConfigurationRefresh();
+    return await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage, password);
+  }
 }

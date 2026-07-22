@@ -82,4 +82,36 @@ test.describe('DB 工具类', () => {
 
     expect(db.usesMysql2Driver()).toBe(true);
   });
+
+  test('MysqlDb 应返回参数化查询结果并关闭连接', async () => {
+    const calls: unknown[] = [];
+    const db = new MysqlDb(
+      {
+        host: '192.168.0.247',
+        port: 22108,
+        database: 'kpos',
+        user: 'root',
+        password: 'N0mur@4$99!',
+      },
+      async () => ({
+        query: async (sql: string, values?: unknown[]) => {
+          calls.push({ sql, values });
+          return [[{ count: 7 }], []];
+        },
+        end: async () => {
+          calls.push('end');
+        },
+      }),
+    );
+
+    const rows = await db.queryRows<{ count: number }>('SELECT COUNT(*) AS count WHERE id = ?', [
+      42,
+    ]);
+
+    expect(rows).toEqual([{ count: 7 }]);
+    expect(calls).toEqual([
+      { sql: 'SELECT COUNT(*) AS count WHERE id = ?', values: [42] },
+      'end',
+    ]);
+  });
 });

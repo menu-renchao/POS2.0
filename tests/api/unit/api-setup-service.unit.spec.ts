@@ -67,6 +67,10 @@ test.describe('API 数据预置服务', () => {
           updateByName: expect.any(Function),
           updateManyByName: expect.any(Function),
         }),
+        staff: expect.objectContaining({
+          readRoleDiscountCapRates: expect.any(Function),
+          updateRoleDiscountCapRates: expect.any(Function),
+        }),
       }),
     );
   });
@@ -212,6 +216,7 @@ test.describe('API 数据预置服务', () => {
       rateType: 2,
       type: 'SERVICE',
       taxed: true,
+      orderType: 'dine in',
     });
     const chargeList = await apiSetup.charge.read(charge.id);
     await apiSetup.charge.update(charge.id, {
@@ -236,6 +241,7 @@ test.describe('API 数据预置服务', () => {
         type: 'SERVICE',
         taxed: true,
         active: true,
+        orderType: 'DINE_IN',
       }),
     });
     expect(adminConfig.payloads.saveCharge[1]).toEqual({
@@ -249,6 +255,41 @@ test.describe('API 数据预置服务', () => {
     });
     expect(adminConfig.payloads.deleteCharge[0]).toEqual({ chargeId: 1201 });
     expect(resourceRegistry.has('charge', 1201)).toBe(false);
+  });
+
+  test('停用缺少订单类型的自动加收时应补充堂食订单类型', async () => {
+    const adminConfig = createAdminConfigApi();
+    adminConfig.api.listCharges = async () =>
+      createApiResponse({
+        code: 0,
+        msg: 'ok',
+        data: {
+          charge: [
+            {
+              id: 1202,
+              name: 'AT_CHG_INVALID',
+              active: true,
+              triggerMode: 1,
+            },
+          ],
+          count: 1,
+        },
+      });
+    const apiSetup = createApiSetup({
+      adminConfigApi: adminConfig.api as AdminConfigApiClient,
+      resourceRegistry: new ResourceRegistry(),
+    });
+
+    await apiSetup.charge.deactivateInvalidAutomaticCharges();
+
+    expect(adminConfig.payloads.saveCharge[0]).toEqual({
+      charge: expect.objectContaining({
+        id: 1202,
+        chargeId: 1202,
+        active: false,
+        orderType: 'DINE_IN',
+      }),
+    });
   });
 
   test('菜单 create/update/delete 应调用菜单接口并按软删除策略清理', async () => {
@@ -331,6 +372,7 @@ apiFixtureTest.describe('API 数据预置 fixture', () => {
     expect(apiSetup.menu.create).toEqual(expect.any(Function));
     expect(apiSetup.saleItem.create).toEqual(expect.any(Function));
     expect(apiSetup.systemConfiguration.updateManyByName).toEqual(expect.any(Function));
+    expect(apiSetup.staff.updateRoleDiscountCapRates).toEqual(expect.any(Function));
   });
 });
 

@@ -6,6 +6,7 @@ export type HomeEntry =
   | 'Report'
   | 'Admin'
   | 'Recall'
+  | 'Gift Card'
   | 'To Go';
 
 export const HOME_ENTRY_TEST_IDS: Record<HomeEntry, string> = {
@@ -15,6 +16,7 @@ export const HOME_ENTRY_TEST_IDS: Record<HomeEntry, string> = {
   Report: 'pos-ui-function-card-report',
   Admin: 'pos-ui-function-card-admin',
   Recall: 'pos-ui-function-card-recall',
+  'Gift Card': 'pos-ui-function-card-gift_card',
   'To Go': 'pos-ui-function-card-togo',
 };
 

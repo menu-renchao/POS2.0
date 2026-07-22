@@ -9,6 +9,26 @@ import {
 export class AdminConfigApiClient {
   constructor(private readonly request: APIRequestContext) {}
 
+  /** 查询员工列表。 */
+  listStaff(params?: ApiQueryParams): Promise<APIResponse> {
+    return this.get('/api/staff/member/list', params);
+  }
+
+  /** 创建或更新员工。 */
+  saveStaff(data: ApiRequestData): Promise<APIResponse> {
+    return this.post('/api/staff/member/save', data);
+  }
+
+  /** 软删除测试员工。 */
+  deleteStaff(data: ApiRequestData): Promise<APIResponse> {
+    return this.post('/api/staff/member/delete', data);
+  }
+
+  /** 根据员工口令和功能 ID 实时校验权限。 */
+  checkPrivilege(data: ApiRequestData): Promise<APIResponse> {
+    return this.post('/api/admin/privilege/check', data);
+  }
+
   /**
    * HTTP method: GET；Swagger 原始 path：`/api/admin/role/list`。
    * 用途：查询角色列表。

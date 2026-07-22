@@ -47,6 +47,7 @@ npm run test:smoke
 npm run test:e2e
 npm run test:headed
 npm run codegen
+npm run capture:case -- POS-16324
 npm run allure:generate
 npm run allure:open
 ```

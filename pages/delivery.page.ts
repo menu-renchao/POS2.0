@@ -73,10 +73,8 @@ export class DeliveryPage {
   @step('页面操作：在 Delivery 页面点击 Start Order 并进入点单页')
   async clickStartOrder(): Promise<OrderDishesPage> {
     await this.closeKeyboardIfVisible();
-    await waitForInputSettled(this.noteInput);
-    await this.startOrderButton.evaluate((buttonElement) => {
-      (buttonElement as HTMLElement).click();
-    });
+    await waitForInputSettled();
+    await this.startOrderButton.click();
     return new OrderDishesPage(this.page);
   }
 
@@ -86,8 +84,6 @@ export class DeliveryPage {
       return;
     }
 
-    await this.keyboardCloseButton.evaluate((buttonElement) => {
-      (buttonElement as HTMLElement).click();
-    });
+    await this.keyboardCloseButton.click();
   }
 }

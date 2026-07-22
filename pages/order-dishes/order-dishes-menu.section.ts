@@ -6,8 +6,6 @@ import type { OrderDishesPageContext } from './order-dishes-page-context';
 import type { OrderDishesPageHost } from './order-dishes-page-host';
 import type { OrderDishesLocators } from './order-dishes-locators';
 
-const CONFIRM_BUTTON_NAME = /^(Confirm|确认)$/;
-
 export class OrderDishesMenuSection {
   constructor(
     private readonly ctx: OrderDishesPageContext,
@@ -27,22 +25,65 @@ export class OrderDishesMenuSection {
       await expect(this.resolveTableNumberButton(tableNumber)).toBeVisible();
     }
 
+    @step((tableNumber: string) => `页面操作：从点餐页桌号 ${tableNumber} 进入换桌页面`)
+    async openChangeTable(tableNumber: string): Promise<void> {
+      await this.host.expectLoaded();
+      await this.resolveTableNumberButton(tableNumber).click();
+      await expect(this.changeTablePrompt()).toBeVisible();
+      await expect(this.changeTableConfirmButton()).toBeDisabled();
+    }
+
+    @step('页面读取：读取换桌页面中的可选目标桌号')
+    async readAvailableChangeTableNumbers(): Promise<string[]> {
+      await expect(this.changeTablePrompt()).toBeVisible();
+      const targetButtons = this.changeTableTargetButtons();
+      const targetCount = await targetButtons.count();
+      const tableNumbers: string[] = [];
+
+      for (let index = 0; index < targetCount; index += 1) {
+        const text = (await targetButtons.nth(index).innerText()).trim();
+        const tableNumber = text.match(/^\d+/)?.[0];
+        if (tableNumber) {
+          tableNumbers.push(tableNumber);
+        }
+      }
+
+      return tableNumbers;
+    }
+
+    @step((tableNumber: string) => `页面操作：选择换桌目标桌台 ${tableNumber}`)
+    async selectChangeTableTarget(tableNumber: string): Promise<void> {
+      const targetTable = this.page.getByRole('button', {
+        name: new RegExp(`^${this.ctx.escapeRegExp(tableNumber)}\\s+Seat2Icon(?:\\s|$)`),
+      });
+      await expect(targetTable).toHaveCount(1);
+      await targetTable.click();
+      await expect(this.changeTableConfirmButton()).toBeEnabled();
+    }
+
+    @step((tableNumber: string) => `页面操作：确认换桌到桌台 ${tableNumber} 并返回点餐页`)
+    async confirmChangeTable(tableNumber: string): Promise<void> {
+      await this.changeTableConfirmButton().click();
+      await this.host.expectLoaded();
+      await this.expectTableNumber(tableNumber);
+    }
+
     @step((guestCount: number) => `页面操作：确认点餐页顶部人数为 ${guestCount}`)
     async expectGuestCount(guestCount: number): Promise<void> {
-      await expect(await this.resolveGuestCountButton(guestCount)).toBeVisible();
+      await expect(this.locators.guestCountButton).toHaveText(String(guestCount));
     }
 
     @step((guestCount: number) => `页面操作：将点餐页人数改为 ${guestCount}`)
     async changeGuestCount(guestCount: number): Promise<void> {
       await this.host.expectLoaded();
-      await (await this.resolveAnyGuestCountButton()).click();
+      await this.locators.guestCountButton.click();
 
-      const guestCountDialog = await this.resolveGuestCountDialog();
-      await expect(guestCountDialog).toBeVisible();
-      await guestCountDialog.getByRole('button', { name: String(guestCount), exact: true }).click();
+      await expect(this.locators.guestCountDialog).toBeVisible();
+      await this.locators.guestCountClearButton.click();
+      await this.locators.guestCountNumberButton(guestCount).click();
       await waitForInputSettled(undefined, 250);
-      await this.resolveGuestCountDialogConfirmButton(guestCountDialog).click();
-      await expect(guestCountDialog).toBeHidden({ timeout: 10_000 });
+      await this.locators.guestCountConfirmButton.click();
+      await expect(this.locators.guestCountDialog).toBeHidden({ timeout: 10_000 });
       await this.expectGuestCount(guestCount);
     }
 
@@ -104,22 +145,122 @@ export class OrderDishesMenuSection {
       await searchResult.click();
     }
 
+    @step((visible: boolean) => `页面断言：Search Menu 入口${visible ? '可见' : '不可见'}`)
+    async expectSearchMenuVisible(visible: boolean): Promise<void> {
+      if (visible) {
+        await expect(this.locators.searchMenuButton).toBeVisible();
+        return;
+      }
+
+      await expect(this.locators.searchMenuButton).toBeHidden();
+    }
+
+    @step((query: string) => `页面操作：打开 Search Menu 并搜索 ${query}`)
+    async openSearchMenuAndFill(query: string): Promise<void> {
+      await this.locators.searchMenuButton.click();
+      await expect(this.locators.searchMenuInput).toBeVisible();
+      await this.locators.searchMenuInput.fill(query);
+    }
+
+    @step((query: string) => `页面操作：在中文界面打开搜索菜单并搜索 ${query}`)
+    async openChineseSearchMenuAndFill(query: string): Promise<void> {
+      await this.locators.chineseSearchMenuButton.click();
+      await expect(this.locators.searchMenuInput).toBeVisible();
+      await this.locators.searchMenuInput.fill(query);
+    }
+
+    @step(
+      (name: string, itemNumber: string) =>
+        `页面读取：获取 Search Menu 中名称 ${name}、编号 ${itemNumber} 的结果数量`,
+    )
+    async readSearchMenuResultCountByNameAndNumber(
+      name: string,
+      itemNumber: string,
+    ): Promise<number> {
+      const resultCards = this.locators.searchMenuResultCardsByNameAndNumber(
+        name,
+        itemNumber,
+      );
+      await resultCards.first().waitFor({ state: 'visible', timeout: 10_000 });
+      return await resultCards.count();
+    }
+
+    @step(
+      (testId: string, expectedText: string) =>
+        `页面断言：Search Menu 结果 ${testId} 展示 ${expectedText}`,
+    )
+    async expectSearchMenuResult(testId: string, expectedText: string): Promise<void> {
+      await expect(this.locators.searchMenuResultCard(testId)).toContainText(expectedText);
+    }
+
+    @step((dishName: string) => `页面断言：Search Menu 展示菜品 ${dishName}`)
+    async expectSearchMenuResultByName(dishName: string): Promise<void> {
+      await expect(this.locators.menuItemButtonByName(dishName)).toBeVisible();
+    }
+
+    @step((testId: string) => `页面操作：点击 Search Menu 结果 ${testId}`)
+    async clickSearchMenuResult(testId: string): Promise<void> {
+      await this.locators.searchMenuResultCard(testId).click();
+    }
+
     @step((groupName: string) => `页面操作：切换菜单组 ${groupName}`)
     async switchMenuGroup(groupName: string): Promise<void> {
       await this.host.expectLoaded();
-      await (await this.resolveMenuGroupCard(groupName)).click();
+      await this.locators.menuGroupCard(groupName).click();
+      await expect(this.locators.selectedMenuGroupName).toHaveText(groupName);
     }
 
     @step((categoryName: string) => `页面操作：切换菜单类别 ${categoryName}`)
     async switchMenuCategory(categoryName: string): Promise<void> {
       await this.host.expectLoaded();
-      await (await this.resolveMenuCategoryCard(categoryName)).click();
+      await this.locators.menuCategoryCard(categoryName).click();
+      await expect(this.locators.selectedMenuCategoryName).toContainText(categoryName);
     }
 
     @step((groupName: string, categoryName: string) => `页面操作：切换菜单组 ${groupName} 和类别 ${categoryName}`)
     async switchMenu(groupName: string, categoryName: string): Promise<void> {
       await this.switchMenuGroup(groupName);
       await this.switchMenuCategory(categoryName);
+    }
+
+    @step('页面读取：读取当前选中的菜单组名称')
+    async readSelectedMenuGroupName(): Promise<string> {
+      await this.host.expectLoaded();
+      return (await this.locators.selectedMenuGroupName.innerText()).replace(/\s+/g, ' ').trim();
+    }
+
+    @step('页面读取：读取当前选中的菜单类别名称')
+    async readSelectedMenuCategoryName(): Promise<string> {
+      await this.host.expectLoaded();
+      return (await this.locators.selectedMenuCategoryName.innerText()).replace(/\s+/g, ' ').trim();
+    }
+
+    @step('页面读取：读取菜单类别名称列表')
+    async readMenuCategoryNames(): Promise<string[]> {
+      await this.host.expectLoaded();
+      return (await this.locators.menuCategoryCards.allInnerTexts())
+        .map((name) => name.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+    }
+
+    @step('页面读取：读取当前类别的菜品名称列表')
+    async readCurrentCategoryDishNames(): Promise<string[]> {
+      await this.host.expectLoaded();
+      return (await this.locators.menuItemCards.allInnerTexts())
+        .map((name) => name.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+    }
+
+    @step('页面操作：点击当前类别的第一道菜品')
+    async clickFirstCurrentCategoryDish(): Promise<void> {
+      await this.host.expectLoaded();
+      await this.locators.menuItemCards.first().click();
+    }
+
+    @step((dishName: string) => `页面操作：按名称 ${dishName} 点击当前类别菜品`)
+    async clickCurrentCategoryDish(dishName: string): Promise<void> {
+      await this.host.expectLoaded();
+      await this.locators.menuItemButtonByName(dishName).click();
     }
 
     @step((quantity: number) => `页面操作：通过 Count 按钮将待点菜数量修改为 ${quantity}`)
@@ -217,13 +358,14 @@ export class OrderDishesMenuSection {
         (buttonElement as HTMLElement).click();
       });
       await this.expectCurrencyKeypadVisible();
+      await this.clickCurrencyKeypadClear();
       await this.enterCurrencyKeypadAmount(price);
       await waitForInputSettled(undefined, 250);
       const confirmButton = await this.resolveCurrencyKeypadConfirmButton();
       await confirmButton.evaluate((buttonElement) => {
         (buttonElement as HTMLElement).click();
       });
-      await expect(confirmButton).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
+      await expect(confirmButton).toBeHidden({ timeout: 5_000 });
     }
 
     @step((dishName: string, taxExempt: boolean) =>
@@ -355,6 +497,78 @@ export class OrderDishesMenuSection {
       await expect(this.locators.openFoodConfirmButton).toBeHidden();
     }
 
+    @step((dishName: string) => `页面操作：将菜品 ${dishName} 标记为 To Go`)
+    async markOrderedDishToGo(dishName: string): Promise<void> {
+      await this.host.expectLoaded();
+      await this.selectOrderedDish(dishName);
+      await this.locators.changeToGoButton.click();
+      await expect(this.locators.orderedDishItemByName(dishName)).toContainText('To go', {
+        ignoreCase: true,
+      });
+    }
+
+    @step('页面操作：打开 Open Food 弹框')
+    async openOpenFoodDialog(): Promise<void> {
+      await this.host.expectLoaded();
+      await this.locators.openFoodButton.click();
+      await expect(this.locators.openFoodDialog).toBeVisible();
+      await expect(this.locators.openFoodKeyboardLanguageButton).toBeVisible();
+    }
+
+    @step('页面读取：读取 Open Food 屏幕键盘语言标识')
+    async readOpenFoodKeyboardLanguage(): Promise<string> {
+      return (await this.locators.openFoodKeyboardLanguageButton.innerText()).trim();
+    }
+
+    @step('页面操作：切换 Open Food 屏幕键盘语言')
+    async switchOpenFoodKeyboardLanguage(): Promise<void> {
+      await this.locators.openFoodKeyboardLanguageButton.click();
+    }
+
+    @step((letters: readonly string[]) => `页面操作：通过屏幕键盘输入拼音 ${letters.join('')}`)
+    async pressOpenFoodKeyboardLetters(letters: readonly string[]): Promise<void> {
+      for (const letter of letters) {
+        await this.locators.openFoodKeyboardLetterButton(letter).click();
+      }
+    }
+
+    @step((candidate: string) => `页面操作：选择屏幕键盘中文候选字 ${candidate}`)
+    async selectOpenFoodKeyboardCandidate(candidate: string): Promise<void> {
+      await this.locators.openFoodKeyboardCandidateButton(candidate).click();
+      await expect(this.locators.openFoodNameInput).toHaveValue(candidate);
+    }
+
+    @step('页面读取：读取 Open Food 名称')
+    async readOpenFoodName(): Promise<string> {
+      return await this.locators.openFoodNameInput.inputValue();
+    }
+
+    @step((price: number) => `页面操作：填写 Open Food 价格 ${price} 并确认`)
+    async fillOpenFoodPriceAndConfirm(price: number): Promise<void> {
+      await this.locators.openFoodPriceInput.fill(price.toFixed(3));
+      await this.locators.openFoodKeyboardCloseButton.click();
+      await waitForInputSettled(this.locators.openFoodPriceInput);
+      await this.locators.openFoodConfirmButton.click();
+      await expect(this.locators.openFoodDialog).toBeHidden();
+    }
+
+    @step((name: string, price: number) => `页面操作：添加不选择税的 Open Food 菜品 ${name}，价格 ${price}`)
+    async addOpenFoodWithoutTax(name: string, price: number): Promise<void> {
+      await this.host.expectLoaded();
+      await this.locators.openFoodButton.click();
+      await expect(this.locators.openFoodConfirmButton).toBeVisible();
+
+      await this.locators.openFoodNameInput.fill(name);
+      await this.locators.openFoodPriceInput.fill(price.toFixed(3));
+      await this.locators.openFoodKeyboardCloseButton.click();
+      await this.locators.openFoodNoTaxOption.click();
+      await waitForInputSettled(this.locators.openFoodPriceInput);
+      await this.locators.openFoodConfirmButton.click();
+      await expect(this.locators.notification).toContainText('No tax selected. Confirm to save?');
+      await this.locators.notificationConfirmButton.click();
+      await expect(this.locators.openFoodConfirmButton).toBeHidden();
+    }
+
     @step('页面操作：确认规格选择弹窗可见')
     async expectSpecificationDialogVisible(): Promise<void> {
       await expect(this.locators.specificationDialog).toBeVisible();
@@ -379,13 +593,12 @@ export class OrderDishesMenuSection {
 
     @step((suboption: string) => `页面操作：检查分类二级 option ${suboption} 是否可见`)
     private async isCategorySubOptionVisible(suboption: string): Promise<boolean> {
-      const escapedSuboption = this.ctx.escapeRegExp(suboption);
-      const suboptionPattern = new RegExp(`^\\s*${escapedSuboption}\\s*(?:\\$[\\d,.]+)?\\s*$`);
+      return await this.locators.itemOptionButton(suboption).isVisible().catch(() => false);
+    }
 
-      return await this.page
-        .getByRole('button', { name: suboptionPattern })
-        .isVisible()
-        .catch(() => false);
+    @step((optionName: string) => `页面断言：菜品 option ${optionName} 可见`)
+    async expectItemOptionVisible(optionName: string): Promise<void> {
+      await expect(this.locators.itemOptionButton(optionName)).toBeVisible();
     }
 
     @step('页面操作：检查分类 option 面板是否可见')
@@ -424,8 +637,9 @@ export class OrderDishesMenuSection {
         : `页面操作：选择分类 option ${option}`,
     )
     async selectCategoryOption(option: string, suboption?: string): Promise<void> {
-      await this.expectCategoryOptionPanelVisible();
-      await (await this.resolveCategoryOptionButton(option)).click();
+      const optionButton = this.locators.itemOptionButton(option);
+      await expect(optionButton).toBeVisible();
+      await optionButton.click();
 
       if (suboption) {
         await waitUntil(
@@ -436,7 +650,7 @@ export class OrderDishesMenuSection {
             message: `分类二级 option ${suboption} 未在超时内可见。`,
           },
         );
-        await (await this.resolveCategorySubOptionButton(suboption)).click();
+        await this.locators.itemOptionButton(suboption).click();
       }
     }
 
@@ -471,7 +685,80 @@ export class OrderDishesMenuSection {
 
     @step('页面操作：确认套餐选择')
     async confirmComboDialog(): Promise<void> {
+      await waitForInputSettled(undefined, 250);
       await this.locators.comboConfirmButton.click();
+      await expect(this.locators.comboDialog).toBeHidden();
+    }
+
+    @step((comboName: string) => `页面操作：选中已点套餐 ${comboName} 并打开套餐编辑器`)
+    async openComboEditorForOrderedCombo(comboName: string): Promise<void> {
+      await this.selectOrderedDish(comboName);
+      await expect(this.locators.comboDialog).toBeVisible();
+    }
+
+    @step(
+      (sectionId: number, saleItemId: number) =>
+        `页面操作：在套餐区域 ${sectionId} 选择菜品 ID ${saleItemId}`,
+    )
+    async selectComboItem(
+      sectionId: number,
+      saleItemId: number,
+      itemIndex: number = 0,
+    ): Promise<void> {
+      const comboItemButton = this.locators.comboItemButton(sectionId, saleItemId, itemIndex);
+      await expect(comboItemButton).toBeVisible();
+      await comboItemButton.click();
+    }
+
+    @step(
+      (sectionId: number, saleItemId: number) =>
+        `页面断言：套餐区域 ${sectionId} 的菜品 ID ${saleItemId} 可见`,
+    )
+    async expectComboItemVisible(
+      sectionId: number,
+      saleItemId: number,
+      itemIndex: number = 0,
+    ): Promise<void> {
+      await expect(this.locators.comboItemButton(sectionId, saleItemId, itemIndex)).toBeVisible();
+    }
+
+    @step(
+      (comboName: string, saleItemId: number) =>
+        `页面操作：选择套餐 ${comboName} 的子菜 ID ${saleItemId}`,
+    )
+    async selectComboSubItem(comboName: string, saleItemId: number): Promise<void> {
+      const comboSubItem = this.locators.comboSubItemBySaleItemId(comboName, saleItemId);
+      await expect(comboSubItem).toBeVisible();
+      await comboSubItem.click();
+    }
+
+    @step(
+      (comboName: string, saleItemId: number, price: number) =>
+        `页面操作：将套餐 ${comboName} 的子菜 ID ${saleItemId} 改价为 ${price}`,
+    )
+    async changeComboSubItemPrice(
+      comboName: string,
+      saleItemId: number,
+      price: number,
+    ): Promise<void> {
+      await this.selectComboSubItem(comboName, saleItemId);
+      const changePriceButton = await this.resolveChangePriceButton();
+      await expect(changePriceButton).toBeEnabled();
+      await changePriceButton.click();
+      await this.expectCurrencyKeypadVisible();
+      await this.clickCurrencyKeypadClear();
+      await this.enterCurrencyKeypadAmount(price);
+      await waitForInputSettled(undefined, 250);
+      const confirmButton = await this.resolveCurrencyKeypadConfirmButton();
+      await confirmButton.click();
+      await expect(confirmButton).toBeHidden({ timeout: 5_000 });
+    }
+
+    @step((dishName: string) => `页面操作：删除已点套餐 ${dishName} 当前选中的一个 option`)
+    async reduceSelectedComboOption(dishName: string): Promise<void> {
+      await this.selectOrderedDish(dishName);
+      await expect(this.locators.reduceSelectedOptionButton).toBeVisible();
+      await this.locators.reduceSelectedOptionButton.click();
     }
 
     @step((dishName: string, times: number) => `页面操作：将已点菜品 ${dishName} 减菜 ${times} 次`)
@@ -492,6 +779,42 @@ export class OrderDishesMenuSection {
       for (let index = 0; index < times; index += 1) {
         await removeButton.click();
       }
+    }
+
+    @step((dishName: string) => `页面操作：尝试删除已送厨菜品 ${dishName} 并校验权限提示`)
+    async requestSentDishRemovalAndExpectAuthorization(dishName: string): Promise<void> {
+      await this.selectOrderedDish(dishName);
+      await this.locators.removeItemButton.click();
+      await this.expectPendingDishRemovalAuthorization();
+    }
+
+    @step((dishName: string) => `页面操作：双击并删除已送厨菜品 ${dishName}`)
+    async removeSentDish(dishName: string): Promise<void> {
+      await this.host.expectLoaded();
+      const orderedDish = this.locators.orderedDishItemByName(dishName);
+      await expect(orderedDish).toBeVisible();
+      await orderedDish.dblclick();
+      await expect(this.locators.removeItemButton).toBeVisible();
+      await this.locators.removeItemButton.click();
+    }
+
+    @step('页面校验：校验已出现送厨删菜授权提示')
+    async expectPendingDishRemovalAuthorization(): Promise<void> {
+      await expect(this.locators.kitchenVoidPermissionMessage).toBeVisible();
+      await expect(this.locators.authorizationConfirmButton).toBeVisible();
+    }
+
+    @step('页面操作：输入授权员工口令并确认删菜授权')
+    async authorizePendingDishRemoval(passcode: string): Promise<void> {
+      if (!/^\d+$/.test(passcode)) {
+        throw new Error('删菜授权口令必须只包含数字。');
+      }
+
+      for (const digit of passcode) {
+        await this.locators.authorizationDigitButton(digit).click();
+      }
+      await this.locators.authorizationConfirmButton.click();
+      await expect(this.locators.authorizationConfirmButton).toBeHidden();
     }
 
     @step((dishName: string, quantity: number) => `页面操作：将已点菜品 ${dishName} 数量修改为 ${quantity}`)
@@ -582,6 +905,12 @@ export class OrderDishesMenuSection {
       }
     }
 
+    @step('页面操作：清空菜品价格输入框')
+    private async clickCurrencyKeypadClear(): Promise<void> {
+      await expect(this.locators.changePriceClearButton).toBeVisible({ timeout: 5_000 });
+      await this.locators.changePriceClearButton.click();
+    }
+
     private async resolveCurrencyKeypadButton(keypadInput: string): Promise<Locator> {
       if (keypadInput === 'double-zero') {
         return await this.ctx.resolveVisibleLocator(
@@ -644,53 +973,10 @@ export class OrderDishesMenuSection {
       throw new Error(`Unable to find dish button: ${dishName}.`);
     }
 
-    private async resolveMenuGroupCard(groupName: string): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.menuGroupCards
-            .filter({
-              hasText: new RegExp(this.ctx.escapeRegExp(groupName)),
-            })
-            .first(),
-          this.locators.appFrame.getByRole('button', { name: groupName, exact: true }).first(),
-          this.page.getByRole('button', { name: groupName, exact: true }).first(),
-        ],
-        `Unable to find menu group: ${groupName}.`,
-      );
-    }
-
-    private async resolveMenuCategoryCard(categoryName: string): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.menuCategoryCards
-            .filter({
-              hasText: new RegExp(this.ctx.escapeRegExp(categoryName)),
-            })
-            .first(),
-          this.locators.appFrame.getByRole('button', { name: categoryName, exact: true }).first(),
-          this.page.getByRole('button', { name: categoryName, exact: true }).first(),
-        ],
-        `Unable to find menu category: ${categoryName}.`,
-      );
-    }
-
     private async resolveOrderedDishButton(dishName: string): Promise<Locator> {
-      const escapedDishName = this.ctx.escapeRegExp(dishName);
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByRole('button', {
-            name: new RegExp(
-              `(?:^|\\s)\\d+\\s+${escapedDishName}(?:\\s+\\d+\\s+sent)?\\s+\\$[\\d,.]+`,
-            ),
-          }).first(),
-          this.page.getByRole('button', {
-            name: new RegExp(
-              `(?:^|\\s)\\d+\\s+${escapedDishName}(?:\\s+\\d+\\s+sent)?\\s+\\$[\\d,.]+`,
-            ),
-          }).first(),
-        ],
-        `Unable to find ordered dish button: ${dishName}.`,
-      );
+      const orderedDishButton = this.locators.orderedDishItemByName(dishName);
+      await expect(orderedDishButton).toBeVisible();
+      return orderedDishButton;
     }
 
     private async waitUntilWeightDialogReady(): Promise<void> {
@@ -841,58 +1127,23 @@ export class OrderDishesMenuSection {
     }
 
     private resolveTableNumberButton(tableNumber: string): Locator {
-      return this.locators.appFrame
-        .getByRole('button', {
-          name: new RegExp(`TableIcon\\s*${this.ctx.escapeRegExp(tableNumber)}`),
-        })
-        .or(
-          this.page.getByRole('button', {
-            name: new RegExp(`TableIcon\\s*${this.ctx.escapeRegExp(tableNumber)}`),
-          }),
-        )
-        .first();
+      return this.page.getByRole('button', {
+        name: new RegExp(`^TableIcon\\s*${this.ctx.escapeRegExp(tableNumber)}$`),
+      });
     }
 
-    private async resolveGuestCountButton(guestCount: number): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByRole('button', { name: new RegExp(`SeatIcon\\s*${guestCount}`) }).first(),
-          this.locators.appFrame.getByRole('button', { name: new RegExp(`SeatIcon\\s*${guestCount}`) }).first(),
-        ],
-        `Unable to find order-dishes guest-count button for ${guestCount}.`,
-      );
+    private changeTablePrompt(): Locator {
+      return this.page.getByText('Select a target table', { exact: true });
     }
 
-    private async resolveAnyGuestCountButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByRole('button', { name: /SeatIcon\s*\d+/ }).first(),
-          this.locators.appFrame.getByRole('button', { name: /SeatIcon\s*\d+/ }).first(),
-        ],
-        'Unable to find order-dishes guest-count button.',
-      );
+    private changeTableTargetButtons(): Locator {
+      return this.page.getByRole('button', {
+        name: /^\d+\s+Seat2Icon(?:\s|$)/,
+      });
     }
 
-    private async resolveGuestCountDialog(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByRole('dialog', { name: 'Party Size' }).first(),
-          this.page
-            .getByRole('dialog')
-            .filter({ has: this.page.getByRole('heading', { name: 'Party Size' }) })
-            .first(),
-          this.locators.appFrame.getByRole('dialog', { name: 'Party Size' }).first(),
-          this.locators.appFrame
-            .getByRole('dialog')
-            .filter({ has: this.locators.appFrame.getByRole('heading', { name: 'Party Size' }) })
-            .first(),
-        ],
-        'Unable to find order-dishes guest-count dialog.',
-      );
-    }
-
-    private resolveGuestCountDialogConfirmButton(guestCountDialog: Locator): Locator {
-      return guestCountDialog.getByRole('button', { name: CONFIRM_BUTTON_NAME }).first();
+    private changeTableConfirmButton(): Locator {
+      return this.page.getByRole('button', { name: 'Confirm', exact: true });
     }
 
     private async resolveSharedSeatButton(): Promise<Locator> {

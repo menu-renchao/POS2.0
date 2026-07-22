@@ -101,7 +101,39 @@ properties([
                 fallbackScript: [
                     classpath: [],
                     sandbox: true,
-                    script: 'return ["all"]'
+                    script: '''
+                        def workspaceCandidates = []
+                        def envWorkspace = System.getenv('WORKSPACE')
+                        if (envWorkspace) {
+                            workspaceCandidates << envWorkspace
+                        }
+
+                        def jenkinsHome = System.getenv('JENKINS_HOME')
+                        def jobName = System.getenv('JOB_NAME')
+                        if (jenkinsHome && jobName) {
+                            workspaceCandidates << new File(jenkinsHome, "workspace/${jobName}").path
+                        }
+
+                        workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
+                        for (workspacePath in workspaceCandidates.unique()) {
+                            def suitePath = new File(workspacePath, 'tests/py-migrate')
+                            if (!suitePath.isDirectory()) {
+                                continue
+                            }
+
+                            def hasSpec = false
+                            suitePath.eachFileRecurse { testFile ->
+                                if (testFile.isFile() && testFile.name.endsWith('.spec.ts')) {
+                                    hasSpec = true
+                                }
+                            }
+                            if (hasSpec) {
+                                return ['all', 'py-migrate']
+                            }
+                        }
+
+                        return ['all']
+                    '''
                 ],
                 script: [
                     classpath: [],
@@ -127,37 +159,29 @@ properties([
                                 if (treeFile.isFile()) {
                                     def tree = new groovy.json.JsonSlurperClassic().parseText(treeFile.getText('UTF-8'))
                                     if (tree.suites) {
-                                        return tree.suites.collect { it.toString() }
+                                        def suites = tree.suites.collect { it.toString() }.findAll { it in ['all', 'py-migrate'] }
+                                        if (suites) {
+                                            return suites
+                                        }
                                     }
                                 }
                             }
 
                             for (workspacePath in workspaceCandidates.unique()) {
-                                def testsDir = new File(workspacePath, 'tests')
-                                if (!testsDir.isDirectory()) {
+                                def suitePath = new File(workspacePath, 'tests/py-migrate')
+                                if (!suitePath.isDirectory()) {
                                     continue
                                 }
 
-                                def suites = []
-                                testsDir.eachFile { suiteDir ->
-                                    if (!suiteDir.isDirectory()) {
-                                        return
-                                    }
-
-                                    def hasSpec = false
-                                    suiteDir.eachFileRecurse { testFile ->
-                                        if (testFile.isFile() && testFile.name.endsWith('.spec.ts')) {
-                                            hasSpec = true
-                                        }
-                                    }
-
-                                    if (hasSpec) {
-                                        suites << suiteDir.name
+                                def hasSpec = false
+                                suitePath.eachFileRecurse { testFile ->
+                                    if (testFile.isFile() && testFile.name.endsWith('.spec.ts')) {
+                                        hasSpec = true
                                     }
                                 }
 
-                                if (!suites.isEmpty()) {
-                                    return (['all'] + suites.sort()).unique()
+                                if (hasSpec) {
+                                    return ['all', 'py-migrate']
                                 }
                             }
 
@@ -213,7 +237,14 @@ properties([
                             workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
 
                             selectedSuite = selectedSuite ?: 'all'
+                            selectedSuite = ['all', 'py-migrate'].contains(selectedSuite) ? selectedSuite : 'all'
                             def checkedPaths = []
+                            def isValidUiSpecPath = { String path ->
+                                path != null
+                                    && path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')
+                                    && !path.contains('//')
+                                    && path.split('/').every { segment -> segment != '.' && segment != '..' }
+                            }
                             def toChoiceMap = { items ->
                                 def choices = new LinkedHashMap()
                                 items.collect { it.toString() }.findAll { it }.unique().sort().each { choice ->
@@ -228,13 +259,14 @@ properties([
                                 if (treeFile.isFile()) {
                                     def tree = new groovy.json.JsonSlurperClassic().parseText(treeFile.getText('UTF-8'))
                                     def files = tree.files instanceof Map ? tree.files[selectedSuite] : []
+                                    files = files instanceof Collection ? files.findAll { isValidUiSpecPath(it.toString()) } : []
                                     if (files) {
                                         return toChoiceMap(files)
                                     }
                                 }
                             }
 
-                            def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
+                            def suitePath = 'tests/py-migrate'
                             for (workspacePath in workspaceCandidates.unique()) {
                                 def suiteDir = new File(workspacePath, suitePath)
                                 checkedPaths << suiteDir.path
@@ -317,7 +349,14 @@ properties([
                             workspaceCandidates << 'C:/ProgramData/Jenkins/.jenkins/workspace/POS2.0 UI'
 
                             selectedSuite = selectedSuite ?: 'all'
+                            selectedSuite = ['all', 'py-migrate'].contains(selectedSuite) ? selectedSuite : 'all'
                             def checkedPaths = []
+                            def isValidUiSpecPath = { String path ->
+                                path != null
+                                    && path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')
+                                    && !path.contains('//')
+                                    && path.split('/').every { segment -> segment != '.' && segment != '..' }
+                            }
                             def toChoiceMap = { items ->
                                 def choices = new LinkedHashMap()
                                 items.collect { it.toString() }.findAll { it }.unique().sort().each { choice ->
@@ -328,9 +367,7 @@ properties([
                             def selectedFiles = selectedFilesValue instanceof Collection
                                 ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
                                 : selectedFilesValue.toString().split(',').collect { it.trim() }.findAll { it }
-                            if (selectedSuite != 'all') {
-                                selectedFiles = selectedFiles.findAll { it.startsWith("tests/${selectedSuite}/") }
-                            }
+                            selectedFiles = selectedFiles.findAll { isValidUiSpecPath(it) }
 
                             def parseCasesFromText = { String specText ->
                                 def cases = []
@@ -381,6 +418,7 @@ properties([
                                 def files = selectedFiles
                                     ? selectedFiles
                                     : (tree.files instanceof Map ? tree.files[selectedSuite] : [])
+                                files = files instanceof Collection ? files.findAll { isValidUiSpecPath(it.toString()) } : []
                                 def cases = []
                                 files.each { file ->
                                     def fileCases = tree.cases instanceof Map ? tree.cases[file.toString()] : []
@@ -394,7 +432,7 @@ properties([
                                 }
                             }
 
-                            def suitePath = selectedSuite == 'all' ? 'tests' : "tests/${selectedSuite}"
+                            def suitePath = 'tests/py-migrate'
                             for (workspacePath in workspaceCandidates.unique()) {
                                 def specDir = new File(workspacePath, suitePath)
                                 checkedPaths << specDir.path
@@ -406,7 +444,7 @@ properties([
                                 def cases = []
                                 def specFiles = []
                                 if (selectedFiles) {
-                                    selectedFiles.each { selectedFile ->
+                                    selectedFiles.findAll { isValidUiSpecPath(it) }.each { selectedFile ->
                                         def specFile = new File(workspacePath, selectedFile)
                                         checkedPaths << specFile.path
                                         if (specFile.isFile() && specFile.name.endsWith('.spec.ts')) {
@@ -503,7 +541,7 @@ pipeline {
 
     // 流水线约束：限制总耗时、防止并发构建、保留最近构建记录。
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 120, unit: 'MINUTES')
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
@@ -565,7 +603,7 @@ pipeline {
         // 生成用例树：用 Playwright 自己的 --list 结果产出 suite/file/case 联动数据。
         stage('Generate Test Tree') {
             steps {
-                bat 'npm run jenkins:test-tree'
+                bat 'npm run jenkins:test-tree -- tests/py-migrate --project=py-migrate'
             }
         }
 
@@ -589,27 +627,24 @@ pipeline {
                         echo 'Timer build detected. Running full default suite without file or case filters.'
                     }
 
-                    // 解析运行目标：优先使用已选 spec 文件；未选文件时，all 跑全量，其余套件映射到 tests/<suite>。
+                    // 解析运行目标：优先使用已选 UI spec 文件；未选文件时运行全部 py-migrate UI 测试。
                     def headedFlag = (!isTimerBuild && params.HEADED) ? ' --headed' : ''
-                    def selectedSuite = isTimerBuild ? 'all' : (params.TEST_SUITE ?: 'all')
-                    if (selectedSuite != 'all' && !selectedSuite.matches('[A-Za-z0-9_-]+')) {
-                        error "Invalid TEST_SUITE value: ${selectedSuite}"
+                    def isValidUiSpecPath = { String path ->
+                        path != null
+                            && path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')
+                            && !path.contains('//')
+                            && path.split('/').every { segment -> segment != '.' && segment != '..' }
                     }
                     def selectedFilesValue = isTimerBuild ? '' : (params.TEST_FILE ?: '')
                     def selectedFiles = selectedFilesValue instanceof Collection
                         ? selectedFilesValue.collect { it.toString().trim() }.findAll { it }
                         : selectedFilesValue.toString().split('\\s*,\\s*').collect { it.trim() }.findAll { it }
                     for (selectedFile in selectedFiles) {
-                        if (!selectedFile.matches('tests/[A-Za-z0-9_./-]+\\.spec\\.ts')) {
-                            error "Invalid TEST_FILE value: ${selectedFile}"
-                        }
-                        if (selectedSuite != 'all' && !selectedFile.startsWith("tests/${selectedSuite}/")) {
-                            error "TEST_FILE is outside selected TEST_SUITE: ${selectedFile}"
+                        if (!isValidUiSpecPath(selectedFile)) {
+                            error "Invalid UI TEST_FILE value: ${selectedFile}"
                         }
                     }
-                    def testTarget = selectedFiles
-                        ? selectedFiles.join(' ')
-                        : (selectedSuite == 'all' ? '' : "tests/${selectedSuite}")
+                    def testTarget = selectedFiles ? selectedFiles.join(' ') : 'tests/py-migrate'
 
                     // 解析多选用例：Active Choices 多选值可能是集合或逗号分隔字符串。
                     def selectedCases = isTimerBuild ? '' : (params.TEST_CASE_GREP ?: '')
@@ -657,7 +692,7 @@ pipeline {
                         ? " --grep \"${grepValue.replace('"', '\\"').replace('%', '%%')}\""
                         : ''
 
-                    bat "node node_modules/playwright/cli.js test ${testTarget}${headedFlag}${grepFlag}"
+                    bat "node node_modules/@playwright/test/cli.js test ${testTarget} --project=py-migrate${headedFlag}${grepFlag}"
                 }
             }
             post {

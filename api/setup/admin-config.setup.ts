@@ -35,6 +35,10 @@ export type ChargeSetupService = {
   read: (id: ResourceId) => Promise<unknown>;
   update: (id: ResourceId, overrides: ChargeSetupOverrides) => Promise<SetupResource>;
   delete: (id: ResourceId) => Promise<void>;
+  deactivateInvalidAutomaticCharges: () => Promise<ReadonlyArray<{
+    id: ResourceId;
+    name: string;
+  }>>;
 };
 
 export function createTaxSetupService(options: AdminConfigSetupOptions): TaxSetupService {
@@ -162,7 +166,82 @@ export function createChargeSetupService(options: AdminConfigSetupOptions): Char
       await expectOkEnvelope(await options.adminConfigApi.deleteCharge({ chargeId: id }));
       options.resourceRegistry.markCleaned('charge', id);
     },
+    deactivateInvalidAutomaticCharges: async () => {
+      const body = await expectOkEnvelope(await options.adminConfigApi.listCharges());
+      const invalidCharges = readChargeRecords(body.data).filter(isInvalidAutomaticCharge);
+
+      for (const charge of invalidCharges) {
+        const id = readResourceId(charge, '自动加收');
+        const name = typeof charge.name === 'string' ? charge.name : String(id);
+        const registryType = 'charge-configuration';
+        const chargeWithOrderType = {
+          ...charge,
+          id,
+          chargeId: id,
+          orderType: 'DINE_IN',
+        };
+
+        if (!options.resourceRegistry.has(registryType, id)) {
+          options.resourceRegistry.register({
+            type: registryType,
+            id,
+            name,
+            cleanupPriority: 100,
+            cleanup: async () => {
+              await expectOkEnvelope(
+                await options.adminConfigApi.saveCharge({
+                  charge: chargeWithOrderType,
+                }),
+              );
+            },
+          });
+        }
+
+        await expectOkEnvelope(
+          await options.adminConfigApi.saveCharge({
+            charge: { ...chargeWithOrderType, active: false },
+          }),
+        );
+      }
+
+      return invalidCharges.map((charge) => {
+        const id = readResourceId(charge, '自动加收');
+        return {
+          id,
+          name: typeof charge.name === 'string' ? charge.name : String(id),
+        };
+      });
+    },
   };
+}
+
+function readChargeRecords(value: unknown): Record<string, unknown>[] {
+  if (!isRecord(value) || !Array.isArray(value.charge)) {
+    throw new Error('加收列表接口未返回 data.charge 数组。');
+  }
+
+  return value.charge.filter(isRecord);
+}
+
+function isInvalidAutomaticCharge(charge: Record<string, unknown>): boolean {
+  return (
+    charge.active === true &&
+    charge.triggerMode === 1 &&
+    (typeof charge.orderType !== 'string' || charge.orderType.trim() === '')
+  );
+}
+
+function readResourceId(value: Record<string, unknown>, label: string): ResourceId {
+  const id = value.id ?? value.chargeId;
+  if (typeof id !== 'number' && typeof id !== 'string') {
+    throw new Error(`${label}配置缺少可恢复的 ID。`);
+  }
+
+  return id;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function mergeTaxUpdateRequest(id: ResourceId, overrides: TaxSetupOverrides): ApiRequestData & { tax: Record<string, unknown> } {

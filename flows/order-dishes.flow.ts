@@ -66,7 +66,83 @@ export type CustomModifierParams = {
   price?: number | string;
 };
 
+export type PresetItemDiscountParams = {
+  authorizationPasscode: string;
+  discountName: string;
+  dishName: string;
+  price?: number;
+};
+
+export type ModifyGlobalOptionOperation =
+  | { type: 'add' }
+  | { type: 'count'; quantity: number }
+  | { type: 'reduce' };
+
+export type ModifyGlobalOptionQuantityParams = {
+  closeAfter?: boolean;
+  dishName: string;
+  operations: readonly ModifyGlobalOptionOperation[];
+  optionName: string;
+};
+
+export type ModifyGlobalOptionQuantityResult = {
+  modifyPanelVisible: boolean[];
+  quantities: number[];
+};
+
+export type ComboDishOptionSelection = {
+  option: string;
+  suboption?: string;
+};
+
+export type ComboDishWithOptionsParams = {
+  comboName: string;
+  itemIndex?: number;
+  menuSelection: MenuSelection;
+  saleItemId: number;
+  sectionId: number;
+  selections: readonly ComboDishOptionSelection[];
+};
+
 export class OrderDishesFlow {
+  @step(
+    (_orderDishesPage: OrderDishesPage, dishName: string, optionName: string) =>
+      `业务步骤：为菜品 ${dishName} 添加全局调味 ${optionName} 后点击空白区域退出 Modify`,
+  )
+  async addGlobalOptionAndCloseModifyByBlank(
+    orderDishesPage: OrderDishesPage,
+    dishName: string,
+    optionName: string,
+  ): Promise<void> {
+    await orderDishesPage.openModifyForOrderedDish(dishName);
+    await orderDishesPage.selectModifyOption(optionName);
+    await orderDishesPage.closeModifyPanelByClickingBlank();
+  }
+
+  @step(
+    (_orderDishesPage: OrderDishesPage, params: ComboDishWithOptionsParams) =>
+      `业务步骤：添加套餐 ${params.comboName}，为套餐子菜选择多个 option`,
+  )
+  async addComboDishWithItemOptions(
+    orderDishesPage: OrderDishesPage,
+    params: ComboDishWithOptionsParams,
+  ): Promise<void> {
+    await orderDishesPage.expectLoaded();
+    await this.switchMenu(orderDishesPage, params.menuSelection);
+    await orderDishesPage.clickDish(params.comboName);
+    await orderDishesPage.selectComboItem(
+      params.sectionId,
+      params.saleItemId,
+      params.itemIndex ?? 0,
+    );
+
+    for (const selection of params.selections) {
+      await orderDishesPage.selectCategoryOption(selection.option, selection.suboption);
+    }
+
+    await orderDishesPage.confirmComboDialog();
+  }
+
   @step('业务步骤：添加普通菜品到购物车')
   async addRegularDish(
     orderDishesPage: OrderDishesPage,
@@ -194,6 +270,16 @@ export class OrderDishesFlow {
     await orderDishesPage.addOpenFood(name, price);
   }
 
+  @step((_: OrderDishesPage, name: string, price: number) => `业务步骤：添加无税 Open Food 菜品 ${name}，价格 ${price}`)
+  async addOpenFoodItemWithoutTax(
+    orderDishesPage: OrderDishesPage,
+    name: string,
+    price: number,
+  ): Promise<void> {
+    await orderDishesPage.expectLoaded();
+    await orderDishesPage.addOpenFoodWithoutTax(name, price);
+  }
+
   @step('业务步骤：通用添加菜品到购物车')
   async addDishToCart(
     orderDishesPage: OrderDishesPage,
@@ -231,6 +317,33 @@ export class OrderDishesFlow {
     return await orderDishesPage.sendOrder();
   }
 
+  @step('业务步骤：打印当前订单收据并保存订单号')
+  async printReceiptWithReference(
+    orderDishesPage: OrderDishesPage,
+  ): ReturnType<OrderDishesPage['printReceiptWithReference']> {
+    await orderDishesPage.expectLoaded();
+    return await orderDishesPage.printReceiptWithReference();
+  }
+
+  @step((_: OrderDishesPage, dishName: string, note: string) =>
+    `业务步骤：为菜品 ${dishName} 添加 Note：${note}`,
+  )
+  async addDishNote(
+    orderDishesPage: OrderDishesPage,
+    dishName: string,
+    note: string,
+    authorizationPasscode = '11',
+  ): Promise<void> {
+    await orderDishesPage.selectOrderedDish(dishName);
+    const state = await orderDishesPage.openSelectedItemNote();
+
+    if (state === 'authorization') {
+      await orderDishesPage.authorizeSelectedItemNote(authorizationPasscode);
+    }
+
+    await orderDishesPage.fillSelectedItemNote(note);
+  }
+
   @step((_: OrderDishesPage, dishName: string) => `业务步骤：编辑已下单菜品 ${dishName} 并加 1`)
   async increaseOrderedDishQuantityByOne(
     orderDishesPage: OrderDishesPage,
@@ -263,6 +376,54 @@ export class OrderDishesFlow {
         }
       }
     });
+  }
+
+  @step(
+    (_orderDishesPage: OrderDishesPage, params: ModifyGlobalOptionQuantityParams) =>
+      `业务步骤：在 Modify 中调整全局选项 ${params.optionName} 的数量`,
+  )
+  async changeGlobalOptionQuantity(
+    orderDishesPage: OrderDishesPage,
+    params: ModifyGlobalOptionQuantityParams,
+  ): Promise<ModifyGlobalOptionQuantityResult> {
+    const modifyPanelVisible: boolean[] = [];
+    const quantities: number[] = [];
+
+    await this.runModifyPanelFlow(
+      orderDishesPage,
+      params.dishName,
+      params.closeAfter ?? false,
+      async () => {
+        await orderDishesPage.selectModifyOption(params.optionName);
+        quantities.push(
+          await orderDishesPage.readOrderedDishAdditionQuantity(
+            params.dishName,
+            params.optionName,
+          ),
+        );
+        modifyPanelVisible.push(await orderDishesPage.isModifyPanelVisible());
+
+        for (const operation of params.operations) {
+          if (operation.type === 'add') {
+            await orderDishesPage.addSelectedModifyOption();
+          } else if (operation.type === 'count') {
+            await orderDishesPage.changeSelectedModifyOptionCount(operation.quantity);
+          } else {
+            await orderDishesPage.reduceSelectedModifyOption();
+          }
+
+          quantities.push(
+            await orderDishesPage.readOrderedDishAdditionQuantity(
+              params.dishName,
+              params.optionName,
+            ),
+          );
+          modifyPanelVisible.push(await orderDishesPage.isModifyPanelVisible());
+        }
+      },
+    );
+
+    return { modifyPanelVisible, quantities };
   }
 
   @step(
@@ -433,6 +594,28 @@ export class OrderDishesFlow {
       await orderDishesPage.closeChargeDialog();
       throw error;
     }
+  }
+
+  @step(
+    (_orderDishesPage: OrderDishesPage, params: PresetItemDiscountParams) =>
+      params.price === undefined
+        ? `业务步骤：为菜品 ${params.dishName} 选择预置单菜折扣 ${params.discountName}`
+        : `业务步骤：将菜品 ${params.dishName} 改价为 ${params.price.toFixed(2)} 并选择预置单菜折扣 ${params.discountName}`,
+  )
+  async applyPresetItemDiscount(
+    orderDishesPage: OrderDishesPage,
+    params: PresetItemDiscountParams,
+  ): Promise<void> {
+    await orderDishesPage.selectOrderedDish(params.dishName);
+    await orderDishesPage.openSelectedItemPriceDiscountDialog();
+
+    if (params.price !== undefined) {
+      await orderDishesPage.fillSelectedItemPrice(params.price);
+    }
+
+    await orderDishesPage.selectItemDiscount(params.discountName);
+    await orderDishesPage.confirmItemPriceAndDiscountForAuthorization();
+    await orderDishesPage.authorizeItemPriceAndDiscount(params.authorizationPasscode);
   }
 
   @step(

@@ -5,13 +5,14 @@
   "description": "Playwright + TypeScript UI automation project for the POS frontend",
   "scripts": {
     "test": "playwright test",
-    "test:scripts": "node --test tests/scripts/codegen.unit.test.mjs",
+    "test:scripts": "node --test tests/scripts/codegen.unit.test.mjs tests/scripts/capture-case.unit.test.mjs tests/scripts/jenkinsfile-ui-scope.unit.test.mjs",
     "test:api": "playwright test tests/api/business tests/api/contracts tests/api/endpoints tests/api/unit --project=api",
     "test:api:cleanup": "playwright test tests/api/maintenance --project=api",
     "test:py-migrate": "playwright test tests/py-migrate",
     "test:headed": "playwright test --headed",
     "jenkins:test-tree": "node scripts/generate-jenkins-test-tree.mjs",
     "codegen": "node scripts/codegen.mjs",
+    "capture:case": "node scripts/capture-case.mjs",
     "allure:generate": "allure generate allure-results --clean -o allure-report",
     "allure:open": "allure open allure-report"
   },

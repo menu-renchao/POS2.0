@@ -1,9 +1,14 @@
 import { test as base } from '@playwright/test';
 import { AdminConfigApiClient } from '../api/clients/admin-config-api.client';
+import { GiftCardApiClient } from '../api/clients/gift-card-api.client';
 import { MenuApiClient } from '../api/clients/menu-api.client';
+import { KitchenApiClient } from '../api/clients/kitchen-api.client';
+import { LayoutConfigApiClient } from '../api/clients/layout-config-api.client';
 import { OrderApiClient } from '../api/clients/order-api.client';
+import { OrderTypeApiClient } from '../api/clients/order-type-api.client';
 import { SaleItemApiClient } from '../api/clients/sale-item-api.client';
 import { SystemConfigurationApiClient } from '../api/clients/system-configuration-api.client';
+import { PrintConfigApiClient } from '../api/clients/print-config-api.client';
 import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
 import { createApiRequestContext } from '../api/core/api-context';
 import { ResourceRegistry } from '../api/core/resource-registry';
@@ -24,6 +29,7 @@ type AppFixtures = {
   splitOrderPage: SplitOrderPage;
   apiConfig: ApiConfig;
   orderApi: OrderApiClient;
+  giftCardApi: GiftCardApiClient;
   systemConfigurationApi: SystemConfigurationApiClient;
   resourceRegistry: ResourceRegistry;
   apiSetup: ApiSetup;
@@ -60,9 +66,13 @@ export const test = base.extend<AppFixtures>({
       await use(
         createApiSetup({
           adminConfigApi: new AdminConfigApiClient(apiRequest),
+          kitchenApi: new KitchenApiClient(apiRequest),
+          layoutConfigApi: new LayoutConfigApiClient(apiRequest),
           menuApi: new MenuApiClient(apiRequest),
           saleItemApi: new SaleItemApiClient(apiRequest),
+          orderTypeApi: new OrderTypeApiClient(apiRequest),
           systemConfigurationApi,
+          printConfigApi: new PrintConfigApiClient(apiRequest),
           resourceRegistry,
         }),
       );
@@ -96,6 +106,15 @@ export const test = base.extend<AppFixtures>({
 
     try {
       await use(new OrderApiClient(apiRequest));
+    } finally {
+      await apiRequest.dispose();
+    }
+  },
+  giftCardApi: async ({ apiConfig }, use) => {
+    const apiRequest = await createApiRequestContext(apiConfig);
+
+    try {
+      await use(new GiftCardApiClient(apiRequest));
     } finally {
       await apiRequest.dispose();
     }
