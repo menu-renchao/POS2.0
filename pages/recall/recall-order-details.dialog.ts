@@ -30,6 +30,7 @@ import type {
   RecallOrderItem,
   RecallOrderItemAddition,
   RecallKitchenTicketResult,
+  RecallResendResult,
   RecallOrderPaymentRecord,
 } from './recall.types';
 
@@ -37,6 +38,8 @@ const recallOrderDetailActionNames = {
   edit: 'Edit',
   send: 'Send',
   print: 'Print',
+  reprint: 'Reprint',
+  resend: 'Resend',
   pay: 'Pay',
   split: 'Split',
   discount: 'Discount',
@@ -46,6 +49,9 @@ const recallOrderDetailActionNames = {
 
 const recallOrderDetailActionTestIds: Partial<Record<RecallOrderDetailAction, string>> = {
   edit: 'shared-order-detail-side-action-editod',
+  print: 'shared-order-detail-unified-action-print',
+  reprint: 'shared-order-detail-unified-action-reprint',
+  resend: 'shared-order-detail-unified-action-resend',
   pay: 'shared-order-detail-side-action-pay',
   more: 'shared-order-detail-more-trigger',
 };
@@ -124,6 +130,8 @@ export class RecallOrderDetailsDialog {
   private readonly discountWholeOrderNumber: Locator;
   private readonly discountWholeOrderSubtotalValue: Locator;
   private readonly visiblePaymentTipKeyboardConfirmButton: Locator;
+  private readonly resendDialog: Locator;
+  private readonly resendConfirmButton: Locator;
 
   constructor(
     readonly page: Page,
@@ -274,6 +282,11 @@ export class RecallOrderDetailsDialog {
     this.visiblePaymentTipKeyboardConfirmButton = this.page.locator(
       '[data-testid="pos-keyboard-confirm"]:visible',
     );
+    this.resendDialog = this.page.getByLabel('Resend to Kitchen');
+    this.resendConfirmButton = this.resendDialog.getByRole('button', {
+      name: 'Resend',
+      exact: true,
+    });
   }
 
   @step((orderNumber: string, targetOrderNumber?: string) =>
@@ -437,6 +450,90 @@ export class RecallOrderDetailsDialog {
     return (await this.clickPrintInOrderDetailsAndReadKitchenTicketResult()).httpStatus;
   }
 
+  @step('页面操作：点击 Recall 订单详情中的 Print 并等待小票打印接口成功')
+  async clickPrintInOrderDetailsAndReadReceiptStatus(): Promise<number> {
+    await this.waitForOrderDetailsDialogReady();
+    const [receiptResponse] = await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname.endsWith('/kpos/api/print/receipt'),
+        { timeout: 15_000 },
+      ),
+      this.clickOrderDetailsAction('print'),
+    ]);
+
+    if (!receiptResponse.ok()) {
+      throw new Error(
+        `Recall 订单小票打印接口失败：${receiptResponse.status()} ${receiptResponse.url()}`,
+      );
+    }
+
+    return receiptResponse.status();
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Reprint 并等待小票打印接口成功')
+  async clickReprintInOrderDetailsAndReadReceiptStatus(): Promise<number> {
+    await this.waitForOrderDetailsDialogReady();
+    const [receiptResponse] = await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname.endsWith('/kpos/api/print/receipt'),
+        { timeout: 15_000 },
+      ),
+      this.clickOrderDetailsAction('reprint'),
+    ]);
+
+    if (!receiptResponse.ok()) {
+      throw new Error(
+        `Recall 订单重打小票接口失败：${receiptResponse.status()} ${receiptResponse.url()}`,
+      );
+    }
+
+    return receiptResponse.status();
+  }
+
+  @step((dishNames: readonly string[]) =>
+    `页面操作：从 Recall 对菜品 ${dishNames.join('、')} 执行 Resend`,
+  )
+  async resendDishes(dishNames: readonly string[]): Promise<RecallResendResult> {
+    if (dishNames.length === 0) {
+      throw new Error('Resend 至少需要选择一道菜。');
+    }
+
+    await this.waitForOrderDetailsDialogReady();
+    await this.clickOrderDetailsAction('resend');
+    await expect(this.resendDialog).toBeVisible({ timeout: 10_000 });
+
+    for (const dishName of dishNames) {
+      const dishLabel = this.resendDialog.getByText(dishName, { exact: true }).first();
+      await expect(dishLabel).toBeVisible();
+      await dishLabel.click();
+    }
+
+    const [kitchenTicketResponse] = await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname.endsWith('/kpos/api/print/kitchen/ticket'),
+        { timeout: 15_000 },
+      ),
+      this.resendConfirmButton.click(),
+    ]);
+
+    if (!kitchenTicketResponse.ok()) {
+      throw new Error(
+        `Recall Resend 送厨接口失败：${kitchenTicketResponse.status()} ${kitchenTicketResponse.url()}`,
+      );
+    }
+
+    return {
+      httpStatus: kitchenTicketResponse.status(),
+      selectedDishes: [...dishNames],
+    };
+  }
+
   @step('页面操作：点击 Recall 订单详情中的 Print 并读取打单结果')
   async clickPrintInOrderDetailsAndReadKitchenTicketResult(): Promise<RecallKitchenTicketResult> {
     await this.waitForOrderDetailsDialogReady();
@@ -559,6 +656,8 @@ export class RecallOrderDetailsDialog {
       edit: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'edit'),
       send: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'send'),
       print: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'print'),
+      reprint: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'reprint'),
+      resend: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'resend'),
       pay: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'pay'),
       split: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'split'),
       discount: await this.isOrderDetailsActionVisible(orderDetailsDialog, 'discount'),
@@ -1119,6 +1218,24 @@ export class RecallOrderDetailsDialog {
     await this.waitForGlobalLoadingOverlayHidden();
   }
 
+  @step((paymentIndex: number) => `页面操作：对 Recall 订单详情第 ${paymentIndex + 1} 笔支付流水执行 Void`)
+  async voidPaymentRecord(paymentIndex: number): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    const paymentSection = this.resolvePaymentSection(await this.resolveActiveOrderDetailsDialog());
+    const paymentCards = await this.resolveRefundablePaymentCards(paymentSection);
+    const paymentCard = paymentCards.nth(paymentIndex);
+
+    await expect(paymentCard).toBeVisible({ timeout: 10_000 });
+    await paymentCard.scrollIntoViewIfNeeded();
+    await paymentCard.getByRole('button', { name: /^Void$/i }).click();
+
+    const confirmationDialog = this.page.getByRole('alertdialog', { name: /^Void$/i });
+    await expect(confirmationDialog).toBeVisible({ timeout: 10_000 });
+    await confirmationDialog.getByRole('button', { name: /^Yes$/i }).click();
+    await expect(confirmationDialog).toBeHidden({ timeout: 10_000 });
+    await this.waitForGlobalLoadingOverlayHidden();
+  }
+
   @step((paymentIndex: number, dishName: string) =>
     `页面操作：从 Recall 第 ${paymentIndex + 1} 笔支付流水按菜退款 ${dishName}`,
   )
@@ -1221,6 +1338,18 @@ export class RecallOrderDetailsDialog {
 
     await this.waitForGlobalLoadingOverlayAfterTipMutation();
     return null;
+  }
+
+  @step((paymentMethod?: string) =>
+    paymentMethod
+      ? `页面操作：在 Recall PAYMENT 卡片 ${paymentMethod} 的 Tips 弹窗不输入金额直接确认`
+      : '页面操作：在 Recall PAYMENT 卡片的 Tips 弹窗不输入金额直接确认',
+  )
+  async confirmEmptyPaymentCardTip(paymentMethod?: string): Promise<void> {
+    await this.waitForOrderDetailsDialogReady();
+    await this.clickPaymentCardTipsButton(paymentMethod);
+    await this.confirmTipDialog(true);
+    await this.waitForGlobalLoadingOverlayAfterTipMutation();
   }
 
   @step((paymentIndex: number, amountInCents: number) =>
@@ -1723,6 +1852,10 @@ export class RecallOrderDetailsDialog {
 
         if (/^Tips$/i.test(normalized)) {
           return 'Tips';
+        }
+
+        if (/^Rounding$/i.test(normalized)) {
+          return 'Rounding';
         }
 
         const totalMatch = normalized.match(/^Total\s*(?:\(\s*(Cash|Card)\s*\))?$/i);

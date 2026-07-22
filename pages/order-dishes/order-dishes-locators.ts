@@ -28,6 +28,8 @@ export class OrderDishesLocators {
   readonly headerRecallButton: Locator;
   readonly sendButton: Locator;
   readonly payButton: Locator;
+  readonly bottomMoreButton: Locator;
+  readonly printReceiptActionButton: Locator;
   readonly addLineButton: Locator;
   readonly selectedDishAddButton: Locator;
   readonly changePriceButton: Locator;
@@ -93,6 +95,7 @@ export class OrderDishesLocators {
   readonly customerInformationPageHeading: Locator;
   readonly customerInformationNameInput: Locator;
   readonly customerInformationPhoneInput: Locator;
+  readonly customerInformationAddressInput: Locator;
   readonly customerInformationSaveButton: Locator;
   readonly customerInformationKeyboardCloseButton: Locator;
   readonly orderCustomerAddressSummary: (accessibleName: string) => Locator;
@@ -101,12 +104,14 @@ export class OrderDishesLocators {
   readonly authorizationDigitButton: (digit: string) => Locator;
   readonly authorizationConfirmButton: Locator;
   readonly noteButton: Locator;
+  readonly orderNoteActionButton: Locator;
   readonly notePermissionMessage: Locator;
   readonly noteAuthorizationForm: Locator;
   readonly noteAuthorizationDigitButton: (digit: string) => Locator;
   readonly noteAuthorizationConfirmButton: Locator;
   readonly noteInput: Locator;
   readonly noteConfirmButton: Locator;
+  readonly changeToGoButton: Locator;
   readonly specificationDialog: Locator;
   readonly specificationConfirmButton: Locator;
   readonly categoryOptionPanel: Locator;
@@ -202,6 +207,8 @@ export class OrderDishesLocators {
         .first(),
     );
     this.payButton = this.page.getByTestId('bottom-button-payOrderBtn');
+    this.bottomMoreButton = this.page.getByTestId('bottom-button-more');
+    this.printReceiptActionButton = this.page.getByTestId('bottom-more-action-printR');
     this.addLineButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
       appFrame
         .getByTestId('action-rail-button-addline')
@@ -372,6 +379,7 @@ export class OrderDishesLocators {
       'Phone number',
       { exact: true },
     );
+    this.customerInformationAddressInput = this.page.getByTestId('pos-ui-autocomplete-input');
     this.customerInformationSaveButton = this.page
       .getByRole('banner')
       .getByRole('button', { name: 'Save', exact: true });
@@ -394,6 +402,7 @@ export class OrderDishesLocators {
       exact: true,
     });
     this.noteButton = this.page.getByTestId('action-rail-button-addnote');
+    this.orderNoteActionButton = this.page.getByTestId('bottom-more-action-addnoteheader');
     this.notePermissionMessage = this.page.getByText(
       'You do not have permission NOTE, please enter the password!',
       { exact: true },
@@ -412,6 +421,7 @@ export class OrderDishesLocators {
     });
     this.noteInput = this.page.getByPlaceholder('Note', { exact: true });
     this.noteConfirmButton = this.page.getByTestId('note-action-modal-confirm-button');
+    this.changeToGoButton = this.page.getByTestId('action-rail-button-chgTogo');
     this.specificationDialog = this.appFrame.getByRole('dialog', {
       name: 'Select Specifications',
     });

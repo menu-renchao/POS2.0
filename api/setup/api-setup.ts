@@ -5,6 +5,7 @@ import type { MenuApiClient } from '../clients/menu-api.client';
 import type { OrderTypeApiClient } from '../clients/order-type-api.client';
 import type { SaleItemApiClient } from '../clients/sale-item-api.client';
 import type { SystemConfigurationApiClient } from '../clients/system-configuration-api.client';
+import type { PrintConfigApiClient } from '../clients/print-config-api.client';
 import type { ResourceRegistry } from '../core/resource-registry';
 import {
   createChargeSetupService,
@@ -34,12 +35,17 @@ import {
   createCustomOrderTypeSetupService,
   type CustomOrderTypeSetupService,
 } from './custom-order-type.setup';
+import {
+  createPrintConfigurationSetupService,
+  type PrintConfigurationSetupService,
+} from './print-config.setup';
 
 export type ApiSetupFactoryOptions = {
   adminConfigApi: AdminConfigApiClient;
   kitchenApi?: KitchenApiClient;
   layoutConfigApi?: LayoutConfigApiClient;
   systemConfigurationApi?: SystemConfigurationApiClient;
+  printConfigApi?: PrintConfigApiClient;
   orderTypeApi?: OrderTypeApiClient;
   menuApi?: MenuApiClient;
   saleItemApi?: SaleItemApiClient;
@@ -58,6 +64,7 @@ export type ApiSetup = {
   staff: StaffSetupService;
   kitchen: KitchenSetupService;
   customOrderType: CustomOrderTypeSetupService;
+  printConfiguration: PrintConfigurationSetupService;
 };
 
 export function createApiSetup(options: ApiSetupFactoryOptions): ApiSetup {
@@ -73,5 +80,6 @@ export function createApiSetup(options: ApiSetupFactoryOptions): ApiSetup {
     staff: createStaffSetupService(options),
     kitchen: createKitchenSetupService(options),
     customOrderType: createCustomOrderTypeSetupService(options),
+    printConfiguration: createPrintConfigurationSetupService(options.printConfigApi),
   };
 }

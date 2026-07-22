@@ -306,7 +306,7 @@ export class RecallFilterBarSection {
     await filterButton.click();
     await this.page
       .getByTestId(/^recall2-filter-option-.+$/)
-      .filter({ hasText: optionName })
+      .filter({ hasText: new RegExp(`^\\s*${escapeRegularExpression(optionName)}\\s*$`, 'i') })
       .first()
       .click();
   }
@@ -415,4 +415,8 @@ export class RecallFilterBarSection {
 
     return null;
   }
+}
+
+function escapeRegularExpression(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -63,6 +63,22 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.menu.expectTableNumber(...args);
   }
 
+  openChangeTable(...args: Parameters<OrderDishesMenuSection['openChangeTable']>): ReturnType<OrderDishesMenuSection['openChangeTable']> {
+    return this.menu.openChangeTable(...args);
+  }
+
+  readAvailableChangeTableNumbers(...args: Parameters<OrderDishesMenuSection['readAvailableChangeTableNumbers']>): ReturnType<OrderDishesMenuSection['readAvailableChangeTableNumbers']> {
+    return this.menu.readAvailableChangeTableNumbers(...args);
+  }
+
+  selectChangeTableTarget(...args: Parameters<OrderDishesMenuSection['selectChangeTableTarget']>): ReturnType<OrderDishesMenuSection['selectChangeTableTarget']> {
+    return this.menu.selectChangeTableTarget(...args);
+  }
+
+  confirmChangeTable(...args: Parameters<OrderDishesMenuSection['confirmChangeTable']>): ReturnType<OrderDishesMenuSection['confirmChangeTable']> {
+    return this.menu.confirmChangeTable(...args);
+  }
+
   expectGuestCount(...args: Parameters<OrderDishesMenuSection['expectGuestCount']>): ReturnType<OrderDishesMenuSection['expectGuestCount']> {
     return this.menu.expectGuestCount(...args);
   }
@@ -81,6 +97,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
 
   clickDish(...args: Parameters<OrderDishesMenuSection['clickDish']>): ReturnType<OrderDishesMenuSection['clickDish']> {
     return this.menu.clickDish(...args);
+  }
+
+  markOrderedDishToGo(...args: Parameters<OrderDishesMenuSection['markOrderedDishToGo']>): ReturnType<OrderDishesMenuSection['markOrderedDishToGo']> {
+    return this.menu.markOrderedDishToGo(...args);
   }
 
   addOpenFoodWithoutTax(...args: Parameters<OrderDishesMenuSection['addOpenFoodWithoutTax']>): ReturnType<OrderDishesMenuSection['addOpenFoodWithoutTax']> {
@@ -215,12 +235,20 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.note.requestSelectedItemNoteAndExpectAuthorization(...args);
   }
 
+  openSelectedItemNote(...args: Parameters<OrderDishesNoteSection['openSelectedItemNote']>): ReturnType<OrderDishesNoteSection['openSelectedItemNote']> {
+    return this.note.openSelectedItemNote(...args);
+  }
+
   authorizeSelectedItemNote(...args: Parameters<OrderDishesNoteSection['authorizeSelectedItemNote']>): ReturnType<OrderDishesNoteSection['authorizeSelectedItemNote']> {
     return this.note.authorizeSelectedItemNote(...args);
   }
 
   fillSelectedItemNote(...args: Parameters<OrderDishesNoteSection['fillSelectedItemNote']>): ReturnType<OrderDishesNoteSection['fillSelectedItemNote']> {
     return this.note.fillSelectedItemNote(...args);
+  }
+
+  addOrderNote(...args: Parameters<OrderDishesNoteSection['addOrderNote']>): ReturnType<OrderDishesNoteSection['addOrderNote']> {
+    return this.note.addOrderNote(...args);
   }
 
   openModifyForOrderedDish(...args: Parameters<OrderDishesModifierSection['openModifyForOrderedDish']>): ReturnType<OrderDishesModifierSection['openModifyForOrderedDish']> {
@@ -559,6 +587,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.navigation.sendOrderWithReference(...args);
   }
 
+  printReceiptWithReference(...args: Parameters<OrderDishesPageNavigation['printReceiptWithReference']>): ReturnType<OrderDishesPageNavigation['printReceiptWithReference']> {
+    return this.navigation.printReceiptWithReference(...args);
+  }
+
   clickSaveOrder(...args: Parameters<OrderDishesPageNavigation['clickSaveOrder']>): ReturnType<OrderDishesPageNavigation['clickSaveOrder']> {
     return this.navigation.clickSaveOrder(...args);
   }
@@ -585,6 +617,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
 
   reduceOrderedDishQuantity(...args: Parameters<OrderDishesMenuSection['reduceOrderedDishQuantity']>): ReturnType<OrderDishesMenuSection['reduceOrderedDishQuantity']> {
     return this.menu.reduceOrderedDishQuantity(...args);
+  }
+
+  removeSentDish(...args: Parameters<OrderDishesMenuSection['removeSentDish']>): ReturnType<OrderDishesMenuSection['removeSentDish']> {
+    return this.menu.removeSentDish(...args);
   }
 
   requestSentDishRemovalAndExpectAuthorization(...args: Parameters<OrderDishesMenuSection['requestSentDishRemovalAndExpectAuthorization']>): ReturnType<OrderDishesMenuSection['requestSentDishRemovalAndExpectAuthorization']> {

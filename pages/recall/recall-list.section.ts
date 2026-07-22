@@ -7,14 +7,23 @@ import { step } from '../../utils/step';
 import { waitUntil } from '../../utils/wait';
 
 export class RecallListSection {
+  private readonly cardViewButton: Locator;
   private readonly listViewButton: Locator;
   private readonly orderTableContainer: Locator;
   private readonly orderTable: Locator;
 
   constructor(private readonly page: Page) {
+    this.cardViewButton = this.page.getByTestId('recall2-view-mode-card-option');
     this.listViewButton = this.page.getByTestId('recall2-view-mode-list-option');
     this.orderTableContainer = this.page.getByTestId('recall2-order-table-container');
     this.orderTable = this.page.getByTestId('recall2-order-table');
+  }
+
+  @step('页面操作：将 Recall 订单切换为卡片视图')
+  async switchToCardView(): Promise<void> {
+    await expect(this.cardViewButton).toBeVisible();
+    await this.cardViewButton.click();
+    await expect(this.orderTableContainer).toBeHidden();
   }
 
   @step('页面操作：将 Recall 订单切换为列表视图')
@@ -51,9 +60,13 @@ export class RecallListSection {
 
   @step((column: RecallSortableColumn) => `页面读取：读取 Recall 列表 ${column} 列排序方向`)
   async readSortDirection(column: RecallSortableColumn): Promise<RecallSortDirection | null> {
-    const style = await this.sortButton(column)
-      .locator('svg[aria-label="SortIcon"]')
-      .getAttribute('style');
+    const sortIcon = this.sortButton(column).locator('svg').first();
+
+    if ((await sortIcon.count()) === 0) {
+      return null;
+    }
+
+    const style = await sortIcon.getAttribute('style');
 
     if (style?.includes('--pos-ui-sort-primary: var(--pos-ui-primary-color)')) {
       return 'ascending';

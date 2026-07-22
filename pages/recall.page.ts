@@ -177,6 +177,11 @@ export class RecallPage {
     return this.list.switchToListView();
   }
 
+  @step('页面操作：将 Recall 订单切换为卡片视图')
+  async switchToCardView(): ReturnType<RecallListSection['switchToCardView']> {
+    return this.list.switchToCardView();
+  }
+
   @step('页面操作：点击 Recall 列表字段排序')
   async clickListSort(
     ...args: Parameters<RecallListSection['clickSort']>
@@ -282,6 +287,13 @@ export class RecallPage {
     return this.orderDetails.readOrderPaymentAmounts();
   }
 
+  @step('页面操作：对 Recall 订单详情中的支付流水执行 Void')
+  async voidPaymentRecord(
+    ...args: Parameters<RecallOrderDetailsDialog['voidPaymentRecord']>
+  ): ReturnType<RecallOrderDetailsDialog['voidPaymentRecord']> {
+    return this.orderDetails.voidPaymentRecord(...args);
+  }
+
   async refundPaymentRecord(
     ...args: Parameters<RecallOrderDetailsDialog['refundPaymentRecord']>
   ): Promise<void> {
@@ -322,6 +334,13 @@ export class RecallPage {
     ...args: Parameters<RecallOrderDetailsDialog['addPaymentCardTip']>
   ): Promise<string | null> {
     return this.orderDetails.addPaymentCardTip(...args);
+  }
+
+  @step('页面操作：在 Recall PAYMENT 卡片的 Tips 弹窗不输入金额直接确认')
+  async confirmEmptyPaymentCardTip(
+    ...args: Parameters<RecallOrderDetailsDialog['confirmEmptyPaymentCardTip']>
+  ): ReturnType<RecallOrderDetailsDialog['confirmEmptyPaymentCardTip']> {
+    return this.orderDetails.confirmEmptyPaymentCardTip(...args);
   }
 
   @step((paymentIndex: number, amountInCents: number) =>
@@ -400,6 +419,25 @@ export class RecallPage {
   @step('页面操作：点击 Recall 订单详情中的 Print 并读取打单接口状态')
   async clickPrintInOrderDetailsAndReadKitchenTicketStatus(): Promise<number> {
     return await this.orderDetails.clickPrintInOrderDetailsAndReadKitchenTicketStatus();
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Print 并等待小票打印接口成功')
+  async clickPrintInOrderDetailsAndReadReceiptStatus(): Promise<number> {
+    return await this.orderDetails.clickPrintInOrderDetailsAndReadReceiptStatus();
+  }
+
+  @step('页面操作：点击 Recall 订单详情中的 Reprint 并等待小票打印接口成功')
+  async clickReprintInOrderDetailsAndReadReceiptStatus(): Promise<number> {
+    return await this.orderDetails.clickReprintInOrderDetailsAndReadReceiptStatus();
+  }
+
+  @step((dishNames: readonly string[]) =>
+    `页面操作：从 Recall 对菜品 ${dishNames.join('、')} 执行 Resend`,
+  )
+  async resendDishes(
+    ...args: Parameters<RecallOrderDetailsDialog['resendDishes']>
+  ): ReturnType<RecallOrderDetailsDialog['resendDishes']> {
+    return await this.orderDetails.resendDishes(...args);
   }
 
   @step('页面操作：点击 Recall 订单详情中的 Print 并读取打单结果')

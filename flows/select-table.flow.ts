@@ -108,6 +108,39 @@ export class SelectTableFlow {
     };
   }
 
+  @step(
+    (_orderDishesPage: OrderDishesPage, currentTableNumber: string, guestCount: number) =>
+      `业务步骤：将当前桌台 ${currentTableNumber} 换到任意其他空桌并保留 ${guestCount} 位客人`,
+  )
+  async changeToAnyAvailableTable(
+    orderDishesPage: OrderDishesPage,
+    currentTableNumber: string,
+    guestCount: number,
+  ): Promise<TableOrderEntryResult> {
+    await orderDishesPage.openChangeTable(currentTableNumber);
+    const targetTableNumbers = await orderDishesPage.readAvailableChangeTableNumbers();
+    const targetTableNumber = targetTableNumbers.find(
+      (tableNumber) => tableNumber !== currentTableNumber,
+    );
+
+    if (!targetTableNumber) {
+      throw new Error(`当前桌台 ${currentTableNumber} 没有其他可用的换桌目标。`);
+    }
+
+    await orderDishesPage.selectChangeTableTarget(targetTableNumber);
+    await orderDishesPage.confirmChangeTable(targetTableNumber);
+    await orderDishesPage.expectGuestCount(guestCount);
+    const selectedTable = {
+      areaName: '换桌',
+      tableNumber: targetTableNumber,
+    };
+
+    return {
+      orderDishesPage,
+      selectedTable,
+    };
+  }
+
   @step('业务步骤：跳过选桌并通过 New order 直接进入点单页')
   async skipTableSelectionAndEnterOrderDishes(
     selectTablePage: SelectTablePage,

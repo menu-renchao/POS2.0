@@ -299,6 +299,42 @@ export class RecallFlow {
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
     targetOrderNumber
+      ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并打印小票`
+      : `业务步骤：从 Recall 打开订单 ${orderNumber} 并打印小票`,
+  )
+  async printReceiptAndReadStatus(
+    recallPage: RecallPage,
+    orderNumber: string,
+    targetOrderNumber?: string,
+  ): Promise<number> {
+    await recallPage.expectLoaded();
+    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.clickPrintInOrderDetailsAndReadReceiptStatus();
+  }
+
+  @step((_: RecallPage, orderNumber: string) => `业务步骤：重打 Recall 订单 ${orderNumber} 的收据`)
+  async reprintReceiptAndReadStatus(
+    recallPage: RecallPage,
+    orderNumber: string,
+  ): Promise<number> {
+    await recallPage.openOrderDetails(orderNumber);
+    return await recallPage.clickReprintInOrderDetailsAndReadReceiptStatus();
+  }
+
+  @step((_: RecallPage, orderNumber: string, dishNames: readonly string[]) =>
+    `业务步骤：对 Recall 订单 ${orderNumber} 的菜品 ${dishNames.join('、')} 执行 Resend`,
+  )
+  async resendDishes(
+    recallPage: RecallPage,
+    orderNumber: string,
+    dishNames: readonly string[],
+  ): ReturnType<RecallPage['resendDishes']> {
+    await recallPage.openOrderDetails(orderNumber);
+    return await recallPage.resendDishes(dishNames);
+  }
+
+  @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
+    targetOrderNumber
       ? `业务步骤：从 Recall 打开订单 ${orderNumber} 的子单 ${targetOrderNumber} 并进入分单面板`
       : `业务步骤：从 Recall 打开订单 ${orderNumber} 并进入分单面板`,
   )
@@ -445,7 +481,7 @@ export class RecallFlow {
     await recallPage.expectCombineTargetSelectionReady();
     await recallPage.clickCombineTargetOrder(targetOrderNumber);
     await recallPage.confirmCombineChargeWarningIfNeeded();
-    await recallPage.expectCombinedOrderDetailsReady(sourceOrderNumber);
+    await recallPage.expectCombinedOrderDetailsReady(targetOrderNumber);
     return recallPage;
   }
 

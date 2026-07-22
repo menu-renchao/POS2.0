@@ -12,6 +12,7 @@ export type OrderDishesCustomerInformationSnapshot = {
 };
 
 export type OrderDishesCustomerInformationInput = {
+  address?: string;
   customerName: string;
   phoneNumber: string;
 };
@@ -60,6 +61,9 @@ export class OrderDishesCustomerSection {
     await expect(this.locators.customerInformationPageHeading).toBeVisible();
     await this.locators.customerInformationPhoneInput.fill(customer.phoneNumber);
     await this.locators.customerInformationNameInput.fill(customer.customerName);
+    if (customer.address !== undefined) {
+      await this.locators.customerInformationAddressInput.fill(customer.address);
+    }
   }
 
   @step((customerButtonLabel: string) => `页面读取：读取点单页客户按钮 ${customerButtonLabel}`)

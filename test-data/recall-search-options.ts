@@ -15,10 +15,12 @@ export const RecallOrderStatuses = {
   unpaid: 'Unpaid',
   inKitchen: 'In Kitchen',
   printed: 'Printed',
+  semiSent: 'Semi-Sent',
   semiPaid: 'Semi-Paid',
   paidBeforeDelivered: 'Paid B4 Delivered',
   paid: 'Paid',
   voided: 'Void',
+  partiallyVoided: 'Partially Void',
   pending: 'Pending',
 } as const;
 

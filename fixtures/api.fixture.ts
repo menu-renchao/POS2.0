@@ -9,6 +9,7 @@ import { PaymentApiClient } from '../api/clients/payment-api.client';
 import { SaleItemApiClient } from '../api/clients/sale-item-api.client';
 import { SpuApiClient } from '../api/clients/spu-api.client';
 import { SystemConfigurationApiClient } from '../api/clients/system-configuration-api.client';
+import { PrintConfigApiClient } from '../api/clients/print-config-api.client';
 import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
 import { createApiRequestContext } from '../api/core/api-context';
 import { ResourceRegistry } from '../api/core/resource-registry';
@@ -28,6 +29,7 @@ type ApiFixtures = {
   paymentApi: PaymentApiClient;
   adminConfigApi: AdminConfigApiClient;
   systemConfigurationApi: SystemConfigurationApiClient;
+  printConfigApi: PrintConfigApiClient;
   apiSetup: ApiSetup;
 };
 
@@ -99,6 +101,9 @@ export const test = base.extend<ApiFixtures>({
   systemConfigurationApi: async ({ apiRequest }, use) => {
     await use(new SystemConfigurationApiClient(apiRequest));
   },
+  printConfigApi: async ({ apiRequest }, use) => {
+    await use(new PrintConfigApiClient(apiRequest));
+  },
   apiSetup: async (
     {
       adminConfigApi,
@@ -106,6 +111,7 @@ export const test = base.extend<ApiFixtures>({
       layoutConfigApi,
       orderTypeApi,
       systemConfigurationApi,
+      printConfigApi,
       menuApi,
       saleItemApi,
       resourceRegistry,
@@ -120,6 +126,7 @@ export const test = base.extend<ApiFixtures>({
           layoutConfigApi,
           orderTypeApi,
           systemConfigurationApi,
+          printConfigApi,
           menuApi,
           saleItemApi,
           resourceRegistry,

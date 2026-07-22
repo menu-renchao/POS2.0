@@ -61,7 +61,10 @@ export class OrderDishesPageNavigation {
             new URL(request.url()).pathname === '/kpos/api/order/save',
           { timeout: 15_000 },
         ),
-        saveOrderButton.click(),
+        (async () => {
+          await saveOrderButton.click();
+          await this.dismissPostSaveDialogsIfNeeded();
+        })(),
       ]);
       const saveResponse = await saveRequest.response();
 
@@ -151,7 +154,10 @@ export class OrderDishesPageNavigation {
             new URL(request.url()).pathname === '/kpos/api/order/save',
           { timeout: 15_000 },
         ),
-        (await this.resolveSendButton()).click(),
+        (async () => {
+          await (await this.resolveSendButton()).click();
+          await this.dismissPostSaveDialogsIfNeeded();
+        })(),
       ]);
       const saveResponse = await saveRequest.response();
 
@@ -186,6 +192,57 @@ export class OrderDishesPageNavigation {
       const homePage = new HomePage(this.page);
       await homePage.expectEmployeeReady();
       return { homePage, orderItems, orderNumber: orderNumber.trim() };
+    }
+
+    @step('页面操作：从 More 打印订单收据并读取精确订单号')
+    async printReceiptWithReference(): Promise<{
+      homePage: HomePage;
+      orderNumber: string;
+      printStatus: number;
+    }> {
+      await this.host.expectLoaded();
+      const [saveRequest, printResponse] = await Promise.all([
+        this.page.waitForRequest(
+          (request) =>
+            request.method() === 'POST' &&
+            new URL(request.url()).pathname === '/kpos/api/order/save',
+          { timeout: 15_000 },
+        ),
+        this.page.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/kpos/api/print/receipt',
+          { timeout: 20_000 },
+        ),
+        (async () => {
+          await this.locators.bottomMoreButton.click();
+          await this.locators.printReceiptActionButton.click();
+        })(),
+      ]);
+      const saveResponse = await saveRequest.response();
+
+      if (!saveResponse?.ok()) {
+        throw new Error(`打印前保存订单失败：${saveResponse?.status() ?? '无响应'} ${saveRequest.url()}`);
+      }
+      if (!printResponse.ok()) {
+        throw new Error(`订单收据打印接口失败：${printResponse.status()} ${printResponse.url()}`);
+      }
+
+      const responseBody = (await saveResponse.json()) as {
+        data?: { order?: { orderNumber?: unknown } };
+      };
+      const orderNumber = responseBody.data?.order?.orderNumber;
+      if (typeof orderNumber !== 'string' || !orderNumber.trim()) {
+        throw new Error('打印前保存订单接口响应缺少 data.order.orderNumber。');
+      }
+
+      const homePage = new HomePage(this.page);
+      await homePage.expectEmployeeReady();
+      return {
+        homePage,
+        orderNumber: orderNumber.trim(),
+        printStatus: printResponse.status(),
+      };
     }
 
     @step('页面操作：点击 Save 保存订单但不假设页面跳转')
@@ -295,6 +352,25 @@ export class OrderDishesPageNavigation {
     @step('页面操作：关闭保存订单后的提示或删菜原因弹窗')
     private async dismissPostSaveDialogsIfNeeded(): Promise<void> {
       const gotItButton = this.page.getByRole('button', { name: /^I Got it$/i });
+
+      await waitUntil(
+        async () => ({
+          gotItVisible: await gotItButton.isVisible().catch(() => false),
+          homeReady: !this.page.url().includes('#orderDishes'),
+          voidReasonVisible: await this.page
+            .locator(
+              '[data-test-id="order-dishes-save-void-reason-confirm"], [data-testid="order-dishes-save-void-reason-confirm"]',
+            )
+            .isVisible()
+            .catch(() => false),
+        }),
+        (state) => state.gotItVisible || state.homeReady || state.voidReasonVisible,
+        {
+          timeout: 3_000,
+          interval: 100,
+          message: '保存订单后未出现需要处理的提示。',
+        },
+      ).catch(() => undefined);
 
       if (await gotItButton.isVisible().catch(() => false)) {
         await gotItButton.click();

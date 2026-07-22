@@ -25,6 +25,49 @@ export class OrderDishesMenuSection {
       await expect(this.resolveTableNumberButton(tableNumber)).toBeVisible();
     }
 
+    @step((tableNumber: string) => `页面操作：从点餐页桌号 ${tableNumber} 进入换桌页面`)
+    async openChangeTable(tableNumber: string): Promise<void> {
+      await this.host.expectLoaded();
+      await this.resolveTableNumberButton(tableNumber).click();
+      await expect(this.changeTablePrompt()).toBeVisible();
+      await expect(this.changeTableConfirmButton()).toBeDisabled();
+    }
+
+    @step('页面读取：读取换桌页面中的可选目标桌号')
+    async readAvailableChangeTableNumbers(): Promise<string[]> {
+      await expect(this.changeTablePrompt()).toBeVisible();
+      const targetButtons = this.changeTableTargetButtons();
+      const targetCount = await targetButtons.count();
+      const tableNumbers: string[] = [];
+
+      for (let index = 0; index < targetCount; index += 1) {
+        const text = (await targetButtons.nth(index).innerText()).trim();
+        const tableNumber = text.match(/^\d+/)?.[0];
+        if (tableNumber) {
+          tableNumbers.push(tableNumber);
+        }
+      }
+
+      return tableNumbers;
+    }
+
+    @step((tableNumber: string) => `页面操作：选择换桌目标桌台 ${tableNumber}`)
+    async selectChangeTableTarget(tableNumber: string): Promise<void> {
+      const targetTable = this.page.getByRole('button', {
+        name: new RegExp(`^${this.ctx.escapeRegExp(tableNumber)}\\s+Seat2Icon(?:\\s|$)`),
+      });
+      await expect(targetTable).toHaveCount(1);
+      await targetTable.click();
+      await expect(this.changeTableConfirmButton()).toBeEnabled();
+    }
+
+    @step((tableNumber: string) => `页面操作：确认换桌到桌台 ${tableNumber} 并返回点餐页`)
+    async confirmChangeTable(tableNumber: string): Promise<void> {
+      await this.changeTableConfirmButton().click();
+      await this.host.expectLoaded();
+      await this.expectTableNumber(tableNumber);
+    }
+
     @step((guestCount: number) => `页面操作：确认点餐页顶部人数为 ${guestCount}`)
     async expectGuestCount(guestCount: number): Promise<void> {
       await expect(this.locators.guestCountButton).toHaveText(String(guestCount));
@@ -454,6 +497,16 @@ export class OrderDishesMenuSection {
       await expect(this.locators.openFoodConfirmButton).toBeHidden();
     }
 
+    @step((dishName: string) => `页面操作：将菜品 ${dishName} 标记为 To Go`)
+    async markOrderedDishToGo(dishName: string): Promise<void> {
+      await this.host.expectLoaded();
+      await this.selectOrderedDish(dishName);
+      await this.locators.changeToGoButton.click();
+      await expect(this.locators.orderedDishItemByName(dishName)).toContainText('To go', {
+        ignoreCase: true,
+      });
+    }
+
     @step('页面操作：打开 Open Food 弹框')
     async openOpenFoodDialog(): Promise<void> {
       await this.host.expectLoaded();
@@ -733,6 +786,16 @@ export class OrderDishesMenuSection {
       await this.selectOrderedDish(dishName);
       await this.locators.removeItemButton.click();
       await this.expectPendingDishRemovalAuthorization();
+    }
+
+    @step((dishName: string) => `页面操作：双击并删除已送厨菜品 ${dishName}`)
+    async removeSentDish(dishName: string): Promise<void> {
+      await this.host.expectLoaded();
+      const orderedDish = this.locators.orderedDishItemByName(dishName);
+      await expect(orderedDish).toBeVisible();
+      await orderedDish.dblclick();
+      await expect(this.locators.removeItemButton).toBeVisible();
+      await this.locators.removeItemButton.click();
     }
 
     @step('页面校验：校验已出现送厨删菜授权提示')
@@ -1064,16 +1127,23 @@ export class OrderDishesMenuSection {
     }
 
     private resolveTableNumberButton(tableNumber: string): Locator {
-      return this.locators.appFrame
-        .getByRole('button', {
-          name: new RegExp(`TableIcon\\s*${this.ctx.escapeRegExp(tableNumber)}`),
-        })
-        .or(
-          this.page.getByRole('button', {
-            name: new RegExp(`TableIcon\\s*${this.ctx.escapeRegExp(tableNumber)}`),
-          }),
-        )
-        .first();
+      return this.page.getByRole('button', {
+        name: new RegExp(`^TableIcon\\s*${this.ctx.escapeRegExp(tableNumber)}$`),
+      });
+    }
+
+    private changeTablePrompt(): Locator {
+      return this.page.getByText('Select a target table', { exact: true });
+    }
+
+    private changeTableTargetButtons(): Locator {
+      return this.page.getByRole('button', {
+        name: /^\d+\s+Seat2Icon(?:\s|$)/,
+      });
+    }
+
+    private changeTableConfirmButton(): Locator {
+      return this.page.getByRole('button', { name: 'Confirm', exact: true });
     }
 
     private async resolveSharedSeatButton(): Promise<Locator> {

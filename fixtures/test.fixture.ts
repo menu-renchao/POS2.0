@@ -8,6 +8,7 @@ import { OrderApiClient } from '../api/clients/order-api.client';
 import { OrderTypeApiClient } from '../api/clients/order-type-api.client';
 import { SaleItemApiClient } from '../api/clients/sale-item-api.client';
 import { SystemConfigurationApiClient } from '../api/clients/system-configuration-api.client';
+import { PrintConfigApiClient } from '../api/clients/print-config-api.client';
 import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
 import { createApiRequestContext } from '../api/core/api-context';
 import { ResourceRegistry } from '../api/core/resource-registry';
@@ -71,6 +72,7 @@ export const test = base.extend<AppFixtures>({
           saleItemApi: new SaleItemApiClient(apiRequest),
           orderTypeApi: new OrderTypeApiClient(apiRequest),
           systemConfigurationApi,
+          printConfigApi: new PrintConfigApiClient(apiRequest),
           resourceRegistry,
         }),
       );

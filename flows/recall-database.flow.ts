@@ -7,6 +7,24 @@ type OrderCountRow = {
   count: number | string;
 };
 
+type SplitChildOrderRow = {
+  id: number | string;
+  parent_order_id: number | string | null;
+};
+
+type OrderStatusRow = {
+  id: number | string;
+  status: number | string;
+};
+
+type OrderReceiptPrintCountRow = {
+  number_of_receipt_printed: number | string;
+};
+
+type OccupiedTableOrderRow = {
+  table_id: number | string;
+};
+
 function toMysqlDate(date: string): string {
   const [month, day, year] = date.split('/');
 
@@ -86,4 +104,115 @@ export class RecallDatabaseFlow {
 
     return count;
   }
+
+  @step('业务步骤：为分单子单临时设置带字母的订单号')
+  async replaceLatestSplitChildOrderNumberWithAlphabetic(
+    childOrderNumber: string,
+  ): Promise<{ orderNumber: string; restore: () => Promise<void> }> {
+    const rows = await this.db.queryRows<SplitChildOrderRow>(
+      [
+        'SELECT id, parent_order_id',
+        'FROM kpos.order_bill',
+        'WHERE order_num = ?',
+        'ORDER BY id DESC',
+        'LIMIT 1',
+      ].join(' '),
+      [childOrderNumber],
+    );
+    const row = rows[0];
+
+    if (!row || row.parent_order_id === null) {
+      throw new Error(`数据库中未找到已落库的分单子单：${childOrderNumber}`);
+    }
+
+    const rowId = Number(row.id);
+    if (!Number.isInteger(rowId) || rowId <= 0) {
+      throw new Error(`分单子单 ${childOrderNumber} 返回了无效数据库 ID：${String(row.id)}`);
+    }
+
+    const alphabeticOrderNumber = childOrderNumber.replace(/-\d+$/, 'A');
+    if (alphabeticOrderNumber === childOrderNumber) {
+      throw new Error(`无法从分单子单号生成带字母订单号：${childOrderNumber}`);
+    }
+
+    await this.db.execute('UPDATE kpos.order_bill SET order_num = ? WHERE id = ?', [
+      alphabeticOrderNumber,
+      rowId,
+    ]);
+
+    return {
+      orderNumber: alphabeticOrderNumber,
+      restore: async () => {
+        await this.db.execute('UPDATE kpos.order_bill SET order_num = ? WHERE id = ?', [
+          childOrderNumber,
+          rowId,
+        ]);
+      },
+    };
+  }
+
+  @step('业务步骤：读取指定订单号最新记录的数据库状态')
+  async readLatestOrderStatus(orderNumber: string): Promise<string> {
+    const rows = await this.db.queryRows<OrderStatusRow>(
+      [
+        'SELECT id, status',
+        'FROM kpos.order_bill',
+        'WHERE order_num = ?',
+        'ORDER BY id DESC',
+        'LIMIT 1',
+      ].join(' '),
+      [orderNumber],
+    );
+    const status = rows[0]?.status;
+
+    if (status === undefined || status === null || String(status).trim() === '') {
+      throw new Error(`数据库中未找到订单 ${orderNumber} 的状态。`);
+    }
+
+    return String(status);
+  }
+
+  @step('业务步骤：读取指定订单号最新记录的小票打印次数')
+  async readLatestReceiptPrintCount(orderNumber: string): Promise<number> {
+    const rows = await this.db.queryRows<OrderReceiptPrintCountRow>(
+      [
+        'SELECT number_of_receipt_printed',
+        'FROM kpos.order_bill',
+        'WHERE order_num = ?',
+        'ORDER BY id DESC',
+        'LIMIT 1',
+      ].join(' '),
+      [orderNumber],
+    );
+    const count = Number(rows[0]?.number_of_receipt_printed);
+
+    if (!Number.isInteger(count) || count < 0) {
+      throw new Error(`数据库中未找到订单 ${orderNumber} 的有效小票打印次数。`);
+    }
+
+    return count;
+  }
+
+  @step('业务步骤：读取当前被最少未完成订单占用的桌台 ID')
+  async readLeastOccupiedTableId(): Promise<number> {
+    const rows = await this.db.queryRows<OccupiedTableOrderRow>(
+      [
+        'SELECT table_id',
+        'FROM kpos.order_bill',
+        'WHERE table_id IS NOT NULL',
+        'AND status IN (1, 2, 3)',
+        'GROUP BY table_id',
+        'ORDER BY COUNT(*) ASC, MIN(created_on) ASC',
+        'LIMIT 1',
+      ].join(' '),
+    );
+    const tableId = Number(rows[0]?.table_id);
+
+    if (!Number.isInteger(tableId) || tableId <= 0) {
+      throw new Error('数据库中没有可清理的已占用桌台。');
+    }
+
+    return tableId;
+  }
+
 }

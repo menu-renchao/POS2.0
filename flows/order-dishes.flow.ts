@@ -317,6 +317,33 @@ export class OrderDishesFlow {
     return await orderDishesPage.sendOrder();
   }
 
+  @step('业务步骤：打印当前订单收据并保存订单号')
+  async printReceiptWithReference(
+    orderDishesPage: OrderDishesPage,
+  ): ReturnType<OrderDishesPage['printReceiptWithReference']> {
+    await orderDishesPage.expectLoaded();
+    return await orderDishesPage.printReceiptWithReference();
+  }
+
+  @step((_: OrderDishesPage, dishName: string, note: string) =>
+    `业务步骤：为菜品 ${dishName} 添加 Note：${note}`,
+  )
+  async addDishNote(
+    orderDishesPage: OrderDishesPage,
+    dishName: string,
+    note: string,
+    authorizationPasscode = '11',
+  ): Promise<void> {
+    await orderDishesPage.selectOrderedDish(dishName);
+    const state = await orderDishesPage.openSelectedItemNote();
+
+    if (state === 'authorization') {
+      await orderDishesPage.authorizeSelectedItemNote(authorizationPasscode);
+    }
+
+    await orderDishesPage.fillSelectedItemNote(note);
+  }
+
   @step((_: OrderDishesPage, dishName: string) => `业务步骤：编辑已下单菜品 ${dishName} 并加 1`)
   async increaseOrderedDishQuantityByOne(
     orderDishesPage: OrderDishesPage,

@@ -38,11 +38,11 @@ export class MysqlDb {
     return this.connectionFactory === createConnection;
   }
 
-  async execute(sql: string): Promise<void> {
+  async execute(sql: string, values: unknown[] = []): Promise<void> {
     const connection = await this.connectionFactory(this.connectionOptions());
 
     try {
-      await connection.query(sql);
+      await connection.query(sql, values);
     } finally {
       await connection.end();
     }

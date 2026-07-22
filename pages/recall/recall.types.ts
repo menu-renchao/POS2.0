@@ -42,6 +42,8 @@ export type RecallOrderDetailAction =
   | 'edit'
   | 'send'
   | 'print'
+  | 'reprint'
+  | 'resend'
   | 'pay'
   | 'split'
   | 'discount'
@@ -77,6 +79,11 @@ export type RecallOrderDetails = {
 export type RecallKitchenTicketResult = {
   httpStatus: number;
   orderStatus: string | null;
+};
+
+export type RecallResendResult = {
+  httpStatus: number;
+  selectedDishes: string[];
 };
 
 export type RecallDiscountWholeOrderSummary = {
