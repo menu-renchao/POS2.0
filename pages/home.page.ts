@@ -196,18 +196,29 @@ export class HomePage {
   @step('页面操作：点击 Dine In 入口并等待堂食入口页面稳定')
   async enterDineInEntry(): Promise<DineInEntryPage> {
     await this.clickFunctionButton('Dine In');
+    const entryPage = this.createDineInEntryPage(await this.waitForDineInEntryState());
+    await entryPage.expectLoaded();
+    return entryPage;
+  }
 
-    const entryState = await this.waitForDineInEntryState();
+  @step('页面读取：等待已触发的 Dine In 入口到达选桌页或点单页')
+  async waitForDineInEntryPage(): Promise<DineInEntryPage> {
+    const entryPage = this.createDineInEntryPage(await this.waitForDineInEntryState());
+    await entryPage.expectLoaded();
+    return entryPage;
+  }
 
+  @step('页面读取：判断当前是否已经到达 Dine In 选桌页或点单页')
+  async isDineInEntryRoute(): Promise<boolean> {
+    return /#(?:tableV2|orderDishes)/.test(this.page.url());
+  }
+
+  private createDineInEntryPage(entryState: DineInEntryState): DineInEntryPage {
     if (entryState === 'orderDishes') {
-      const orderDishesPage = new OrderDishesPage(this.page);
-      await orderDishesPage.expectLoaded();
-      return orderDishesPage;
+      return new OrderDishesPage(this.page);
     }
 
-    const selectTablePage = new SelectTablePage(this.page);
-    await selectTablePage.expectLoaded();
-    return selectTablePage;
+    return new SelectTablePage(this.page);
   }
 
   @step('页面操作：点击 Delivery 入口并进入 Delivery 页面')

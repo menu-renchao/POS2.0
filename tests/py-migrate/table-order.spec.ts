@@ -129,7 +129,9 @@ async function createSecondOrderOnSameTable(
 }
 
 function readRecallOrderTime(cardText: string): string {
-  const dateTime = cardText.match(/\b\d{4}-\d{2}-\d{2}\s+(\d{2}:\d{2}):\d{2}\b/)?.[1];
+  const dateTime = cardText.match(
+    /\b(?:\d{4}-\d{2}-\d{2}|\d{2}\/\d{2})\s+(\d{2}:\d{2}):\d{2}\b/,
+  )?.[1];
 
   if (!dateTime) {
     throw new Error(`Recall 订单卡未显示可解析的创建时间：${cardText}`);
@@ -139,7 +141,6 @@ function readRecallOrderTime(cardText: string): string {
 }
 
 test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, () => {
-  test.describe.configure({ mode: 'serial' });
   test.setTimeout(120_000);
 
   test.beforeEach(async ({ apiConfig, employeeLoginPage, homePage, orderApi }) => {
@@ -220,6 +221,23 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
       const details = await readRecallDetailsAndReturnHome(createdOrder);
 
       expect(details.orderContext.tableName).toContain(createdOrder.selectedTable.tableNumber);
+    },
+  );
+
+  test(
+    '应能在桌台卡片显示订单时长达到一分钟',
+    { annotation: [jiraIssueAnnotation('POS-15557')] },
+    async ({ employeeLoginPage, homePage }) => {
+      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
+      const createdOrder = await createTableOrder(readyHomePage);
+      const tablePage = await openSavedTable(createdOrder);
+
+      expect(
+        await tablePage.cards.waitForDisplayedDuration(
+          createdOrder.selectedTable.tableNumber,
+          '0:01',
+        ),
+      ).toBe('0:01');
     },
   );
 
@@ -325,7 +343,11 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
       const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
       const customer = buildOrderServiceDineInCustomer();
       const createdOrder = await createTableOrder(readyHomePage, { customer });
-      const tablePage = await openSavedTable(createdOrder);
+      const tablePage = await new SelectTableFlow().enterDineInWithEmployeeContext(
+        createdOrder.homePage,
+        employeeLoginPage,
+      );
+      await tablePage.selectArea(createdOrder.selectedTable.areaName);
       await tablePage.cards.selectDisplayField('partyName');
 
       expect(
@@ -350,9 +372,11 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
       await editingPage.changeGuestCount(5);
       const editedOrder = await editingPage.saveOrderWithReference();
       const finalRecallPage = await new RecallFlow().openRecallFromHome(editedOrder.homePage);
-      await finalRecallPage.openOrderDetails(savedOrder.orderNumber);
-
-      expect((await finalRecallPage.readOrderContext()).guestCount).toBe('5');
+      const finalEditingPage = await new RecallFlow().editOrder(
+        finalRecallPage,
+        savedOrder.orderNumber,
+      );
+      await finalEditingPage.expectGuestCount(5);
     },
   );
 

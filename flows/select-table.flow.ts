@@ -1,7 +1,10 @@
 import { OrderDishesPage } from '../pages/order-dishes.page';
 import { HomePage } from '../pages/home.page';
+import { EmployeeLoginPage } from '../pages/employee-login.page';
 import { type SelectedTableRecord, SelectTablePage } from '../pages/select-table.page';
 import { step } from '../utils/step';
+import { waitUntil } from '../utils/wait';
+import { EmployeeLoginFlow } from './employee-login.flow';
 
 export type TableSelectionResult = {
   selectedTable: SelectedTableRecord;
@@ -13,6 +16,52 @@ export type TableOrderEntryResult = {
 };
 
 export class SelectTableFlow {
+  @step('业务步骤：从主页进入 Dine In，并按需完成员工口令确认')
+  async enterDineInWithEmployeeContext(
+    homePage: HomePage,
+    employeeLoginPage: EmployeeLoginPage,
+    employeePasscode = '11',
+  ): Promise<SelectTablePage> {
+    await homePage.clickEntry('Dine In');
+    const entryState = await waitUntil(
+      async () => {
+        if (await employeeLoginPage.isVisible().catch(() => false)) {
+          return 'employee-login';
+        }
+
+        if (await homePage.isDineInEntryRoute()) {
+          return 'dine-in';
+        }
+
+        return 'pending';
+      },
+      (state) => state !== 'pending',
+      {
+        timeout: 10_000,
+        interval: 100,
+        message: 'Dine In 入口未进入员工口令页或堂食页面。',
+      },
+    );
+
+    if (entryState === 'employee-login') {
+      await new EmployeeLoginFlow().enterWithEmployeePassword(
+        employeeLoginPage,
+        homePage,
+        employeePasscode,
+      );
+      return await homePage.enterDineIn();
+    }
+
+    const entryPage = await homePage.waitForDineInEntryPage();
+
+    if (entryPage instanceof OrderDishesPage) {
+      throw new Error('Dine In 当前跳过了选桌页，无法执行桌台用例。');
+    }
+
+    await entryPage.expectLoaded();
+    return entryPage;
+  }
+
   @step('业务步骤：从 Dine In 以无桌位路径进入点单页')
   async enterDineInNoTableOrder(homePage: HomePage): Promise<OrderDishesPage> {
     const entryPage = await homePage.enterDineInEntry();

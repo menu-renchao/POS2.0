@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { step } from '../../utils/step';
+import { waitUntil } from '../../utils/wait';
 import { RecallFilterBarSection } from '../recall/recall-filter-bar.section';
 import { RecallOrderDetailsDialog } from '../recall/recall-order-details.dialog';
 
@@ -15,7 +16,7 @@ const displayFieldAccessibleNames = {
   orderTime: 'TimeoutIcon Order Time',
   orderId: 'Order Id',
   partySize: 'Seat3Icon Party Size',
-  server: 'RoleIcon Server',
+  server: 'StaffIcon Server',
   price: 'PriceIcon Price',
   partyName: 'MemberIcon Party Name',
 } as const satisfies Record<TableCardDisplayField, string>;
@@ -34,6 +35,7 @@ export class SelectTableCardsSection {
   private readonly tableNodeById: (tableId: string) => Locator;
   private readonly occupiedTableButtonByNumber: (tableNumber: string) => Locator;
   private readonly multiOrderDialog: Locator;
+  private readonly refreshButton: Locator;
 
   constructor(private readonly page: Page) {
     this.tableAreaRoot = this.page.locator('#myAreaRoot');
@@ -46,6 +48,7 @@ export class SelectTableCardsSection {
         ),
       }).first();
     this.multiOrderDialog = this.page.getByTestId('pos-ui-modal').last();
+    this.refreshButton = this.page.getByRole('button', { name: 'Refresh', exact: true });
     this.orderDetails = new RecallOrderDetailsDialog(
       page,
       new RecallFilterBarSection(page),
@@ -92,6 +95,39 @@ export class SelectTableCardsSection {
     }
 
     return orderTime.padStart(5, '0');
+  }
+
+  @step((tableNumber: string) => `页面读取：读取桌台 ${tableNumber} 显示的订单时长`)
+  async readDisplayedDuration(tableNumber: string): Promise<string> {
+    const tableText = await this.readTableCardText(tableNumber);
+    const duration = tableText.match(/(?:^|\s)(>24h|\d{1,2}:\d{2})$/)?.[1];
+
+    if (!duration) {
+      throw new Error(`无法从桌台卡片读取订单时长：${tableText}`);
+    }
+
+    return duration;
+  }
+
+  @step((tableNumber: string, expectedDuration: string) =>
+    `页面操作：等待桌台 ${tableNumber} 的订单时长达到 ${expectedDuration}`,
+  )
+  async waitForDisplayedDuration(
+    tableNumber: string,
+    expectedDuration: string,
+  ): Promise<string> {
+    return await waitUntil(
+      async () => {
+        await this.refreshButton.click();
+        return await this.readDisplayedDuration(tableNumber);
+      },
+      (duration) => duration === expectedDuration,
+      {
+        timeout: 90_000,
+        interval: 5_000,
+        message: `桌台 ${tableNumber} 的订单时长未达到 ${expectedDuration}。`,
+      },
+    );
   }
 
   @step((tableNumber: string) => `页面读取：读取桌台 ${tableNumber} 显示的客人数`)
@@ -172,7 +208,10 @@ export class SelectTableCardsSection {
 
   private async readDisplayValueText(tableNumber: string): Promise<string> {
     const tableText = await this.readTableCardText(tableNumber);
-    const leadingTableNumber = new RegExp(`^\\W*${escapeRegExp(tableNumber)}\\W*`);
-    return tableText.replace(leadingTableNumber, '').trim();
+    const leadingTableNumber = new RegExp(`^\\s*${escapeRegExp(tableNumber)}\\s*`);
+    return tableText
+      .replace(leadingTableNumber, '')
+      .replace(/\s+(?:>24h|\d{1,2}:\d{2})$/, '')
+      .trim();
   }
 }
