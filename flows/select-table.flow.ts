@@ -16,6 +16,18 @@ export type TableOrderEntryResult = {
 };
 
 export class SelectTableFlow {
+  @step('业务步骤：返回主页后重新进入指定桌台区域以刷新桌台信息')
+  async refreshTableInformationByReentering(
+    selectTablePage: SelectTablePage,
+    areaName: string,
+  ): Promise<SelectTablePage> {
+    const homePage = await selectTablePage.returnHome();
+    await homePage.clickRefresh();
+    const refreshedSelectTablePage = await homePage.enterDineIn();
+    await refreshedSelectTablePage.selectArea(areaName);
+    return refreshedSelectTablePage;
+  }
+
   @step('业务步骤：从主页进入 Dine In，并按需完成员工口令确认')
   async enterDineInWithEmployeeContext(
     homePage: HomePage,

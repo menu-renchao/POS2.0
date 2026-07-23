@@ -29,6 +29,8 @@ export class PaymentPage {
   private readonly printReceiptCancelButton: Locator;
   private readonly printReceiptConfirmButton: Locator;
   private readonly paymentSuccessConfirmButton: Locator;
+  private readonly paymentLoadingOverlay: Locator;
+  private readonly paymentFailureDialog: Locator;
   private readonly paymentFlow: Locator;
   private readonly tipsButton: Locator;
   private readonly tipsConfirmButton: Locator;
@@ -42,6 +44,15 @@ export class PaymentPage {
     this.printReceiptCancelButton = this.printReceiptDialog.locator('#print-customer-cancel');
     this.printReceiptConfirmButton = this.printReceiptDialog.locator('#print-customer-submit');
     this.paymentSuccessConfirmButton = this.paymentFrame.getByTestId('pay-success-status-button-1');
+    this.paymentLoadingOverlay = this.paymentFrame.getByTestId('pos-ui-loading-overlay');
+    this.paymentFailureDialog = this.paymentFrame
+      .getByRole('dialog')
+      .filter({
+        has: this.paymentFrame.getByRole('heading', {
+          name: 'Payment Failed',
+          exact: true,
+        }),
+      });
     this.paymentFlow = this.paymentFrame.getByTestId('payment-panel-payment-flow');
     this.tipsButton = this.paymentFrame.getByTestId('payment-panel-action-tips');
     this.tipsConfirmButton = this.paymentFrame.getByTestId(
@@ -75,7 +86,23 @@ export class PaymentPage {
 
   @step('页面操作：在 Payment type 区域点击 Cash')
   async clickPaymentTypeCash(): Promise<void> {
-    await (await this.resolvePaymentTypeCashButton()).click();
+    await this.waitForPaymentOverlayToClear();
+    if (
+      (await this.isPaymentSuccessConfirmVisible()) ||
+      (await this.isPrintReceiptDialogVisible()) ||
+      !(await this.isPaymentPanelVisible())
+    ) {
+      return;
+    }
+
+    const paymentFailureText = await this.readPaymentFailureText();
+    if (paymentFailureText) {
+      throw new Error(`支付终端返回失败：${paymentFailureText}`);
+    }
+
+    const cashButton = await this.resolvePaymentTypeCashButton();
+    await expect(cashButton).toBeEnabled({ timeout: 5_000 });
+    await cashButton.click({ timeout: 10_000 });
   }
 
   @step((amountInCents: number) => `页面操作：输入本次现金支付金额 ${amountInCents} 分`)
@@ -152,12 +179,31 @@ export class PaymentPage {
     await expect(this.paymentFlow).toContainText(text);
   }
 
+  @step('页面读取：读取 Payment 当前未付金额')
+  async readBalanceDue(): Promise<number> {
+    const paymentFlowText = await this.paymentFlow.innerText();
+    const balanceMatch = paymentFlowText.match(/Balance due\s*\$([\d,]+(?:\.\d{2})?)/i);
+    const balanceDue = Number(balanceMatch?.[1].replace(/,/g, ''));
+
+    if (!Number.isFinite(balanceDue)) {
+      throw new Error(`无法从 Payment 支付流程读取未付金额：${paymentFlowText}`);
+    }
+
+    return balanceDue;
+  }
+
   @step('页面操作：在 Payment type 区域点击 Credit Card')
   async clickPaymentTypeCreditCard(): Promise<void> {
     await this.waitForPaymentOverlayToClear();
+    const paymentFailureText = await this.readPaymentFailureText();
+    if (paymentFailureText) {
+      throw new Error(`支付终端返回失败：${paymentFailureText}`);
+    }
+
     const creditCardButton = await this.resolvePaymentTypeCreditCardButton();
     await expect(creditCardButton).toBeVisible({ timeout: 5_000 });
-    await creditCardButton.dispatchEvent('click');
+    await expect(creditCardButton).toBeEnabled({ timeout: 5_000 });
+    await creditCardButton.click({ timeout: 10_000 });
   }
 
   @step('页面操作：填写信用卡表单')
@@ -378,6 +424,15 @@ export class PaymentPage {
   @step('页面读取：确认支付成功确认按钮当前是否可见')
   async isPaymentSuccessConfirmVisible(): Promise<boolean> {
     return await this.paymentSuccessConfirmButton.isVisible().catch(() => false);
+  }
+
+  @step('页面读取：读取支付失败弹窗信息')
+  async readPaymentFailureText(): Promise<string | null> {
+    if (!(await this.paymentFailureDialog.isVisible().catch(() => false))) {
+      return null;
+    }
+
+    return (await this.paymentFailureDialog.innerText()).replace(/\s+/g, ' ').trim();
   }
 
   private async resolvePaymentSurface(): Promise<Locator> {
@@ -681,15 +736,13 @@ export class PaymentPage {
   }
 
   private async waitForPaymentOverlayToClear(): Promise<void> {
-    const overlay = this.paymentFrame.locator('.mycover, [id^="floatcover"]').first();
-
     await waitUntil(
-      async () => await overlay.isVisible().catch(() => false),
+      async () => await this.paymentLoadingOverlay.isVisible().catch(() => false),
       (visible) => !visible,
       {
-        timeout: 5_000,
-        message: 'Payment overlay did not disappear in time.',
+        timeout: 15_000,
+        message: '支付加载遮罩未在超时内消失。',
       },
-    ).catch(() => undefined);
+    );
   }
 }

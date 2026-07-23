@@ -25,6 +25,10 @@ type OccupiedTableOrderRow = {
   table_id: number | string;
 };
 
+type OccupiedTableParentOrderRow = {
+  order_id: number | string;
+};
+
 type LatestTableOrderRow = {
   order_num: number | string;
 };
@@ -204,7 +208,7 @@ export class RecallDatabaseFlow {
         'SELECT table_id',
         'FROM kpos.order_bill',
         'WHERE table_id IS NOT NULL',
-        'AND status IN (1, 2, 3)',
+        'AND status IN (1, 2, 3, 4, 100, 101)',
         'GROUP BY table_id',
         'ORDER BY COUNT(*) ASC, MIN(created_on) ASC',
         'LIMIT 1',
@@ -217,6 +221,64 @@ export class RecallDatabaseFlow {
     }
 
     return tableId;
+  }
+
+  @step((limit: number) => `业务步骤：读取当前最少占用的前 ${limit} 个不同桌台对应父订单 ID`)
+  async readLeastOccupiedTableOrderIds(limit: number): Promise<number[]> {
+    if (!Number.isInteger(limit) || limit <= 0) {
+      throw new Error(`待读取的桌台数量必须为正整数：${limit}`);
+    }
+
+    const rows = await this.db.queryRows<OccupiedTableParentOrderRow>(
+      [
+        'SELECT DISTINCT COALESCE(order_bill.parent_order_id, order_bill.id) AS order_id',
+        'FROM kpos.order_bill AS order_bill',
+        'INNER JOIN (',
+        'SELECT table_id',
+        'FROM kpos.order_bill',
+        'WHERE table_id IS NOT NULL',
+        'AND status IN (1, 2, 3, 4, 100, 101)',
+        'GROUP BY table_id',
+        'ORDER BY COUNT(*) ASC, MIN(created_on) ASC',
+        `LIMIT ${limit}`,
+        ') AS selected_tables ON selected_tables.table_id = order_bill.table_id',
+        'WHERE order_bill.status IN (1, 2, 3, 4)',
+        'ORDER BY order_id',
+      ].join(' '),
+    );
+    const orderIds = rows.map(({ order_id: orderId }) => Number(orderId));
+
+    if (
+      orderIds.length < limit ||
+      orderIds.some((orderId) => !Number.isInteger(orderId) || orderId <= 0)
+    ) {
+      throw new Error(`数据库中没有找到 ${limit} 个不同占用桌台对应的有效父订单 ID。`);
+    }
+
+    return orderIds;
+  }
+
+  @step((tableId: string) => `业务步骤：读取占用桌台 ${tableId} 的全部有效父订单 ID`)
+  async readOccupiedTableOrderIds(tableId: string): Promise<number[]> {
+    const normalizedTableId = Number(tableId);
+    if (!Number.isInteger(normalizedTableId) || normalizedTableId <= 0) {
+      throw new Error(`桌台 ID 必须为正整数：${tableId}`);
+    }
+
+    const rows = await this.db.queryRows<OccupiedTableParentOrderRow>(
+      [
+        'SELECT DISTINCT COALESCE(parent_order_id, id) AS order_id',
+        'FROM kpos.order_bill',
+        'WHERE table_id = ?',
+        'AND status IN (1, 2, 3, 4, 100, 101)',
+        'ORDER BY order_id',
+      ].join(' '),
+      [normalizedTableId],
+    );
+
+    return rows
+      .map(({ order_id: orderId }) => Number(orderId))
+      .filter((orderId) => Number.isInteger(orderId) && orderId > 0);
   }
 
   @step((tableId: string) => `业务步骤：读取桌台 ${tableId} 最新一笔订单的订单号`)

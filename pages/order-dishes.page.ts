@@ -179,6 +179,10 @@ export class OrderDishesPage implements OrderDishesPageHost {
     return this.menu.clickCurrentCategoryDish(...args);
   }
 
+  doubleClickCurrentCategoryDish(...args: Parameters<OrderDishesMenuSection['doubleClickCurrentCategoryDish']>): ReturnType<OrderDishesMenuSection['doubleClickCurrentCategoryDish']> {
+    return this.menu.doubleClickCurrentCategoryDish(...args);
+  }
+
   changeDishCount(...args: Parameters<OrderDishesMenuSection['changeDishCount']>): ReturnType<OrderDishesMenuSection['changeDishCount']> {
     return this.menu.changeDishCount(...args);
   }
@@ -269,10 +273,6 @@ export class OrderDishesPage implements OrderDishesPageHost {
 
   closeModifyPanel(...args: Parameters<OrderDishesModifierSection['closeModifyPanel']>): ReturnType<OrderDishesModifierSection['closeModifyPanel']> {
     return this.modifier.closeModifyPanel(...args);
-  }
-
-  closeModifyPanelByClickingBlank(...args: Parameters<OrderDishesModifierSection['closeModifyPanelByClickingBlank']>): ReturnType<OrderDishesModifierSection['closeModifyPanelByClickingBlank']> {
-    return this.modifier.closeModifyPanelByClickingBlank(...args);
   }
 
   selectModifyAction(...args: Parameters<OrderDishesModifierSection['selectModifyAction']>): ReturnType<OrderDishesModifierSection['selectModifyAction']> {

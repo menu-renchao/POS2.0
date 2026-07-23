@@ -58,38 +58,6 @@ export class OrderDishesModifierSection {
       await expect(this.locators.modifyPanel).toBeHidden();
     }
 
-    @step('页面操作：点击 Modify 面板外的空白区域关闭调味页面')
-    async closeModifyPanelByClickingBlank(): Promise<void> {
-      await this.expectModifyPanelVisible();
-      const panelBox = await this.locators.modifyPanel.boundingBox();
-      const viewport = this.page.viewportSize();
-
-      if (!panelBox || !viewport) {
-        throw new Error('无法读取 Modify 面板或页面视口尺寸，不能定位面板外空白区域。');
-      }
-
-      const panelRight = panelBox.x + panelBox.width;
-      const leftBlankWidth = panelBox.x;
-      const rightBlankWidth = viewport.width - panelRight;
-      if (leftBlankWidth < 2 && rightBlankWidth < 2) {
-        throw new Error('Modify 面板两侧均没有可点击的面板外空白区域。');
-      }
-
-      const clickPoint = {
-        x:
-          leftBlankWidth >= rightBlankWidth
-            ? Math.max(1, leftBlankWidth / 2)
-            : Math.min(viewport.width - 1, panelRight + rightBlankWidth / 2),
-        y: Math.min(
-          viewport.height - 1,
-          Math.max(1, panelBox.y + panelBox.height * 0.7),
-        ),
-      };
-
-      await this.page.mouse.click(clickPoint.x, clickPoint.y);
-      await expect(this.locators.modifyPanel).toBeHidden({ timeout: 5_000 });
-    }
-
     @step((action: string) => `页面操作：选择调味动作 ${action}`)
     async selectModifyAction(action: string): Promise<void> {
       await this.expectModifyPanelVisible();

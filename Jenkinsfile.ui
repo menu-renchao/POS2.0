@@ -535,6 +535,8 @@ pipeline {
     environment {
         PLAYWRIGHT_BASE_URL = "${params.PLAYWRIGHT_BASE_URL}"
         CI = 'true'
+        UI_CLEAR_TABLES_BEFORE_RUN = 'true'
+        POS_PRINT_OUTPUT_DIR = 'C:\\Users\\nhqrt\\.menusifu\\POS\\data\\temp'
         PLAYWRIGHT_BROWSERS_PATH = 'C:\\ProgramData\\Jenkins\\ms-playwright'
         PATH = "C:\\Program Files\\nodejs;C:\\Users\\nhqrt\\AppData\\Roaming\\npm;${env.PATH}"
     }

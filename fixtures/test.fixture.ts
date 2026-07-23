@@ -58,24 +58,28 @@ export const test = base.extend<AppFixtures>({
       }
     }
   },
-  apiSetup: async ({ apiConfig, resourceRegistry }, use) => {
+  apiSetup: async ({ apiConfig, resourceRegistry }, use, testInfo) => {
     const apiRequest = await createApiRequestContext(apiConfig);
 
     try {
       const systemConfigurationApi = new SystemConfigurationApiClient(apiRequest);
-      await use(
-        createApiSetup({
-          adminConfigApi: new AdminConfigApiClient(apiRequest),
-          kitchenApi: new KitchenApiClient(apiRequest),
-          layoutConfigApi: new LayoutConfigApiClient(apiRequest),
-          menuApi: new MenuApiClient(apiRequest),
-          saleItemApi: new SaleItemApiClient(apiRequest),
-          orderTypeApi: new OrderTypeApiClient(apiRequest),
-          systemConfigurationApi,
-          printConfigApi: new PrintConfigApiClient(apiRequest),
-          resourceRegistry,
-        }),
-      );
+      const setup = createApiSetup({
+        adminConfigApi: new AdminConfigApiClient(apiRequest),
+        kitchenApi: new KitchenApiClient(apiRequest),
+        layoutConfigApi: new LayoutConfigApiClient(apiRequest),
+        menuApi: new MenuApiClient(apiRequest),
+        saleItemApi: new SaleItemApiClient(apiRequest),
+        orderTypeApi: new OrderTypeApiClient(apiRequest),
+        systemConfigurationApi,
+        printConfigApi: new PrintConfigApiClient(apiRequest),
+        resourceRegistry,
+      });
+
+      if (testInfo.tags.includes('@加收')) {
+        await setup.charge.deleteAll();
+      }
+
+      await use(setup);
     } finally {
       const cleanupResult = await resourceRegistry.cleanupAll();
 

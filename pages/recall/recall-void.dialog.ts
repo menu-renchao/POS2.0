@@ -39,10 +39,8 @@ export class RecallVoidDialog {
     this.voidRestoreInventoryCheckbox = recallScopedTestId(
       this.voidDialog,
       'shared-void-dialog-restore-inventory-checkbox',
-    );
-    this.labeledVoidRestoreInventoryCheckbox = this.voidDialog.getByRole('checkbox', {
-      name: /Restore inventory/i,
-    });
+    ).getByRole('checkbox');
+    this.labeledVoidRestoreInventoryCheckbox = this.voidDialog.getByRole('checkbox').first();
     this.voidNoteInput = this.voidDialog.getByRole('textbox', { name: /^Note$/i });
     this.voidSubmitButton = this.voidDialog.getByRole('button', { name: /^Void$/i });
   }
@@ -107,12 +105,15 @@ export class RecallVoidDialog {
     const restoreInventoryCheckbox = await this.resolveRestoreInventoryCheckbox();
 
     if (!restoreInventoryCheckbox) {
+      if (!restoreInventory) {
+        throw new Error('Void 弹窗未找到可交互的 Restore inventory 复选框，无法切换为不恢复库存。');
+      }
       return;
     }
 
-    const checkboxChecked = await restoreInventoryCheckbox.isChecked().catch(() => null);
+    const checkboxChecked = await restoreInventoryCheckbox.isChecked();
 
-    if (checkboxChecked === null || checkboxChecked === restoreInventory) {
+    if (checkboxChecked === restoreInventory) {
       return;
     }
 
@@ -382,13 +383,20 @@ export class RecallVoidDialog {
 
   private async resolveRestoreInventoryCheckbox(): Promise<Locator | null> {
     const checkboxCandidates = [
-      this.voidRestoreInventoryCheckbox,
       this.labeledVoidRestoreInventoryCheckbox,
+      this.voidRestoreInventoryCheckbox,
     ];
 
     for (const checkboxCandidate of checkboxCandidates) {
-      if ((await checkboxCandidate.count().catch(() => 0)) > 0) {
-        return checkboxCandidate;
+      const candidateCount = await checkboxCandidate.count().catch(() => 0);
+
+      for (let index = 0; index < candidateCount; index += 1) {
+        const candidate = checkboxCandidate.nth(index);
+        const checked = await candidate.isChecked().catch(() => null);
+
+        if (checked !== null) {
+          return candidate;
+        }
       }
     }
 

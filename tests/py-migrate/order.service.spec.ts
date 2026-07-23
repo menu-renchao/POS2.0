@@ -703,6 +703,11 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
     },
     async ({ apiSetup, homePage, employeeLoginPage }) => {
       test.setTimeout(120_000);
+      test.info().annotations.push({
+        type: '已知产品问题',
+        description:
+          '10% 整单加收预期仅按普通菜 $8.80 计算为 $0.88，实际为 $1.88，未启用整单折扣适用性的 $10 类别菜仍被计入加收基数。',
+      });
       const chargeCase = buildOrderServiceOrderChargeExcludedCategoryCase();
 
       await test.step('创建不参与整单折扣的类别及两道菜品', async () => {
@@ -1379,6 +1384,10 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
     },
     async ({ apiSetup, homePage, employeeLoginPage }) => {
       test.setTimeout(120_000);
+      test.info().annotations.push({
+        type: '已知产品问题',
+        description: '同一菜品的名称与编号同时命中 AA 时，搜索结果实际重复显示 2 条，需求预期为 1 条。',
+      });
       const searchCase = orderServiceSameNameAndNumberSearchCase;
       const restoreSearchMenuConfiguration =
         await apiSetup.systemConfiguration.updateByName(
@@ -1772,103 +1781,119 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
         tag: ['@分单', '@现金支付'],
         annotation: [jiraIssueAnnotation('POS-19362')],
       },
-      async ({ homePage, employeeLoginPage }) => {
-        const orderDishesFlow = new OrderDishesFlow();
-        const splitOrderFlow = new SplitOrderFlow();
-        const recallFlow = new RecallFlow();
-        const paymentFlow = new PaymentFlow();
+      async ({ apiSetup, homePage, employeeLoginPage }) => {
+        const restoreSeatDisplay = await apiSetup.systemConfiguration.updateByName(
+          'IS_SHOW_SEATS',
+          null,
+          { verify: true },
+        );
 
-        const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-          return await enterReadyHome({ employeeLoginPage, homePage });
-        });
+        try {
+          const orderDishesFlow = new OrderDishesFlow();
+          const splitOrderFlow = new SplitOrderFlow();
+          const recallFlow = new RecallFlow();
+          const paymentFlow = new PaymentFlow();
 
-        const orderDishesPage = await test.step('从堂食 New Order 进入点餐页', async () => {
-          const selectTablePage = await readyHomePage.enterDineIn();
-          const page = await selectTablePage.clickNewOrder();
-          await page.expectLoaded();
-          return page;
-        });
-
-        await test.step('添加两道菜并分别改价后添加母单 tips', async () => {
-          await orderDishesFlow.addRegularDish(
-            orderDishesPage,
-            orderServiceDishes.regular.name,
-            orderServiceDishes.regular.menu,
+          const readyHomePage = await test.step(
+            '关闭座位显示配置并刷新 POS 员工上下文',
+            async () => {
+              const page = await enterReadyHome({ employeeLoginPage, homePage });
+              await page.clickRefresh();
+              await page.confirmDelayedConfigurationRefresh();
+              return page;
+            },
           );
-          await orderDishesPage.clickAddLine();
-          await orderDishesFlow.addRegularDish(
-            orderDishesPage,
-            orderServiceDishes.test.name,
-            orderServiceDishes.test.menu,
-          );
-          await orderDishesPage.changeOrderedDishPrice(
-            orderServiceDishes.regular.name,
-            orderServiceSplitTipsCase.changedDishPrice,
-          );
-          await orderDishesPage.changeOrderedDishPrice(
-            orderServiceDishes.test.name,
-            orderServiceSplitTipsCase.changedDishPrice,
-          );
-          await orderDishesPage.addTip(orderServiceSplitTipsCase.tipAmountInCents);
 
-          const priceSummary = await orderDishesPage.readPriceSummary();
-          expect(priceSummary.Tips).toBe(orderServiceSplitTipsCase.expectedTipAmount);
-        });
+          const orderDishesPage = await test.step('从堂食 New Order 进入点餐页', async () => {
+            const selectTablePage = await readyHomePage.enterDineIn();
+            const page = await selectTablePage.clickNewOrder();
+            await page.expectLoaded();
+            return page;
+          });
 
-        const recallPage = await test.step('按座位分单并进入 Recall', async () => {
-          const splitOrderPage = await orderDishesPage.openSplitOrder();
-          await splitOrderFlow.splitOrderBySeats(splitOrderPage);
-          const returnedPage = await splitOrderFlow.submitAndReturnPage(splitOrderPage);
-          return await enterRecallFromReturnedPage(returnedPage);
-        });
-
-        const { orderNumber, paidTargetOrderNumber, voidTargetOrderNumber, originalTip } =
-          await test.step('读取分单后的两个子单号并确认第一个子单 tips', async () => {
-            const latestOrderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
-            await recallPage.openOrderDetails(latestOrderNumber);
-            const targetOrderNumbers = await recallPage.readTargetOrderNumbers();
-            expect(targetOrderNumbers.length).toBeGreaterThanOrEqual(2);
-
-            const [firstTargetOrderNumber, secondTargetOrderNumber] = targetOrderNumbers;
-            expect(firstTargetOrderNumber).toBeTruthy();
-            expect(secondTargetOrderNumber).toBeTruthy();
-
-            const targetTip = await readTargetTips(
-              recallPage,
-              latestOrderNumber,
-              firstTargetOrderNumber,
+          await test.step('添加两道菜并分别改价后添加母单 tips', async () => {
+            await orderDishesFlow.addRegularDish(
+              orderDishesPage,
+              orderServiceDishes.regular.name,
+              orderServiceDishes.regular.menu,
             );
-            expect(targetTip).toBeGreaterThan(0);
+            await orderDishesPage.clickAddLine();
+            await orderDishesFlow.addRegularDish(
+              orderDishesPage,
+              orderServiceDishes.test.name,
+              orderServiceDishes.test.menu,
+            );
+            await orderDishesPage.changeOrderedDishPrice(
+              orderServiceDishes.regular.name,
+              orderServiceSplitTipsCase.changedDishPrice,
+            );
+            await orderDishesPage.changeOrderedDishPrice(
+              orderServiceDishes.test.name,
+              orderServiceSplitTipsCase.changedDishPrice,
+            );
+            await orderDishesPage.addTip(orderServiceSplitTipsCase.tipAmountInCents);
 
-            return {
-              orderNumber: latestOrderNumber,
-              paidTargetOrderNumber: firstTargetOrderNumber,
-              voidTargetOrderNumber: secondTargetOrderNumber,
-              originalTip: targetTip,
-            };
+            const priceSummary = await orderDishesPage.readPriceSummary();
+            expect(priceSummary.Tips).toBe(orderServiceSplitTipsCase.expectedTipAmount);
           });
 
-        await test.step('支付第一个子单并回到 Recall 详情上下文', async () => {
-          await recallPage.openOrderDetails(orderNumber, paidTargetOrderNumber);
-          const paymentPage = await recallPage.openPayment();
-          await paymentFlow.payByCash(paymentPage, { printReceipt: false });
-          await recallPage.closeOrderDetailsDialog();
-        });
-
-        await test.step('删除另一个子单后回到已支付子单', async () => {
-          await recallPage.openOrderDetails(orderNumber, voidTargetOrderNumber);
-          await recallPage.voidCurrentOrderKeepingDetails({
-            reason: orderServiceSplitTipsCase.voidReason,
-            restoreInventory: true,
+          const recallPage = await test.step('按座位分单并进入 Recall', async () => {
+            const splitOrderPage = await orderDishesPage.openSplitOrder();
+            await splitOrderFlow.splitOrderBySeats(splitOrderPage);
+            const returnedPage = await splitOrderFlow.submitAndReturnPage(splitOrderPage);
+            return await enterRecallFromReturnedPage(returnedPage);
           });
-          await recallPage.openOrderDetails(orderNumber, paidTargetOrderNumber);
-        });
 
-        await test.step('确认已支付子单 tips 未被删除子单影响', async () => {
-          const finalSummary = await recallPage.readDisplayedOrderPriceSummary();
-          expect(finalSummary.Tips).toBe(originalTip);
-          await recallPage.closeOrderDetailsDialog();
-        });
+          const { orderNumber, paidTargetOrderNumber, voidTargetOrderNumber, originalTip } =
+            await test.step('读取分单后的两个子单号并确认第一个子单 tips', async () => {
+              const latestOrderNumber = await recallFlow.readLatestVisibleOrderNumber(recallPage);
+              await recallPage.openOrderDetails(latestOrderNumber);
+              const targetOrderNumbers = await recallPage.readTargetOrderNumbers();
+              expect(targetOrderNumbers.length).toBeGreaterThanOrEqual(2);
+
+              const [firstTargetOrderNumber, secondTargetOrderNumber] = targetOrderNumbers;
+              expect(firstTargetOrderNumber).toBeTruthy();
+              expect(secondTargetOrderNumber).toBeTruthy();
+
+              const targetTip = await readTargetTips(
+                recallPage,
+                latestOrderNumber,
+                firstTargetOrderNumber,
+              );
+              expect(targetTip).toBeGreaterThan(0);
+
+              return {
+                orderNumber: latestOrderNumber,
+                paidTargetOrderNumber: firstTargetOrderNumber,
+                voidTargetOrderNumber: secondTargetOrderNumber,
+                originalTip: targetTip,
+              };
+            });
+
+          await test.step('支付第一个子单并回到 Recall 详情上下文', async () => {
+            await recallPage.openOrderDetails(orderNumber, paidTargetOrderNumber);
+            const paymentPage = await recallPage.openPayment();
+            await paymentFlow.payByCash(paymentPage, { printReceipt: false });
+            await recallPage.closeOrderDetailsDialog();
+          });
+
+          await test.step('删除另一个子单后回到已支付子单', async () => {
+            await recallPage.openOrderDetails(orderNumber, voidTargetOrderNumber);
+            await recallPage.voidCurrentOrderKeepingDetails({
+              reason: orderServiceSplitTipsCase.voidReason,
+              restoreInventory: true,
+            });
+            await recallPage.openOrderDetails(orderNumber, paidTargetOrderNumber);
+          });
+
+          await test.step('确认已支付子单 tips 未被删除子单影响', async () => {
+            const finalSummary = await recallPage.readDisplayedOrderPriceSummary();
+            expect(finalSummary.Tips).toBe(originalTip);
+            await recallPage.closeOrderDetailsDialog();
+          });
+        } finally {
+          await restoreSeatDisplay();
+        }
       },
     );
   });
@@ -2006,6 +2031,11 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
         ],
       },
       async ({ homePage, employeeLoginPage }) => {
+        test.info().annotations.push({
+          type: '已知产品问题',
+          description:
+            'Count 弹窗已将全局选项数量显示为 0，但 Confirm 按钮仍为 disabled，无法按需求确认归零并移除选项。',
+        });
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
           return await enterReadyHome({ employeeLoginPage, homePage });
         });
@@ -2094,7 +2124,9 @@ test.describe('堂食点单后 Recall 编辑税额校验', { tag: ['@点单'] },
             orderServiceModifyGlobalOptionCase.reduceExpectedQuantities,
           );
           expect(result.modifyPanelVisible).toEqual(
-            orderServiceModifyGlobalOptionCase.reduceExpectedQuantities.map(() => true),
+            orderServiceModifyGlobalOptionCase.reduceExpectedQuantities.map(
+              (quantity) => quantity > 0,
+            ),
           );
           await orderDishesPage.closeModifyPanel();
         });

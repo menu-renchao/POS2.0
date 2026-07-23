@@ -35,6 +35,10 @@ export type ChargeSetupService = {
   read: (id: ResourceId) => Promise<unknown>;
   update: (id: ResourceId, overrides: ChargeSetupOverrides) => Promise<SetupResource>;
   delete: (id: ResourceId) => Promise<void>;
+  deleteAll: () => Promise<ReadonlyArray<{
+    id: ResourceId;
+    name: string;
+  }>>;
   deactivateInvalidAutomaticCharges: () => Promise<ReadonlyArray<{
     id: ResourceId;
     name: string;
@@ -165,6 +169,22 @@ export function createChargeSetupService(options: AdminConfigSetupOptions): Char
     delete: async (id) => {
       await expectOkEnvelope(await options.adminConfigApi.deleteCharge({ chargeId: id }));
       options.resourceRegistry.markCleaned('charge', id);
+    },
+    deleteAll: async () => {
+      const body = await expectOkEnvelope(await options.adminConfigApi.listCharges());
+      const charges = readChargeRecords(body.data).map((charge) => ({
+        id: readResourceId(charge, '加收'),
+        name: typeof charge.name === 'string' ? charge.name : String(readResourceId(charge, '加收')),
+      }));
+
+      for (const charge of charges) {
+        await expectOkEnvelope(
+          await options.adminConfigApi.deleteCharge({ chargeId: charge.id }),
+        );
+        options.resourceRegistry.markCleaned('charge', charge.id);
+      }
+
+      return charges;
     },
     deactivateInvalidAutomaticCharges: async () => {
       const body = await expectOkEnvelope(await options.adminConfigApi.listCharges());

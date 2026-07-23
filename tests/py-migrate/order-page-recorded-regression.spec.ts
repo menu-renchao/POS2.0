@@ -139,6 +139,11 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       annotation: [jiraIssueAnnotation('POS-34873')],
     },
     async ({ apiSetup, employeeLoginPage, homePage }) => {
+      test.info().annotations.push({
+        type: '已知产品问题',
+        description:
+          '受限员工对 Delay 菜品执行 Count=0 后，产品未显示 VOID_KITCHEN_ITEM 授权提示，无法继续输入主管口令完成删除。',
+      });
       const restrictedEmployee = await apiSetup.staff.createWithoutKitchenVoidPermission();
       const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
         homePage,

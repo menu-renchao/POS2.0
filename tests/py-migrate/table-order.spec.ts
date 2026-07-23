@@ -16,6 +16,7 @@ import {
   orderServiceDishes,
 } from '../../test-data/order-service';
 import { jiraIssueAnnotation } from '../../utils/jira';
+import { waitUntil } from '../../utils/wait';
 
 type CreatedTableOrder = {
   homePage: HomePage;
@@ -24,7 +25,6 @@ type CreatedTableOrder = {
 };
 
 const createdTableIds = new Set<string>();
-let tableEnvironmentPrepared = false;
 
 async function enterReadyHome(
   homePage: Parameters<HomeFlow['openHomeWithEmployeeContext']>[0],
@@ -144,32 +144,28 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
   test.setTimeout(120_000);
 
   test.beforeEach(async ({ apiConfig, employeeLoginPage, homePage, orderApi }) => {
-    if (tableEnvironmentPrepared) {
-      return;
-    }
-
     const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-    const selectTablePage = await readyHomePage.enterDineIn();
-    const hasAvailableTable = await new SelectTableFlow().hasAnyAvailableTable(selectTablePage);
+    const occupiedOrderIds = await new RecallDatabaseFlow(
+      apiConfig.baseURL,
+    ).readLeastOccupiedTableOrderIds(1);
+    const response = await orderApi.clearTable({ orderIds: occupiedOrderIds });
+    const body = (await response.json()) as { code?: number };
 
-    if (!hasAvailableTable) {
-      const occupiedTableId = await new RecallDatabaseFlow(
-        apiConfig.baseURL,
-      ).readLeastOccupiedTableId();
-      const response = await orderApi.clearTable({ tableId: occupiedTableId });
-      const body = (await response.json()) as { code?: number };
-
-      if (!response.ok() || body.code !== 0) {
-        throw new Error(`无法为桌台回归释放空桌：HTTP ${response.status()}，code=${body.code}`);
-      }
+    if (!response.ok() || body.code !== 0) {
+      throw new Error(`无法为桌台回归释放空桌：HTTP ${response.status()}，code=${body.code}`);
     }
 
-    tableEnvironmentPrepared = true;
+    await readyHomePage.clickRefresh();
   });
 
-  test.afterEach(async ({ orderApi }) => {
+  test.afterEach(async ({ apiConfig, orderApi }) => {
+    const databaseFlow = new RecallDatabaseFlow(apiConfig.baseURL);
     for (const tableId of createdTableIds) {
-      const response = await orderApi.clearTable({ tableId });
+      const orderIds = await databaseFlow.readOccupiedTableOrderIds(tableId);
+      if (orderIds.length === 0) {
+        continue;
+      }
+      const response = await orderApi.clearTable({ orderIds });
 
       if (!response.ok()) {
         throw new Error(`清理桌台 ${tableId} 失败：HTTP ${response.status()}`);
@@ -214,7 +210,9 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
 
   test(
     '应能切换区域选择空桌并在 Recall 回查桌号',
-    { annotation: [jiraIssueAnnotation('POS-15534')] },
+    {
+      annotation: [jiraIssueAnnotation('POS-15534')],
+    },
     async ({ employeeLoginPage, homePage }) => {
       const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
       const createdOrder = await createTableOrder(readyHomePage, { switchArea: true });
@@ -226,16 +224,40 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
 
   test(
     '应能在桌台卡片显示订单时长达到一分钟',
-    { annotation: [jiraIssueAnnotation('POS-15557')] },
+    {
+      annotation: [jiraIssueAnnotation('POS-15557')],
+    },
     async ({ employeeLoginPage, homePage }) => {
+      test.setTimeout(180_000);
       const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
       const createdOrder = await createTableOrder(readyHomePage);
       const tablePage = await openSavedTable(createdOrder);
+      const refreshAfter = Date.now() + 105_000;
+
+      await test.step('等待订单时长超过一分钟', async () => {
+        await waitUntil(
+          async () => Date.now(),
+          (currentTime) => currentTime >= refreshAfter,
+          {
+            timeout: 110_000,
+            interval: 1_000,
+            message: '等待订单时长超过一分钟超时。',
+          },
+        );
+      });
+
+      const refreshedTablePage = await test.step(
+        '返回主页并再次进入桌台区域以刷新桌台信息',
+        async () =>
+          await new SelectTableFlow().refreshTableInformationByReentering(
+            tablePage,
+            createdOrder.selectedTable.areaName,
+          ),
+      );
 
       expect(
-        await tablePage.cards.waitForDisplayedDuration(
+        await refreshedTablePage.cards.readDisplayedDuration(
           createdOrder.selectedTable.tableNumber,
-          '0:01',
         ),
       ).toBe('0:01');
     },
@@ -338,7 +360,16 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
 
   test(
     '应能在桌台卡片显示下单时填写的客人姓名',
-    { annotation: [jiraIssueAnnotation('POS-15564')] },
+    {
+      annotation: [
+        jiraIssueAnnotation('POS-15564'),
+        {
+          type: 'known-issue',
+          description:
+            '堂食订单已填写动态客户姓名，但桌台卡片 Party Name 字段仍显示“-”。',
+        },
+      ],
+    },
     async ({ employeeLoginPage, homePage }) => {
       const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
       const customer = buildOrderServiceDineInCustomer();

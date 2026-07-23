@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { HomePage } from './home.page';
 import { OrderDishesPage } from './order-dishes.page';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
@@ -20,6 +21,7 @@ export class SelectTablePage {
   private readonly guestCountDialog: Locator;
   private readonly orderDishesFrame: Locator;
   private readonly loadingTablesStatus: Locator;
+  private readonly backButton: Locator;
 
   constructor(private readonly page: Page) {
     this.cards = new SelectTableCardsSection(page);
@@ -35,6 +37,9 @@ export class SelectTablePage {
     this.loadingTablesStatus = this.page.getByRole('status').filter({
       hasText: 'Loading tables...',
     });
+    this.backButton = this.page
+      .locator('#myAreaRoot')
+      .getByTestId('icon-button-Back');
   }
 
   @step('页面操作：确认选桌页面已经加载完成')
@@ -231,6 +236,14 @@ export class SelectTablePage {
     }
 
     return matchedTableNumber[1];
+  }
+
+  @step('页面操作：从选桌页返回主页')
+  async returnHome(): Promise<HomePage> {
+    await this.backButton.click();
+    const homePage = new HomePage(this.page);
+    await homePage.expectPrimaryFunctionCardsVisible();
+    return homePage;
   }
 
   @step('页面读取：读取桌台卡片的内部桌台 ID')

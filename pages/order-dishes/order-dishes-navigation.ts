@@ -168,8 +168,9 @@ export class OrderDishesPageNavigation {
       const responseBody = (await saveResponse.json()) as {
         data?: {
           order?: {
-            orderItems?: Array<{ displayName?: unknown; id?: unknown }>;
+            orderItems?: unknown[];
             orderNumber?: unknown;
+            subOrders?: unknown[];
           };
         };
       };
@@ -177,11 +178,15 @@ export class OrderDishesPageNavigation {
       if (typeof orderNumber !== 'string' || orderNumber.trim().length === 0) {
         throw new Error('送厨订单接口响应缺少非空字符串 data.order.orderNumber。');
       }
-      const rawOrderItems = responseBody.data?.order?.orderItems;
+      const rawOrderItems = readSavedOrderItems(responseBody.data?.order);
       if (!Array.isArray(rawOrderItems)) {
-        throw new Error('送厨订单接口响应缺少 data.order.orderItems。');
+        throw new Error('送厨订单接口响应缺少 data.order.orderItems 或 data.order.subOrders[].orderItems。');
       }
       const orderItems = rawOrderItems.map((item) => {
+        if (!isRecord(item)) {
+          throw new Error('送厨订单接口响应包含无效的订单菜引用。');
+        }
+
         if (typeof item.id !== 'number' || typeof item.displayName !== 'string') {
           throw new Error('送厨订单接口响应包含无效的订单菜引用。');
         }
@@ -245,11 +250,10 @@ export class OrderDishesPageNavigation {
       };
     }
 
-    @step('页面操作：点击 Save 保存订单但不假设页面跳转')
+    @step('页面操作：点击 Save 且保留保存后的业务弹窗')
     async clickSaveOrder(): Promise<void> {
       await this.host.expectLoaded();
       await (await this.resolveSaveOrderButton()).click();
-      await this.dismissPostSaveDialogsIfNeeded();
     }
 
     @step('页面操作：在点单页确认系统配置刷新')
@@ -270,13 +274,11 @@ export class OrderDishesPageNavigation {
 
     @step('页面读取：读取库存不足提示文案')
     async readInventoryAlertText(): Promise<string> {
-      const alertBody = this.page
-        .getByText('Insufficient stock, please modify the order.', { exact: true })
-        .locator('xpath=..');
+      await expect(this.locators.inventoryAlertItems).toBeVisible({ timeout: 10_000 });
 
-      await expect(alertBody).toBeVisible({ timeout: 10_000 });
-
-      return (await alertBody.innerText()).replace(/\s*\n\s*/g, '\n').trim();
+      return (await this.locators.inventoryAlertItems.innerText())
+        .replace(/\s*\n\s*/g, '\n')
+        .trim();
     }
 
     @step('页面操作：打开库存管理页')
@@ -554,12 +556,12 @@ function readSavedOrderItems(order: unknown): unknown[] | null {
     return null;
   }
 
-  if (Array.isArray(order.orderItems)) {
+  if (Array.isArray(order.orderItems) && order.orderItems.length > 0) {
     return order.orderItems;
   }
 
   if (!Array.isArray(order.subOrders)) {
-    return null;
+    return Array.isArray(order.orderItems) ? order.orderItems : null;
   }
 
   const subOrderItems: unknown[] = [];

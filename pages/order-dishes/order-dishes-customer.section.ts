@@ -26,6 +26,23 @@ function normalizeCustomerText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+function parseCustomerButtonIdentity(customerButtonText: string): {
+  customerName: string;
+  formattedPhone: string;
+} {
+  const normalizedText = normalizeCustomerText(customerButtonText);
+  const formattedPhone = normalizedText.match(/\(\d{3}\)\d{3}-\d{4}/)?.[0];
+
+  if (!formattedPhone) {
+    throw new Error(`客户按钮未显示可解析的格式化电话：${normalizedText}`);
+  }
+
+  return {
+    customerName: normalizedText.slice(0, normalizedText.indexOf(formattedPhone)).trim(),
+    formattedPhone,
+  };
+}
+
 export class OrderDishesCustomerSection {
   constructor(
     private readonly ctx: OrderDishesPageContext,
@@ -109,6 +126,7 @@ export class OrderDishesCustomerSection {
   @step((customerButtonLabel: string) => `页面操作：打开客户信息 ${customerButtonLabel}`)
   async openCustomerInformation(customerButtonLabel: string): Promise<void> {
     await this.host.expectLoaded();
+    const { customerName, formattedPhone } = parseCustomerButtonIdentity(customerButtonLabel);
     const customerInformationButton = this.locators.customerInformationButton(customerButtonLabel);
     await expect(customerInformationButton).toBeVisible();
     await customerInformationButton.click();
@@ -117,28 +135,28 @@ export class OrderDishesCustomerSection {
       await this.locators.customerInformationKeyboardCloseButton.click();
     }
 
-    await expect(this.locators.customerInformationRegion).toBeVisible();
+    await expect(
+      this.locators.customerInformationRegion(customerName, formattedPhone),
+    ).toBeVisible();
   }
 
   @step('页面读取：读取点单页客户按钮和客户信息区域文本')
   async readCustomerInformationSnapshot(
     customerButtonLabel: string,
   ): Promise<OrderDishesCustomerInformationSnapshot> {
-    await expect(this.locators.customerInformationRegion).toBeVisible();
     const customerButtonText = normalizeCustomerText(
       await this.locators.customerInformationButton(customerButtonLabel).innerText(),
     );
-    const formattedPhone = customerButtonText.match(/\(\d{3}\)\d{3}-\d{4}/)?.[0];
-
-    if (!formattedPhone) {
-      throw new Error(`客户按钮未显示可解析的格式化电话：${customerButtonText}`);
-    }
+    const { customerName, formattedPhone } = parseCustomerButtonIdentity(customerButtonText);
+    const customerInformationRegion = this.locators.customerInformationRegion(
+      customerName,
+      formattedPhone,
+    );
+    await expect(customerInformationRegion).toBeVisible();
 
     return {
-      customerName: customerButtonText.slice(0, customerButtonText.indexOf(formattedPhone)).trim(),
-      informationText: normalizeCustomerText(
-        await this.locators.customerInformationRegion.innerText(),
-      ),
+      customerName,
+      informationText: normalizeCustomerText(await customerInformationRegion.innerText()),
       normalizedPhone: formattedPhone.replace(/\D/g, ''),
     };
   }
@@ -148,7 +166,7 @@ export class OrderDishesCustomerSection {
     await expect(this.locators.customerInformationSaveButton).toBeVisible();
     await waitForInputSettled();
     await this.locators.customerInformationSaveButton.click();
-    await expect(this.locators.customerInformationRegion).toBeHidden();
+    await expect(this.locators.customerInformationPageHeading).toBeHidden();
   }
 
   @step('页面读取：读取点单页客户摘要文本')

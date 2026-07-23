@@ -1202,17 +1202,7 @@ export class RecallOrderDetailsDialog {
   async refundPaymentRecord(paymentIndex: number): Promise<void> {
     await this.waitForOrderDetailsDialogReady();
     const paymentSection = this.resolvePaymentSection(await this.resolveActiveOrderDetailsDialog());
-    const refundableCards = await this.resolveRefundablePaymentCards(paymentSection).catch(() => null);
-
-    if (refundableCards) {
-      const paymentCard = refundableCards.nth(paymentIndex);
-
-      await expect(paymentCard).toBeVisible({ timeout: 10_000 });
-      await paymentCard.scrollIntoViewIfNeeded();
-      await this.clickPaymentCardRefundButton(paymentCard);
-    } else {
-      await this.clickPaymentSectionRefundButton(paymentSection, paymentIndex);
-    }
+    await this.clickPaymentSectionRefundButton(paymentSection, paymentIndex);
 
     await this.confirmPaymentRefundDialog();
     await this.waitForGlobalLoadingOverlayHidden();

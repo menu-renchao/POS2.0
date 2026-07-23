@@ -36,8 +36,15 @@ export class OrderDishesMenuSection {
     @step('页面读取：读取换桌页面中的可选目标桌号')
     async readAvailableChangeTableNumbers(): Promise<string[]> {
       await expect(this.changeTablePrompt()).toBeVisible();
+      const targetCount = await waitUntil(
+        async () => await this.changeTableTargetButtons().count(),
+        (count) => count > 0,
+        {
+          timeout: 5_000,
+          message: '换桌页面未加载出可选目标桌台。',
+        },
+      );
       const targetButtons = this.changeTableTargetButtons();
-      const targetCount = await targetButtons.count();
       const tableNumbers: string[] = [];
 
       for (let index = 0; index < targetCount; index += 1) {
@@ -53,9 +60,7 @@ export class OrderDishesMenuSection {
 
     @step((tableNumber: string) => `页面操作：选择换桌目标桌台 ${tableNumber}`)
     async selectChangeTableTarget(tableNumber: string): Promise<void> {
-      const targetTable = this.page.getByRole('button', {
-        name: new RegExp(`^${this.ctx.escapeRegExp(tableNumber)}\\s+Seat2Icon(?:\\s|$)`),
-      });
+      const targetTable = this.locators.changeTableTargetButtonByNumber(tableNumber);
       await expect(targetTable).toHaveCount(1);
       await targetTable.click();
       await expect(this.changeTableConfirmButton()).toBeEnabled();
@@ -261,6 +266,12 @@ export class OrderDishesMenuSection {
     async clickCurrentCategoryDish(dishName: string): Promise<void> {
       await this.host.expectLoaded();
       await this.locators.menuItemButtonByName(dishName).click();
+    }
+
+    @step((dishName: string) => `页面操作：双击当前类别菜品 ${dishName}`)
+    async doubleClickCurrentCategoryDish(dishName: string): Promise<void> {
+      await this.host.expectLoaded();
+      await this.locators.menuItemButtonByName(dishName).dblclick();
     }
 
     @step((quantity: number) => `页面操作：通过 Count 按钮将待点菜数量修改为 ${quantity}`)
@@ -932,13 +943,8 @@ export class OrderDishesMenuSection {
     }
 
     private async resolveCurrencyKeypadConfirmButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByTestId('preset-currency-keypad-input-confirm-button').first(),
-          this.page.getByTestId('preset-currency-keypad-input-confirm-button').first(),
-        ],
-        'Unable to find currency keypad confirm button.',
-      );
+      await expect(this.locators.changePriceConfirmButton).toBeVisible({ timeout: 5_000 });
+      return this.locators.changePriceConfirmButton;
     }
 
     private async resolveDishButton(dishName: string): Promise<Locator> {
@@ -1137,9 +1143,7 @@ export class OrderDishesMenuSection {
     }
 
     private changeTableTargetButtons(): Locator {
-      return this.page.getByRole('button', {
-        name: /^\d+\s+Seat2Icon(?:\s|$)/,
-      });
+      return this.locators.changeTableTargetButtons;
     }
 
     private changeTableConfirmButton(): Locator {

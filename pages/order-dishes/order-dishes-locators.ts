@@ -19,6 +19,8 @@ export class OrderDishesLocators {
   readonly scope: FrameOrHostScope;
   readonly page: Page;
   readonly appFrame: FrameLocator;
+  readonly changeTableTargetButtons: Locator;
+  readonly changeTableTargetButtonByNumber: (tableNumber: string) => Locator;
   readonly backButton: Locator;
   readonly guestCountButton: Locator;
   readonly guestCountDialog: Locator;
@@ -91,7 +93,10 @@ export class OrderDishesLocators {
   readonly customerPhoneRequiredMessage: Locator;
   readonly emptyCustomerInformationButton: Locator;
   readonly customerInformationButton: (accessibleName: string) => Locator;
-  readonly customerInformationRegion: Locator;
+  readonly customerInformationRegion: (
+    customerName: string,
+    formattedPhone: string,
+  ) => Locator;
   readonly customerInformationPageHeading: Locator;
   readonly customerInformationNameInput: Locator;
   readonly customerInformationPhoneInput: Locator;
@@ -173,6 +178,15 @@ export class OrderDishesLocators {
     this.page = page;
     this.scope = createOrderDishesScope(page);
     this.appFrame = this.scope.appFrame;
+    this.changeTableTargetButtons = this.page.locator(
+      'article[role="button"].table-node-available[data-table-id]',
+    );
+    this.changeTableTargetButtonByNumber = (tableNumber: string) =>
+      this.changeTableTargetButtons.filter({
+        has: this.page.locator('.table-node-title').filter({
+          hasText: new RegExp(`^\\s*${tableNumber}\\s*$`),
+        }),
+      });
     const scoped = (selector: string) => scopedLocator(this.scope, selector);
 
     this.backButton = this.page.getByTestId('button-back');
@@ -242,11 +256,8 @@ export class OrderDishesLocators {
         .first(),
     );
     this.changePriceClearButton = this.page.getByTestId('preset-currency-keypad-input-clear');
-    this.changePriceConfirmButton = mergeFrameOrHost(this.scope, ({ appFrame, page: hostPage }) =>
-      appFrame
-        .getByTestId('preset-currency-keypad-input-confirm-button')
-        .or(hostPage.getByTestId('preset-currency-keypad-input-confirm-button'))
-        .first(),
+    this.changePriceConfirmButton = this.page.getByTestId(
+      'preset-numeric-input-modal-confirm-button',
     );
     this.itemPriceChangeButton = this.page.getByTestId('action-rail-button-chgPrc');
     this.itemPriceDiscountDialog = this.page.getByRole('dialog', { name: 'Price', exact: true });
@@ -368,7 +379,13 @@ export class OrderDishesLocators {
     });
     this.customerInformationButton = (accessibleName: string) =>
       this.page.getByRole('button', { name: accessibleName, exact: true });
-    this.customerInformationRegion = this.page.getByLabel('客人信息', { exact: true });
+    this.customerInformationRegion = (customerName: string, formattedPhone: string) =>
+      this.page
+        .getByRole('region', { name: 'Search results', exact: true })
+        .getByRole('button', { name: '客人信息', exact: true })
+        .filter({ hasText: customerName })
+        .filter({ hasText: formattedPhone })
+        .getByRole('region', { name: '客人信息', exact: true });
     this.customerInformationPageHeading = this.page
       .getByRole('banner')
       .getByText('Information', { exact: true });
@@ -497,6 +514,7 @@ export class OrderDishesLocators {
     ).or(scoped('#reduce1icon'));
     this.exitConfirmButton = scoped('#exit-edit-submit');
     this.inventoryAlertItems = this.page
+      .locator('#inventory-alert-dialog')
       .getByText('Insufficient stock, please modify the order.', { exact: true })
       .locator('xpath=..');
     this.moreActionButton = this.appFrame.getByRole('button', {
@@ -514,9 +532,9 @@ export class OrderDishesLocators {
         has: this.page.getByText(/^(Modify|修改)$/),
       })
       .first();
-    this.modifyBackButton = this.modifyPanel
-      .locator('[aria-label="onLeftIcon"], [aria-label="Back"], [aria-label="返回"]')
-      .first();
+    this.modifyBackButton = this.page
+      .locator('#orderDishesRoot')
+      .getByTestId('icon-button-Back');
     this.modifyOptionButton = (optionName: string) =>
       this.page.getByRole('button', { name: optionName, exact: true });
     this.selectedModifyOptionAddButton = this.page.getByTestId(

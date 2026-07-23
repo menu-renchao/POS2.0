@@ -257,6 +257,20 @@ test.describe('API 数据预置服务', () => {
     expect(resourceRegistry.has('charge', 1201)).toBe(false);
   });
 
+  test('清空加收配置时应查询并逐条调用删除接口', async () => {
+    const adminConfig = createAdminConfigApi();
+    const apiSetup = createApiSetup({
+      adminConfigApi: adminConfig.api as AdminConfigApiClient,
+      resourceRegistry: new ResourceRegistry(),
+    });
+
+    const deletedCharges = await apiSetup.charge.deleteAll();
+
+    expect(deletedCharges).toEqual([{ id: 1201, name: 'AT_CHG_A' }]);
+    expect(adminConfig.calls.listCharges).toBe(1);
+    expect(adminConfig.payloads.deleteCharge).toEqual([{ chargeId: 1201 }]);
+  });
+
   test('停用缺少订单类型的自动加收时应补充堂食订单类型', async () => {
     const adminConfig = createAdminConfigApi();
     adminConfig.api.listCharges = async () =>

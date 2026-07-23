@@ -307,7 +307,14 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
   test(
     '[POS-34463] 关闭结账后自动送厨时订单打单后应变为Printed',
     {
-      annotation: [jiraIssueAnnotation('POS-34463')],
+      annotation: [
+        jiraIssueAnnotation('POS-34463'),
+        {
+          type: 'known-issue',
+          description:
+            '打印接口返回 200 后订单仍未进入 Printed 筛选结果，产品状态流转与 POS-34463 预期不一致。',
+        },
+      ],
       tag: ['@点单'],
     },
     async ({ apiSetup, employeeLoginPage, homePage }) => {
@@ -547,8 +554,8 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
     async ({ apiConfig, employeeLoginPage, homePage, orderApi }) => {
       test.setTimeout(120_000);
       const databaseFlow = new RecallDatabaseFlow(apiConfig.baseURL);
-      const occupiedTableId = await databaseFlow.readLeastOccupiedTableId();
-      const clearTableResponse = await orderApi.clearTable({ tableId: occupiedTableId });
+      const occupiedOrderIds = await databaseFlow.readLeastOccupiedTableOrderIds(2);
+      const clearTableResponse = await orderApi.clearTable({ orderIds: occupiedOrderIds });
       expect(clearTableResponse.ok()).toBe(true);
       const clearTableBody = (await clearTableResponse.json()) as { code?: number };
       expect(clearTableBody.code).toBe(0);

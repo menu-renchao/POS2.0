@@ -3,6 +3,7 @@ import { InventoryFlow } from '../../flows/inventory.flow';
 import { HomeFlow } from '../../flows/home.flow';
 import { OrderDishesFlow } from '../../flows/order-dishes.flow';
 import { RecallFlow } from '../../flows/recall.flow';
+import { SelectTableFlow } from '../../flows/select-table.flow';
 import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import { EmployeeLoginPage } from '../../pages/employee-login.page';
@@ -126,6 +127,11 @@ test.describe('库存管理', { tag: ['@库存', '@点单'] }, () => {
       annotation: jiraIssueAnnotations(['POS-43898', 'POS-43890', 'POS-43889']),
     },
     async ({ homePage, employeeLoginPage }) => {
+      test.info().annotations.push({
+        type: '已知产品问题',
+        description:
+          '第二次 Void 前已确认 Restore inventory 隐藏复选框切换为 checked=false，但产品仍把库存从 15 恢复为 20，忽略了“不恢复库存”选择。',
+      });
       let trackedOrderNumber: string | null = null;
       let currentHomePage = await enterReadyHome({ employeeLoginPage, homePage });
       let orderDishesPage = await startInventoryToGoOrder(currentHomePage);
@@ -246,7 +252,16 @@ test.describe('库存管理', { tag: ['@库存', '@点单'] }, () => {
       let orderDishesPage = await startInventoryToGoOrder(readyHomePage);
 
       orderDishesPage = await new InventoryFlow().configureLimitedStock(orderDishesPage, dish.name, 2);
-      await new OrderDishesFlow().addRegularDish(orderDishesPage, dish.name, dish.menu, 3);
+      await orderDishesPage.exitOrderPage();
+      await readyHomePage.expectPrimaryFunctionCardsVisible();
+      await readyHomePage.clickRefresh();
+      orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+      await new OrderDishesFlow().addRegularDishByRepeatedCardClicks(
+        orderDishesPage,
+        dish.name,
+        dish.menu,
+        3,
+      );
       await orderDishesPage.clickSaveOrder();
 
       const alertText = await orderDishesPage.readInventoryAlertText();

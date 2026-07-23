@@ -918,7 +918,14 @@ test.describe('点单页面回归', { tag: ['@点单'] }, () => {
     test(
       '[POS-16316] 应能保存改价为 10.60 的订单后从 Recall 按 2 和 8.6 分单',
       {
-        annotation: [jiraIssueAnnotation('POS-16316')],
+        annotation: [
+          jiraIssueAnnotation('POS-16316'),
+          {
+            type: 'known-issue',
+            description:
+              '按金额拆分已正确得到 2.00 和 8.60 两个未支付子单，但点击 Submit 后分单面板不关闭、页面不切换且无空子单确认，属于产品提交状态未流转。',
+          },
+        ],
       },
       async ({ homePage, employeeLoginPage }) => {
         const ready = await test.step('进入 POS 主页并建立员工上下文', async () => {

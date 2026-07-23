@@ -30,9 +30,13 @@ export class OrderKitchenFlow {
     orderItems: readonly SentOrderItemReference[],
     dishName: string,
   ): SentOrderItemReference {
-    const targetItem = orderItems.find((item) => item.displayName === dishName);
+    const normalizedDishName = dishName.trim();
+    const targetItem = orderItems.find((item) => item.displayName.trim() === normalizedDishName);
     if (!targetItem) {
-      throw new Error(`送厨响应中没有找到目标菜品 ${dishName}。`);
+      const availableNames = orderItems.map((item) => item.displayName).join(', ');
+      throw new Error(
+        `送厨响应中没有找到目标菜品 ${dishName}。可用菜品：${availableNames || '无'}`,
+      );
     }
 
     return targetItem;

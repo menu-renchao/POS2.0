@@ -12,7 +12,16 @@ export class EmployeeLoginFlow {
     homePage: HomePage,
     password: string,
   ): Promise<HomePage> {
-    await employeeLoginPage.expectVisible();
+    try {
+      await employeeLoginPage.expectVisible();
+    } catch (error) {
+      if (await homePage.isPrimaryFunctionCardsVisible().catch(() => false)) {
+        await homePage.expectPrimaryFunctionCardsVisible();
+        return homePage;
+      }
+
+      throw error;
+    }
     await employeeLoginPage.fillPassword(password);
     await employeeLoginPage.clickConfirm();
     await homePage.expectLoaded();

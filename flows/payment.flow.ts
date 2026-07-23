@@ -139,15 +139,24 @@ export class PaymentFlow {
     const completionState = await waitUntil(
       async () => ({
         paymentPanelVisible: await paymentPage.isPaymentPanelVisible(),
+        paymentFailureText: await paymentPage.readPaymentFailureText(),
         printReceiptVisible: await paymentPage.isPrintReceiptDialogVisible(),
         successConfirmVisible: await paymentPage.isPaymentSuccessConfirmVisible(),
       }),
-      (state) => state.printReceiptVisible || state.successConfirmVisible || !state.paymentPanelVisible,
+      (state) =>
+        Boolean(state.paymentFailureText) ||
+        state.printReceiptVisible ||
+        state.successConfirmVisible ||
+        !state.paymentPanelVisible,
       {
         timeout: 20_000,
         message: 'Payment did not reach a settled completion state in time.',
       },
     );
+
+    if (completionState.paymentFailureText) {
+      throw new Error(`支付终端返回失败：${completionState.paymentFailureText}`);
+    }
 
     if (!completionState.paymentPanelVisible) {
       return;

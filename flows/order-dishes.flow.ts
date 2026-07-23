@@ -107,16 +107,16 @@ export type ComboDishWithOptionsParams = {
 export class OrderDishesFlow {
   @step(
     (_orderDishesPage: OrderDishesPage, dishName: string, optionName: string) =>
-      `业务步骤：为菜品 ${dishName} 添加全局调味 ${optionName} 后点击空白区域退出 Modify`,
+      `业务步骤：为菜品 ${dishName} 添加全局调味 ${optionName} 后点击返回按钮退出 Modify`,
   )
-  async addGlobalOptionAndCloseModifyByBlank(
+  async addGlobalOptionAndCloseModify(
     orderDishesPage: OrderDishesPage,
     dishName: string,
     optionName: string,
   ): Promise<void> {
     await orderDishesPage.openModifyForOrderedDish(dishName);
     await orderDishesPage.selectModifyOption(optionName);
-    await orderDishesPage.closeModifyPanelByClickingBlank();
+    await orderDishesPage.closeModifyPanel();
   }
 
   @step(
@@ -154,6 +154,32 @@ export class OrderDishesFlow {
     await this.switchMenu(orderDishesPage, menuSelection);
     await orderDishesPage.clickDish(dishName);
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
+  }
+
+  @step(
+    (_orderDishesPage: OrderDishesPage, dishName: string, _menuSelection: MenuSelection, quantity: number) =>
+      `业务步骤：通过连续点击菜品卡片添加 ${quantity} 份 ${dishName}`,
+  )
+  async addRegularDishByRepeatedCardClicks(
+    orderDishesPage: OrderDishesPage,
+    dishName: string,
+    menuSelection: MenuSelection,
+    quantity: number,
+  ): Promise<void> {
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new Error(`连续点击点菜数量必须为正整数：${quantity}`);
+    }
+
+    await orderDishesPage.expectLoaded();
+    await this.switchMenu(orderDishesPage, menuSelection);
+
+    if (quantity >= 2) {
+      await orderDishesPage.doubleClickCurrentCategoryDish(dishName);
+    }
+
+    for (let index = quantity >= 2 ? 2 : 0; index < quantity; index += 1) {
+      await orderDishesPage.clickCurrentCategoryDish(dishName);
+    }
   }
 
   @step('业务步骤：添加第一道可用菜品到购物车')

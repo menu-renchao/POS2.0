@@ -15,3 +15,13 @@ test('Jenkins UI 测试树应白名单缓存套件并拒绝路径遍历', async 
   assert.ok((source.match(/findAll \{ isValidUiSpecPath\(it\.toString\(\)\) \}/g) ?? []).length >= 2, '缓存文件均应先过滤');
   assert.match(source, /selectedFiles = selectedFiles\.findAll \{ isValidUiSpecPath\(it\) \}/);
 });
+
+test('Jenkins UI 运行应启用清桌预检并使用实际打印目录', async () => {
+  const source = await readFile(jenkinsfilePath, 'utf8');
+
+  assert.match(source, /UI_CLEAR_TABLES_BEFORE_RUN = 'true'/);
+  assert.match(
+    source,
+    /POS_PRINT_OUTPUT_DIR = 'C:\\\\Users\\\\nhqrt\\\\\.menusifu\\\\POS\\\\data\\\\temp'/,
+  );
+});

@@ -99,7 +99,7 @@ export class OrderDishesDiscountSection {
     await expect(this.locators.itemPriceAuthorizationForm).toBeHidden();
     await expect(
       this.locators.itemPriceDiscountDialog,
-      '授权成功后价格与折扣弹窗应关闭并提交修改',
+      '授权接口成功后价格与折扣弹窗应关闭并应用所选折扣；若仍可见则为产品未继续原操作',
     ).toBeHidden({ timeout: 5_000 });
   }
 }

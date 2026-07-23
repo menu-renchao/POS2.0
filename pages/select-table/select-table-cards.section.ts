@@ -1,6 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { step } from '../../utils/step';
-import { waitUntil } from '../../utils/wait';
 import { RecallFilterBarSection } from '../recall/recall-filter-bar.section';
 import { RecallOrderDetailsDialog } from '../recall/recall-order-details.dialog';
 
@@ -35,7 +34,6 @@ export class SelectTableCardsSection {
   private readonly tableNodeById: (tableId: string) => Locator;
   private readonly occupiedTableButtonByNumber: (tableNumber: string) => Locator;
   private readonly multiOrderDialog: Locator;
-  private readonly refreshButton: Locator;
 
   constructor(private readonly page: Page) {
     this.tableAreaRoot = this.page.locator('#myAreaRoot');
@@ -48,7 +46,6 @@ export class SelectTableCardsSection {
         ),
       }).first();
     this.multiOrderDialog = this.page.getByTestId('pos-ui-modal').last();
-    this.refreshButton = this.page.getByRole('button', { name: 'Refresh', exact: true });
     this.orderDetails = new RecallOrderDetailsDialog(
       page,
       new RecallFilterBarSection(page),
@@ -107,27 +104,6 @@ export class SelectTableCardsSection {
     }
 
     return duration;
-  }
-
-  @step((tableNumber: string, expectedDuration: string) =>
-    `页面操作：等待桌台 ${tableNumber} 的订单时长达到 ${expectedDuration}`,
-  )
-  async waitForDisplayedDuration(
-    tableNumber: string,
-    expectedDuration: string,
-  ): Promise<string> {
-    return await waitUntil(
-      async () => {
-        await this.refreshButton.click();
-        return await this.readDisplayedDuration(tableNumber);
-      },
-      (duration) => duration === expectedDuration,
-      {
-        timeout: 90_000,
-        interval: 5_000,
-        message: `桌台 ${tableNumber} 的订单时长未达到 ${expectedDuration}。`,
-      },
-    );
   }
 
   @step((tableNumber: string) => `页面读取：读取桌台 ${tableNumber} 显示的客人数`)
