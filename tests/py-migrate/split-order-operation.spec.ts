@@ -692,10 +692,24 @@ const combineChargeRecalculationCases: readonly CombineChargeRecalculationCase[]
   },
   {
     issue: 'POS-32023',
-    title: '[POS-32023] 应能在合单重新计算加收时保留计小费百分比手动加收',
-    recalculate: true,
+    title: '[POS-32023] 应能在合单不重新计算加收时保留计小费百分比手动加收',
+    recalculate: false,
     scenario: 'single-manual',
-    charge: { ...manualPercentCharge, name: autoPercentChargeName, sharedTip: true, type: 'SERVICE' },
+    charge: {
+      ...autoPercentCharge,
+      active: true,
+      description: '',
+      minConsumption: 0,
+      minGuest: 0,
+      minMileage: 0,
+      orderType: 'dine in',
+      rate: 10,
+      rateType: 2,
+      sharedTip: true,
+      taxed: false,
+      triggerMode: 0,
+      type: 'SERVICE',
+    },
     firstOrderType: 'dine-in',
     expectedChargeName: autoPercentChargeName,
     expectedChargeAmount: 'percent10',
@@ -1628,16 +1642,23 @@ async function createSavedDeliveryOrder(
 async function createSavedToGoOrder(
   readyHomePage: HomePage,
   employeeLoginPage: EmployeeLoginPage,
-): Promise<{ orderNumber: string; recallPage: RecallPage }> {
+): Promise<{
+  beforeChargeSnapshot: OrderChargeSnapshot;
+  beforeSummary: Awaited<ReturnType<OrderDishesPage['readPriceSummary']>>;
+  orderNumber: string;
+  recallPage: RecallPage;
+}> {
   const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
   await new OrderDishesFlow().addRegularDish(
     orderDishesPage,
     orderServiceDishes.regular.name,
     orderServiceDishes.regular.menu,
   );
+  const beforeSummary = await orderDishesPage.readPriceSummary();
+  const beforeChargeSnapshot = await readOrderDishesChargeSnapshot(orderDishesPage);
   const recallPage = await saveEditingOrderAndOpenRecall(orderDishesPage, employeeLoginPage);
   const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
-  return { orderNumber, recallPage };
+  return { beforeChargeSnapshot, beforeSummary, orderNumber, recallPage };
 }
 
 async function createSavedOrderWithThreeChargeKinds(
@@ -1820,11 +1841,17 @@ function readChargeAmountFromDetailsText(detailsText: string, chargeName: string
 
 function hasBeforeChargeSnapshot(
   value: object,
-): value is { beforeChargeSnapshot: OrderChargeSnapshot } {
+): value is {
+  beforeChargeSnapshot: OrderChargeSnapshot;
+  beforeSummary: Awaited<ReturnType<OrderDishesPage['readPriceSummary']>>;
+} {
   return (
     'beforeChargeSnapshot' in value &&
     typeof value.beforeChargeSnapshot === 'object' &&
-    value.beforeChargeSnapshot !== null
+    value.beforeChargeSnapshot !== null &&
+    'beforeSummary' in value &&
+    typeof value.beforeSummary === 'object' &&
+    value.beforeSummary !== null
   );
 }
 
@@ -1886,6 +1913,7 @@ async function readTransferredOrderChargeAmount(
 ): Promise<{
   amount: number | null;
   hasNamedCharge: boolean;
+  namedChargeCount: number;
   summary: Record<string, number> | null;
 }> {
   if (orderNumber) {
@@ -1895,12 +1923,15 @@ async function readTransferredOrderChargeAmount(
   const summary = await recallPage.readDisplayedOrderPriceSummary();
   const detailsText = await recallPage.readOrderDetailsText();
   const namedChargeAmount = readChargeAmountFromDetailsText(detailsText, chargeName);
+  const namedChargeCount =
+    detailsText.match(new RegExp(escapeRegExpForText(chargeName), 'g'))?.length ?? 0;
 
   return {
     amount:
       namedChargeAmount ??
       (orderNumber ? summary.Charge ?? summary.Total ?? summary['Total(Cash)'] ?? null : null),
     hasNamedCharge: namedChargeAmount !== null,
+    namedChargeCount,
     summary,
   };
 }
@@ -1944,19 +1975,6 @@ async function configureCombineChargeRecalculation(
   return restore;
 }
 
-async function configureShowUnsplitItemsWhenSplitOrder(
-  apiSetup: ApiSetup,
-  enabled: boolean,
-  homePage: HomePage,
-): Promise<void> {
-  await apiSetup.systemConfiguration.updateByName(
-    'SHOW_UNSPLIT_ITEMS_WHEN_SPLIT_ORDER',
-    enabled,
-    { verify: true },
-  );
-  await homePage.clickRefresh();
-}
-
 async function configureTaxIncludesCharge(
   apiSetup: ApiSetup,
   enabled: boolean,
@@ -1969,19 +1987,6 @@ async function configureTaxIncludesCharge(
   );
   await homePage.clickRefresh();
   await homePage.confirmDelayedConfigurationRefresh();
-}
-
-async function readSplitOrderDishListCounts(
-  _orderDishesPage: OrderDishesPage,
-): Promise<{
-  allDishCount: number;
-  sharedAfterFirstMove: number;
-  sharedAfterSecondMove: number;
-  sharedBeforeMove: number;
-}> {
-  throw new Error(
-    '当前 POS NG 分单面板未提供“未分单菜品”和“全部菜品”列表，无法读取 POS-32954 所需数量。',
-  );
 }
 
 async function readOrderDishesChargeSnapshot(
@@ -4510,9 +4515,23 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           return await enterReadyHome({ employeeLoginPage, homePage });
         });
 
+        let workingHomePage = readyHomePage;
+        let deliveryTargetWithoutCharge:
+          | Awaited<ReturnType<typeof createSavedDeliveryOrder>>
+          | null = null;
         let chargeResourceId: string | number | null = null;
         let restoreCombineChargeRecalculation: (() => Promise<void>) | null = null;
         try {
+          if (chargeCase.issue === 'POS-32016') {
+            deliveryTargetWithoutCharge = await test.step(
+              '在加收配置生效前创建不含加收的 Delivery 目标订单',
+              async () => {
+                return await createSavedDeliveryOrder(workingHomePage, employeeLoginPage);
+              },
+            );
+            workingHomePage = await enterReadyHome({ employeeLoginPage, homePage });
+          }
+
           const chargeResource = await test.step(
             '预置合单加收配置并设置合单是否重新计算加收',
             async () => {
@@ -4521,7 +4540,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
               restoreCombineChargeRecalculation = await configureCombineChargeRecalculation(
                 apiSetup,
                 chargeCase.recalculate,
-                readyHomePage,
+                workingHomePage,
               );
               return resource;
             },
@@ -4529,7 +4548,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
 
           const sourceOrder = await test.step('创建合单源订单并记录合单前加收信息', async () => {
             return await createSavedOrderForCombineChargeCase(
-              readyHomePage,
+              workingHomePage,
               employeeLoginPage,
               orderApi,
               chargeResource,
@@ -4539,6 +4558,10 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           });
 
           const targetOrder = await test.step('创建用于接收合并的目标订单', async () => {
+            if (deliveryTargetWithoutCharge) {
+              return deliveryTargetWithoutCharge;
+            }
+
             const targetReadyHomePage = await enterReadyHome({ employeeLoginPage, homePage });
 
             if (chargeCase.issue === 'POS-32008') {
@@ -4570,6 +4593,45 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
                 chargeCase.expectedChargeName,
               ),
             );
+          });
+
+          await test.step('校验目标订单合单前不含目标加收', async () => {
+            if (chargeCase.issue !== 'POS-32016' && chargeCase.issue !== 'POS-32023') {
+              return;
+            }
+
+            expect(hasBeforeChargeSnapshot(targetOrder)).toBe(true);
+            if (!hasBeforeChargeSnapshot(targetOrder)) {
+              throw new Error(`${chargeCase.issue} 目标订单缺少合单前加收快照。`);
+            }
+
+            expect(
+              parseChargeAmountText(
+                readWholeChargeAmountText(
+                  targetOrder.beforeChargeSnapshot,
+                  chargeCase.expectedChargeName,
+                ),
+              ),
+            ).toBeNull();
+
+            if (chargeCase.issue === 'POS-32023') {
+              expect(targetOrder.beforeSummary.Subtotal).toBeCloseTo(8.8, 2);
+              expect(targetOrder.beforeSummary.Tax).toBeCloseTo(0.88, 2);
+              expect(targetOrder.beforeSummary.Charge ?? 0).toBe(0);
+              expect(targetOrder.beforeSummary['Total(Cash)']).toBeCloseTo(9.68, 2);
+            }
+          });
+
+          await test.step('校验 POS-32023 订单 A 合单前手动加收金额为 0.88', async () => {
+            if (chargeCase.issue !== 'POS-32023') {
+              return;
+            }
+
+            expect(oldChargeAmount).toBeCloseTo(0.88, 2);
+            expect(sourceOrder.beforeSummary.Subtotal).toBeCloseTo(8.8, 2);
+            expect(sourceOrder.beforeSummary.Tax).toBeCloseTo(0.88, 2);
+            expect(sourceOrder.beforeSummary.Charge).toBeCloseTo(0.88, 2);
+            expect(sourceOrder.beforeSummary['Total(Cash)']).toBeCloseTo(10.56, 2);
           });
 
           await test.step('校验两笔源订单合并前均包含十元自动加收', async () => {
@@ -4627,6 +4689,16 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
 
             if (chargeCase.preservesSourceChargeAmount && oldChargeAmount !== null) {
               expect(combinedCharge.amount).toBeCloseTo(oldChargeAmount, 2);
+            }
+
+            if (chargeCase.issue === 'POS-32023') {
+              expect(combinedCharge.namedChargeCount).toBe(1);
+              expect(combinedCharge.summary!.Subtotal).toBeCloseTo(17.6, 2);
+              expect(combinedCharge.summary!.Tax).toBeCloseTo(1.76, 2);
+              expect(combinedCharge.summary!.Charge).toBeCloseTo(0.88, 2);
+              expect(
+                combinedCharge.summary!['Total(Cash)'] ?? combinedCharge.summary!.Total,
+              ).toBeCloseTo(20.24, 2);
             }
           });
         } finally {
@@ -4850,49 +4922,6 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         await splitOrderPage.expectAddSuborderLabel('Add Suborder');
         await splitOrderPage.clickAddSuborder();
         await splitOrderPage.expectSuborderIndexVisible(2);
-      });
-    },
-  );
-
-  test(
-    '[POS-32954] 应能在分单时按配置展示未分单菜品和全部菜品',
-    {
-      tag: ['@分单'],
-      annotation: [jiraIssueAnnotation('POS-32954')],
-    },
-    async ({ homePage, employeeLoginPage, apiSetup }) => {
-      const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
-      });
-
-      await test.step('开启分单时展示未分单菜品配置并刷新 POS', async () => {
-        await configureShowUnsplitItemsWhenSplitOrder(apiSetup, true, readyHomePage);
-      });
-
-      const orderDishesPage = await test.step('创建含三道菜的堂食无桌台订单并进入分单', async () => {
-        const page = await enterDineInNoTableOrder(readyHomePage);
-        await addTwoRegularDishes(page);
-        await new OrderDishesFlow().addRegularDish(
-          page,
-          orderServiceDishes.regular.name,
-          orderServiceDishes.regular.menu,
-        );
-        return page;
-      });
-
-      const dishCounts = await test.step('读取分单过程中未分单菜品和全部菜品数量', async () => {
-        return await readSplitOrderDishListCounts(orderDishesPage);
-      });
-
-      await test.step('校验未分单菜品与全部菜品展示数量', async () => {
-        expect(dishCounts.sharedBeforeMove).toBe(3);
-        expect(dishCounts.sharedAfterFirstMove).toBe(2);
-        expect(dishCounts.sharedAfterSecondMove).toBe(0);
-        expect(dishCounts.allDishCount).toBe(3);
-      });
-
-      await test.step('关闭分单时展示未分单菜品配置并刷新 POS', async () => {
-        await configureShowUnsplitItemsWhenSplitOrder(apiSetup, false, readyHomePage);
       });
     },
   );

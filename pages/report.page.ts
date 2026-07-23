@@ -12,7 +12,7 @@ export class ReportPage {
   constructor(page: Page) {
     this.passcodeInput = page.getByTestId('pos-ui-password-input-hidden-input');
     this.confirmButton = page.getByRole('button', { name: 'confirm' });
-    this.reportFrame = page.frameLocator('iframe[name="thirdAppIframe"]');
+    this.reportFrame = page.frameLocator('iframe#thirdAppIframe');
     this.reportBody = this.reportFrame.locator('body');
   }
 
@@ -34,7 +34,9 @@ export class ReportPage {
 
     const reportState = await waitUntil(
       async () => {
-        const bodyText = await this.reportBody.innerText().catch(() => '');
+        const bodyText = await this.reportBody
+          .innerText({ timeout: 1_000 })
+          .catch(() => '');
         return {
           bodyText,
           metricMatch: bodyText.match(metricPattern),
