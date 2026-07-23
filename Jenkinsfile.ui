@@ -240,10 +240,10 @@ properties([
                             selectedSuite = ['all', 'py-migrate'].contains(selectedSuite) ? selectedSuite : 'all'
                             def checkedPaths = []
                             def isValidUiSpecPath = { String path ->
-                                path != null
-                                    && path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')
-                                    && !path.contains('//')
-                                    && path.split('/').every { segment -> segment != '.' && segment != '..' }
+                                path != null &&
+                                    path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts') &&
+                                    !path.contains('//') &&
+                                    path.split('/').every { segment -> segment != '.' && segment != '..' }
                             }
                             def toChoiceMap = { items ->
                                 def choices = new LinkedHashMap()
@@ -352,10 +352,10 @@ properties([
                             selectedSuite = ['all', 'py-migrate'].contains(selectedSuite) ? selectedSuite : 'all'
                             def checkedPaths = []
                             def isValidUiSpecPath = { String path ->
-                                path != null
-                                    && path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')
-                                    && !path.contains('//')
-                                    && path.split('/').every { segment -> segment != '.' && segment != '..' }
+                                path != null &&
+                                    path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts') &&
+                                    !path.contains('//') &&
+                                    path.split('/').every { segment -> segment != '.' && segment != '..' }
                             }
                             def toChoiceMap = { items ->
                                 def choices = new LinkedHashMap()
@@ -630,10 +630,10 @@ pipeline {
                     // 解析运行目标：优先使用已选 UI spec 文件；未选文件时运行全部 py-migrate UI 测试。
                     def headedFlag = (!isTimerBuild && params.HEADED) ? ' --headed' : ''
                     def isValidUiSpecPath = { String path ->
-                        path != null
-                            && path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts')
-                            && !path.contains('//')
-                            && path.split('/').every { segment -> segment != '.' && segment != '..' }
+                        path != null &&
+                            path.matches('tests/py-migrate/[A-Za-z0-9_./-]+\\.spec\\.ts') &&
+                            !path.contains('//') &&
+                            path.split('/').every { segment -> segment != '.' && segment != '..' }
                     }
                     def selectedFilesValue = isTimerBuild ? '' : (params.TEST_FILE ?: '')
                     def selectedFiles = selectedFilesValue instanceof Collection
