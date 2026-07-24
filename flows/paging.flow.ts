@@ -12,15 +12,21 @@ export type PagingOrderReference = {
 };
 
 export class PagingFlow {
+  constructor(
+    private readonly selectTableFlow: SelectTableFlow,
+    private readonly orderDishesFlow: OrderDishesFlow,
+    private readonly recallFlow: RecallFlow,
+  ) {}
+
   @step('业务步骤：创建无桌位堂食订单、添加普通菜并整单送厨')
   async createSentDineInOrder(homePage: HomePage): Promise<PagingOrderReference> {
-    const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(homePage);
-    await new OrderDishesFlow().addRegularDish(
+    const orderDishesPage = await this.selectTableFlow.enterDineInNoTableOrder(homePage);
+    await this.orderDishesFlow.addRegularDish(
       orderDishesPage,
       orderServiceDishes.regular.name,
       orderServiceDishes.regular.menu,
     );
-    const sentOrder = await orderDishesPage.sendOrderWithReference();
+    const sentOrder = await orderDishesPage.navigation.sendOrderWithReference();
     return {
       homePage: sentOrder.homePage,
       orderNumber: sentOrder.orderNumber,
@@ -29,7 +35,7 @@ export class PagingFlow {
 
   @step((_homePage: HomePage, orderNumber: string) => `业务步骤：从 Recall 进入 Paging 并定位订单 ${orderNumber}`)
   async openPagingForOrder(homePage: HomePage, orderNumber: string): Promise<PagingPage> {
-    const recallPage = await new RecallFlow().openRecallFromHome(homePage);
+    const recallPage = await this.recallFlow.openRecallFromHome(homePage);
     const pagingPage = await recallPage.enterPaging();
     await pagingPage.waitForOrderVisible(orderNumber);
     return pagingPage;

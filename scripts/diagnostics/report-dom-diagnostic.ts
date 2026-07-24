@@ -1,3 +1,4 @@
+// 仅供显式 diagnostics 命令运行，不参与正式 UI 回归收集。
 import { test } from '../../fixtures/test.fixture';
 import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
 import { HomeFlow } from '../../flows/home.flow';

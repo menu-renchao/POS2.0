@@ -579,6 +579,12 @@ export const orderServiceSeatDisplayConfigurationUpdate = {
   },
 } as const;
 
+export function buildLargeTipAmountInCents(
+  totalBeforeTips: number,
+): number {
+  return Math.floor(totalBeforeTips * 100 * 0.5) + 100;
+}
+
 export const orderPageRegressionCases = {
   modifier: { name: 'POS-42888', price: 0 },
   splitTips: { tipAmountInCents: 200, splitTip: 1, mergedTip: 2 },

@@ -16,10 +16,23 @@ test('Jenkins UI 测试树应白名单缓存套件并拒绝路径遍历', async 
   assert.match(source, /selectedFiles = selectedFiles\.findAll \{ isValidUiSpecPath\(it\) \}/);
 });
 
-test('Jenkins UI 运行应启用清桌预检并使用实际打印目录', async () => {
+test('Jenkins UI 运行应使用分层执行项目且不清理非测试拥有的桌台订单', async () => {
   const source = await readFile(jenkinsfilePath, 'utf8');
 
-  assert.match(source, /UI_CLEAR_TABLES_BEFORE_RUN = 'true'/);
+  assert.doesNotMatch(source, /UI_CLEAR_TABLES_BEFORE_RUN/);
+  assert.match(
+    source,
+    /jenkins:test-tree -- tests\/py-migrate --project=ui-isolated --project=ui-shared --project=ui-exclusive-config --project=ui-print --project=ui-slow/,
+  );
+  assert.match(
+    source,
+    /def projectFlags = '--project=ui-isolated --project=ui-shared --project=ui-exclusive-config --project=ui-print'/,
+  );
+  assert.match(source, /if \(isTimerBuild \|\| hasExplicitSelection\)/);
+  assert.match(source, /script: "node node_modules\/@playwright\/test\/cli\.js test \$\{testTarget\} \$\{projectFlags\} --pass-with-no-tests/);
+  assert.match(source, /script: "node node_modules\/@playwright\/test\/cli\.js test \$\{testTarget\} --project=ui-slow --pass-with-no-tests/);
+  assert.match(source, /error "UI tests failed: regular=\$\{regularStatus\}, slow=\$\{slowStatus\}"/);
+  assert.doesNotMatch(source, /--project=py-migrate/);
   assert.match(
     source,
     /POS_PRINT_OUTPUT_DIR = 'C:\\\\Users\\\\nhqrt\\\\\.menusifu\\\\POS\\\\data\\\\temp'/,

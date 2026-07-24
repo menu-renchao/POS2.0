@@ -4,6 +4,8 @@ import { step } from '../utils/step';
 import { EmployeeLoginFlow } from './employee-login.flow';
 
 export class HomeFlow {
+  constructor(private readonly employeeLoginFlow: EmployeeLoginFlow) {}
+
   @step('业务步骤：打开首页并确认首页完成加载')
   async openHome(homePage: HomePage): Promise<void> {
     await homePage.goto();
@@ -17,7 +19,7 @@ export class HomeFlow {
     password = '11',
   ): Promise<HomePage> {
     await this.openHome(homePage);
-    return await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage, password);
+    return await this.employeeLoginFlow.enterEmployeeContext(homePage, employeeLoginPage, password);
   }
 
   @step('业务步骤：刷新系统配置后建立员工上下文')
@@ -29,6 +31,6 @@ export class HomeFlow {
     await this.openHome(homePage);
     await homePage.clickRefresh();
     await homePage.confirmDelayedConfigurationRefresh();
-    return await new EmployeeLoginFlow().enterEmployeeContext(homePage, employeeLoginPage, password);
+    return await this.employeeLoginFlow.enterEmployeeContext(homePage, employeeLoginPage, password);
   }
 }

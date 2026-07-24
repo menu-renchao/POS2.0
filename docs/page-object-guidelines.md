@@ -45,3 +45,20 @@
 
 - 推荐：**类方法承载 `@step` 报告步骤** + **薄包装函数**供 fixture/smoke 直接调用。
 - 避免与类方法一比一重复、且无人使用的导出。
+
+## 自动架构门禁
+
+修改 Page、Flow、Fixture 或 UI spec 后运行：
+
+```powershell
+npm.cmd run lint:ui-architecture
+```
+
+门禁会检查候选 Locator resolver、`.or()` fallback、XPath、selector
+别名、Flow/Spec 中的 raw Locator、同页返回 `this`、硬等待以及无 Locator
+的输入等待。现存问题记录在 `docs/ui-architecture-baseline.json`，该文件是只能
+下降的债务上限；整改后应同步下调对应数量，不得通过提高上限绕过新增问题。
+
+## 外部展示端导航例外
+
+`/kpos/call/index.html` 是独立的顾客叫号展示端，不属于 POS 内页。`PagingPage.openPickupDisplay()` 可以直接打开该外部展示端；POS 内部页面仍必须从主页通过 UI 导航进入，禁止使用 hash 或 deep link。

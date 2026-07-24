@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { appConfig } from '../test-data/env';
 import { step } from '../utils/step';
+import { escapeRegExp, normalizeOrderNumber } from '../utils/text';
 import { waitUntil } from '../utils/wait';
 import { PickupScreenPage } from './pickup-screen.page';
 
@@ -181,14 +182,6 @@ export class PagingPage {
     const orderNumberLocator = this.page.locator('.pagingOrderNumber', { hasText: numberText });
     return this.container.locator('[id^="order_"]', { has: orderNumberLocator }).first();
   }
-}
-
-function normalizeOrderNumber(orderNumber: string): string {
-  return orderNumber.replace(/^#\s*/, '').trim();
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function statusLabel(status: PagingStatus): string {

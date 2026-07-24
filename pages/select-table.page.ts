@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { HomePage } from './home.page';
 import { OrderDishesPage } from './order-dishes.page';
 import { step } from '../utils/step';
+import { escapeRegExp } from '../utils/text';
 import { waitUntil } from '../utils/wait';
 import { SelectTableCardsSection } from './select-table/select-table-cards.section';
 
@@ -53,19 +54,7 @@ export class SelectTablePage {
   async getAvailableTables(): Promise<Locator[]> {
     await this.expectLoaded();
     await this.waitUntilTableDataLoaded();
-
-    const availableTableCount = await this.tableButtons.count();
-    const availableTables: Locator[] = [];
-
-    for (let index = 0; index < availableTableCount; index += 1) {
-      const tableButton = this.tableButtons.nth(index);
-
-      if (await this.isAvailableTableButton(tableButton)) {
-        availableTables.push(tableButton);
-      }
-    }
-
-    return availableTables;
+    return await this.tableButtons.filter({ visible: true }).all();
   }
 
   @step((areaName: string) => `页面操作：切换到区域 ${areaName}`)
@@ -260,28 +249,9 @@ export class SelectTablePage {
   }
 
   private resolveAreaLocator(areaName: string): Locator {
-    return this.page
-      .getByRole('radio', {
-        name: areaName,
-        exact: true,
-      })
-      .or(
-        this.page.getByRole('button', {
-          name: areaName,
-          exact: true,
-        }),
-      )
-      .first();
-  }
-
-  private async isAvailableTableButton(table: Locator): Promise<boolean> {
-    if (!(await table.isVisible().catch(() => false))) {
-      return false;
-    }
-
-    const tableText = await this.readTableButtonText(table);
-
-    return tableText.length > 0 && !tableText.includes('Boss');
+    return this.areaButtons.filter({
+      hasText: new RegExp(`^\\s*${escapeRegExp(areaName)}\\s*$`),
+    });
   }
 
   private async readTableButtonText(table: Locator): Promise<string> {

@@ -1,12 +1,5 @@
 import { expect } from '@playwright/test';
 import type { ApiSetup } from '../../api/setup/api-setup';
-import { HomeFlow } from '../../flows/home.flow';
-import { OrderDishesFlow } from '../../flows/order-dishes.flow';
-import { PaymentFlow } from '../../flows/payment.flow';
-import { RecallFlow } from '../../flows/recall.flow';
-import { SelectTableFlow } from '../../flows/select-table.flow';
-import { SplitOrderFlow } from '../../flows/split-order.flow';
-import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import { HomePage } from '../../pages/home.page';
 import { OrderDishesPage } from '../../pages/order-dishes.page';
@@ -16,13 +9,14 @@ import {
 } from '../../test-data/order-service';
 import { printConfigurationNames, printTestData } from '../../test-data/print';
 import { RecallPaymentStatuses } from '../../test-data/recall-search-options';
+import { runCleanupTasks } from '../../utils/cleanup';
 import { jiraIssueAnnotation } from '../../utils/jira';
 import { PrintOutputReader, type PrintTicket } from '../../utils/print-output';
 
 const printOutput = new PrintOutputReader();
 
 test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => {
-  test.describe.configure({ mode: 'serial', timeout: 180_000 });
+  test.describe.configure({ timeout: 180_000 });
 
   test(
     '[POS-34187] 仅打印新菜应在重打时恢复整单菜品',
@@ -30,7 +24,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-34187')],
       tag: ['@点单', '@订单编辑'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         {
           AUTO_SEND_TO_KITCHEN_AFTER_PRINTED: true,
@@ -41,12 +35,12 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        const orderFlow = new OrderDishesFlow();
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        const orderFlow = flows.orderDishesFlow;
 
         await orderFlow.addRegularDish(
           orderDishesPage,
@@ -62,8 +56,8 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         expect(firstPrint.printStatus).toBe(200);
         expect(firstReceipt.text).toContain(printTestData.dishes.first.name);
 
-        const recallPage = await new RecallFlow().openRecallFromHome(firstPrint.homePage);
-        const editingPage = await new RecallFlow().editOrder(
+        const recallPage = await flows.recallFlow.openRecallFromHome(firstPrint.homePage);
+        const editingPage = await flows.recallFlow.editOrder(
           recallPage,
           firstPrint.orderNumber,
         );
@@ -81,12 +75,12 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         expect(secondReceipt.text).toContain(printTestData.dishes.second.name);
         expect(secondReceipt.text).not.toContain(printTestData.dishes.first.name);
 
-        const recallAfterSecondPrint = await new RecallFlow().openRecallFromHome(
+        const recallAfterSecondPrint = await flows.recallFlow.openRecallFromHome(
           secondPrint.homePage,
         );
         const beforeReprint = await printOutput.snapshot();
         expect(
-          await new RecallFlow().reprintReceiptAndReadStatus(
+          await flows.recallFlow.reprintReceiptAndReadStatus(
             recallAfterSecondPrint,
             firstPrint.orderNumber,
           ),
@@ -117,7 +111,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       ],
       tag: ['@点单', '@分单', '@加收', '@小费'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       test.fixme(
         true,
         'POS-50320：POS NG / 环境 0.247 分单子单收据缺少加收提醒语，等待产品修复。',
@@ -138,12 +132,12 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-        const orderFlow = new OrderDishesFlow();
+        const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+        const orderFlow = flows.orderDishesFlow;
 
         await orderFlow.addRegularDish(
           orderDishesPage,
@@ -159,27 +153,27 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
           optionName: charge.name,
           scope: 'whole',
         });
-        const savedOrder = await orderDishesPage.saveOrderWithReference();
-        const recallPage = await new RecallFlow().openRecallFromHome(savedOrder.homePage);
-        const splitOrderPage = await new RecallFlow().openSplitOrder(
+        const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
+        const recallPage = await flows.recallFlow.openRecallFromHome(savedOrder.homePage);
+        const splitOrderPage = await flows.recallFlow.openSplitOrder(
           recallPage,
           savedOrder.orderNumber,
           undefined,
           { chargePromptAction: 'keep' },
         );
-        await new SplitOrderFlow().moveDishToNewSuborder(
+        await flows.splitOrderFlow.moveDishToNewSuborder(
           splitOrderPage,
           printTestData.dishes.second.name,
         );
-        const returnedPage = await new SplitOrderFlow().submitAndReturnPage(splitOrderPage);
+        const returnedPage = await flows.splitOrderFlow.submitAndReturnPage(splitOrderPage);
         const recallAfterSplit = await enterRecall(returnedPage);
-        await recallAfterSplit.openOrderDetails(savedOrder.orderNumber);
-        const childOrderNumbers = await recallAfterSplit.readTargetOrderNumbers();
+        await recallAfterSplit.orderDetails.openOrderDetails(savedOrder.orderNumber);
+        const childOrderNumbers = await recallAfterSplit.orderDetails.readTargetOrderNumbers();
         expect(childOrderNumbers.length).toBeGreaterThanOrEqual(2);
 
         const beforePrint = await printOutput.snapshot();
         expect(
-          await new RecallFlow().printReceiptAndReadStatus(
+          await flows.recallFlow.printReceiptAndReadStatus(
             recallAfterSplit,
             savedOrder.orderNumber,
             childOrderNumbers[0],
@@ -197,9 +191,14 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         expect(receipt.text).toContain(charge.name);
         expect(receipt.text).toContain(printTestData.chargeReminder.defaultText);
       } finally {
-        await apiSetup.charge.delete(charge.id);
-        await restoreConfiguration();
-        await restoreTemplate();
+        await runCleanupTasks(
+          [
+            ['删除测试加收', async () => await apiSetup.charge.delete(charge.id)],
+            ['恢复打印配置', restoreConfiguration],
+            ['恢复票据模板', restoreTemplate],
+          ],
+          'POS-32337 用例清理',
+        );
       }
     },
   );
@@ -210,25 +209,25 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-34222')],
       tag: ['@点单'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreTemplate = await apiSetup.printConfiguration.selectTemplate(
         'RECEIPT',
         '1_5',
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-        await new OrderDishesFlow().addRegularDish(
+        const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+        await flows.orderDishesFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
           printTestData.dishes.first.menu,
         );
         const beforePrint = await printOutput.snapshot();
-        await new OrderDishesFlow().printReceiptWithReference(orderDishesPage);
+        await flows.orderDishesFlow.printReceiptWithReference(orderDishesPage);
         const receipt = onlyTicket(
           await printOutput.waitForTickets({ after: beforePrint, kinds: ['RECEIPT'] }),
         );
@@ -247,7 +246,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-33876')],
       tag: ['@点单'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreTemplate = await apiSetup.printConfiguration.selectTemplate(
         'KITCHEN',
         '1_5',
@@ -260,30 +259,35 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new TakeoutFlow().startDeliveryOrder(readyHomePage, {
+        const orderDishesPage = await flows.takeoutFlow.startDeliveryOrder(readyHomePage, {
           address: printTestData.customer.address,
           customerName: printTestData.customer.customerName,
           phoneNumber: printTestData.customer.phoneNumber,
         });
-        await new OrderDishesFlow().addRegularDish(
+        await flows.orderDishesFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
           printTestData.dishes.first.menu,
         );
         const beforeSend = await printOutput.snapshot();
-        await orderDishesPage.sendOrderWithReference();
+        await orderDishesPage.navigation.sendOrderWithReference();
         const kitchenTicket = onlyTicket(
           await printOutput.waitForTickets({ after: beforeSend, kinds: ['KITCHEN'] }),
         );
 
         expect(kitchenTicket.text).toContain(printTestData.customer.phoneNumber);
       } finally {
-        await restoreConfiguration();
-        await restoreTemplate();
+        await runCleanupTasks(
+          [
+            ['恢复打印配置', restoreConfiguration],
+            ['恢复票据模板', restoreTemplate],
+          ],
+          'POS-33876 用例清理',
+        );
       }
     },
   );
@@ -294,7 +298,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-33599')],
       tag: ['@点单'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreTemplate = await apiSetup.printConfiguration.selectTemplate('KITCHEN', '7');
       const restoreConfiguration = await apiSetup.systemConfiguration.updateByName(
         printConfigurationNames.printXAfterItemCount,
@@ -304,18 +308,18 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        await new OrderDishesFlow().addRegularDish(
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        await flows.orderDishesFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
           printTestData.dishes.first.menu,
         );
         const beforeSend = await printOutput.snapshot();
-        await orderDishesPage.sendOrderWithReference();
+        await orderDishesPage.navigation.sendOrderWithReference();
         const kitchenTicket = onlyTicket(
           await printOutput.waitForTickets({ after: beforeSend, kinds: ['KITCHEN'] }),
         );
@@ -323,8 +327,13 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         expect(kitchenTicket.text).toContain('1X');
         expect(kitchenTicket.text).toContain(printTestData.dishes.first.name);
       } finally {
-        await restoreConfiguration();
-        await restoreTemplate();
+        await runCleanupTasks(
+          [
+            ['恢复打印配置', restoreConfiguration],
+            ['恢复票据模板', restoreTemplate],
+          ],
+          'POS-33599 用例清理',
+        );
       }
     },
   );
@@ -335,7 +344,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-26979')],
       tag: ['@点单', '@加收', '@小费'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreTemplate = await apiSetup.printConfiguration.selectTemplate(
         'RECEIPT',
         '1_2',
@@ -351,12 +360,12 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        const orderFlow = new OrderDishesFlow();
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        const orderFlow = flows.orderDishesFlow;
         await orderFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
@@ -375,9 +384,14 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         expect(receipt.text).toContain(charge.name);
         expect(receipt.text).toContain(printTestData.chargeReminder.defaultText);
       } finally {
-        await apiSetup.charge.delete(charge.id);
-        await restoreConfiguration();
-        await restoreTemplate();
+        await runCleanupTasks(
+          [
+            ['删除测试加收', async () => await apiSetup.charge.delete(charge.id)],
+            ['恢复打印配置', restoreConfiguration],
+            ['恢复票据模板', restoreTemplate],
+          ],
+          'POS-26979 用例清理',
+        );
       }
     },
   );
@@ -388,7 +402,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-32335')],
       tag: ['@点单', '@加收', '@小费'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreTemplate = await apiSetup.printConfiguration.selectTemplate(
         'RECEIPT',
         '1_3',
@@ -404,16 +418,16 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new TakeoutFlow().startDeliveryOrder(readyHomePage, {
+        const orderDishesPage = await flows.takeoutFlow.startDeliveryOrder(readyHomePage, {
           address: printTestData.customer.address,
           customerName: printTestData.customer.customerName,
           phoneNumber: printTestData.customer.phoneNumber,
         });
-        const orderFlow = new OrderDishesFlow();
+        const orderFlow = flows.orderDishesFlow;
         await orderFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
@@ -432,9 +446,14 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         expect(receipt.text).toContain(charge.name);
         expect(receipt.text).toContain(printTestData.chargeReminder.defaultText);
       } finally {
-        await apiSetup.charge.delete(charge.id);
-        await restoreConfiguration();
-        await restoreTemplate();
+        await runCleanupTasks(
+          [
+            ['删除测试加收', async () => await apiSetup.charge.delete(charge.id)],
+            ['恢复打印配置', restoreConfiguration],
+            ['恢复票据模板', restoreTemplate],
+          ],
+          'POS-32335 用例清理',
+        );
       }
     },
   );
@@ -445,7 +464,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-31979')],
       tag: ['@点单', '@加收', '@小费', '@现金支付'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreTemplate = await apiSetup.printConfiguration.selectTemplate(
         'RECEIPT',
         '3_5',
@@ -462,12 +481,12 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        const orderFlow = new OrderDishesFlow();
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        const orderFlow = flows.orderDishesFlow;
         await orderFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
@@ -477,9 +496,9 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
           optionName: charge.name,
           scope: 'whole',
         });
-        const paymentPage = await orderDishesPage.openPayment();
-        await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
-        const recallFlow = new RecallFlow();
+        const paymentPage = await orderDishesPage.navigation.openPayment();
+        await flows.paymentFlow.payByCash(paymentPage, { printReceipt: false });
+        const recallFlow = flows.recallFlow;
         const recallPage = await recallFlow.openRecallFromHome(readyHomePage);
         await recallFlow.searchOrders(recallPage, {
           paymentStatus: RecallPaymentStatuses.paid,
@@ -494,9 +513,14 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         expect(receipt.text).toContain(charge.name);
         expect(receipt.text).toContain(printTestData.chargeReminder.maximumEnglishText);
       } finally {
-        await apiSetup.charge.delete(charge.id);
-        await restoreConfiguration();
-        await restoreTemplate();
+        await runCleanupTasks(
+          [
+            ['删除测试加收', async () => await apiSetup.charge.delete(charge.id)],
+            ['恢复打印配置', restoreConfiguration],
+            ['恢复票据模板', restoreTemplate],
+          ],
+          'POS-31979 用例清理',
+        );
       }
     },
   );
@@ -507,7 +531,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-31934')],
       tag: ['@点单', '@加收', '@小费', '@现金支付'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         {
           [printConfigurationNames.paymentTipSuggestion]:
@@ -521,12 +545,12 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        const orderFlow = new OrderDishesFlow();
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        const orderFlow = flows.orderDishesFlow;
         await orderFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
@@ -536,9 +560,9 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
           optionName: charge.name,
           scope: 'whole',
         });
-        const paymentPage = await orderDishesPage.openPayment();
-        await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
-        const recallFlow = new RecallFlow();
+        const paymentPage = await orderDishesPage.navigation.openPayment();
+        await flows.paymentFlow.payByCash(paymentPage, { printReceipt: false });
+        const recallFlow = flows.recallFlow;
         const recallPage = await recallFlow.openRecallFromHome(readyHomePage);
         await recallFlow.searchOrders(recallPage, {
           paymentStatus: RecallPaymentStatuses.paid,
@@ -553,8 +577,13 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         expect(receipt.text).toContain(charge.name);
         expect(receipt.text).not.toContain(printTestData.ticketText.tipSuggestion);
       } finally {
-        await apiSetup.charge.delete(charge.id);
-        await restoreConfiguration();
+        await runCleanupTasks(
+          [
+            ['删除测试加收', async () => await apiSetup.charge.delete(charge.id)],
+            ['恢复打印配置', restoreConfiguration],
+          ],
+          'POS-31934 用例清理',
+        );
       }
     },
   );
@@ -565,7 +594,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-32336')],
       tag: ['@点单', '@加收', '@小费', '@现金支付'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreTemplate = await apiSetup.printConfiguration.selectTemplate('RECEIPT', '2');
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         {
@@ -578,12 +607,12 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        const orderFlow = new OrderDishesFlow();
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        const orderFlow = flows.orderDishesFlow;
         await orderFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
@@ -593,9 +622,9 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
           optionName: charge.name,
           scope: 'whole',
         });
-        const paymentPage = await orderDishesPage.openPayment();
-        await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
-        const recallFlow = new RecallFlow();
+        const paymentPage = await orderDishesPage.navigation.openPayment();
+        await flows.paymentFlow.payByCash(paymentPage, { printReceipt: false });
+        const recallFlow = flows.recallFlow;
         const recallPage = await recallFlow.openRecallFromHome(readyHomePage);
         await recallFlow.searchOrders(recallPage, {
           paymentStatus: RecallPaymentStatuses.paid,
@@ -610,9 +639,14 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         expect(receipt.text).toContain(charge.name);
         expect(receipt.text).toContain(printTestData.chargeReminder.defaultText);
       } finally {
-        await apiSetup.charge.delete(charge.id);
-        await restoreConfiguration();
-        await restoreTemplate();
+        await runCleanupTasks(
+          [
+            ['删除测试加收', async () => await apiSetup.charge.delete(charge.id)],
+            ['恢复打印配置', restoreConfiguration],
+            ['恢复票据模板', restoreTemplate],
+          ],
+          'POS-32336 用例清理',
+        );
       }
     },
   );
@@ -623,23 +657,23 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-33004')],
       tag: ['@点单'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreFooters =
         await apiSetup.printConfiguration.selectReceiptFooterForAllParts(3);
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        await new OrderDishesFlow().addRegularDish(
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        await flows.orderDishesFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
           printTestData.dishes.first.menu,
         );
         const beforePrint = await printOutput.snapshot();
-        await new OrderDishesFlow().printReceiptWithReference(orderDishesPage);
+        await flows.orderDishesFlow.printReceiptWithReference(orderDishesPage);
         const receipt = onlyTicket(
           await printOutput.waitForTickets({ after: beforePrint, kinds: ['RECEIPT'] }),
         );
@@ -659,22 +693,22 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-33010')],
       tag: ['@点单', '@小费', '@现金支付'],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+    async ({ flows, employeeLoginPage, homePage }) => {
+      const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
         homePage,
         employeeLoginPage,
       );
-      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-      await new OrderDishesFlow().addRegularDish(
+      const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+      await flows.orderDishesFlow.addRegularDish(
         orderDishesPage,
         printTestData.dishes.first.name,
         printTestData.dishes.first.menu,
       );
-      const paymentPage = await orderDishesPage.openPayment();
-      const paymentFlow = new PaymentFlow();
+      const paymentPage = await orderDishesPage.navigation.openPayment();
+      const paymentFlow = flows.paymentFlow;
       await paymentFlow.addTip(paymentPage, 100);
       await paymentFlow.payByCash(paymentPage, { printReceipt: false });
-      const recallFlow = new RecallFlow();
+      const recallFlow = flows.recallFlow;
       const recallPage = await recallFlow.openRecallFromHome(readyHomePage);
       await recallFlow.searchOrders(recallPage, {
         paymentStatus: RecallPaymentStatuses.paid,
@@ -697,26 +731,26 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-33036')],
       tag: ['@点单', '@现金支付'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreTemplate = await apiSetup.printConfiguration.selectTemplate(
         'RECEIPT',
         '1_5',
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        await new OrderDishesFlow().addRegularDish(
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        await flows.orderDishesFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
           printTestData.dishes.first.menu,
         );
-        const paymentPage = await orderDishesPage.openPayment();
-        await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
-        const recallFlow = new RecallFlow();
+        const paymentPage = await orderDishesPage.navigation.openPayment();
+        await flows.paymentFlow.payByCash(paymentPage, { printReceipt: false });
+        const recallFlow = flows.recallFlow;
         const recallPage = await recallFlow.openRecallFromHome(readyHomePage);
         await recallFlow.searchOrders(recallPage, {
           paymentStatus: RecallPaymentStatuses.paid,
@@ -728,7 +762,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
           await printOutput.waitForTickets({ after: beforeFirstPrint, kinds: ['RECEIPT'] }),
         );
         const beforeReprint = await printOutput.snapshot();
-        await recallPage.clickReprintInOrderDetailsAndReadReceiptStatus();
+        await recallPage.orderDetails.clickReprintInOrderDetailsAndReadReceiptStatus();
         const reprintedReceipt = onlyTicket(
           await printOutput.waitForTickets({ after: beforeReprint, kinds: ['RECEIPT'] }),
         );
@@ -750,27 +784,27 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-34259')],
       tag: ['@点单'],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+    async ({ flows, employeeLoginPage, homePage }) => {
+      const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
         homePage,
         employeeLoginPage,
       );
-      const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-      const orderFlow = new OrderDishesFlow();
+      const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+      const orderFlow = flows.orderDishesFlow;
 
       await orderFlow.addRegularDish(
         orderDishesPage,
         printTestData.dishes.first.name,
         printTestData.dishes.first.menu,
       );
-      await orderDishesPage.addOrderNote(printTestData.notes.order);
+      await orderDishesPage.note.addOrderNote(printTestData.notes.order);
       await orderFlow.addDishNote(
         orderDishesPage,
         printTestData.dishes.first.name,
         printTestData.notes.item,
       );
       const beforeSend = await printOutput.snapshot();
-      await orderDishesPage.sendOrderWithReference();
+      await orderDishesPage.navigation.sendOrderWithReference();
       const kitchenTicket = onlyTicket(
         await printOutput.waitForTickets({ after: beforeSend, kinds: ['KITCHEN'] }),
       );
@@ -790,13 +824,13 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-34258'), jiraIssueAnnotation('POS-34225')],
       tag: ['@点单'],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+    async ({ flows, employeeLoginPage, homePage }) => {
+      const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
         homePage,
         employeeLoginPage,
       );
-      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-      const orderFlow = new OrderDishesFlow();
+      const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+      const orderFlow = flows.orderDishesFlow;
 
       await orderFlow.addRegularDish(
         orderDishesPage,
@@ -808,9 +842,9 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         printTestData.dishes.second.name,
         printTestData.dishes.second.menu,
       );
-      await orderDishesPage.markOrderedDishToGo(printTestData.dishes.first.name);
+      await orderDishesPage.menu.markOrderedDishToGo(printTestData.dishes.first.name);
       const beforeSend = await printOutput.snapshot();
-      const sentOrder = await orderDishesPage.sendOrderWithReference();
+      const sentOrder = await orderDishesPage.navigation.sendOrderWithReference();
       const kitchenTicket = onlyTicket(
         await printOutput.waitForTickets({ after: beforeSend, kinds: ['KITCHEN'] }),
       );
@@ -819,10 +853,10 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       expect(kitchenTicket.text).toContain('TO GO');
       expectBoldText(kitchenTicket, 'TO GO');
 
-      const recallPage = await new RecallFlow().openRecallFromHome(sentOrder.homePage);
+      const recallPage = await flows.recallFlow.openRecallFromHome(sentOrder.homePage);
       const beforeReceipt = await printOutput.snapshot();
       expect(
-        await new RecallFlow().printReceiptAndReadStatus(recallPage, sentOrder.orderNumber),
+        await flows.recallFlow.printReceiptAndReadStatus(recallPage, sentOrder.orderNumber),
       ).toBe(200);
       const receipt = onlyTicket(
         await printOutput.waitForTickets({ after: beforeReceipt, kinds: ['RECEIPT'] }),
@@ -840,7 +874,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-33892')],
       tag: ['@点单'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreTemplate = await apiSetup.printConfiguration.selectTemplate(
         'KITCHEN',
         '1_6',
@@ -853,29 +887,34 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-        await orderDishesPage.openEmptyCustomerInformation();
-        await orderDishesPage.fillCustomerInformation(printTestData.customer);
-        await orderDishesPage.saveCustomerInformationPage();
-        await new OrderDishesFlow().addRegularDish(
+        const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+        await orderDishesPage.customer.openEmptyCustomerInformation();
+        await orderDishesPage.customer.fillCustomerInformation(printTestData.customer);
+        await orderDishesPage.customer.saveCustomerInformationPage();
+        await flows.orderDishesFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
           printTestData.dishes.first.menu,
         );
         const beforeSend = await printOutput.snapshot();
-        await orderDishesPage.sendOrderWithReference();
+        await orderDishesPage.navigation.sendOrderWithReference();
         const kitchenTicket = onlyTicket(
           await printOutput.waitForTickets({ after: beforeSend, kinds: ['KITCHEN'] }),
         );
 
         expect(kitchenTicket.text).toContain(printTestData.customer.address);
       } finally {
-        await restoreConfiguration();
-        await restoreTemplate();
+        await runCleanupTasks(
+          [
+            ['恢复打印配置', restoreConfiguration],
+            ['恢复票据模板', restoreTemplate],
+          ],
+          'POS-33892 用例清理',
+        );
       }
     },
   );
@@ -886,13 +925,13 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-35260')],
       tag: ['@点单'],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+    async ({ flows, employeeLoginPage, homePage }) => {
+      const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
         homePage,
         employeeLoginPage,
       );
-      const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-      const orderFlow = new OrderDishesFlow();
+      const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+      const orderFlow = flows.orderDishesFlow;
 
       await orderFlow.addSpecDish(
         orderDishesPage,
@@ -906,13 +945,13 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
         printTestData.dishes.second.menu,
       );
       const beforeInitialSend = await printOutput.snapshot();
-      const sentOrder = await orderDishesPage.sendOrderWithReference();
+      const sentOrder = await orderDishesPage.navigation.sendOrderWithReference();
       await printOutput.waitForTickets({ after: beforeInitialSend, kinds: ['KITCHEN'] });
       const beforeDelete = await printOutput.snapshot();
-      const recallPage = await new RecallFlow().openRecallFromHome(sentOrder.homePage);
-      const editingPage = await new RecallFlow().editOrder(recallPage, sentOrder.orderNumber);
-      await editingPage.removeSentDish(printTestData.dishes.first.name);
-      await editingPage.sendOrderWithReference();
+      const recallPage = await flows.recallFlow.openRecallFromHome(sentOrder.homePage);
+      const editingPage = await flows.recallFlow.editOrder(recallPage, sentOrder.orderNumber);
+      await editingPage.menu.removeSentDish(printTestData.dishes.first.name);
+      await editingPage.navigation.sendOrderWithReference();
       const voidKitchenTicket = onlyTicket(
         await printOutput.waitForTickets({ after: beforeDelete, kinds: ['KITCHEN'] }),
       );
@@ -929,7 +968,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-35227')],
       tag: ['@点单', '@订单编辑'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateByName(
         printConfigurationNames.packerVoidItemsStyle,
         0,
@@ -938,12 +977,12 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-        const orderFlow = new OrderDishesFlow();
+        const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+        const orderFlow = flows.orderDishesFlow;
         await orderFlow.addRegularDish(
           orderDishesPage,
           printTestData.dishes.first.name,
@@ -955,13 +994,13 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
           printTestData.dishes.second.menu,
         );
         const beforeInitialSend = await printOutput.snapshot();
-        const sentOrder = await orderDishesPage.sendOrderWithReference();
+        const sentOrder = await orderDishesPage.navigation.sendOrderWithReference();
         await printOutput.waitForTickets({ after: beforeInitialSend, kinds: ['PACKAGE'] });
         const beforeDelete = await printOutput.snapshot();
-        const recallPage = await new RecallFlow().openRecallFromHome(sentOrder.homePage);
-        const editingPage = await new RecallFlow().editOrder(recallPage, sentOrder.orderNumber);
-        await editingPage.removeSentDish(printTestData.dishes.first.name);
-        await editingPage.sendOrderWithReference();
+        const recallPage = await flows.recallFlow.openRecallFromHome(sentOrder.homePage);
+        const editingPage = await flows.recallFlow.editOrder(recallPage, sentOrder.orderNumber);
+        await editingPage.menu.removeSentDish(printTestData.dishes.first.name);
+        await editingPage.navigation.sendOrderWithReference();
         const packageTicket = onlyTicket(
           await printOutput.waitForTickets({ after: beforeDelete, kinds: ['PACKAGE'] }),
         );
@@ -979,7 +1018,7 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       annotation: [jiraIssueAnnotation('POS-42890')],
       tag: ['@点单', '@现金支付'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ flows, apiSetup, employeeLoginPage, homePage }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateByName(
         'AUTO_SEND_TO_KITCHEN_AFTER_SETTLED',
         true,
@@ -988,12 +1027,12 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
 
       try {
         const readyHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-        const orderFlow = new OrderDishesFlow();
+        const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+        const orderFlow = flows.orderDishesFlow;
 
         await orderFlow.addRegularDish(
           orderDishesPage,
@@ -1006,11 +1045,11 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
           printTestData.dishes.second.menu,
         );
         const beforePayment = await printOutput.snapshot();
-        const paymentPage = await orderDishesPage.openPayment();
-        await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
+        const paymentPage = await orderDishesPage.navigation.openPayment();
+        await flows.paymentFlow.payByCash(paymentPage, { printReceipt: false });
         await printOutput.waitForTickets({ after: beforePayment, kinds: ['KITCHEN'] });
         const beforeResend = await printOutput.snapshot();
-        const recallFlow = new RecallFlow();
+        const recallFlow = flows.recallFlow;
         const recallPage = await recallFlow.openRecallFromHome(readyHomePage);
         await recallFlow.searchOrders(recallPage, {
           paymentStatus: RecallPaymentStatuses.paid,
@@ -1040,7 +1079,9 @@ async function enterRecall(
     return returnedPage;
   }
 
-  return await returnedPage.clickRecall();
+  return returnedPage instanceof OrderDishesPage
+    ? await returnedPage.navigation.clickRecall()
+    : await returnedPage.clickRecall();
 }
 
 function onlyTicket(tickets: PrintTicket[]): PrintTicket {

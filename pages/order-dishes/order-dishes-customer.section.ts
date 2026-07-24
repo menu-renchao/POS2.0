@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, type Locator } from '@playwright/test';
 import { waitForInputSettled } from '../../utils/input-stability';
 import { step } from '../../utils/step';
 import { PaymentPage } from '../payment.page';
@@ -44,6 +44,8 @@ function parseCustomerButtonIdentity(customerButtonText: string): {
 }
 
 export class OrderDishesCustomerSection {
+  private lastEditedInformationInput: Locator | null = null;
+
   constructor(
     private readonly ctx: OrderDishesPageContext,
     private readonly host: OrderDishesPageHost,
@@ -78,8 +80,10 @@ export class OrderDishesCustomerSection {
     await expect(this.locators.customerInformationPageHeading).toBeVisible();
     await this.locators.customerInformationPhoneInput.fill(customer.phoneNumber);
     await this.locators.customerInformationNameInput.fill(customer.customerName);
+    this.lastEditedInformationInput = this.locators.customerInformationNameInput;
     if (customer.address !== undefined) {
       await this.locators.customerInformationAddressInput.fill(customer.address);
+      this.lastEditedInformationInput = this.locators.customerInformationAddressInput;
     }
   }
 
@@ -118,9 +122,12 @@ export class OrderDishesCustomerSection {
   @step('页面操作：保存客户 Information 页面并返回点单页')
   async saveCustomerInformationPage(): Promise<void> {
     await expect(this.locators.customerInformationPageHeading).toBeVisible();
-    await waitForInputSettled();
+    if (this.lastEditedInformationInput) {
+      await waitForInputSettled(this.lastEditedInformationInput);
+    }
     await this.locators.customerInformationSaveButton.click();
     await expect(this.locators.customerInformationPageHeading).toBeHidden();
+    this.lastEditedInformationInput = null;
   }
 
   @step((customerButtonLabel: string) => `页面操作：打开客户信息 ${customerButtonLabel}`)
@@ -164,9 +171,12 @@ export class OrderDishesCustomerSection {
   @step('页面操作：保存点单页客户信息并关闭 Info 区域')
   async saveCustomerInformation(): Promise<void> {
     await expect(this.locators.customerInformationSaveButton).toBeVisible();
-    await waitForInputSettled();
+    if (this.lastEditedInformationInput) {
+      await waitForInputSettled(this.lastEditedInformationInput);
+    }
     await this.locators.customerInformationSaveButton.click();
     await expect(this.locators.customerInformationPageHeading).toBeHidden();
+    this.lastEditedInformationInput = null;
   }
 
   @step('页面读取：读取点单页客户摘要文本')
@@ -198,6 +208,7 @@ export class OrderDishesCustomerSection {
 
   @step('页面操作：确认仅填写姓名的客户信息并校验电话必填提示')
   async confirmCustomerNameAndExpectPhoneRequired(): Promise<void> {
+    await waitForInputSettled(this.locators.customerNameInput);
     await this.locators.customerConfirmButton.click();
     await expect(this.locators.customerPhoneRequiredMessage).toBeVisible();
   }

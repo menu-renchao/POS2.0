@@ -1,8 +1,7 @@
-import { expect, type Frame, type Locator } from '@playwright/test';
+import { expect, type Locator } from '@playwright/test';
 import { step } from '../../utils/step';
 import { waitUntil } from '../../utils/wait';
 import {
-  ORDER_DISHES_IFRAME_SELECTOR,
   type OrderDishesSnapshot,
   type OrderedDishItem,
   type OrderedDishItemAddition,
@@ -26,8 +25,6 @@ export class OrderDishesReadsSection {
   private get locators(): OrderDishesLocators {
     return this.ctx.locators;
   }
-
-  private orderDishesContentFrame: Frame | null = null;
 
     @step('页面读取：读取点单页 Count 原始文本')
     async readCountText(): Promise<string> {
@@ -223,117 +220,11 @@ export class OrderDishesReadsSection {
     }
 
     private async readOrderedItemsSnapshot(): Promise<OrderedDishItem[]> {
-      for (const readScope of await this.resolveOrderedItemReadScopes()) {
-        const cartButtonItems = await this.readCartButtonOrderedItems(readScope);
-
-        if (cartButtonItems.length > 0) {
-          return cartButtonItems;
-        }
-
-        const structuredItems = await this.readStructuredOrderedItemsInScope(readScope);
-
-        if (structuredItems.length > 0) {
-          return structuredItems;
-        }
-
-        const cartItemTexts = (
-          await readScope
-            .getByRole('button', { name: /^\d+(?:\.\d+)?\s+.+\s+\$[\d,.]+/i })
-            .allInnerTexts()
-        ).map((text) => text.replace(/\s+/g, ' ').trim());
-        const itemsFromCartButtons = this.parseOrderedItemsFromTexts(cartItemTexts);
-
-        if (itemsFromCartButtons.length > 0) {
-          return itemsFromCartButtons;
-        }
-
-        const frameLines = (await readScope.innerText())
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter(Boolean);
-        const itemsFromLines = this.parseOrderedItemsFromTexts(frameLines);
-
-        if (itemsFromLines.length > 0) {
-          return itemsFromLines;
-        }
-      }
-
-      return [];
+      return await this.readStructuredOrderedItems();
     }
 
-    private async resolveOrderedItemReadScopes(): Promise<Locator[]> {
-      const readScopes: Locator[] = [
-        this.page.locator('#orderDishesContainer'),
-        this.page.locator(ORDER_DISHES_IFRAME_SELECTOR).contentFrame().locator('body'),
-      ];
-
-      const contentFrame = await this.tryResolveOrderDishesContentFrame();
-      if (contentFrame) {
-        readScopes.push(contentFrame.locator('body'));
-      }
-
-      return readScopes;
-    }
-
-    private async tryResolveOrderDishesContentFrame(): Promise<Frame | null> {
-      if (this.orderDishesContentFrame) {
-        const frameStillReady = await this.frameHasOrderDishesContent(this.orderDishesContentFrame).catch(
-          () => false,
-        );
-
-        if (frameStillReady) {
-          return this.orderDishesContentFrame;
-        }
-
-        this.orderDishesContentFrame = null;
-      }
-
-      const iframeLocator = this.page.locator(ORDER_DISHES_IFRAME_SELECTOR);
-
-      if ((await iframeLocator.count().catch(() => 0)) === 0) {
-        return null;
-      }
-
-      const iframeHandle = await iframeLocator.first().elementHandle().catch(() => null);
-      const contentFrame = iframeHandle ? await iframeHandle.contentFrame() : null;
-
-      if (!contentFrame || !(await this.frameHasOrderDishesContent(contentFrame).catch(() => false))) {
-        return null;
-      }
-
-      this.orderDishesContentFrame = contentFrame;
-      return contentFrame;
-    }
-
-    private async frameHasOrderDishesContent(frame: Frame): Promise<boolean> {
-      return await frame.locator('body').evaluate((bodyElement) => {
-        const hasStructuredDishItem = Boolean(
-          bodyElement.querySelector(
-            '[data-testid="pos-ui-dish-item"], [data-test-id="pos-ui-dish-item"], [class*="_dishItem_"]',
-          ),
-        );
-        const hasOrderActionButton = Boolean(
-          bodyElement.querySelector(
-            '[data-testid="bottom-button-sendOrderBtn"], [data-test-id="bottom-button-sendOrderBtn"], [data-testid="bottom-button-saveOrderBtn"], [data-test-id="bottom-button-saveOrderBtn"]',
-          ),
-        );
-        const hasCartDishButton = Array.from(
-          bodyElement.querySelectorAll('button,[role="button"]'),
-        ).some((buttonElement) =>
-          /^\d+(?:\.\d+)?\s+.+\s+\$[\d,.]+$/i.test(
-            buttonElement.textContent?.replace(/\s+/g, ' ').trim() ?? '',
-          ),
-        );
-
-        return hasStructuredDishItem || hasOrderActionButton || hasCartDishButton;
-      }).catch(() => false);
-    }
-
-    private async readStructuredOrderedItemsInScope(readScope: Locator): Promise<OrderedDishItem[]> {
-      return await readScope.evaluate((scopeElement) => {
-        const rootElement =
-          scopeElement instanceof HTMLBodyElement ? scopeElement : scopeElement.closest('body') ?? scopeElement;
-
+    private async readStructuredOrderedItems(): Promise<OrderedDishItem[]> {
+      return await this.locators.orderedDishItems.evaluateAll((dishElements) => {
         return (() => {
         type OrderedDishItemFromDom = {
           additions: Array<{ name: string; price?: string }>;
@@ -373,7 +264,6 @@ export class OrderDishesReadsSection {
         };
         const additionSelectors = [
           '[data-testid^="dish-item-subitem-"]',
-          '[data-test-id^="dish-item-subitem-"]',
           '[class*="_extraItem_"]',
           '[class*="_optionItemContainer_"]',
         ].join(', ');
@@ -436,13 +326,7 @@ export class OrderDishesReadsSection {
           };
         };
 
-        return dedupeElements(
-          Array.from(
-            rootElement.querySelectorAll(
-              '[data-testid="pos-ui-dish-item"], [data-test-id="pos-ui-dish-item"], [class*="_dishItem_"]',
-            ),
-          ),
-        ).reduce<OrderedDishItemFromDom[]>((items, dishElement) => {
+        return dedupeElements(dishElements).reduce<OrderedDishItemFromDom[]>((items, dishElement) => {
           const quantity =
             selectText(dishElement, '[class*="_quantity_"]') ??
             readTexts(dishElement, 'span').find((text) => /^\d+(?:\.\d+)?$/.test(text)) ??
@@ -463,17 +347,15 @@ export class OrderDishesReadsSection {
           const topLevelAdditionElements: Element[] = [];
 
           for (const additionElement of additionElements) {
-            let parentAdditionElement: Element | null = null;
-            let currentParent = additionElement.parentElement;
-
-            while (currentParent && currentParent !== dishElement) {
-              if (additionElementSet.has(currentParent)) {
-                parentAdditionElement = currentParent;
-                break;
-              }
-
-              currentParent = currentParent.parentElement;
-            }
+            const closestParentAddition =
+              additionElement.parentElement?.closest(additionSelectors) ?? null;
+            const parentAdditionElement =
+              closestParentAddition &&
+              closestParentAddition !== additionElement &&
+              additionElementSet.has(closestParentAddition) &&
+              dishElement.contains(closestParentAddition)
+                ? closestParentAddition
+                : null;
 
             if (parentAdditionElement) {
               const children = childMap.get(parentAdditionElement) ?? [];
@@ -504,162 +386,10 @@ export class OrderDishesReadsSection {
       });
     }
 
-    private async readCartButtonOrderedItems(readScope: Locator): Promise<OrderedDishItem[]> {
-      return await readScope
-        .getByRole('button', { name: /^\d+(?:\.\d+)?\s+.+\s+\$[\d,.]+/i })
-        .evaluateAll((buttonElements) => {
-          const cleanText = (value: string | null | undefined): string =>
-            value?.replace(/\s+/g, ' ').trim() ?? '';
-
-          return buttonElements
-            .map<OrderedDishItem | null>((buttonElement) => {
-              const text = cleanText(buttonElement.textContent);
-              const headerMatch = text.match(/^(\d+(?:\.\d+)?)\s+(.+?)\s+(\$[\d,.]+)/i);
-
-              if (!headerMatch) {
-                return null;
-              }
-
-              const [, quantity, name, price] = headerMatch;
-              const domAdditionNodes = Array.from(
-                buttonElement.querySelectorAll(
-                  [
-                    '[data-testid^="dish-item-subitem-"]',
-                    '[data-test-id^="dish-item-subitem-"]',
-                    '[class*="_optionItemContainer_"]',
-                    '[class*="_extraItem_"]',
-                  ].join(', '),
-                ),
-              )
-                .map((additionElement) =>
-                  cleanText(additionElement.textContent).replace(/DishLevelIcon/gi, '').trim(),
-                )
-                .filter(Boolean);
-              const leafAdditions = Array.from(buttonElement.querySelectorAll('span, div'))
-                .filter((element) => element.children.length === 0)
-                .map((element) => cleanText(element.textContent))
-                .filter(
-                  (label) =>
-                    label &&
-                    label !== quantity &&
-                    label !== name &&
-                    label !== price &&
-                    !/^DishLevelIcon$/i.test(label) &&
-                    !/^\d+(?:\.\d+)?$/.test(label),
-                );
-              const rowBasedAdditions = Array.from(buttonElement.children)
-                .slice(1)
-                .flatMap((rowElement) =>
-                  Array.from(rowElement.children).map((additionRow) =>
-                    cleanText(additionRow.textContent).replace(/DishLevelIcon/gi, '').trim(),
-                  ),
-                )
-                .filter(Boolean);
-              const iconBasedAdditions = Array.from(
-                buttonElement.querySelectorAll('img[alt="DishLevelIcon"], img[alt*="DishLevel"]'),
-              )
-                .map((iconElement) => {
-                  const labelElement = Array.from(iconElement.parentElement?.children ?? []).find(
-                    (childElement) => childElement !== iconElement,
-                  );
-
-                  return cleanText(labelElement?.textContent ?? iconElement.parentElement?.textContent)
-                    .replace(/DishLevelIcon/gi, '')
-                    .trim();
-                })
-                .filter(Boolean);
-              const remainder = text.slice(headerMatch[0].length).trim();
-              const textBasedAdditions = remainder
-                .split(/DishLevelIcon/i)
-                .map((part) => cleanText(part))
-                .filter(Boolean);
-              const additionTexts =
-                domAdditionNodes.length > 0
-                  ? domAdditionNodes
-                  : leafAdditions.length > 0
-                    ? leafAdditions
-                    : rowBasedAdditions.length > 0
-                      ? rowBasedAdditions
-                      : iconBasedAdditions.length > 0
-                        ? iconBasedAdditions
-                        : textBasedAdditions;
-              const normalizedAdditionTexts =
-                additionTexts.length === 1
-                  ? additionTexts[0].split(/\s+(?=(?:free|category)\s+(?:option|suboption))/i)
-                  : additionTexts;
-              const additions = normalizedAdditionTexts
-                .map((part) => cleanText(part))
-                .filter(Boolean)
-                .map((part) => {
-                  const priceMatch = part.match(/\$[\d,.]+$/);
-                  const additionName = priceMatch
-                    ? cleanText(part.replace(priceMatch[0], ''))
-                    : part;
-
-                  return {
-                    name: additionName,
-                    ...(priceMatch ? { price: priceMatch[0] } : {}),
-                  };
-                })
-                .filter((addition) => addition.name.length > 0);
-
-              return {
-                additions,
-                name,
-                price,
-                quantity,
-              } satisfies OrderedDishItem;
-            })
-            .filter((item): item is OrderedDishItem => item !== null);
-        });
-    }
-
-    private parseOrderedItemsFromTexts(texts: string[]): OrderedDishItem[] {
-      return texts.reduce<OrderedDishItem[]>((items, text) => {
-        const matchedItem = text.match(/^(\d+(?:\.\d+)?)\s+(.+?)\s+(\$[\d,.]+)/i);
-
-        if (!matchedItem) {
-          return items;
-        }
-
-        const [, quantity, name, price] = matchedItem;
-        const remainder = text.slice(matchedItem[0].length).trim();
-        const additions = remainder
-          .split(/DishLevelIcon/i)
-          .map((part) => part.trim())
-          .filter(Boolean)
-          .map((part) => {
-            const priceMatch = part.match(/\$[\d,.]+$/);
-            const additionName = priceMatch ? part.replace(priceMatch[0], '').trim() : part;
-
-            return {
-              name: additionName,
-              ...(priceMatch ? { price: priceMatch[0] } : {}),
-            };
-          })
-          .filter((addition) => addition.name.length > 0);
-
-        items.push({
-          additions,
-          quantity,
-          name,
-          price,
-        });
-
-        return items;
-      }, []);
-    }
-
     @step('页面读取：读取点单页左侧价格汇总')
     async readPriceSummary(): Promise<OrderPriceSummary> {
       await this.host.expectLoaded();
       await this.expandPriceSummary();
-      const structuredPriceSummary = await this.tryReadStructuredPriceSummary();
-
-      if (structuredPriceSummary) {
-        return structuredPriceSummary;
-      }
-
       const inlinePriceSummary = await this.tryReadInlinePriceSummary();
 
       if (inlinePriceSummary) {
@@ -683,101 +413,6 @@ export class OrderDishesReadsSection {
         summary['Total(Cash)'];
 
       return summary as OrderPriceSummary;
-    }
-
-    private async tryReadStructuredPriceSummary(): Promise<OrderPriceSummary | null> {
-      const containers = [
-        this.locators.priceSummaryDetailsContainer,
-        this.locators.priceSummaryTotalContainer,
-        this.locators.priceSummaryToggle,
-      ];
-      const entries: Record<string, number> = {};
-
-      for (const container of containers) {
-        if (!(await container.isVisible().catch(() => false))) {
-          continue;
-        }
-
-        const pairs = await container.evaluate((rootElement) => {
-          const cleanText = (value: string | null | undefined): string =>
-            value?.replace(/\s+/g, ' ').trim() ?? '';
-          const rows = [rootElement, ...Array.from(rootElement.querySelectorAll('div, section, button'))];
-          const results: Array<{ label: string; value: string }> = [];
-
-          for (const row of rows) {
-            const spanChildren = Array.from(row.children).filter(
-              (childElement) => childElement.tagName === 'SPAN',
-            );
-
-            if (spanChildren.length < 2) {
-              continue;
-            }
-
-            for (let index = 0; index < spanChildren.length - 1; index += 1) {
-              const label = cleanText(spanChildren[index]?.textContent);
-              const followingTexts = spanChildren
-                .slice(index + 1)
-                .map((childElement) => cleanText(childElement.textContent))
-                .filter((text) => text && !/^Save/i.test(text));
-              const value =
-                followingTexts.find((text) => /^\$?[\d,.]+$/.test(text)) ??
-                followingTexts.at(-1) ??
-                '';
-
-              if (label && value) {
-                results.push({ label, value });
-              }
-            }
-          }
-
-          return results;
-        });
-
-        for (const pair of pairs) {
-          const normalizedLabel =
-            /^(Count|Subtotal|Tax|Charge|Total Before Tips|Tips|Total(?:\((?:Cash|Card)\))?)$/i.test(
-              pair.label,
-            )
-              ? pair.label
-              : null;
-
-          if (!normalizedLabel) {
-            continue;
-          }
-
-          const parsedValue = Number(pair.value.replace(/[$,]/g, ''));
-          if (!Number.isNaN(parsedValue)) {
-            entries[normalizedLabel] = parsedValue;
-          }
-        }
-      }
-
-      if (
-        entries.Count === undefined ||
-        entries.Subtotal === undefined ||
-        entries.Tax === undefined ||
-        entries['Total Before Tips'] === undefined
-      ) {
-        return null;
-      }
-
-      const resolvedTotal = entries['Total(Cash)'] ?? entries.Total;
-      const resolvedCardTotal = entries['Total(Card)'] ?? entries.Total ?? resolvedTotal;
-
-      if (resolvedTotal === undefined || resolvedCardTotal === undefined) {
-        return null;
-      }
-
-      return {
-        Count: entries.Count,
-        Subtotal: entries.Subtotal,
-        Tax: entries.Tax,
-        ...(entries.Charge === undefined ? {} : { Charge: entries.Charge }),
-        'Total Before Tips': entries['Total Before Tips'],
-        ...(entries.Tips === undefined ? {} : { Tips: entries.Tips }),
-        'Total(Cash)': resolvedTotal,
-        'Total(Card)': resolvedCardTotal,
-      };
     }
 
     private async tryReadInlinePriceSummary(): Promise<OrderPriceSummary | null> {
@@ -872,52 +507,21 @@ export class OrderDishesReadsSection {
         return false;
       }
 
-      return await priceSummaryToggle
-        .locator('xpath=following-sibling::*[1]')
-        .isVisible()
-        .catch(() => false);
+      return await this.locators.priceSummaryDetailsContainer.isVisible().catch(() => false);
     }
 
     private async readPriceSummaryRowNumber(label: string): Promise<number> {
-      const containers = [this.locators.priceSummaryDetailsContainer, this.locators.priceSummaryToggle];
+      const container = this.locators.priceSummaryDetailsContainer;
+      await expect(container).toBeVisible();
+      const normalizedText = (await container.innerText()).replace(/\s+/g, ' ').trim();
+      const escapedLabel = this.ctx.escapeRegExp(label);
+      const value = normalizedText.match(
+        new RegExp(`(?:^|\\s)${escapedLabel}\\s+\\$?([\\d,.]+)(?:\\s|$)`, 'i'),
+      )?.[1];
+      const parsedValue = Number(value?.replace(/,/g, '') ?? Number.NaN);
 
-      for (const container of containers) {
-        if (!(await container.isVisible().catch(() => false))) {
-          continue;
-        }
-
-        const value = await container.evaluate((rootElement, targetLabel) => {
-          const cleanText = (value: string | null | undefined): string =>
-            value?.replace(/\s+/g, ' ').trim() ?? '';
-          const rows = [rootElement, ...Array.from(rootElement.querySelectorAll('div, section, button'))];
-
-          for (const row of rows) {
-            const spans = Array.from(row.querySelectorAll(':scope > span'));
-
-            if (spans.length < 2) {
-              continue;
-            }
-
-            const labelText = cleanText(spans[0]?.textContent);
-            if (labelText !== targetLabel) {
-              continue;
-            }
-
-            return cleanText(spans.at(-1)?.textContent);
-          }
-
-          return '';
-        }, label);
-        const normalizedValue = value.replace(/\s+/g, ' ').trim();
-
-        if (!normalizedValue) {
-          continue;
-        }
-
-        const parsedValue = Number(normalizedValue.replace(/[$,]/g, ''));
-        if (!Number.isNaN(parsedValue)) {
-          return parsedValue;
-        }
+      if (!Number.isNaN(parsedValue)) {
+        return parsedValue;
       }
 
       throw new Error(`Unable to read ${label} from order price summary.`);
@@ -932,55 +536,19 @@ export class OrderDishesReadsSection {
     }
 
     private async readPriceSummaryMoneyNumber(label: string): Promise<number> {
-      const containers = [this.locators.priceSummaryTotalContainer, this.locators.priceSummaryToggle];
+      const container = this.locators.priceSummaryTotalContainer;
+      await expect(container).toBeVisible();
+      const normalizedText = (await container.innerText()).replace(/\s+/g, ' ').trim();
+      const escapedLabel = this.ctx.escapeRegExp(label);
+      const matches = [
+        ...normalizedText.matchAll(
+          new RegExp(`(?:^|\\s)${escapedLabel}\\s+\\$([\\d,.]+)(?:\\s|$)`, 'gi'),
+        ),
+      ];
+      const parsedValue = Number(matches.at(-1)?.[1]?.replace(/,/g, '') ?? Number.NaN);
 
-      for (const container of containers) {
-        if (!(await container.isVisible().catch(() => false))) {
-          continue;
-        }
-
-        const value = await container.evaluate((rootElement, targetLabel) => {
-          const cleanText = (value: string | null | undefined): string =>
-            value?.replace(/\s+/g, ' ').trim() ?? '';
-          const rows = [rootElement, ...Array.from(rootElement.querySelectorAll('div, section, button'))];
-
-          for (const row of rows) {
-            const spans = Array.from(row.querySelectorAll(':scope > span'));
-
-            if (spans.length < 2) {
-              continue;
-            }
-
-            for (let index = 0; index < spans.length; index += 1) {
-              const labelText = cleanText(spans[index]?.textContent);
-              if (labelText !== targetLabel) {
-                continue;
-              }
-
-              const followingTexts = spans
-                .slice(index + 1)
-                .map((span) => cleanText(span.textContent))
-                .filter((text) => text && !/^Save/i.test(text));
-              const moneyValue = followingTexts.find((text) => /^\$[\d,.]+$/.test(text));
-
-              if (moneyValue) {
-                return moneyValue;
-              }
-            }
-          }
-
-          return '';
-        }, label);
-        const normalizedValue = value.replace(/\s+/g, ' ').trim();
-
-        if (!normalizedValue) {
-          continue;
-        }
-
-        const parsedValue = Number(normalizedValue.replace(/[$,]/g, ''));
-        if (!Number.isNaN(parsedValue)) {
-          return parsedValue;
-        }
+      if (!Number.isNaN(parsedValue)) {
+        return parsedValue;
       }
 
       throw new Error(`Unable to read ${label} from order price summary.`);
@@ -1015,24 +583,6 @@ export class OrderDishesReadsSection {
     }
 
     private async resolvePriceSummaryToggle(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame
-            .locator(
-              '[data-test-id="shared-order-price-summary-toggle"], [data-testid="shared-order-price-summary-toggle"]',
-            )
-            .or(this.locators.appFrame.getByRole('button', { name: /Total\(Cash\).*Total\(Card\)/ }))
-            .or(this.locators.appFrame.getByRole('button', { name: /Total\s*\$[\d,.]+/ }))
-            .first(),
-          this.page
-            .locator(
-              '[data-test-id="shared-order-price-summary-toggle"], [data-testid="shared-order-price-summary-toggle"]',
-            )
-            .or(this.page.getByRole('button', { name: /Total\(Cash\).*Total\(Card\)/ }))
-            .or(this.page.getByRole('button', { name: /Total\s*\$[\d,.]+/ }))
-            .first(),
-        ],
-        'Unable to find order price summary toggle.',
-      );
+      return this.locators.priceSummaryToggle;
     }
 }

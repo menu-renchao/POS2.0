@@ -1,22 +1,20 @@
 import { expect } from '@playwright/test';
-import { PagingFlow } from '../../flows/paging.flow';
-import { HomeFlow } from '../../flows/home.flow';
 import { test } from '../../fixtures/test.fixture';
 import { pagingConfiguration, pagingOrder } from '../../test-data/paging';
 import { jiraIssueAnnotation } from '../../utils/jira';
 
 test.describe(
   'Paging 叫号核心回归',
-  { tag: ['@点单', '@叫号', '@订单查询', '@送厨打印'] },
+  { tag: ['@点单', '@叫号', '@订单查询', '@送厨打印', '@ui-exclusive-config'] },
   () => {
-    test.describe.configure({ mode: 'serial', timeout: 180_000 });
+    test.describe.configure({ timeout: 180_000 });
 
     test(
       '[POS-42087] 应能在 Paging 页面按订单类型和订单号组合搜索订单',
       {
         annotation: [jiraIssueAnnotation('POS-42087')],
       },
-      async ({ apiSetup, employeeLoginPage, homePage }) => {
+      async ({ apiSetup, employeeLoginPage, homeFlow, homePage, pagingFlow }) => {
         const restoreConfiguration = await apiSetup.systemConfiguration.updateByName(
           pagingConfiguration.automaticCompletionMinutes,
           pagingConfiguration.searchScenarioMinutes,
@@ -24,11 +22,10 @@ test.describe(
         );
 
         try {
-          const readyHomePage = await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          const readyHomePage = await homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-          const pagingFlow = new PagingFlow();
           const sentOrder = await pagingFlow.createSentDineInOrder(readyHomePage);
           const pagingPage = await pagingFlow.openPagingForOrder(
             sentOrder.homePage,
@@ -54,12 +51,11 @@ test.describe(
       {
         annotation: [jiraIssueAnnotation('POS-42090')],
       },
-      async ({ employeeLoginPage, homePage }) => {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+      async ({ employeeLoginPage, homeFlow, homePage, pagingFlow }) => {
+        const readyHomePage = await homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const pagingFlow = new PagingFlow();
         const sentOrder = await pagingFlow.createSentDineInOrder(readyHomePage);
         const pagingPage = await pagingFlow.openPagingForOrder(
           sentOrder.homePage,
@@ -80,8 +76,9 @@ test.describe(
       '[POS-42091] 应能按配置时长自动完成 Paging 订单',
       {
         annotation: [jiraIssueAnnotation('POS-42091')],
+        tag: ['@slow'],
       },
-      async ({ apiSetup, employeeLoginPage, homePage }) => {
+      async ({ apiSetup, employeeLoginPage, homeFlow, homePage, pagingFlow }) => {
         const restoreConfiguration = await apiSetup.systemConfiguration.updateByName(
           pagingConfiguration.automaticCompletionMinutes,
           pagingConfiguration.timeoutScenarioMinutes,
@@ -89,11 +86,10 @@ test.describe(
         );
 
         try {
-          const readyHomePage = await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          const readyHomePage = await homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
-          const pagingFlow = new PagingFlow();
           const sentOrder = await pagingFlow.createSentDineInOrder(readyHomePage);
           const pagingPage = await pagingFlow.openPagingForOrder(
             sentOrder.homePage,
@@ -119,12 +115,11 @@ test.describe(
       {
         annotation: [jiraIssueAnnotation('POS-42092')],
       },
-      async ({ employeeLoginPage, homePage }) => {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+      async ({ employeeLoginPage, homeFlow, homePage, pagingFlow }) => {
+        const readyHomePage = await homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const pagingFlow = new PagingFlow();
         const sentOrder = await pagingFlow.createSentDineInOrder(readyHomePage);
         const pagingPage = await pagingFlow.openPagingForOrder(
           sentOrder.homePage,
@@ -146,12 +141,11 @@ test.describe(
       {
         annotation: [jiraIssueAnnotation('POS-43829')],
       },
-      async ({ employeeLoginPage, homePage }) => {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+      async ({ employeeLoginPage, homeFlow, homePage, pagingFlow }) => {
+        const readyHomePage = await homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const pagingFlow = new PagingFlow();
         const sentOrder = await pagingFlow.createSentDineInOrder(readyHomePage);
         const pagingPage = await pagingFlow.openPagingForOrder(
           sentOrder.homePage,

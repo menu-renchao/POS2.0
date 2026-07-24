@@ -340,9 +340,7 @@ export class OrderDishesPageNavigation {
     @step('页面操作：点击 Split 并打开分单面板')
     async openSplitOrder(): Promise<SplitOrderPage> {
       await this.host.expectLoaded();
-      await (await this.resolveSplitButton()).evaluate((buttonElement) => {
-        (buttonElement as HTMLElement).click();
-      });
+      await this.locators.splitButton.click();
       await this.clickKeepSplitOrderIfVisible();
 
       const splitOrderPage = new SplitOrderPage(this.page);
@@ -361,7 +359,7 @@ export class OrderDishesPageNavigation {
           homeReady: !this.page.url().includes('#orderDishes'),
           voidReasonVisible: await this.page
             .locator(
-              '[data-test-id="order-dishes-save-void-reason-confirm"], [data-testid="order-dishes-save-void-reason-confirm"]',
+              '[data-testid="order-dishes-save-void-reason-confirm"]',
             )
             .isVisible()
             .catch(() => false),
@@ -379,7 +377,7 @@ export class OrderDishesPageNavigation {
       }
 
       const voidReasonConfirmButton = this.page.locator(
-        '[data-test-id="order-dishes-save-void-reason-confirm"], [data-testid="order-dishes-save-void-reason-confirm"]',
+        '[data-testid="order-dishes-save-void-reason-confirm"]',
       );
 
       if (!(await voidReasonConfirmButton.isVisible().catch(() => false))) {
@@ -388,7 +386,7 @@ export class OrderDishesPageNavigation {
 
       const voidReasonOption = this.page
         .locator(
-          '[data-test-id="order-dishes-save-void-reason-option-1"], [data-testid="order-dishes-save-void-reason-option-1"]',
+          '[data-testid="order-dishes-save-void-reason-option-1"]',
         )
         .first();
 
@@ -400,21 +398,11 @@ export class OrderDishesPageNavigation {
     }
 
     private async resolveHeaderMoreButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [this.page.getByTestId('icon-button-more').first(), this.locators.appFrame.getByTestId('icon-button-more').first()],
-        'Unable to find order-dishes header More button.',
-      );
+      return this.locators.headerMoreButton;
     }
 
     private async resolveInventoryMenuItem(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByTestId('dropdown-item-inventory').first(),
-          this.page.getByRole('menuitem', { name: 'Inventory' }).first(),
-          this.locators.appFrame.getByTestId('dropdown-item-inventory').first(),
-        ],
-        'Unable to find Inventory entry in order-dishes More menu.',
-      );
+      return this.locators.inventoryMenuItem;
     }
 
     private async resolveBackButton(): Promise<Locator> {
@@ -422,95 +410,28 @@ export class OrderDishesPageNavigation {
     }
 
     private async resolveHeaderRecallButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByRole('button', { name: /Recall/ }).first(),
-          this.page.getByRole('button', { name: /Recall/ }).first(),
-        ],
-        'Unable to find order-dishes Recall button.',
-      );
+      return this.locators.headerRecallButton;
     }
 
     private async resolveSendButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame
-            .locator(
-              '[data-testid="bottom-button-sendOrderBtn"], [data-test-id="bottom-button-sendOrderBtn"]',
-            )
-            .or(this.locators.appFrame.getByRole('button', { name: 'Send' }))
-            .first(),
-          this.page
-            .locator(
-              '[data-testid="bottom-button-sendOrderBtn"], [data-test-id="bottom-button-sendOrderBtn"]',
-            )
-            .or(this.page.getByRole('button', { name: 'Send' }))
-            .first(),
-        ],
-        'Unable to find order-dishes Send button.',
-      );
+      return this.locators.sendButton;
     }
 
     private async resolvePayButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [this.locators.payButton],
-        'Unable to find order-dishes Pay button.',
-      );
+      return this.locators.payButton;
     }
 
     private async resolveSaveOrderButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame
-            .locator(
-              '[data-testid="bottom-button-saveOrderBtn"], [data-test-id="bottom-button-saveOrderBtn"]',
-            )
-            .or(this.locators.appFrame.getByRole('button', { name: /^(Save|保存)$/ }))
-            .first(),
-          this.page
-            .locator(
-              '[data-testid="bottom-button-saveOrderBtn"], [data-test-id="bottom-button-saveOrderBtn"]',
-            )
-            .or(this.page.getByRole('button', { name: /^(Save|保存)$/ }))
-            .first(),
-        ],
-        'Unable to find order-dishes Save button.',
-      );
-    }
-
-    private async resolveSplitButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByRole('button', { name: /^Split$/ }).first(),
-          this.page.getByRole('button', { name: /^Split$/ }).first(),
-          this.locators.appFrame.getByRole('button', { name: /^分单$/ }).first(),
-          this.page.getByRole('button', { name: /^分单$/ }).first(),
-          this.locators.splitButton,
-        ],
-        'Unable to find visible Split button on the order page.',
-      );
+      return this.locators.saveOrderButton;
     }
 
     private async clickKeepSplitOrderIfVisible(): Promise<void> {
-      const keepButtonCandidates = [
-        this.page.locator('[data-testid="button-keep"], [data-test-id="button-keep"]').first(),
-        this.locators.appFrame.locator('[data-testid="button-keep"], [data-test-id="button-keep"]').first(),
-        this.page.getByRole('button', { name: /^Keep$/ }).first(),
-        this.locators.appFrame.getByRole('button', { name: /^Keep$/ }).first(),
-      ];
-      const keepButton = await waitUntil(
-        async () => await this.ctx.findVisibleLocator(keepButtonCandidates),
-        (button): button is Locator => button !== null,
-        {
-          timeout: 2_000,
-          message: 'Split order keep button did not appear.',
-        },
-      ).catch(() => null);
-
-      if (keepButton) {
-        await keepButton.evaluate((buttonElement) => {
-          (buttonElement as HTMLElement).click();
-        });
+      if (
+        await this.locators.keepSplitOrderButton
+          .isVisible({ timeout: 2_000 })
+          .catch(() => false)
+      ) {
+        await this.locators.keepSplitOrderButton.click();
       }
     }
 }

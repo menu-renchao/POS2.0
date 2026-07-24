@@ -13,7 +13,16 @@ export class LicenseSelectionFlow {
     type = 'PC',
   ): Promise<HomePage> {
     await licenseSelectionPage.expectVisible();
-    await licenseSelectionPage.selectAvailableLicenseByType(type);
+    const licenses = await licenseSelectionPage.readLicenseRecords();
+    const availableLicense = licenses.find(
+      (license) => license.type === type && license.status === 'Not in use',
+    );
+
+    if (!availableLicense) {
+      throw new Error(`未找到类型为 ${type} 且未占用的 License。`);
+    }
+
+    await licenseSelectionPage.selectLicenseByName(availableLicense.name);
     await licenseSelectionPage.clickEnter();
 
     return homePage;

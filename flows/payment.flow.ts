@@ -11,19 +11,11 @@ export type PartialCashPaymentOptions = PaymentCompletionOptions & {
   successButtonText?: 'Continue' | 'NO RECEIPT';
 };
 
-const testCreditCard = {
-  cardNumber: '4000000000000002',
-  cvv: '999',
-  expMonth: '12',
-  expYear: '55',
-  holderName: 'Tester',
-} as const;
-
 export class PaymentFlow {
   @step((_: PaymentPage, amountInCents: number) => `业务步骤：在 Payment 页设置小费 ${amountInCents} 分`)
   async addTip(paymentPage: PaymentPage, amountInCents: number): Promise<void> {
     await paymentPage.expectLoaded();
-    await paymentPage.addTip(amountInCents);
+    await paymentPage.tips.add(amountInCents);
   }
 
   @step('业务步骤：完成现金支付并处理打印小票选择')
@@ -34,8 +26,7 @@ export class PaymentFlow {
     await paymentPage.expectLoaded();
 
     try {
-      await paymentPage.clickBalanceDueCash();
-      await paymentPage.clickPaymentTypeCash();
+      await paymentPage.cash.clickPaymentTypeCash();
       await this.finishPrintReceiptStep(paymentPage, options);
     } catch (error) {
       await paymentPage.dismissPrintReceiptDialogIfVisible();
@@ -51,8 +42,8 @@ export class PaymentFlow {
     await paymentPage.expectLoaded();
 
     try {
-      await paymentPage.fillAmountTendered(options.amountInCents);
-      await paymentPage.clickPaymentTypeCash();
+      await paymentPage.cash.fillAmountTendered(options.amountInCents);
+      await paymentPage.cash.clickPaymentTypeCash();
       await this.finishPrintReceiptStep(
         paymentPage,
         options,
@@ -73,8 +64,8 @@ export class PaymentFlow {
     await paymentPage.expectLoaded();
 
     try {
-      await paymentPage.fillAmountTendered(options.amountInCents);
-      await paymentPage.clickPaymentTypeCash();
+      await paymentPage.cash.fillAmountTendered(options.amountInCents);
+      await paymentPage.cash.clickPaymentTypeCash();
       await this.finishPrintReceiptStep(
         paymentPage,
         options,
@@ -95,10 +86,7 @@ export class PaymentFlow {
     await paymentPage.expectLoaded();
 
     try {
-      await paymentPage.clickBalanceDueCards();
-      await paymentPage.clickPaymentTypeCreditCard();
-      await paymentPage.fillCreditCardForm(testCreditCard);
-      await paymentPage.clickPay();
+      await paymentPage.card.clickCreditCard();
       await this.finishPrintReceiptStep(paymentPage, options);
     } catch (error) {
       await paymentPage.dismissPrintReceiptDialogIfVisible();
@@ -114,10 +102,8 @@ export class PaymentFlow {
     await paymentPage.expectLoaded();
 
     try {
-      await paymentPage.fillAmountTendered(options.amountInCents);
-      await paymentPage.clickPaymentTypeCreditCard();
-      await paymentPage.fillCreditCardForm(testCreditCard);
-      await paymentPage.clickPay();
+      await paymentPage.cash.fillAmountTendered(options.amountInCents);
+      await paymentPage.card.clickCreditCard();
       await this.finishPrintReceiptStep(
         paymentPage,
         options,

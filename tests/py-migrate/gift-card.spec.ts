@@ -1,6 +1,4 @@
 import { expect } from '@playwright/test';
-import { GiftCardFlow } from '../../flows/gift-card.flow';
-import { HomeFlow } from '../../flows/home.flow';
 import { test } from '../../fixtures/test.fixture';
 import { buildOrderServicePhysicalGiftCardCase } from '../../test-data/order-service';
 import { jiraIssueAnnotation } from '../../utils/jira';
@@ -11,13 +9,19 @@ test.describe('礼品卡实体卡管理', () => {
     {
       annotation: [jiraIssueAnnotation('POS-34106')],
     },
-    async ({ employeeLoginPage, giftCardApi, homePage }) => {
+    async ({
+      employeeLoginPage,
+      giftCardApi,
+      giftCardFlow,
+      homeFlow,
+      homePage,
+    }) => {
       const giftCard = buildOrderServicePhysicalGiftCardCase();
       let saveSucceeded = false;
 
       try {
         const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-          return await new HomeFlow().openHomeWithEmployeeContext(
+          return await homeFlow.openHomeWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
@@ -28,7 +32,7 @@ test.describe('礼品卡实体卡管理', () => {
         });
 
         const result = await test.step('新增实体礼品卡并读取保存请求', async () => {
-          return await new GiftCardFlow().createPhysicalCard(giftCardPage, giftCard);
+          return await giftCardFlow.createPhysicalCard(giftCardPage, giftCard);
         });
         saveSucceeded = result.save.status === 200;
 

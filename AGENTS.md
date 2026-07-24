@@ -121,3 +121,10 @@ test(
 - Put shared Playwright extensions in `fixtures/`.
 - Put environment and sample domain data in `test-data/`.
 - Put pure helpers in `utils/`.
+
+## Architecture Gate
+
+- Run `npm run lint:ui-architecture` after modifying Page, Flow, Fixture, or UI spec code.
+- `docs/ui-architecture-baseline.json` is a decreasing debt ceiling, not a permanent exception list.
+- A remediation may lower a baseline value after removing debt; it must never raise a value to make the gate pass.
+- New hard waits and `waitForInputSettled()` calls without a concrete Locator are prohibited at zero baseline.

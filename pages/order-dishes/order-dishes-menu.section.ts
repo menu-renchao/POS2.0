@@ -86,7 +86,7 @@ export class OrderDishesMenuSection {
       await expect(this.locators.guestCountDialog).toBeVisible();
       await this.locators.guestCountClearButton.click();
       await this.locators.guestCountNumberButton(guestCount).click();
-      await waitForInputSettled(undefined, 250);
+      await waitForInputSettled(this.locators.guestCountInput);
       await this.locators.guestCountConfirmButton.click();
       await expect(this.locators.guestCountDialog).toBeHidden({ timeout: 10_000 });
       await this.expectGuestCount(guestCount);
@@ -107,47 +107,15 @@ export class OrderDishesMenuSection {
     @step((dishName: string) => `页面操作：点击菜品 ${dishName}`)
     async clickDish(dishName: string): Promise<void> {
       await this.host.expectLoaded();
-
-      try {
-        await (await this.resolveDishButton(dishName)).click();
-        return;
-      } catch (error) {
-        await this.searchAndClickDish(dishName).catch(() => {
-          throw error;
-        });
-      }
+      await this.locators.menuItemButtonByName(dishName).click();
     }
 
     @step((dishName: string) => `页面操作：通过 Search menu 搜索并点击菜品 ${dishName}`)
     async searchAndClickDish(dishName: string): Promise<void> {
-      const searchMenuButton = await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByRole('button', { name: 'Search menu' }).first(),
-          this.locators.appFrame.getByRole('button', { name: 'Search menu' }).first(),
-        ],
-        'Unable to find Search menu button on order dishes page.',
-      );
-      await searchMenuButton.click();
-
-      const searchInput = await this.ctx.resolveVisibleLocator(
-        [
-          this.ctx.scopedLocator('#searchiptedit'),
-          this.ctx.scopedLocator('#schipt'),
-          this.page.getByRole('textbox').last(),
-        ],
-        'Unable to find Search menu input on order dishes page.',
-      );
-      await searchInput.fill(dishName);
-
-      const searchResult = await this.ctx.resolveVisibleLocator(
-        [
-          this.ctx.scopedLocator('#itemdsply').getByText(dishName, { exact: true }).first(),
-          this.page.getByRole('button', { name: dishName, exact: true }).first(),
-          this.locators.appFrame.getByRole('button', { name: dishName, exact: true }).first(),
-        ],
-        `Unable to find Search menu result for dish: ${dishName}.`,
-      );
-      await searchResult.click();
+      await this.locators.searchMenuButton.click();
+      await expect(this.locators.searchMenuInput).toBeVisible();
+      await this.locators.searchMenuInput.fill(dishName);
+      await this.locators.searchMenuResultByName(dishName).click();
     }
 
     @step((visible: boolean) => `页面断言：Search Menu 入口${visible ? '可见' : '不可见'}`)
@@ -277,51 +245,8 @@ export class OrderDishesMenuSection {
     @step((quantity: number) => `页面操作：通过 Count 按钮将待点菜数量修改为 ${quantity}`)
     async changeDishCount(quantity: number): Promise<void> {
       await this.host.expectLoaded();
-      await (await this.resolveCountButton()).click();
-
-      const countDialog = await this.resolveCountDialog();
-      await expect(countDialog).toBeVisible();
-      const countDialogInput = countDialog.locator('input').first();
-      const countDialogConfirmButton = countDialog
-        .getByTestId('dish-count-modal-numeric-input-confirm-button')
-        .or(
-          countDialog.getByRole('button', {
-            name: /^(Confirm|确认)$/,
-          }),
-        )
-        .first();
-
-      if (await countDialogInput.isVisible().catch(() => false)) {
-        await countDialogInput.fill(String(quantity)).catch(async () => {
-          await countDialogInput.evaluate((inputElement, nextValue) => {
-            const input = inputElement as HTMLInputElement;
-            input.value = String(nextValue);
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-          }, String(quantity));
-        });
-      } else {
-        for (const digit of String(quantity)) {
-          const numericKey = countDialog.getByTestId(`dish-count-modal-numeric-input-number-${digit}`);
-
-          if (await numericKey.isVisible().catch(() => false)) {
-            await numericKey.click();
-            continue;
-          }
-
-          await countDialog.getByRole('button', { name: digit, exact: true }).click();
-        }
-      }
-
-      await waitForInputSettled(countDialogInput);
-      await countDialogConfirmButton.click();
-      await expect(countDialog).toBeHidden();
-    }
-
-    @step('页面操作：点击第一个可用菜品')
-    async clickFirstAvailableDish(): Promise<void> {
-      await this.host.expectLoaded();
-      await this.locators.firstAvailableDishButton.click();
+      await this.locators.countButton.click();
+      await this.enterCountDialogQuantity(quantity);
     }
 
     @step((dishName: string) => `页面操作：选中已下单菜品 ${dishName}`)
@@ -347,35 +272,19 @@ export class OrderDishesMenuSection {
     @step('页面操作：在点餐页新增一条菜品分线')
     async clickAddLine(): Promise<void> {
       await this.host.expectLoaded();
-      const addLineButton = await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByTestId('action-rail-button-addline').first(),
-          this.page.getByTestId('action-rail-button-addline').first(),
-        ],
-        'Unable to find order-dishes Add Line button.',
-      );
-
-      await addLineButton.evaluate((buttonElement) => {
-        (buttonElement as HTMLElement).click();
-      });
+      await this.locators.addLineButton.click();
     }
 
     @step((dishName: string, price: number) => `页面操作：将已点菜品 ${dishName} 的价格修改为 ${price}`)
     async changeOrderedDishPrice(dishName: string, price: number): Promise<void> {
       await this.selectOrderedDish(dishName);
-      const changePriceButton = await this.resolveChangePriceButton();
-
-      await changePriceButton.evaluate((buttonElement) => {
-        (buttonElement as HTMLElement).click();
-      });
+      await this.locators.changePriceButton.click();
       await this.expectCurrencyKeypadVisible();
       await this.clickCurrencyKeypadClear();
       await this.enterCurrencyKeypadAmount(price);
-      await waitForInputSettled(undefined, 250);
+      await waitForInputSettled(this.locators.changePriceInput);
       const confirmButton = await this.resolveCurrencyKeypadConfirmButton();
-      await confirmButton.evaluate((buttonElement) => {
-        (buttonElement as HTMLElement).click();
-      });
+      await confirmButton.click();
       await expect(confirmButton).toBeHidden({ timeout: 5_000 });
     }
 
@@ -384,65 +293,18 @@ export class OrderDishesMenuSection {
     )
     async setOrderedDishTaxExempt(dishName: string, taxExempt: boolean): Promise<void> {
       await this.selectOrderedDish(dishName);
-      const taxExemptButton = await this.resolveTaxExemptButton();
-
-      await taxExemptButton.click();
+      await this.locators.taxExemptButton.click();
       await this.selectTaxExemptionChoice(taxExempt);
-      await waitForInputSettled(undefined, 250);
     }
 
     private async resolveChangePriceButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByTestId('action-rail-button-chgPrc').first(),
-          this.page.getByTestId('action-rail-button-chgPrc').first(),
-        ],
-        'Unable to find order-dishes Change Price button.',
-      );
-    }
-
-    private async resolveTaxExemptButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByTestId('action-rail-button-taxExempt').first(),
-          this.page.getByTestId('action-rail-button-taxExempt').first(),
-          this.locators.appFrame.getByRole('button', { name: /^Tax$/ }).first(),
-          this.page.getByRole('button', { name: /^Tax$/ }).first(),
-          this.locators.appFrame.getByRole('button', { name: /^(Tax Exempt|免税)$/ }).first(),
-          this.page.getByRole('button', { name: /^(Tax Exempt|免税)$/ }).first(),
-        ],
-        'Unable to find order-dishes Tax Exempt button.',
-      );
+      return this.locators.changePriceButton;
     }
 
     private async selectTaxExemptionChoice(taxExempt: boolean): Promise<void> {
-      const taxDialog = await this.ctx.resolveVisibleLocator(
-        [
-          this.page
-            .getByRole('alertdialog')
-            .filter({ has: this.page.getByText(/Tax exemption or not\?/i) })
-            .first(),
-          this.page
-            .getByRole('dialog')
-            .filter({ has: this.page.getByText(/Tax exemption or not\?/i) })
-            .first(),
-          this.locators.appFrame
-            .getByRole('alertdialog')
-            .filter({ has: this.locators.appFrame.getByText(/Tax exemption or not\?/i) })
-            .first(),
-          this.locators.appFrame
-            .getByRole('dialog')
-            .filter({ has: this.locators.appFrame.getByText(/Tax exemption or not\?/i) })
-            .first(),
-        ],
-        'Unable to find order-dishes tax exemption dialog.',
-      );
-      const choiceButton = taxDialog
-        .getByRole('button', { name: taxExempt ? /^Exempt$/ : /^Taxes$/ })
-        .first();
-
-      await choiceButton.click();
-      await expect(taxDialog).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
+      await expect(this.locators.taxExemptionDialog).toBeVisible();
+      await this.locators.taxExemptionChoiceButton(taxExempt).click();
+      await expect(this.locators.taxExemptionDialog).toBeHidden({ timeout: 5_000 });
     }
 
     private async expectCurrencyKeypadVisible(): Promise<void> {
@@ -459,14 +321,8 @@ export class OrderDishesMenuSection {
     async enterWeight(weight: number): Promise<void> {
       await this.expectWeightDialogVisible();
 
-      if (await this.locators.weightInput.isVisible().catch(() => false)) {
-        await this.locators.weightInput.fill(String(weight));
-        return;
-      }
-
-      for (const digit of String(weight)) {
-        await this.locators.weightDialog.getByRole('button', { name: digit, exact: true }).click();
-      }
+      await expect(this.locators.weightInput).toBeVisible();
+      await this.locators.weightInput.fill(String(weight));
     }
 
     @step('页面操作：确认重量输入')
@@ -614,26 +470,7 @@ export class OrderDishesMenuSection {
 
     @step('页面操作：检查分类 option 面板是否可见')
     async isCategoryOptionPanelVisible(): Promise<boolean> {
-      const panelCandidates = [
-        this.locators.categoryOptionPanel,
-        this.page
-          .locator('[data-testid="item-option-panel-collapse-button"]')
-          .locator('xpath=ancestor::div[contains(@class,"_dock_")][1]'),
-        this.locators.appFrame
-          .locator('[data-testid="item-option-panel-collapse-button"]')
-          .locator('xpath=ancestor::motion[contains(@class,"_dock_")][1]'),
-      ];
-
-      for (const panel of panelCandidates) {
-        if (await panel.isVisible().catch(() => false)) {
-          return true;
-        }
-      }
-
-      return await this.page
-        .getByRole('button', { name: /^Collapse/i })
-        .isVisible()
-        .catch(() => false);
+      return await this.locators.categoryOptionPanel.isVisible().catch(() => false);
     }
 
     @step((spec: string) => `页面操作：选择规格 ${spec}`)
@@ -696,7 +533,6 @@ export class OrderDishesMenuSection {
 
     @step('页面操作：确认套餐选择')
     async confirmComboDialog(): Promise<void> {
-      await waitForInputSettled(undefined, 250);
       await this.locators.comboConfirmButton.click();
       await expect(this.locators.comboDialog).toBeHidden();
     }
@@ -759,7 +595,7 @@ export class OrderDishesMenuSection {
       await this.expectCurrencyKeypadVisible();
       await this.clickCurrencyKeypadClear();
       await this.enterCurrencyKeypadAmount(price);
-      await waitForInputSettled(undefined, 250);
+      await waitForInputSettled(this.locators.changePriceInput);
       const confirmButton = await this.resolveCurrencyKeypadConfirmButton();
       await confirmButton.click();
       await expect(confirmButton).toBeHidden({ timeout: 5_000 });
@@ -775,20 +611,10 @@ export class OrderDishesMenuSection {
     @step((dishName: string, times: number) => `页面操作：将已点菜品 ${dishName} 减菜 ${times} 次`)
     async reduceOrderedDishQuantity(dishName: string, times: number): Promise<void> {
       await this.selectOrderedDish(dishName);
-
-      const removeButton = await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByTestId('action-rail-button-rmvItem').first(),
-          this.locators.appFrame.getByTestId('action-rail-button-rmvItem').first(),
-          this.locators.appFrame.getByRole('button', { name: /^Reduce$/ }).first(),
-          this.page.getByRole('button', { name: /^Reduce$/ }).first(),
-          this.ctx.scopedLocator('#reduce1icon'),
-        ],
-        'Unable to find order-dishes remove item button.',
-      );
+      await expect(this.locators.reduceButton).toBeVisible();
 
       for (let index = 0; index < times; index += 1) {
-        await removeButton.click();
+        await this.locators.reduceButton.click();
       }
     }
 
@@ -831,73 +657,30 @@ export class OrderDishesMenuSection {
     @step((dishName: string, quantity: number) => `页面操作：将已点菜品 ${dishName} 数量修改为 ${quantity}`)
     async changeOrderedDishQuantity(dishName: string, quantity: number): Promise<void> {
       await this.selectOrderedDish(dishName);
-      await (await this.resolveCountButton()).click();
+      await this.locators.countButton.click();
+      await this.enterCountDialogQuantity(quantity);
+    }
 
-      const countDialog = await this.resolveCountDialog();
+    @step((quantity: number) => `页面操作：在 Count 数字键盘输入数量 ${quantity} 并确认`)
+    private async enterCountDialogQuantity(quantity: number): Promise<void> {
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        throw new Error(`菜品数量必须是大于 0 的有限数字，实际为 ${quantity}。`);
+      }
+
+      const countDialog = this.locators.countDialog;
       await expect(countDialog).toBeVisible();
-      const countDialogInput = countDialog.locator('input').first();
-      const countDialogConfirmButton = countDialog.getByRole('button', {
-        name: /^(Confirm|确认)$/,
-      });
+      const countDialogInput = this.locators.countDialogInput;
+      const countDialogConfirmButton = this.locators.countDialogConfirmButton;
 
-      if (await countDialogInput.isVisible().catch(() => false)) {
-        await countDialogInput.fill(String(quantity)).catch(async () => {
-          await countDialogInput.evaluate((inputElement, nextValue) => {
-            const input = inputElement as HTMLInputElement;
-            input.value = String(nextValue);
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-          }, String(quantity));
-        });
-      } else {
-        for (const digit of String(quantity)) {
-          await countDialog.getByRole('button', { name: digit, exact: true }).click();
-        }
+      await expect(countDialogInput).toBeVisible();
+      await this.locators.countDialogClearButton.click();
+      for (const key of String(quantity)) {
+        await this.locators.countDialogKeyButton(key).click();
       }
 
       await waitForInputSettled(countDialogInput);
       await countDialogConfirmButton.click();
       await expect(countDialog).toBeHidden();
-    }
-
-    private async resolveCountButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByTestId('action-rail-button-chgNum').first(),
-          this.locators.appFrame.getByTestId('action-rail-button-chgNum').first(),
-          this.locators.appFrame
-            .locator(
-              '[data-testid="action-rail-button-count"], [data-test-id="action-rail-button-count"]',
-            )
-            .first(),
-          this.page
-            .locator(
-              '[data-testid="action-rail-button-count"], [data-test-id="action-rail-button-count"]',
-            )
-            .first(),
-          this.locators.appFrame.getByRole('button', { name: /^(Count|数量)$/ }).first(),
-          this.page.getByRole('button', { name: /^(Count|数量)$/ }).first(),
-          this.locators.countButton,
-        ],
-        'Unable to find visible Count button on the order page.',
-      );
-    }
-
-    private async resolveCountDialog(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.page.locator('[data-testid="dish-count-modal"], [data-testid="option-count-modal"]'),
-          this.locators.appFrame.locator('[data-testid="dish-count-modal"], [data-testid="option-count-modal"]'),
-          this.page
-            .getByRole('dialog')
-            .filter({ has: this.page.getByRole('heading', { name: /^(Count|数量)$/ }) }),
-          this.locators.appFrame
-            .getByRole('dialog')
-            .filter({ has: this.locators.appFrame.getByRole('heading', { name: /^(Count|数量)$/ }) }),
-          this.locators.countDialog,
-        ],
-        'Unable to find visible Count dialog on the order page.',
-      );
     }
 
     private async enterCurrencyKeypadAmount(amount: number): Promise<void> {
@@ -923,60 +706,12 @@ export class OrderDishesMenuSection {
     }
 
     private async resolveCurrencyKeypadButton(keypadInput: string): Promise<Locator> {
-      if (keypadInput === 'double-zero') {
-        return await this.ctx.resolveVisibleLocator(
-          [
-            this.locators.appFrame.getByTestId('preset-currency-keypad-input-double-zero').first(),
-            this.page.getByTestId('preset-currency-keypad-input-double-zero').first(),
-          ],
-          'Unable to find currency keypad double-zero button.',
-        );
-      }
-
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame.getByTestId(`preset-currency-keypad-input-number-${keypadInput}`).first(),
-          this.page.getByTestId(`preset-currency-keypad-input-number-${keypadInput}`).first(),
-        ],
-        `Unable to find currency keypad number button: ${keypadInput}.`,
-      );
+      return this.locators.currencyKeypadButton(keypadInput);
     }
 
     private async resolveCurrencyKeypadConfirmButton(): Promise<Locator> {
       await expect(this.locators.changePriceConfirmButton).toBeVisible({ timeout: 5_000 });
       return this.locators.changePriceConfirmButton;
-    }
-
-    private async resolveDishButton(dishName: string): Promise<Locator> {
-      const dishCandidates = [
-        this.locators.appFrame.getByRole('button', { name: dishName, exact: true }).first(),
-        this.page.getByRole('button', { name: dishName, exact: true }).first(),
-        this.locators.appFrame
-          .getByRole('button')
-          .filter({ has: this.locators.appFrame.getByText(dishName, { exact: true }) })
-          .first(),
-        this.page
-          .getByRole('button')
-          .filter({ has: this.page.getByText(dishName, { exact: true }) })
-          .first(),
-      ];
-      const dishNextButton = this.ctx.scopedLocator('#postfalse');
-
-      for (let attempt = 0; attempt < 15; attempt += 1) {
-        const visibleDishButton = await this.ctx.findVisibleLocator(dishCandidates);
-
-        if (visibleDishButton) {
-          return visibleDishButton;
-        }
-
-        if (!(await dishNextButton.isVisible().catch(() => false))) {
-          break;
-        }
-
-        await dishNextButton.click();
-      }
-
-      throw new Error(`Unable to find dish button: ${dishName}.`);
     }
 
     private async resolveOrderedDishButton(dishName: string): Promise<Locator> {
@@ -1031,42 +766,13 @@ export class OrderDishesMenuSection {
     private async resolveCategoryOptionButton(option: string): Promise<Locator> {
       const escapedOption = this.ctx.escapeRegExp(option);
       const optionPattern = new RegExp(`^\\s*${escapedOption}\\s*(?:\\$[\\d,.]+)?\\s*$`);
-
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByRole('button', { name: optionPattern }).first(),
-          this.locators.appFrame.getByRole('button', { name: optionPattern }).first(),
-          this.locators.categoryOptionGrid.getByRole('button', { name: optionPattern }).first(),
-          this.locators.categoryOptionGrid
-            .locator('[data-testid^="category-option-"], [data-test-id^="category-option-"]')
-            .filter({ hasText: optionPattern })
-            .first(),
-          this.locators.categoryOptionGrid.locator('[class*="_card_"]').filter({ hasText: optionPattern }).first(),
-        ],
-        `Unable to find category option button: ${option}.`,
-      );
+      return this.locators.categoryOptionButton(optionPattern);
     }
 
     private async resolveCategorySubOptionButton(option: string): Promise<Locator> {
       const escapedOption = this.ctx.escapeRegExp(option);
       const optionPattern = new RegExp(`^\\s*${escapedOption}\\s*(?:\\$[\\d,.]+)?\\s*$`);
-
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByRole('button', { name: optionPattern }).first(),
-          this.locators.appFrame.getByRole('button', { name: optionPattern }).first(),
-          this.locators.categoryOptionSubGrid.getByRole('button', { name: optionPattern }).first(),
-          this.locators.categoryOptionSubGrid
-            .locator('[data-testid^="category-sub-option-"], [data-test-id^="category-sub-option-"]')
-            .filter({ hasText: optionPattern })
-            .first(),
-          this.locators.categoryOptionSubGrid
-            .locator('[class*="_card_"]')
-            .filter({ hasText: optionPattern })
-            .first(),
-        ],
-        `Unable to find category sub option button: ${option}.`,
-      );
+      return this.locators.categorySubOptionButton(optionPattern);
     }
 
     private async activateComboSection(sectionName: string): Promise<void> {
@@ -1081,55 +787,18 @@ export class OrderDishesMenuSection {
       }
     }
 
-    private resolveLegacyComboSection(sectionName: string): Locator {
-      return this.locators.comboDialog
-        .locator('div[class*="_sectionName_"]')
-        .filter({
-          hasText: new RegExp(`^${this.ctx.escapeRegExp(sectionName)}$`),
-        })
-        .first()
-        .locator('xpath=ancestor::section[1]');
-    }
-
-    private resolveComboSectionItemCardShell(sectionName: string, dishName: string): Locator {
-      const itemTitle = this.locators.comboDialog.locator('span[class*="_itemTitle_"]', {
-        hasText: new RegExp(`^${this.ctx.escapeRegExp(dishName)}$`),
-      });
-
-      return this.resolveLegacyComboSection(sectionName)
-        .locator('span[class*="_itemTitle_"]', {
-          hasText: new RegExp(`^${this.ctx.escapeRegExp(dishName)}$`),
-        })
-        .locator('xpath=ancestor::div[contains(@class,"_cardShell_")][1]')
-        .or(itemTitle.locator('xpath=ancestor::div[contains(@class,"_cardShell_")][1]'))
-        .first();
-    }
-
     private async resolveComboSectionItemButton(
       sectionName: string,
       dishName: string,
     ): Promise<Locator> {
-      const cardShell = this.resolveComboSectionItemCardShell(sectionName, dishName);
-
-      return await this.ctx.resolveVisibleLocator(
-        [cardShell.getByRole('button').first()],
-        `Unable to find combo item button: ${sectionName} / ${dishName}.`,
-      );
+      return this.locators.comboSectionItemButton(sectionName, dishName);
     }
 
     private async resolveComboSectionItemPlusButton(
       sectionName: string,
       dishName: string,
     ): Promise<Locator> {
-      const cardShell = this.resolveComboSectionItemCardShell(sectionName, dishName);
-
-      return await this.ctx.resolveVisibleLocator(
-        [
-          cardShell.locator('button[class*="_counterBtnPlus_"]').first(),
-          cardShell.getByRole('button', { name: '+', exact: true }).first(),
-        ],
-        `Unable to find combo item plus button: ${sectionName} / ${dishName}.`,
-      );
+      return this.locators.comboSectionItemPlusButton(sectionName, dishName);
     }
 
     private resolveTableNumberButton(tableNumber: string): Locator {
@@ -1151,50 +820,14 @@ export class OrderDishesMenuSection {
     }
 
     private async resolveSharedSeatButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByRole('button', { name: 'Share For Whole Table', exact: true }).first(),
-          this.locators.appFrame.getByRole('button', { name: 'Share For Whole Table', exact: true }).first(),
-        ],
-        'Unable to find Share For Whole Table button.',
-      );
+      return this.locators.sharedSeatButton;
     }
 
     private async resolveSeatButton(seatNumber: number): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.page.getByRole('button', { name: `Seat ${seatNumber}`, exact: true }).first(),
-          this.locators.appFrame.getByRole('button', { name: `Seat ${seatNumber}`, exact: true }).first(),
-        ],
-        `Unable to find Seat ${seatNumber} button.`,
-      );
+      return this.locators.seatButton(seatNumber);
     }
 
     private async resolveSelectedDishAddButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.appFrame
-            .locator(
-              '[data-testid="action-rail-button-add1"], [data-test-id="action-rail-button-add1"]',
-            )
-            .or(
-              this.locators.appFrame
-                .locator('aside, [role="complementary"]')
-                .getByRole('button', { name: /^(Add|加)$/ }),
-            )
-            .first(),
-          this.page
-            .locator(
-              '[data-testid="action-rail-button-add1"], [data-test-id="action-rail-button-add1"]',
-            )
-            .or(
-              this.page
-                .locator('aside, [role="complementary"]')
-                .getByRole('button', { name: /^(Add|加)$/ }),
-            )
-            .first(),
-        ],
-        'Unable to find selected-dish add button.',
-      );
+      return this.locators.selectedDishAddButton;
     }
 }

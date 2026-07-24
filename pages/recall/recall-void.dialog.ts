@@ -7,15 +7,10 @@ import type { RecallOrderDetailsDialog } from './recall-order-details.dialog';
 import { recallScopedTestId } from './recall-reads.section';
 
 export class RecallVoidDialog {
-  private readonly voidOrderButton: Locator;
   private readonly unifiedVoidMoreButton: Locator;
-  private readonly voidAllMoreButton: Locator;
-  private readonly legacyVoidAllMoreButton: Locator;
-  private readonly namedVoidMoreButton: Locator;
-  private readonly namedVoidAllMoreButton: Locator;
   private readonly voidDialog: Locator;
   private readonly voidRestoreInventoryCheckbox: Locator;
-  private readonly labeledVoidRestoreInventoryCheckbox: Locator;
+  private readonly voidReasonOptions: Locator;
   private readonly voidNoteInput: Locator;
   private readonly voidSubmitButton: Locator;
 
@@ -23,15 +18,9 @@ export class RecallVoidDialog {
     readonly page: Page,
     private readonly orderDetails: RecallOrderDetailsDialog,
   ) {
-    this.voidOrderButton = recallScopedTestId(this.page, 'recall2-order-detail-void');
-    this.unifiedVoidMoreButton = recallScopedTestId(
-      this.page,
-      'shared-order-detail-unified-more-action-void',
-    );
-    this.voidAllMoreButton = recallScopedTestId(this.page, 'recall2-order-detail-void-all');
-    this.legacyVoidAllMoreButton = this.page.locator('#pvoidod');
-    this.namedVoidMoreButton = this.page.getByRole('button', { name: /^Void$/i }).last();
-    this.namedVoidAllMoreButton = this.page.getByRole('button', { name: /^Void All$/i });
+    this.unifiedVoidMoreButton = this.page
+      .getByRole('button', { name: 'Void', exact: true })
+      .filter({ visible: true });
     this.voidDialog = this.page
       .locator('[role="dialog"]:visible')
       .filter({ has: this.page.getByText('Void Reason', { exact: true }) })
@@ -40,7 +29,7 @@ export class RecallVoidDialog {
       this.voidDialog,
       'shared-void-dialog-restore-inventory-checkbox',
     ).getByRole('checkbox');
-    this.labeledVoidRestoreInventoryCheckbox = this.voidDialog.getByRole('checkbox').first();
+    this.voidReasonOptions = this.voidDialog.getByRole('radio');
     this.voidNoteInput = this.voidDialog.getByRole('textbox', { name: /^Note$/i });
     this.voidSubmitButton = this.voidDialog.getByRole('button', { name: /^Void$/i });
   }
@@ -62,7 +51,6 @@ export class RecallVoidDialog {
     await this.orderDetails.waitForOrderDetailsDialogReady();
     await this.openVoidActionFromOrderDetails();
     await this.waitForVoidDialogReady();
-    await this.openVoidReasonOptions();
 
     const reasonCount = await this.countVisibleVoidReasonOptions();
     await this.closeVoidDialog();
@@ -102,170 +90,17 @@ export class RecallVoidDialog {
 
   @step((restoreInventory: boolean) => `页面操作：将 Void 弹窗中的恢复库存切换为${restoreInventory ? '勾选' : '不勾选'}`)
   private async setVoidRestoreInventoryCheckbox(restoreInventory: boolean): Promise<void> {
-    const restoreInventoryCheckbox = await this.resolveRestoreInventoryCheckbox();
-
-    if (!restoreInventoryCheckbox) {
-      if (!restoreInventory) {
-        throw new Error('Void 弹窗未找到可交互的 Restore inventory 复选框，无法切换为不恢复库存。');
-      }
-      return;
-    }
-
-    const checkboxChecked = await restoreInventoryCheckbox.isChecked();
-
-    if (checkboxChecked === restoreInventory) {
-      return;
-    }
-
-    const visibleToggleTargets = [
-      this.voidDialog.getByRole('button', { name: /Restore inventory/i }).first(),
-      this.voidDialog.getByText(/Restore inventory/i).first(),
-    ];
-
-    for (const toggleTarget of visibleToggleTargets) {
-      if (!(await toggleTarget.isVisible().catch(() => false))) {
-        continue;
-      }
-
-      await toggleTarget.click({ force: true }).catch(() => undefined);
-
-      const toggledState = await restoreInventoryCheckbox.isChecked().catch(() => null);
-
-      if (toggledState === restoreInventory) {
-        return;
-      }
-    }
-
-    await restoreInventoryCheckbox.evaluate((checkboxElement, nextChecked) => {
-      const checkbox = checkboxElement as HTMLInputElement;
-
-      if (checkbox.checked === nextChecked) {
-        return;
-      }
-
-      const checkedSetter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        'checked',
-      )?.set;
-
-      checkedSetter?.call(checkbox, nextChecked);
-      checkbox.dispatchEvent(new Event('input', { bubbles: true }));
-      checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-    }, restoreInventory);
-
-    await waitUntil(
-      async () => await restoreInventoryCheckbox.isChecked().catch(() => null),
-      (checked) => checked === restoreInventory,
-      {
-        timeout: 5_000,
-        message: 'Void dialog restore inventory checkbox did not reach the expected state.',
-      },
-    );
+    await expect(this.voidRestoreInventoryCheckbox).toBeVisible();
+    await this.voidRestoreInventoryCheckbox.setChecked(restoreInventory);
+    await expect(this.voidRestoreInventoryCheckbox).toBeChecked({ checked: restoreInventory });
   }
 
   @step('页面操作：在 Recall 订单详情中打开 Void 操作')
   private async openVoidActionFromOrderDetails(): Promise<void> {
     await this.orderDetails.waitForOrderDetailsDialogReady();
-
-    if (await this.voidOrderButton.isVisible().catch(() => false)) {
-      await this.voidOrderButton.click();
-      return;
-    }
-
-    if (await this.voidAllMoreButton.isVisible().catch(() => false)) {
-      await this.voidAllMoreButton.click();
-      return;
-    }
-
-    if (await this.unifiedVoidMoreButton.isVisible().catch(() => false)) {
-      await this.unifiedVoidMoreButton.click();
-      return;
-    }
-
-    if (await this.legacyVoidAllMoreButton.isVisible().catch(() => false)) {
-      await this.legacyVoidAllMoreButton.click();
-      return;
-    }
-
-    if (await this.namedVoidMoreButton.isVisible().catch(() => false)) {
-      await this.namedVoidMoreButton.click();
-      return;
-    }
-
-    if (await this.namedVoidAllMoreButton.isVisible().catch(() => false)) {
-      await this.namedVoidAllMoreButton.click();
-      return;
-    }
-
     await this.orderDetails.clickOrderDetailsMoreButton();
-
-    const visibleAction = await waitUntil(
-      async () => {
-        if (await this.voidOrderButton.isVisible().catch(() => false)) {
-          return 'void';
-        }
-
-        if (await this.voidAllMoreButton.isVisible().catch(() => false)) {
-          return 'void-all';
-        }
-
-        if (await this.unifiedVoidMoreButton.isVisible().catch(() => false)) {
-          return 'void';
-        }
-
-        if (await this.legacyVoidAllMoreButton.isVisible().catch(() => false)) {
-          return 'void-all';
-        }
-
-        if (await this.namedVoidMoreButton.isVisible().catch(() => false)) {
-          return 'void';
-        }
-
-        if (await this.namedVoidAllMoreButton.isVisible().catch(() => false)) {
-          return 'void-all';
-        }
-
-        return null;
-      },
-      (action): action is 'void' | 'void-all' => action !== null,
-      {
-        timeout: 3_000,
-        interval: 100,
-        message: 'Recall 订单详情 More 菜单未出现 Void 入口。',
-      },
-    ).catch(() => null);
-
-    if (visibleAction === 'void') {
-      if (await this.unifiedVoidMoreButton.isVisible().catch(() => false)) {
-        await this.unifiedVoidMoreButton.click();
-        return;
-      }
-
-      if (await this.namedVoidMoreButton.isVisible().catch(() => false)) {
-        await this.namedVoidMoreButton.click();
-        return;
-      }
-
-      await this.voidOrderButton.click();
-      return;
-    }
-
-    if (visibleAction === 'void-all') {
-      if (await this.voidAllMoreButton.isVisible().catch(() => false)) {
-        await this.voidAllMoreButton.click();
-        return;
-      }
-
-      if (await this.legacyVoidAllMoreButton.isVisible().catch(() => false)) {
-        await this.legacyVoidAllMoreButton.click();
-        return;
-      }
-
-      await this.namedVoidAllMoreButton.click();
-      return;
-    }
-
-    throw new Error('Unable to find Void action in Recall order details.');
+    await expect(this.unifiedVoidMoreButton).toBeVisible({ timeout: 10_000 });
+    await this.unifiedVoidMoreButton.click();
   }
 
   @step('页面操作：等待 Void 弹窗完成展示')
@@ -284,67 +119,9 @@ export class RecallVoidDialog {
     );
   }
 
-  @step('页面操作：打开 Void 弹窗中的作废原因选择')
-  private async openVoidReasonOptions(): Promise<void> {
-    const reasonSelectorCandidates = [
-      this.voidDialog
-        .locator('[data-testid="void-reason-selector"], [data-test-id="void-reason-selector"]')
-        .first(),
-      this.voidDialog
-        .getByText('Void Reason', { exact: true })
-        .locator('xpath=ancestor::*[self::button or @role="button"][1]')
-        .first(),
-      this.voidDialog
-        .getByText('Void Reason', { exact: true })
-        .locator('xpath=following-sibling::*[1]')
-        .first(),
-      this.voidDialog.getByRole('combobox', { name: /Void Reason/i }).first(),
-      this.voidDialog.getByRole('button', { name: /Void Reason/i }).first(),
-    ];
-
-    for (const reasonSelector of reasonSelectorCandidates) {
-      if (!(await reasonSelector.isVisible().catch(() => false))) {
-        continue;
-      }
-
-      await reasonSelector.click();
-      return;
-    }
-  }
-
   @step('页面读取：统计可见 Void 原因选项数量')
   private async countVisibleVoidReasonOptions(): Promise<number> {
-    const optionLocators = [
-      this.page.locator(
-        '[data-testid^="void-reason-option-"]:visible, [data-test-id^="void-reason-option-"]:visible',
-      ),
-      this.page.getByRole('option').filter({ hasText: /\S/ }),
-      this.page
-        .locator('[role="listbox"]:visible, [role="menu"]:visible')
-        .locator('button:visible, [role="option"]:visible, [role="menuitem"]:visible'),
-      this.voidDialog.getByRole('radio').filter({ hasText: /\S/ }),
-      this.voidDialog
-        .locator('[data-testid^="void-reason-option-"]:visible, [data-test-id^="void-reason-option-"]:visible'),
-    ];
-
-    for (const options of optionLocators) {
-      const count = await options.count().catch(() => 0);
-
-      if (count > 0) {
-        return count;
-      }
-    }
-
-    return await this.voidDialog.evaluate((dialogElement) => {
-      const cleanText = (value: string | null | undefined): string =>
-        value?.replace(/\s+/g, ' ').trim() ?? '';
-      const excludedButtonNames = /^(Void|Cancel|Restore inventory.*|Void Reason)$/i;
-
-      return Array.from(dialogElement.querySelectorAll('button'))
-        .map((buttonElement) => cleanText(buttonElement.textContent))
-        .filter((buttonText) => buttonText && !excludedButtonNames.test(buttonText))
-        .length;
-    }).catch(() => 0);
+    return await this.voidReasonOptions.count();
   }
 
   @step('页面操作：关闭 Recall Void 弹窗')
@@ -353,7 +130,10 @@ export class RecallVoidDialog {
       return;
     }
 
-    const cancelButton = this.voidDialog.getByRole('button', { name: /^(Cancel|取消)$/i }).first();
+    const cancelButton = this.voidDialog.getByRole('button', {
+      name: 'Cancel',
+      exact: true,
+    });
 
     if (await cancelButton.isVisible().catch(() => false)) {
       await cancelButton.click();
@@ -381,25 +161,4 @@ export class RecallVoidDialog {
     return null;
   }
 
-  private async resolveRestoreInventoryCheckbox(): Promise<Locator | null> {
-    const checkboxCandidates = [
-      this.labeledVoidRestoreInventoryCheckbox,
-      this.voidRestoreInventoryCheckbox,
-    ];
-
-    for (const checkboxCandidate of checkboxCandidates) {
-      const candidateCount = await checkboxCandidate.count().catch(() => 0);
-
-      for (let index = 0; index < candidateCount; index += 1) {
-        const candidate = checkboxCandidate.nth(index);
-        const checked = await candidate.isChecked().catch(() => null);
-
-        if (checked !== null) {
-          return candidate;
-        }
-      }
-    }
-
-    return null;
-  }
 }

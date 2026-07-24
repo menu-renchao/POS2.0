@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { step } from '../utils/step';
+import { normalizeOrderNumber } from '../utils/text';
 import { waitUntil } from '../utils/wait';
 
 export class PickupScreenPage {
@@ -39,8 +40,4 @@ export class PickupScreenPage {
   async close(): Promise<void> {
     await this.page.close();
   }
-}
-
-function normalizeOrderNumber(orderNumber: string): string {
-  return orderNumber.replace(/^#\s*/, '').trim();
 }

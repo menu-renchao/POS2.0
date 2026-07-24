@@ -114,9 +114,9 @@ export class OrderDishesFlow {
     dishName: string,
     optionName: string,
   ): Promise<void> {
-    await orderDishesPage.openModifyForOrderedDish(dishName);
-    await orderDishesPage.selectModifyOption(optionName);
-    await orderDishesPage.closeModifyPanel();
+    await orderDishesPage.modifier.openModifyForOrderedDish(dishName);
+    await orderDishesPage.modifier.selectModifyOption(optionName);
+    await orderDishesPage.modifier.closeModifyPanel();
   }
 
   @step(
@@ -129,18 +129,18 @@ export class OrderDishesFlow {
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
     await this.switchMenu(orderDishesPage, params.menuSelection);
-    await orderDishesPage.clickDish(params.comboName);
-    await orderDishesPage.selectComboItem(
+    await orderDishesPage.menu.clickDish(params.comboName);
+    await orderDishesPage.menu.selectComboItem(
       params.sectionId,
       params.saleItemId,
       params.itemIndex ?? 0,
     );
 
     for (const selection of params.selections) {
-      await orderDishesPage.selectCategoryOption(selection.option, selection.suboption);
+      await orderDishesPage.menu.selectCategoryOption(selection.option, selection.suboption);
     }
 
-    await orderDishesPage.confirmComboDialog();
+    await orderDishesPage.menu.confirmComboDialog();
   }
 
   @step('业务步骤：添加普通菜品到购物车')
@@ -152,8 +152,19 @@ export class OrderDishesFlow {
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
     await this.switchMenu(orderDishesPage, menuSelection);
-    await orderDishesPage.clickDish(dishName);
+    await orderDishesPage.menu.clickDish(dishName);
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
+  }
+
+  @step((_: OrderDishesPage, dishName: string) =>
+    `业务步骤：通过 Search menu 搜索并添加菜品 ${dishName}`,
+  )
+  async searchAndAddDish(
+    orderDishesPage: OrderDishesPage,
+    dishName: string,
+  ): Promise<void> {
+    await orderDishesPage.expectLoaded();
+    await orderDishesPage.menu.searchAndClickDish(dishName);
   }
 
   @step(
@@ -174,11 +185,11 @@ export class OrderDishesFlow {
     await this.switchMenu(orderDishesPage, menuSelection);
 
     if (quantity >= 2) {
-      await orderDishesPage.doubleClickCurrentCategoryDish(dishName);
+      await orderDishesPage.menu.doubleClickCurrentCategoryDish(dishName);
     }
 
     for (let index = quantity >= 2 ? 2 : 0; index < quantity; index += 1) {
-      await orderDishesPage.clickCurrentCategoryDish(dishName);
+      await orderDishesPage.menu.clickCurrentCategoryDish(dishName);
     }
   }
 
@@ -189,7 +200,13 @@ export class OrderDishesFlow {
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
     await this.switchMenu(orderDishesPage, menuSelection);
-    await orderDishesPage.clickFirstAvailableDish();
+    const [dishName] = await orderDishesPage.menu.readCurrentCategoryDishNames();
+
+    if (!dishName) {
+      throw new Error('当前菜单类别中没有可点选的菜品。');
+    }
+
+    await orderDishesPage.menu.clickCurrentCategoryDish(dishName);
   }
 
   @step('业务步骤：添加称重菜到购物车')
@@ -202,10 +219,10 @@ export class OrderDishesFlow {
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
     await this.switchMenu(orderDishesPage, menuSelection);
-    await orderDishesPage.clickDish(dishName);
+    await orderDishesPage.menu.clickDish(dishName);
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
-    await orderDishesPage.enterWeight(weight);
-    await orderDishesPage.confirmWeightDialog();
+    await orderDishesPage.menu.enterWeight(weight);
+    await orderDishesPage.menu.confirmWeightDialog();
   }
 
   @step('业务步骤：添加套餐菜品到购物车')
@@ -218,11 +235,11 @@ export class OrderDishesFlow {
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
     await this.switchMenu(orderDishesPage, menuSelection);
-    await orderDishesPage.clickDish(dishName);
+    await orderDishesPage.menu.clickDish(dishName);
 
     for (const [sectionName, sectionSelection] of Object.entries(selections)) {
       if (typeof sectionSelection === 'string') {
-        await orderDishesPage.selectComboSectionItem(sectionName, sectionSelection);
+        await orderDishesPage.menu.selectComboSectionItem(sectionName, sectionSelection);
         continue;
       }
 
@@ -231,7 +248,7 @@ export class OrderDishesFlow {
           continue;
         }
 
-        await orderDishesPage.selectComboSectionItem(
+        await orderDishesPage.menu.selectComboSectionItem(
           sectionName,
           sectionDishName,
           sectionDishQuantity,
@@ -239,7 +256,7 @@ export class OrderDishesFlow {
       }
     }
 
-    await orderDishesPage.confirmComboDialog();
+    await orderDishesPage.menu.confirmComboDialog();
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
   }
 
@@ -253,20 +270,20 @@ export class OrderDishesFlow {
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
     await this.switchMenu(orderDishesPage, menuSelection);
-    await orderDishesPage.clickDish(dishName);
+    await orderDishesPage.menu.clickDish(dishName);
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
 
-    if (await orderDishesPage.isCategoryOptionPanelVisible()) {
-      await orderDishesPage.selectCategoryOption(specifications[0], specifications[1]);
+    if (await orderDishesPage.menu.isCategoryOptionPanelVisible()) {
+      await orderDishesPage.menu.selectCategoryOption(specifications[0], specifications[1]);
       return;
     }
 
-    if (await orderDishesPage.isSpecificationDialogVisible()) {
+    if (await orderDishesPage.menu.isSpecificationDialogVisible()) {
       for (const spec of specifications) {
-        await orderDishesPage.selectSpecification(spec);
+        await orderDishesPage.menu.selectSpecification(spec);
       }
 
-      await orderDishesPage.confirmSpecificationDialog();
+      await orderDishesPage.menu.confirmSpecificationDialog();
     }
   }
 
@@ -280,10 +297,10 @@ export class OrderDishesFlow {
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
     await this.switchMenu(orderDishesPage, menuSelection);
-    await orderDishesPage.clickDish(dishName);
+    await orderDishesPage.menu.clickDish(dishName);
     await this.adjustQuantityIfNeeded(orderDishesPage, quantity);
-    await orderDishesPage.enterPrice(price);
-    await orderDishesPage.confirmPriceDialog();
+    await orderDishesPage.menu.enterPrice(price);
+    await orderDishesPage.menu.confirmPriceDialog();
   }
 
   @step((_: OrderDishesPage, name: string, price: number) => `业务步骤：添加 Open Food 菜品 ${name}，价格 ${price}`)
@@ -293,7 +310,7 @@ export class OrderDishesFlow {
     price: number,
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
-    await orderDishesPage.addOpenFood(name, price);
+    await orderDishesPage.menu.addOpenFood(name, price);
   }
 
   @step((_: OrderDishesPage, name: string, price: number) => `业务步骤：添加无税 Open Food 菜品 ${name}，价格 ${price}`)
@@ -303,7 +320,7 @@ export class OrderDishesFlow {
     price: number,
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
-    await orderDishesPage.addOpenFoodWithoutTax(name, price);
+    await orderDishesPage.menu.addOpenFoodWithoutTax(name, price);
   }
 
   @step('业务步骤：通用添加菜品到购物车')
@@ -340,15 +357,15 @@ export class OrderDishesFlow {
   @step('业务步骤：将当前堂食订单送厨')
   async sendOrderToKitchen(orderDishesPage: OrderDishesPage): Promise<HomePage> {
     await orderDishesPage.expectLoaded();
-    return await orderDishesPage.sendOrder();
+    return await orderDishesPage.navigation.sendOrder();
   }
 
   @step('业务步骤：打印当前订单收据并保存订单号')
   async printReceiptWithReference(
     orderDishesPage: OrderDishesPage,
-  ): ReturnType<OrderDishesPage['printReceiptWithReference']> {
+  ): ReturnType<OrderDishesPage['navigation']['printReceiptWithReference']> {
     await orderDishesPage.expectLoaded();
-    return await orderDishesPage.printReceiptWithReference();
+    return await orderDishesPage.navigation.printReceiptWithReference();
   }
 
   @step((_: OrderDishesPage, dishName: string, note: string) =>
@@ -360,14 +377,14 @@ export class OrderDishesFlow {
     note: string,
     authorizationPasscode = '11',
   ): Promise<void> {
-    await orderDishesPage.selectOrderedDish(dishName);
-    const state = await orderDishesPage.openSelectedItemNote();
+    await orderDishesPage.menu.selectOrderedDish(dishName);
+    const state = await orderDishesPage.note.openSelectedItemNote();
 
     if (state === 'authorization') {
-      await orderDishesPage.authorizeSelectedItemNote(authorizationPasscode);
+      await orderDishesPage.note.authorizeSelectedItemNote(authorizationPasscode);
     }
 
-    await orderDishesPage.fillSelectedItemNote(note);
+    await orderDishesPage.note.fillSelectedItemNote(note);
   }
 
   @step((_: OrderDishesPage, dishName: string) => `业务步骤：编辑已下单菜品 ${dishName} 并加 1`)
@@ -376,7 +393,7 @@ export class OrderDishesFlow {
     dishName: string,
   ): Promise<void> {
     await orderDishesPage.expectLoaded();
-    await orderDishesPage.increaseOrderedDishQuantityByOne(dishName);
+    await orderDishesPage.menu.increaseOrderedDishQuantityByOne(dishName);
   }
 
   @step(
@@ -393,12 +410,12 @@ export class OrderDishesFlow {
 
     await this.runModifyPanelFlow(orderDishesPage, params.dishName, params.closeAfter, async () => {
       for (const option of params.options) {
-        await orderDishesPage.selectModifyAction(option.action);
-        await orderDishesPage.selectModifyCategory(option.category);
-        await orderDishesPage.selectModifyOption(option.option);
+        await orderDishesPage.modifier.selectModifyAction(option.action);
+        await orderDishesPage.modifier.selectModifyCategory(option.category);
+        await orderDishesPage.modifier.selectModifyOption(option.option);
 
         if (option.price) {
-          await orderDishesPage.selectModifyPrice(option.price);
+          await orderDishesPage.modifier.selectModifyPrice(option.price);
         }
       }
     });
@@ -420,31 +437,31 @@ export class OrderDishesFlow {
       params.dishName,
       params.closeAfter ?? false,
       async () => {
-        await orderDishesPage.selectModifyOption(params.optionName);
+        await orderDishesPage.modifier.selectModifyOption(params.optionName);
         quantities.push(
-          await orderDishesPage.readOrderedDishAdditionQuantity(
+          await orderDishesPage.reads.readOrderedDishAdditionQuantity(
             params.dishName,
             params.optionName,
           ),
         );
-        modifyPanelVisible.push(await orderDishesPage.isModifyPanelVisible());
+        modifyPanelVisible.push(await orderDishesPage.modifier.isModifyPanelVisible());
 
         for (const operation of params.operations) {
           if (operation.type === 'add') {
-            await orderDishesPage.addSelectedModifyOption();
+            await orderDishesPage.modifier.addSelectedModifyOption();
           } else if (operation.type === 'count') {
-            await orderDishesPage.changeSelectedModifyOptionCount(operation.quantity);
+            await orderDishesPage.modifier.changeSelectedModifyOptionCount(operation.quantity);
           } else {
-            await orderDishesPage.reduceSelectedModifyOption();
+            await orderDishesPage.modifier.reduceSelectedModifyOption();
           }
 
           quantities.push(
-            await orderDishesPage.readOrderedDishAdditionQuantity(
+            await orderDishesPage.reads.readOrderedDishAdditionQuantity(
               params.dishName,
               params.optionName,
             ),
           );
-          modifyPanelVisible.push(await orderDishesPage.isModifyPanelVisible());
+          modifyPanelVisible.push(await orderDishesPage.modifier.isModifyPanelVisible());
         }
       },
     );
@@ -461,7 +478,7 @@ export class OrderDishesFlow {
     params: CustomModifierParams,
   ): Promise<void> {
     await this.runModifyPanelFlow(orderDishesPage, params.dishName, params.closeAfter, async () => {
-      await orderDishesPage.addCustomModifier(params.name, params.price ?? 0);
+      await orderDishesPage.modifier.addCustomModifier(params.name, params.price ?? 0);
     });
   }
 
@@ -487,13 +504,13 @@ export class OrderDishesFlow {
     params: ChargeByScopeParams,
   ): Promise<void> {
     await this.runChargeDialogFlow(orderDishesPage, async () => {
-      await orderDishesPage.switchChargeScope(params.scope);
+      await orderDishesPage.charge.switchChargeScope(params.scope);
 
       if (params.scope === 'item') {
         await this.selectChargeDishes(orderDishesPage, params.dishNames);
       }
 
-      await orderDishesPage.toggleChargeOption(params.optionName);
+      await orderDishesPage.charge.toggleChargeOption(params.optionName);
     });
   }
 
@@ -510,21 +527,21 @@ export class OrderDishesFlow {
     params: CustomChargeParams,
   ): Promise<void> {
     await this.runChargeDialogFlow(orderDishesPage, async () => {
-      await orderDishesPage.switchChargeScope(params.scope);
+      await orderDishesPage.charge.switchChargeScope(params.scope);
 
       if (params.scope === 'item') {
         await this.selectChargeDishes(orderDishesPage, params.dishNames);
       }
 
-      await orderDishesPage.clickCustomCharge();
-      await orderDishesPage.selectCustomChargeType(params.type);
-      await orderDishesPage.fillCustomChargeValue(params.value);
+      await orderDishesPage.charge.clickCustomCharge();
+      await orderDishesPage.charge.selectCustomChargeType(params.type);
+      await orderDishesPage.charge.fillCustomChargeValue(params.value);
 
       if (params.taxed !== undefined) {
-        await orderDishesPage.setCustomChargeTaxed(params.taxed);
+        await orderDishesPage.charge.setCustomChargeTaxed(params.taxed);
       }
 
-      await orderDishesPage.confirmCustomChargeDialog();
+      await orderDishesPage.charge.confirmCustomChargeDialog();
     });
   }
 
@@ -538,9 +555,9 @@ export class OrderDishesFlow {
     value: number,
   ): Promise<void> {
     await this.runChargeDialogFlow(orderDishesPage, async () => {
-      await orderDishesPage.switchChargeScope('item');
+      await orderDishesPage.charge.switchChargeScope('item');
       await this.selectChargeDishes(orderDishesPage, dishNames);
-      await orderDishesPage.applyCustomPercentageDiscount(value);
+      await orderDishesPage.charge.applyCustomPercentageDiscount(value);
     });
   }
 
@@ -554,9 +571,9 @@ export class OrderDishesFlow {
     value: number,
   ): Promise<void> {
     await this.runChargeDialogFlow(orderDishesPage, async () => {
-      await orderDishesPage.switchChargeScope('item');
+      await orderDishesPage.charge.switchChargeScope('item');
       await this.selectChargeDishes(orderDishesPage, dishNames);
-      await orderDishesPage.applyCustomFixedDiscount(value);
+      await orderDishesPage.charge.applyCustomFixedDiscount(value);
     });
   }
 
@@ -569,8 +586,8 @@ export class OrderDishesFlow {
     value: number,
   ): Promise<void> {
     await this.runChargeDialogFlow(orderDishesPage, async () => {
-      await orderDishesPage.switchChargeScope('whole');
-      await orderDishesPage.applyCustomPercentageDiscount(value);
+      await orderDishesPage.charge.switchChargeScope('whole');
+      await orderDishesPage.charge.applyCustomPercentageDiscount(value);
     });
   }
 
@@ -584,14 +601,19 @@ export class OrderDishesFlow {
     orderDishesPage: OrderDishesPage,
     params: ClearChargesParams,
   ): Promise<void> {
+    const currentSummary = await orderDishesPage.reads.readPriceSummary();
+    if (Math.abs(currentSummary.Charge ?? 0) < 0.005) {
+      return;
+    }
+
     await this.runChargeDialogFlow(orderDishesPage, async () => {
-      await orderDishesPage.switchChargeScope(params.scope);
+      await orderDishesPage.charge.switchChargeScope(params.scope);
 
       if (params.scope === 'item') {
         await this.selectChargeDishes(orderDishesPage, params.dishNames);
       }
 
-      await orderDishesPage.clearAllCharges();
+      await orderDishesPage.charge.clearAllCharges();
     });
   }
 
@@ -603,13 +625,13 @@ export class OrderDishesFlow {
     beforeConfirmationSummary: OrderPriceSummary;
     chargeDialogSnapshot: OrderChargeSnapshot;
   }> {
-    const beforeConfirmationSummary = await orderDishesPage.readPriceSummary();
-    await orderDishesPage.clickCharge();
+    const beforeConfirmationSummary = await orderDishesPage.reads.readPriceSummary();
+    await orderDishesPage.charge.clickCharge();
 
     try {
-      const chargeDialogSnapshot = await orderDishesPage.readChargeSnapshot();
-      await orderDishesPage.confirmChargeDialog();
-      const afterConfirmationSummary = await orderDishesPage.readPriceSummary();
+      const chargeDialogSnapshot = await orderDishesPage.charge.readChargeSnapshot();
+      await orderDishesPage.charge.confirmChargeDialog();
+      const afterConfirmationSummary = await orderDishesPage.reads.readPriceSummary();
 
       return {
         afterConfirmationSummary,
@@ -617,7 +639,7 @@ export class OrderDishesFlow {
         chargeDialogSnapshot,
       };
     } catch (error) {
-      await orderDishesPage.closeChargeDialog();
+      await orderDishesPage.charge.closeChargeDialog();
       throw error;
     }
   }
@@ -632,16 +654,16 @@ export class OrderDishesFlow {
     orderDishesPage: OrderDishesPage,
     params: PresetItemDiscountParams,
   ): Promise<void> {
-    await orderDishesPage.selectOrderedDish(params.dishName);
-    await orderDishesPage.openSelectedItemPriceDiscountDialog();
+    await orderDishesPage.menu.selectOrderedDish(params.dishName);
+    await orderDishesPage.discount.openSelectedItemPriceDiscountDialog();
 
     if (params.price !== undefined) {
-      await orderDishesPage.fillSelectedItemPrice(params.price);
+      await orderDishesPage.discount.fillSelectedItemPrice(params.price);
     }
 
-    await orderDishesPage.selectItemDiscount(params.discountName);
-    await orderDishesPage.confirmItemPriceAndDiscountForAuthorization();
-    await orderDishesPage.authorizeItemPriceAndDiscount(params.authorizationPasscode);
+    await orderDishesPage.discount.selectItemDiscount(params.discountName);
+    await orderDishesPage.discount.confirmItemPriceAndDiscountForAuthorization();
+    await orderDishesPage.discount.authorizeItemPriceAndDiscount(params.authorizationPasscode);
   }
 
   @step(
@@ -656,7 +678,7 @@ export class OrderDishesFlow {
       return;
     }
 
-    await orderDishesPage.changeDishCount(quantity);
+    await orderDishesPage.menu.changeDishCount(quantity);
   }
 
   @step(
@@ -667,7 +689,7 @@ export class OrderDishesFlow {
     orderDishesPage: OrderDishesPage,
     menuSelection: MenuSelection,
   ): Promise<void> {
-    await orderDishesPage.switchMenu(menuSelection.group, menuSelection.category);
+    await orderDishesPage.menu.switchMenu(menuSelection.group, menuSelection.category);
   }
 
   @step(
@@ -683,42 +705,46 @@ export class OrderDishesFlow {
     }
 
     for (const dishName of dishNames) {
-      await orderDishesPage.toggleChargeDish(dishName);
+      await orderDishesPage.charge.toggleChargeDish(dishName);
     }
   }
 
+  @step((_: OrderDishesPage, dishName: string) =>
+    `业务步骤：在 Modify 面板处理菜品 ${dishName}`,
+  )
   private async runModifyPanelFlow(
     orderDishesPage: OrderDishesPage,
     dishName: string,
     closeAfter: boolean | undefined,
     work: () => Promise<void>,
   ): Promise<void> {
-    await orderDishesPage.openModifyForOrderedDish(dishName);
+    await orderDishesPage.modifier.openModifyForOrderedDish(dishName);
 
     try {
       await work();
 
       if (closeAfter ?? true) {
-        await orderDishesPage.closeModifyPanel();
+        await orderDishesPage.modifier.closeModifyPanel();
       }
     } catch (error) {
-      await orderDishesPage.closeModifyPanel();
+      await orderDishesPage.modifier.closeModifyPanel();
       throw error;
     }
   }
 
+  @step('业务步骤：在加收弹窗执行订单加收操作')
   private async runChargeDialogFlow(
     orderDishesPage: OrderDishesPage,
     work: () => Promise<void>,
   ): Promise<void> {
-    await orderDishesPage.clickCharge();
+    await orderDishesPage.charge.clickCharge();
 
     try {
       await work();
-      await orderDishesPage.confirmChargeDialog();
+      await orderDishesPage.charge.confirmChargeDialog();
     } catch (error) {
-      await orderDishesPage.closeCustomChargeDialog();
-      await orderDishesPage.closeChargeDialog();
+      await orderDishesPage.charge.closeCustomChargeDialog();
+      await orderDishesPage.charge.closeChargeDialog();
       throw error;
     }
   }

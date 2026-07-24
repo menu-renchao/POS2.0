@@ -62,7 +62,6 @@ export class OrderDishesDiscountSection {
   @step('页面操作：确认菜品价格与折扣并等待授权口令弹窗')
   async confirmItemPriceAndDiscountForAuthorization(): Promise<void> {
     await expect(this.locators.itemPriceDiscountDialog).toBeVisible();
-    await waitForInputSettled(undefined, 250);
     await this.locators.itemPriceDiscountConfirmButton.click();
     await expect(this.locators.itemPriceAuthorizationForm).toBeVisible();
   }

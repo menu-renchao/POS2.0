@@ -13,6 +13,7 @@ export class DeliveryPage {
   private readonly noteInput: Locator;
   private readonly startOrderButton: Locator;
   private readonly keyboardCloseButton: Locator;
+  private lastEditedInput: Locator | null = null;
 
   constructor(private readonly page: Page) {
     this.appFrame = this.page.frameLocator('#newLoginContainer iframe');
@@ -43,37 +44,45 @@ export class DeliveryPage {
   @step((phoneNumber: string) => `页面操作：在 Delivery 页面填写手机号 ${phoneNumber}`)
   async fillPhoneNumber(phoneNumber: string): Promise<void> {
     await this.phoneNumberInput.fill(phoneNumber);
+    this.lastEditedInput = this.phoneNumberInput;
   }
 
   @step((customerName: string) => `页面操作：在 Delivery 页面填写姓名 ${customerName}`)
   async fillCustomerName(customerName: string): Promise<void> {
     await this.customerNameInput.fill(customerName);
+    this.lastEditedInput = this.customerNameInput;
   }
 
   @step((address: string) => `页面操作：在 Delivery 页面填写地址 ${address}`)
   async fillAddress(address: string): Promise<void> {
     await this.addressInput.fill(address);
+    this.lastEditedInput = this.addressInput;
   }
 
   @step((street: string) => `页面操作：在 Delivery 页面填写街道 ${street}`)
   async fillStreet(street: string): Promise<void> {
     await this.streetInput.fill(street);
+    this.lastEditedInput = this.streetInput;
   }
 
   @step((zipCode: string) => `页面操作：在 Delivery 页面填写邮编 ${zipCode}`)
   async fillZipCode(zipCode: string): Promise<void> {
     await this.zipCodeInput.fill(zipCode);
+    this.lastEditedInput = this.zipCodeInput;
   }
 
   @step((note: string) => `页面操作：在 Delivery 页面填写备注 ${note}`)
   async fillNote(note: string): Promise<void> {
     await this.noteInput.fill(note);
+    this.lastEditedInput = this.noteInput;
   }
 
   @step('页面操作：在 Delivery 页面点击 Start Order 并进入点单页')
   async clickStartOrder(): Promise<OrderDishesPage> {
     await this.closeKeyboardIfVisible();
-    await waitForInputSettled();
+    if (this.lastEditedInput) {
+      await waitForInputSettled(this.lastEditedInput);
+    }
     await this.startOrderButton.click();
     return new OrderDishesPage(this.page);
   }

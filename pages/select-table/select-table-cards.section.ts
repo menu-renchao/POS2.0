@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { step } from '../../utils/step';
-import { RecallFilterBarSection } from '../recall/recall-filter-bar.section';
-import { RecallOrderDetailsDialog } from '../recall/recall-order-details.dialog';
+import { escapeRegExp } from '../../utils/text';
+import { OrderDetailsComponent } from '../shared/order-details/order-details.component';
 
 export type TableCardDisplayField =
   | 'orderTime'
@@ -20,16 +20,12 @@ const displayFieldAccessibleNames = {
   partyName: 'MemberIcon Party Name',
 } as const satisfies Record<TableCardDisplayField, string>;
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
 export class SelectTableCardsSection {
-  public readonly orderDetails: RecallOrderDetailsDialog;
+  public readonly orderDetails: OrderDetailsComponent;
   private readonly tableAreaRoot: Locator;
   private readonly tableNodeById: (tableId: string) => Locator;
   private readonly occupiedTableButtonByNumber: (tableNumber: string) => Locator;
@@ -46,10 +42,7 @@ export class SelectTableCardsSection {
         ),
       }).first();
     this.multiOrderDialog = this.page.getByTestId('pos-ui-modal').last();
-    this.orderDetails = new RecallOrderDetailsDialog(
-      page,
-      new RecallFilterBarSection(page),
-    );
+    this.orderDetails = new OrderDetailsComponent(page);
   }
 
   @step((field: TableCardDisplayField) => `页面操作：将桌台卡片显示字段切换为 ${field}`)
@@ -179,7 +172,7 @@ export class SelectTableCardsSection {
 
     await expect(orderButton).toBeVisible();
     await orderButton.click();
-    await this.orderDetails.readOrderDetailsSnapshot();
+    await this.orderDetails.expectReady();
   }
 
   private async readDisplayValueText(tableNumber: string): Promise<string> {

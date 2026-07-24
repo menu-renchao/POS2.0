@@ -535,7 +535,6 @@ pipeline {
     environment {
         PLAYWRIGHT_BASE_URL = "${params.PLAYWRIGHT_BASE_URL}"
         CI = 'true'
-        UI_CLEAR_TABLES_BEFORE_RUN = 'true'
         POS_PRINT_OUTPUT_DIR = 'C:\\Users\\nhqrt\\.menusifu\\POS\\data\\temp'
         PLAYWRIGHT_BROWSERS_PATH = 'C:\\ProgramData\\Jenkins\\ms-playwright'
         PATH = "C:\\Program Files\\nodejs;C:\\Users\\nhqrt\\AppData\\Roaming\\npm;${env.PATH}"
@@ -605,7 +604,7 @@ pipeline {
         // 生成用例树：用 Playwright 自己的 --list 结果产出 suite/file/case 联动数据。
         stage('Generate Test Tree') {
             steps {
-                bat 'npm run jenkins:test-tree -- tests/py-migrate --project=py-migrate'
+                bat 'npm run jenkins:test-tree -- tests/py-migrate --project=ui-isolated --project=ui-shared --project=ui-exclusive-config --project=ui-print --project=ui-slow'
             }
         }
 
@@ -693,8 +692,24 @@ pipeline {
                     def grepFlag = grepValue
                         ? " --grep \"${grepValue.replace('"', '\\"').replace('%', '%%')}\""
                         : ''
+                    def hasExplicitSelection = selectedFiles || selectedCaseTitles
+                    def projectFlags = '--project=ui-isolated --project=ui-shared --project=ui-exclusive-config --project=ui-print'
+                    def regularStatus = bat(
+                        returnStatus: true,
+                        script: "node node_modules/@playwright/test/cli.js test ${testTarget} ${projectFlags} --pass-with-no-tests${headedFlag}${grepFlag}",
+                    )
+                    def slowStatus = 0
 
-                    bat "node node_modules/@playwright/test/cli.js test ${testTarget} --project=py-migrate${headedFlag}${grepFlag}"
+                    if (isTimerBuild || hasExplicitSelection) {
+                        slowStatus = bat(
+                            returnStatus: true,
+                            script: "node node_modules/@playwright/test/cli.js test ${testTarget} --project=ui-slow --pass-with-no-tests${headedFlag}${grepFlag}",
+                        )
+                    }
+
+                    if (regularStatus != 0 || slowStatus != 0) {
+                        error "UI tests failed: regular=${regularStatus}, slow=${slowStatus}"
+                    }
                 }
             }
             post {

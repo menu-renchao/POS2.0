@@ -17,9 +17,7 @@ export class InventoryStockSettingPage {
   ) {
     this.inventoryDialog = this.page.locator('#inventory-dialog');
     this.limitedStockInput = this.page.locator('#gqipt');
-    this.confirmButton = this.inventoryDialog
-      .getByRole('button', { name: /^Confirm$/ })
-      .or(this.page.locator('#inventory-submit'));
+    this.confirmButton = this.page.locator('#inventory-submit');
     this.keyboardHideButton = this.page.locator('#kbrhide');
   }
 
@@ -31,24 +29,22 @@ export class InventoryStockSettingPage {
   }
 
   @step((status: string) => `页面操作：设置库存状态为 ${status}`)
-  async setStockStatus(status: InventoryStockStatus): Promise<this> {
+  async setStockStatus(status: InventoryStockStatus): Promise<void> {
     const statusOption = this.inventoryDialog.getByText(status, { exact: true });
 
     if (await statusOption.isVisible().catch(() => false)) {
       await statusOption.click();
-      return this;
+      return;
     }
 
     await this.page.getByRole('radio', { name: status, exact: true }).click();
-    return this;
   }
 
   @step((quantity: number) => `页面操作：设置有限库存数量为 ${quantity}`)
-  async setLimitedStockQuantity(quantity: number): Promise<this> {
+  async setLimitedStockQuantity(quantity: number): Promise<void> {
     await this.setStockStatus('Limited Stock');
     await this.limitedStockInput.click();
     await this.limitedStockInput.fill(String(quantity));
-    return this;
   }
 
   @step('页面操作：保存库存配置')
@@ -58,7 +54,7 @@ export class InventoryStockSettingPage {
     }
 
     await waitForInputSettled(this.limitedStockInput);
-    await this.confirmButton.click({ force: true });
+    await this.confirmButton.click();
 
     await expect(this.inventoryDialog).toBeHidden({ timeout: 15_000 });
 

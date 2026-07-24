@@ -31,6 +31,11 @@ export class EmployeeLoginPage {
     await expect(this.confirmButton).toBeVisible();
   }
 
+  @step('页面操作：确认员工口令登录区域已经隐藏')
+  async expectHidden(): Promise<void> {
+    await expect(this.passcodeInput).toBeHidden({ timeout: 10_000 });
+  }
+
   @step((password: string) => `页面操作：在员工口令输入框中填写密码 ${password}`)
   async fillPassword(password: string): Promise<void> {
     await this.passcodeInput.fill(password);
@@ -39,8 +44,6 @@ export class EmployeeLoginPage {
   @step('页面操作：提交员工口令')
   async clickConfirm(): Promise<void> {
     await waitForInputSettled(this.passcodeInput);
-    await this.confirmButton.evaluate((button) => {
-      (button as HTMLElement).click();
-    });
+    await this.confirmButton.click();
   }
 }

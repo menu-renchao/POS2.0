@@ -1,16 +1,6 @@
 import { expect } from '@playwright/test';
-import { HomeFlow } from '../../flows/home.flow';
-import { OrderCustomerFlow } from '../../flows/order-customer.flow';
-import { OrderDishesFlow } from '../../flows/order-dishes.flow';
-import { RecallDatabaseFlow } from '../../flows/recall-database.flow';
-import { RecallFlow } from '../../flows/recall.flow';
-import { SelectTableFlow } from '../../flows/select-table.flow';
-import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
-import type { HomePage } from '../../pages/home.page';
-import type { OrderDishesPage } from '../../pages/order-dishes.page';
-import type { RecallOrderDetails } from '../../pages/recall.page';
-import type { SelectedTableRecord, SelectTablePage } from '../../pages/select-table.page';
+import type { SelectedTableRecord } from '../../pages/select-table.page';
 import {
   buildOrderServiceDineInCustomer,
   orderServiceDishes,
@@ -18,114 +8,12 @@ import {
 import { jiraIssueAnnotation } from '../../utils/jira';
 import { waitUntil } from '../../utils/wait';
 
-type CreatedTableOrder = {
-  homePage: HomePage;
-  orderNumber: string;
-  selectedTable: SelectedTableRecord;
-};
-
-const createdTableIds = new Set<string>();
-
-async function enterReadyHome(
-  homePage: Parameters<HomeFlow['openHomeWithEmployeeContext']>[0],
-  employeeLoginPage: Parameters<HomeFlow['openHomeWithEmployeeContext']>[1],
-): Promise<HomePage> {
-  return await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
-}
-
 function requireTableId(selectedTable: SelectedTableRecord): string {
   if (!selectedTable.tableId) {
     throw new Error(`桌台 ${selectedTable.tableNumber} 缺少 data-table-id。`);
   }
 
   return selectedTable.tableId;
-}
-
-async function addRecordedRegularDish(orderDishesPage: OrderDishesPage): Promise<void> {
-  await new OrderDishesFlow().addRegularDish(
-    orderDishesPage,
-    orderServiceDishes.regular.name,
-    orderServiceDishes.regular.menu,
-  );
-}
-
-async function createTableOrder(
-  homePage: HomePage,
-  options: {
-    customer?: ReturnType<typeof buildOrderServiceDineInCustomer>;
-    guestCount?: number;
-    switchArea?: boolean;
-  } = {},
-): Promise<CreatedTableOrder> {
-  const guestCount = options.guestCount ?? 2;
-  const selectTablePage = await homePage.enterDineIn();
-  const selectTableFlow = new SelectTableFlow();
-  const { selectedTable } = options.switchArea
-    ? await selectTableFlow.selectAvailableTableInAnotherArea(selectTablePage)
-    : await selectTableFlow.selectAnyAvailableTable(selectTablePage);
-  const orderDishesPage = await selectTablePage.enterOrderDishesAfterSelectingTable(guestCount);
-  await orderDishesPage.expectLoaded();
-  createdTableIds.add(requireTableId(selectedTable));
-
-  if (options.customer) {
-    await new OrderCustomerFlow().addCustomerInformationToOrder(
-      orderDishesPage,
-      options.customer,
-    );
-  }
-
-  await addRecordedRegularDish(orderDishesPage);
-  const savedOrder = await orderDishesPage.saveOrderWithReference();
-
-  return {
-    homePage: savedOrder.homePage,
-    orderNumber: savedOrder.orderNumber,
-    selectedTable,
-  };
-}
-
-async function openSavedTable(
-  createdOrder: CreatedTableOrder,
-): Promise<SelectTablePage> {
-  const selectTablePage = await createdOrder.homePage.enterDineIn();
-  await selectTablePage.selectArea(createdOrder.selectedTable.areaName);
-  return selectTablePage;
-}
-
-async function readRecallDetailsAndReturnHome(
-  createdOrder: CreatedTableOrder,
-): Promise<RecallOrderDetails> {
-  const recallFlow = new RecallFlow();
-  const recallPage = await recallFlow.openRecallFromHome(createdOrder.homePage);
-  await recallFlow.clearSearchConditions(recallPage);
-  await recallPage.openOrderDetails(createdOrder.orderNumber);
-  const details = await recallPage.readOrderDetailsSnapshot();
-  await recallPage.closeOrderDetailsDialog();
-  await recallPage.exitRecall();
-  await createdOrder.homePage.expectPrimaryFunctionCardsVisible();
-  return details;
-}
-
-async function createSecondOrderOnSameTable(
-  firstOrder: CreatedTableOrder,
-): Promise<CreatedTableOrder> {
-  const orderDishesPage = await new SelectTableFlow().enterAdditionalOrderForTable(
-    firstOrder.homePage,
-    firstOrder.selectedTable,
-    2,
-  );
-  await new OrderDishesFlow().addRegularDish(
-    orderDishesPage,
-    orderServiceDishes.test.name,
-    orderServiceDishes.test.menu,
-  );
-  const savedOrder = await orderDishesPage.saveOrderWithReference();
-
-  return {
-    homePage: savedOrder.homePage,
-    orderNumber: savedOrder.orderNumber,
-    selectedTable: firstOrder.selectedTable,
-  };
 }
 
 function readRecallOrderTime(cardText: string): string {
@@ -143,45 +31,13 @@ function readRecallOrderTime(cardText: string): string {
 test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, () => {
   test.setTimeout(120_000);
 
-  test.beforeEach(async ({ apiConfig, employeeLoginPage, homePage, orderApi }) => {
-    const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-    const occupiedOrderIds = await new RecallDatabaseFlow(
-      apiConfig.baseURL,
-    ).readLeastOccupiedTableOrderIds(1);
-    const response = await orderApi.clearTable({ orderIds: occupiedOrderIds });
-    const body = (await response.json()) as { code?: number };
-
-    if (!response.ok() || body.code !== 0) {
-      throw new Error(`无法为桌台回归释放空桌：HTTP ${response.status()}，code=${body.code}`);
-    }
-
-    await readyHomePage.clickRefresh();
-  });
-
-  test.afterEach(async ({ apiConfig, orderApi }) => {
-    const databaseFlow = new RecallDatabaseFlow(apiConfig.baseURL);
-    for (const tableId of createdTableIds) {
-      const orderIds = await databaseFlow.readOccupiedTableOrderIds(tableId);
-      if (orderIds.length === 0) {
-        continue;
-      }
-      const response = await orderApi.clearTable({ orderIds });
-
-      if (!response.ok()) {
-        throw new Error(`清理桌台 ${tableId} 失败：HTTP ${response.status()}`);
-      }
-    }
-
-    createdTableIds.clear();
-  });
-
   test(
     '应能从空桌创建堂食订单并在 Recall 回查桌号',
     { annotation: [jiraIssueAnnotation('POS-15531')] },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const createdOrder = await createTableOrder(readyHomePage);
-      const details = await readRecallDetailsAndReturnHome(createdOrder);
+    async ({ employeeLoginPage, flows, homePage }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const createdOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage);
+      const details = await flows.tableOrderFlow.readRecallDetailsAndReturnHome(createdOrder);
 
       expect(details.orderNumber).toContain(createdOrder.orderNumber);
       expect(details.orderContext.tableName).toContain(createdOrder.selectedTable.tableNumber);
@@ -191,11 +47,11 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
   test(
     '应能在同一桌台创建第二笔订单并显示两笔订单',
     { annotation: [jiraIssueAnnotation('POS-15532')] },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const firstOrder = await createTableOrder(readyHomePage);
-      const secondOrder = await createSecondOrderOnSameTable(firstOrder);
-      const tablePage = await new SelectTableFlow().openOrdersForTable(
+    async ({ employeeLoginPage, flows, homePage }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const firstOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage);
+      const secondOrder = await flows.tableOrderFlow.createSecondOrderOnSameTable(firstOrder);
+      const tablePage = await flows.selectTableFlow.openOrdersForTable(
         secondOrder.homePage,
         secondOrder.selectedTable,
       );
@@ -213,10 +69,10 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
     {
       annotation: [jiraIssueAnnotation('POS-15534')],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const createdOrder = await createTableOrder(readyHomePage, { switchArea: true });
-      const details = await readRecallDetailsAndReturnHome(createdOrder);
+    async ({ employeeLoginPage, flows, homePage }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const createdOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage, { switchArea: true });
+      const details = await flows.tableOrderFlow.readRecallDetailsAndReturnHome(createdOrder);
 
       expect(details.orderContext.tableName).toContain(createdOrder.selectedTable.tableNumber);
     },
@@ -226,37 +82,31 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
     '应能在桌台卡片显示订单时长达到一分钟',
     {
       annotation: [jiraIssueAnnotation('POS-15557')],
+      tag: ['@slow'],
     },
-    async ({ employeeLoginPage, homePage }) => {
+    async ({ employeeLoginPage, flows, homePage }) => {
       test.setTimeout(180_000);
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const createdOrder = await createTableOrder(readyHomePage);
-      const tablePage = await openSavedTable(createdOrder);
-      const refreshAfter = Date.now() + 105_000;
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const createdOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage);
+      const tablePage = await flows.tableOrderFlow.openSavedTable(createdOrder);
 
-      await test.step('等待订单时长超过一分钟', async () => {
+      await test.step('等待桌台卡片显示订单时长达到一分钟', async () => {
         await waitUntil(
-          async () => Date.now(),
-          (currentTime) => currentTime >= refreshAfter,
+          async () =>
+            await tablePage.cards.readDisplayedDuration(
+              createdOrder.selectedTable.tableNumber,
+            ),
+          (duration) => duration !== '0:00',
           {
             timeout: 110_000,
             interval: 1_000,
-            message: '等待订单时长超过一分钟超时。',
+            message: `桌台 ${createdOrder.selectedTable.tableNumber} 的订单时长未达到一分钟。`,
           },
         );
       });
 
-      const refreshedTablePage = await test.step(
-        '返回主页并再次进入桌台区域以刷新桌台信息',
-        async () =>
-          await new SelectTableFlow().refreshTableInformationByReentering(
-            tablePage,
-            createdOrder.selectedTable.areaName,
-          ),
-      );
-
       expect(
-        await refreshedTablePage.cards.readDisplayedDuration(
+        await tablePage.cards.readDisplayedDuration(
           createdOrder.selectedTable.tableNumber,
         ),
       ).toBe('0:01');
@@ -266,14 +116,13 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
   test(
     '应能在桌台卡片显示与数据库一致的订单号',
     { annotation: [jiraIssueAnnotation('POS-15558')] },
-    async ({ apiConfig, employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const createdOrder = await createTableOrder(readyHomePage);
+    async ({ employeeLoginPage, flows, homePage, recallDatabaseFlow }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const createdOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage);
       const tableId = requireTableId(createdOrder.selectedTable);
-      const databaseOrderNumber = await new RecallDatabaseFlow(
-        apiConfig.baseURL,
-      ).readLatestOrderNumberForTable(tableId);
-      const tablePage = await openSavedTable(createdOrder);
+      const databaseOrderNumber =
+        await recallDatabaseFlow.readLatestOrderNumberForTable(tableId);
+      const tablePage = await flows.tableOrderFlow.openSavedTable(createdOrder);
       await tablePage.cards.selectDisplayField('orderId');
 
       expect(
@@ -286,18 +135,17 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
   test(
     '应能在桌台卡片显示与 Recall 一致的下单时间',
     { annotation: [jiraIssueAnnotation('POS-15559')] },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const createdOrder = await createTableOrder(readyHomePage);
-      const recallFlow = new RecallFlow();
-      const recallPage = await recallFlow.openRecallFromHome(createdOrder.homePage);
-      await recallFlow.clearSearchConditions(recallPage);
+    async ({ employeeLoginPage, flows, homePage }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const createdOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage);
+      const recallPage = await flows.recallFlow.openRecallFromHome(createdOrder.homePage);
+      await flows.recallFlow.clearSearchConditions(recallPage);
       const recallOrderTime = readRecallOrderTime(
-        await recallPage.readOrderCardText(createdOrder.orderNumber),
+        await recallPage.filterBar.readOrderCardText(createdOrder.orderNumber),
       );
       await recallPage.exitRecall();
       await createdOrder.homePage.expectPrimaryFunctionCardsVisible();
-      const tablePage = await openSavedTable(createdOrder);
+      const tablePage = await flows.tableOrderFlow.openSavedTable(createdOrder);
       await tablePage.cards.selectDisplayField('orderTime');
 
       expect(
@@ -309,11 +157,11 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
   test(
     '应能在桌台卡片显示与 Recall 一致的客人数',
     { annotation: [jiraIssueAnnotation('POS-15560')] },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const createdOrder = await createTableOrder(readyHomePage, { guestCount: 2 });
-      const details = await readRecallDetailsAndReturnHome(createdOrder);
-      const tablePage = await openSavedTable(createdOrder);
+    async ({ employeeLoginPage, flows, homePage }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const createdOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage, { guestCount: 2 });
+      const details = await flows.tableOrderFlow.readRecallDetailsAndReturnHome(createdOrder);
+      const tablePage = await flows.tableOrderFlow.openSavedTable(createdOrder);
       await tablePage.cards.selectDisplayField('partySize');
 
       expect(details.orderContext.guestCount).toBe('2');
@@ -326,11 +174,11 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
   test(
     '应能在桌台卡片显示与 Recall 一致的企台',
     { annotation: [jiraIssueAnnotation('POS-15561')] },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const createdOrder = await createTableOrder(readyHomePage);
-      const details = await readRecallDetailsAndReturnHome(createdOrder);
-      const tablePage = await openSavedTable(createdOrder);
+    async ({ employeeLoginPage, flows, homePage }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const createdOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage);
+      const details = await flows.tableOrderFlow.readRecallDetailsAndReturnHome(createdOrder);
+      const tablePage = await flows.tableOrderFlow.openSavedTable(createdOrder);
       await tablePage.cards.selectDisplayField('server');
 
       expect(
@@ -342,11 +190,11 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
   test(
     '应能在桌台卡片显示与 Recall 一致的订单价格',
     { annotation: [jiraIssueAnnotation('POS-15563')] },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const createdOrder = await createTableOrder(readyHomePage);
-      const details = await readRecallDetailsAndReturnHome(createdOrder);
-      const tablePage = await openSavedTable(createdOrder);
+    async ({ employeeLoginPage, flows, homePage }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const createdOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage);
+      const details = await flows.tableOrderFlow.readRecallDetailsAndReturnHome(createdOrder);
+      const tablePage = await flows.tableOrderFlow.openSavedTable(createdOrder);
       await tablePage.cards.selectDisplayField('price');
 
       expect(
@@ -370,11 +218,11 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
         },
       ],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
+    async ({ employeeLoginPage, flows, homePage }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       const customer = buildOrderServiceDineInCustomer();
-      const createdOrder = await createTableOrder(readyHomePage, { customer });
-      const tablePage = await new SelectTableFlow().enterDineInWithEmployeeContext(
+      const createdOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage, { customer });
+      const tablePage = await flows.selectTableFlow.enterDineInWithEmployeeContext(
         createdOrder.homePage,
         employeeLoginPage,
       );
@@ -393,21 +241,25 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
       tag: ['@PickUp'],
       annotation: [jiraIssueAnnotation('POS-15554')],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const orderDishesPage = await new TakeoutFlow().startPickUpOrder(readyHomePage);
-      await addRecordedRegularDish(orderDishesPage);
-      const savedOrder = await orderDishesPage.saveOrderWithReference();
-      const recallPage = await new RecallFlow().openRecallFromHome(savedOrder.homePage);
-      const editingPage = await new RecallFlow().editOrder(recallPage, savedOrder.orderNumber);
-      await editingPage.changeGuestCount(5);
-      const editedOrder = await editingPage.saveOrderWithReference();
-      const finalRecallPage = await new RecallFlow().openRecallFromHome(editedOrder.homePage);
-      const finalEditingPage = await new RecallFlow().editOrder(
+    async ({ employeeLoginPage, flows, homePage }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const orderDishesPage = await flows.takeoutFlow.startPickUpOrder(readyHomePage);
+      await flows.orderDishesFlow.addRegularDish(
+        orderDishesPage,
+        orderServiceDishes.regular.name,
+        orderServiceDishes.regular.menu,
+      );
+      const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
+      const recallPage = await flows.recallFlow.openRecallFromHome(savedOrder.homePage);
+      const editingPage = await flows.recallFlow.editOrder(recallPage, savedOrder.orderNumber);
+      await editingPage.menu.changeGuestCount(5);
+      const editedOrder = await editingPage.navigation.saveOrderWithReference();
+      const finalRecallPage = await flows.recallFlow.openRecallFromHome(editedOrder.homePage);
+      const finalEditingPage = await flows.recallFlow.editOrder(
         finalRecallPage,
         savedOrder.orderNumber,
       );
-      await finalEditingPage.expectGuestCount(5);
+      await finalEditingPage.menu.expectGuestCount(5);
     },
   );
 
@@ -417,11 +269,11 @@ test.describe('桌台点单已录制回归', { tag: ['@桌台', '@点单'] }, ()
       tag: ['@多单', '@打印'],
       annotation: [jiraIssueAnnotation('POS-36301')],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const firstOrder = await createTableOrder(readyHomePage);
-      const secondOrder = await createSecondOrderOnSameTable(firstOrder);
-      const tablePage = await new SelectTableFlow().openOrdersForTable(
+    async ({ employeeLoginPage, flows, homePage }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const firstOrder = await flows.tableOrderFlow.createTableOrder(readyHomePage);
+      const secondOrder = await flows.tableOrderFlow.createSecondOrderOnSameTable(firstOrder);
+      const tablePage = await flows.selectTableFlow.openOrdersForTable(
         secondOrder.homePage,
         secondOrder.selectedTable,
       );

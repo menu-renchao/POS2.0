@@ -12,7 +12,10 @@ import { SystemConfigurationApiClient } from '../api/clients/system-configuratio
 import { PrintConfigApiClient } from '../api/clients/print-config-api.client';
 import { loadApiConfig, type ApiConfig } from '../api/core/api-config';
 import { createApiRequestContext } from '../api/core/api-context';
-import { ResourceRegistry } from '../api/core/resource-registry';
+import {
+  assertCleanupSucceeded,
+  ResourceRegistry,
+} from '../api/core/resource-registry';
 import { createApiSetup, type ApiSetup } from '../api/setup/api-setup';
 
 type ApiFixtures = {
@@ -43,11 +46,7 @@ export const test = base.extend<ApiFixtures>({
     try {
       await use(apiRequest);
     } finally {
-      try {
-        await apiRequest.dispose();
-      } catch (error) {
-        console.warn('API request dispose failed.', error);
-      }
+      await apiRequest.dispose();
     }
   },
   resourceRegistry: async ({}, use) => {
@@ -56,19 +55,10 @@ export const test = base.extend<ApiFixtures>({
     try {
       await use(resourceRegistry);
     } finally {
-      const cleanupResult = await resourceRegistry.cleanupAll();
-
-      if (cleanupResult.errors.length > 0) {
-        const errorSummary = cleanupResult.errors
-          .map(
-            ({ resource, error }) => `${resource.type}:${String(resource.id)} ${error.message}`,
-          )
-          .join('; ');
-
-        console.warn(
-          `API resource cleanup finished with ${cleanupResult.errors.length} error(s): ${errorSummary}`,
-        );
-      }
+      assertCleanupSucceeded(
+        await resourceRegistry.cleanupAll(),
+        'API resource',
+      );
     }
   },
   menuApi: async ({ apiRequest }, use) => {
@@ -118,34 +108,18 @@ export const test = base.extend<ApiFixtures>({
     },
     use,
   ) => {
-    try {
-      await use(
-        createApiSetup({
-          adminConfigApi,
-          kitchenApi,
-          layoutConfigApi,
-          orderTypeApi,
-          systemConfigurationApi,
-          printConfigApi,
-          menuApi,
-          saleItemApi,
-          resourceRegistry,
-        }),
-      );
-    } finally {
-      const cleanupResult = await resourceRegistry.cleanupAll();
-
-      if (cleanupResult.errors.length > 0) {
-        const errorSummary = cleanupResult.errors
-          .map(
-            ({ resource, error }) => `${resource.type}:${String(resource.id)} ${error.message}`,
-          )
-          .join('; ');
-
-        console.warn(
-          `API setup cleanup finished with ${cleanupResult.errors.length} error(s): ${errorSummary}`,
-        );
-      }
-    }
+    await use(
+      createApiSetup({
+        adminConfigApi,
+        kitchenApi,
+        layoutConfigApi,
+        orderTypeApi,
+        systemConfigurationApi,
+        printConfigApi,
+        menuApi,
+        saleItemApi,
+        resourceRegistry,
+      }),
+    );
   },
 });

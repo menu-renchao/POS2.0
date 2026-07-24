@@ -3,6 +3,7 @@ import { InventoryStockSettingPage } from './inventory-stock-setting.page';
 import { OrderDishesPage } from './order-dishes.page';
 import { waitForInputSettled } from '../utils/input-stability';
 import { step } from '../utils/step';
+import { escapeRegExp } from '../utils/text';
 import { waitUntil } from '../utils/wait';
 
 export type InventoryMenuNavigation = {
@@ -164,32 +165,11 @@ export class InventoryPage {
   }
 
   private async resolveVisibleExactTextLocator(text: string, message: string): Promise<Locator> {
-    const resolvedLocator = await waitUntil(
-      async () => {
-        const textLocators = this.page.getByText(text, { exact: true });
-        const count = await textLocators.count().catch(() => 0);
-
-        for (let index = 0; index < count; index += 1) {
-          const candidate = textLocators.nth(index);
-
-          if (await candidate.isVisible().catch(() => false)) {
-            return candidate;
-          }
-        }
-
-        return null;
-      },
-      (locator): locator is Locator => locator !== null,
-      {
-        timeout: 15_000,
-        message,
-      },
-    );
-
-    if (!resolvedLocator) {
-      throw new Error(message);
-    }
-
+    const resolvedLocator = this.page
+      .getByText(text, { exact: true })
+      .filter({ visible: true })
+      .first();
+    await expect(resolvedLocator, message).toBeVisible({ timeout: 15_000 });
     return resolvedLocator;
   }
 
@@ -198,16 +178,6 @@ export class InventoryPage {
       .locator('motion.div, div')
       .filter({ hasText: new RegExp(`^${escapeRegExp(itemName)}\\s*Stock:\\s*\\d+$`) })
       .first();
-    const visibleItemLocator = await this.resolveVisibleItemNameLocator(itemName);
-
-    return visibleItemLocator
-      .locator('xpath=ancestor::*[.//*[contains(normalize-space(.),"Stock:")]][1]')
-      .getByText(/Stock:\s*\d+/)
-      .or(combinedRow.getByText(/Stock:\s*\d+/))
-      .first();
+    return combinedRow.getByText(/Stock:\s*\d+/).first();
   }
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

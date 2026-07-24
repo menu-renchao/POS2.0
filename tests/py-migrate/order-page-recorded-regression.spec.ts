@@ -1,14 +1,4 @@
 import { expect } from '@playwright/test';
-import { HomeFlow } from '../../flows/home.flow';
-import { OrderCustomerFlow } from '../../flows/order-customer.flow';
-import { OrderDishesFlow } from '../../flows/order-dishes.flow';
-import { OrderKitchenFlow } from '../../flows/order-kitchen.flow';
-import { PaymentFlow } from '../../flows/payment.flow';
-import { OrderPermissionFlow } from '../../flows/order-permission.flow';
-import { RecallFlow } from '../../flows/recall.flow';
-import { SelectTableFlow } from '../../flows/select-table.flow';
-import { SplitOrderFlow } from '../../flows/split-order.flow';
-import { TakeoutFlow } from '../../flows/takeout.flow';
 import { test } from '../../fixtures/test.fixture';
 import {
   buildOpenFoodWithoutTaxCase,
@@ -24,7 +14,7 @@ import {
 } from '../../test-data/order-service';
 import { jiraIssueAnnotation } from '../../utils/jira';
 
-test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () => {
+test.describe('录制补充的点单页核心回归', { tag: ['@点单', '@ui-exclusive-config'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
   test(
@@ -33,16 +23,20 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       tag: ['@现金支付'],
       annotation: [jiraIssueAnnotation('POS-42889')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
-      await apiSetup.systemConfiguration.updateManyByName({
-        IS_PAYMENT_CONFIRM_REQUIRED: true,
-        IS_NAME_REQUIRED: true,
-        IS_PHONE_REQUIRED: true,
-      });
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
+      const restoreConfiguration =
+        await apiSetup.systemConfiguration.updateManyByName(
+          {
+            IS_PAYMENT_CONFIRM_REQUIRED: true,
+            IS_NAME_REQUIRED: true,
+            IS_PHONE_REQUIRED: true,
+          },
+          { verify: true },
+        );
 
       try {
         const readyHomePage = await test.step('启用支付前客户信息必填配置并刷新 POS', async () => {
-          const readyPage = await new HomeFlow().openHomeWithEmployeeContext(
+          const readyPage = await flows.homeFlow.openHomeWithEmployeeContext(
             homePage,
             employeeLoginPage,
           );
@@ -51,8 +45,8 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
         });
 
         const orderDishesPage = await test.step('创建 To Go 订单并添加普通菜品', async () => {
-          const orderPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-          await new OrderDishesFlow().addRegularDish(
+          const orderPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+          await flows.orderDishesFlow.addRegularDish(
             orderPage,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
@@ -61,22 +55,18 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
         });
 
         const paymentPage = await test.step('逐项校验客户必填提示并提交完整客户信息', async () => {
-          return await new OrderCustomerFlow().validateRequiredInformationAndOpenPayment(
+          return await flows.orderCustomerFlow.validateRequiredInformationAndOpenPayment(
             orderDishesPage,
             buildRequiredPaymentCustomer(),
           );
         });
 
         await test.step('完成现金支付', async () => {
-          await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
+          await flows.paymentFlow.payByCash(paymentPage, { printReceipt: false });
           expect(await paymentPage.isPaymentPanelVisible()).toBe(false);
         });
       } finally {
-        await apiSetup.systemConfiguration.updateManyByName({
-          IS_PAYMENT_CONFIRM_REQUIRED: false,
-          IS_NAME_REQUIRED: false,
-          IS_PHONE_REQUIRED: false,
-        });
+        await restoreConfiguration();
       }
     },
   );
@@ -86,33 +76,33 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
     {
       annotation: [jiraIssueAnnotation('POS-39750')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       const restrictedEmployee = await apiSetup.staff.createWithoutKitchenVoidPermission();
-      const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+      const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
         homePage,
         employeeLoginPage,
         restrictedEmployee.passcode,
       );
 
       const sentOrder = await test.step('以受限员工创建两道菜的无桌堂食订单并送厨', async () => {
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
         for (const dish of [orderServiceDishes.regular, orderServiceDishes.test]) {
-          await new OrderDishesFlow().addRegularDish(
+          await flows.orderDishesFlow.addRegularDish(
             orderDishesPage,
             dish.name,
             dish.menu,
           );
         }
-        return await orderDishesPage.sendOrderWithReference();
+        return await orderDishesPage.navigation.sendOrderWithReference();
       });
 
       const editingPage = await test.step('从 Recall 精确打开已送厨订单并进入编辑页', async () => {
-        const recallPage = await new RecallFlow().openRecallFromHome(sentOrder.homePage);
-        return await new RecallFlow().editOrder(recallPage, sentOrder.orderNumber);
+        const recallPage = await flows.recallFlow.openRecallFromHome(sentOrder.homePage);
+        return await flows.recallFlow.editOrder(recallPage, sentOrder.orderNumber);
       });
 
       await test.step('校验权限阻断并使用主管口令授权删除已送厨菜品', async () => {
-        await new OrderPermissionFlow().removeSentDishWithAuthorization(
+        await flows.orderPermissionFlow.removeSentDishWithAuthorization(
           editingPage,
           orderServiceDishes.regular.name,
           orderServiceKitchenVoidPermissionCase.authorizationPasscode,
@@ -120,13 +110,13 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       });
 
       const savedHomePage = await test.step('保存授权后的删菜结果并选择作废原因', async () => {
-        return await editingPage.saveOrder();
+        return await editingPage.navigation.saveOrder();
       });
 
       await test.step('回查同一订单并确认目标菜品标记为已作废', async () => {
-        const recallPage = await new RecallFlow().openRecallFromHome(savedHomePage);
-        await recallPage.openOrderDetails(sentOrder.orderNumber);
-        const detailsText = await recallPage.readOrderDetailsText();
+        const recallPage = await flows.recallFlow.openRecallFromHome(savedHomePage);
+        await recallPage.orderDetails.openOrderDetails(sentOrder.orderNumber);
+        const detailsText = await recallPage.orderDetails.readOrderDetailsText();
         expect(detailsText).toContain(orderServiceDishes.regular.name);
         expect(detailsText).toContain(orderServiceKitchenVoidPermissionCase.expectedVoidMarker);
       });
@@ -138,29 +128,29 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
     {
       annotation: [jiraIssueAnnotation('POS-34873')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       test.info().annotations.push({
         type: '已知产品问题',
         description:
           '受限员工对 Delay 菜品执行 Count=0 后，产品未显示 VOID_KITCHEN_ITEM 授权提示，无法继续输入主管口令完成删除。',
       });
       const restrictedEmployee = await apiSetup.staff.createWithoutKitchenVoidPermission();
-      const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+      const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
         homePage,
         employeeLoginPage,
         restrictedEmployee.passcode,
       );
 
       const sentOrder = await test.step('以受限员工创建两道菜的无桌堂食订单并送厨', async () => {
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
         for (const dish of [orderServiceDishes.regular, orderServiceDishes.test]) {
-          await new OrderDishesFlow().addRegularDish(orderDishesPage, dish.name, dish.menu);
+          await flows.orderDishesFlow.addRegularDish(orderDishesPage, dish.name, dish.menu);
         }
-        return await orderDishesPage.sendOrderWithReference();
+        return await orderDishesPage.navigation.sendOrderWithReference();
       });
 
       await test.step('将目标已送厨菜品设置为 Hold', async () => {
-        await new OrderKitchenFlow().holdSentDish(
+        await flows.orderKitchenFlow.holdSentDish(
           apiSetup.kitchen,
           sentOrder.orderItems,
           orderServiceDishes.regular.name,
@@ -168,12 +158,12 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       });
 
       const editingPage = await test.step('从 Recall 精确打开 Hold 订单并进入编辑页', async () => {
-        const recallPage = await new RecallFlow().openRecallFromHome(sentOrder.homePage);
-        return await new RecallFlow().editOrder(recallPage, sentOrder.orderNumber);
+        const recallPage = await flows.recallFlow.openRecallFromHome(sentOrder.homePage);
+        return await flows.recallFlow.editOrder(recallPage, sentOrder.orderNumber);
       });
 
       await test.step('校验权限阻断并使用主管口令授权 Reduce 删除 Hold 菜品', async () => {
-        await new OrderPermissionFlow().removeSentDishWithAuthorization(
+        await flows.orderPermissionFlow.removeSentDishWithAuthorization(
           editingPage,
           orderServiceDishes.regular.name,
           orderServiceKitchenVoidPermissionCase.authorizationPasscode,
@@ -181,13 +171,13 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       });
 
       const savedHomePage = await test.step('保存授权后的删菜结果并选择作废原因', async () => {
-        return await editingPage.saveOrder();
+        return await editingPage.navigation.saveOrder();
       });
 
       await test.step('回查同一订单并确认 Hold 菜品标记为已作废', async () => {
-        const recallPage = await new RecallFlow().openRecallFromHome(savedHomePage);
-        await recallPage.openOrderDetails(sentOrder.orderNumber);
-        const detailsText = await recallPage.readOrderDetailsText();
+        const recallPage = await flows.recallFlow.openRecallFromHome(savedHomePage);
+        await recallPage.orderDetails.openOrderDetails(sentOrder.orderNumber);
+        const detailsText = await recallPage.orderDetails.readOrderDetailsText();
         expect(detailsText).toContain(orderServiceDishes.regular.name);
         expect(detailsText).toContain(orderServiceKitchenVoidPermissionCase.expectedVoidMarker);
       });
@@ -199,24 +189,24 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
     {
       annotation: [jiraIssueAnnotation('POS-35325')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       const restrictedEmployee = await apiSetup.staff.createWithoutKitchenVoidPermission();
-      const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+      const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
         homePage,
         employeeLoginPage,
         restrictedEmployee.passcode,
       );
 
       const sentOrder = await test.step('以受限员工创建两道菜的无桌堂食订单并送厨', async () => {
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
         for (const dish of [orderServiceDishes.regular, orderServiceDishes.test]) {
-          await new OrderDishesFlow().addRegularDish(orderDishesPage, dish.name, dish.menu);
+          await flows.orderDishesFlow.addRegularDish(orderDishesPage, dish.name, dish.menu);
         }
-        return await orderDishesPage.sendOrderWithReference();
+        return await orderDishesPage.navigation.sendOrderWithReference();
       });
 
       await test.step('将目标已送厨菜品设置为 Delay', async () => {
-        await new OrderKitchenFlow().delaySentDish(
+        await flows.orderKitchenFlow.delaySentDish(
           apiSetup.kitchen,
           sentOrder.orderItems,
           orderServiceDishes.regular.name,
@@ -225,12 +215,12 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       });
 
       const editingPage = await test.step('从 Recall 精确打开 Delay 订单并进入编辑页', async () => {
-        const recallPage = await new RecallFlow().openRecallFromHome(sentOrder.homePage);
-        return await new RecallFlow().editOrder(recallPage, sentOrder.orderNumber);
+        const recallPage = await flows.recallFlow.openRecallFromHome(sentOrder.homePage);
+        return await flows.recallFlow.editOrder(recallPage, sentOrder.orderNumber);
       });
 
       await test.step('校验 Count=0 被权限阻断并使用主管口令完成授权', async () => {
-        await new OrderPermissionFlow().removeDelayedDishByCountWithAuthorization(
+        await flows.orderPermissionFlow.removeDelayedDishByCountWithAuthorization(
           editingPage,
           orderServiceDishes.regular.name,
           orderServiceKitchenVoidPermissionCase.authorizationPasscode,
@@ -238,13 +228,13 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       });
 
       const savedHomePage = await test.step('保存授权后的删菜结果并选择作废原因', async () => {
-        return await editingPage.saveOrder();
+        return await editingPage.navigation.saveOrder();
       });
 
       await test.step('回查同一订单并确认 Delay 菜品标记为已作废', async () => {
-        const recallPage = await new RecallFlow().openRecallFromHome(savedHomePage);
-        await recallPage.openOrderDetails(sentOrder.orderNumber);
-        const detailsText = await recallPage.readOrderDetailsText();
+        const recallPage = await flows.recallFlow.openRecallFromHome(savedHomePage);
+        await recallPage.orderDetails.openOrderDetails(sentOrder.orderNumber);
+        const detailsText = await recallPage.orderDetails.readOrderDetailsText();
         expect(detailsText).toContain(orderServiceDishes.regular.name);
         expect(detailsText).toContain(orderServiceKitchenVoidPermissionCase.expectedVoidMarker);
       });
@@ -256,24 +246,24 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
     {
       annotation: [jiraIssueAnnotation('POS-34895')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         orderServiceSameDishSeparateCase.configuration,
         { verify: true },
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
         await readyHomePage.clickRefresh();
         await readyHomePage.confirmDelayedConfigurationRefresh();
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
 
         await test.step('连续三次添加同一道普通菜', async () => {
           for (let index = 0; index < orderServiceSameDishSeparateCase.expectedLineCount; index += 1) {
-            await new OrderDishesFlow().addRegularDish(
+            await flows.orderDishesFlow.addRegularDish(
               orderDishesPage,
               orderServiceDishes.regular.name,
               orderServiceDishes.regular.menu,
@@ -282,7 +272,7 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
         });
 
         await test.step('校验相同菜分为三行且每行数量为一', async () => {
-          const matchingItems = (await orderDishesPage.readOrderedItems()).filter(
+          const matchingItems = (await orderDishesPage.reads.readOrderedItems()).filter(
             (item) => item.name === orderServiceDishes.regular.name,
           );
           expect(matchingItems).toHaveLength(orderServiceSameDishSeparateCase.expectedLineCount);
@@ -303,36 +293,36 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
     {
       annotation: [jiraIssueAnnotation('POS-34903')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         orderServiceSameDishStatusCombineCase.configuration,
         { verify: true },
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
         await readyHomePage.clickRefresh();
         await readyHomePage.confirmDelayedConfigurationRefresh();
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
 
         const sentOrder = await test.step('添加普通菜并送厨', async () => {
-          await new OrderDishesFlow().addRegularDish(
+          await flows.orderDishesFlow.addRegularDish(
             orderDishesPage,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
           );
-          return await orderDishesPage.sendOrderWithReference();
+          return await orderDishesPage.navigation.sendOrderWithReference();
         });
 
-        const recallPage = await new RecallFlow().openRecallFromHome(sentOrder.homePage);
-        const editingPage = await new RecallFlow().editOrder(recallPage, sentOrder.orderNumber);
+        const recallPage = await flows.recallFlow.openRecallFromHome(sentOrder.homePage);
+        const editingPage = await flows.recallFlow.editOrder(recallPage, sentOrder.orderNumber);
 
         await test.step('在已送厨订单中连续两次添加同一道普通菜', async () => {
           for (let index = 0; index < orderServiceSameDishStatusCombineCase.newDishAdds; index += 1) {
-            await new OrderDishesFlow().addRegularDish(
+            await flows.orderDishesFlow.addRegularDish(
               editingPage,
               orderServiceDishes.regular.name,
               orderServiceDishes.regular.menu,
@@ -341,7 +331,7 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
         });
 
         await test.step('校验已送厨菜与新加菜分行且新加同状态菜合并', async () => {
-          const rowStates = await editingPage.readOrderedDishRowStates(orderServiceDishes.regular.name);
+          const rowStates = await editingPage.reads.readOrderedDishRowStates(orderServiceDishes.regular.name);
           const sentRow = rowStates.find((row) => row.sentToKitchen);
           const pendingRow = rowStates.find((row) => !row.sentToKitchen);
 
@@ -350,7 +340,7 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
           expect(pendingRow?.quantity).toBe(orderServiceSameDishStatusCombineCase.pendingQuantity);
         });
 
-        await editingPage.saveOrder();
+        await editingPage.navigation.saveOrder();
       } finally {
         await restoreConfiguration();
       }
@@ -362,36 +352,36 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
     {
       annotation: [jiraIssueAnnotation('POS-34910')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         orderServiceSameDishKitchenCombineCase.configuration,
         { verify: true },
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
         await readyHomePage.clickRefresh();
         await readyHomePage.confirmDelayedConfigurationRefresh();
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
 
         const sentOrder = await test.step('添加普通菜并送厨', async () => {
-          await new OrderDishesFlow().addRegularDish(
+          await flows.orderDishesFlow.addRegularDish(
             orderDishesPage,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
           );
-          return await orderDishesPage.sendOrderWithReference();
+          return await orderDishesPage.navigation.sendOrderWithReference();
         });
 
-        const recallPage = await new RecallFlow().openRecallFromHome(sentOrder.homePage);
-        const editingPage = await new RecallFlow().editOrder(recallPage, sentOrder.orderNumber);
+        const recallPage = await flows.recallFlow.openRecallFromHome(sentOrder.homePage);
+        const editingPage = await flows.recallFlow.editOrder(recallPage, sentOrder.orderNumber);
 
         await test.step('在已送厨订单中继续添加同一道普通菜', async () => {
           for (let index = 0; index < orderServiceSameDishKitchenCombineCase.newDishAdds; index += 1) {
-            await new OrderDishesFlow().addRegularDish(
+            await flows.orderDishesFlow.addRegularDish(
               editingPage,
               orderServiceDishes.regular.name,
               orderServiceDishes.regular.menu,
@@ -400,19 +390,19 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
         });
 
         await test.step('校验同菜合并到一行并展示厨房数量和红色菜名', async () => {
-          const rowStates = await editingPage.readOrderedDishRowStates(orderServiceDishes.regular.name);
+          const rowStates = await editingPage.reads.readOrderedDishRowStates(orderServiceDishes.regular.name);
 
           expect(rowStates).toHaveLength(orderServiceSameDishKitchenCombineCase.expectedLineCount);
           expect(rowStates[0]?.quantity).toBe(orderServiceSameDishKitchenCombineCase.expectedTotalQuantity);
           expect(rowStates[0]?.kitchenQuantity).toBe(
             orderServiceSameDishKitchenCombineCase.expectedKitchenQuantity,
           );
-          expect(await editingPage.readOrderedDishNameColor(orderServiceDishes.regular.name)).toBe(
+          expect(await editingPage.reads.readOrderedDishNameColor(orderServiceDishes.regular.name)).toBe(
             orderServiceSameDishKitchenCombineCase.expectedDishNameColor,
           );
         });
 
-        await editingPage.saveOrder();
+        await editingPage.navigation.saveOrder();
       } finally {
         await restoreConfiguration();
       }
@@ -424,44 +414,44 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
     {
       annotation: [jiraIssueAnnotation('POS-34842')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         orderServiceReduceCategoryCase.configuration,
         { verify: true },
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
         await readyHomePage.clickRefresh();
         await readyHomePage.confirmDelayedConfigurationRefresh();
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
 
         await test.step('从两个不同菜单类别各添加一道普通菜', async () => {
-          await new OrderDishesFlow().addRegularDish(
+          await flows.orderDishesFlow.addRegularDish(
             orderDishesPage,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
           );
-          await new OrderDishesFlow().addRegularDish(
+          await flows.orderDishesFlow.addRegularDish(
             orderDishesPage,
             orderServiceDishes.alternateCategory.name,
             orderServiceDishes.alternateCategory.menu,
           );
-          expect(await orderDishesPage.readSelectedMenuCategoryName()).toBe(
+          expect(await orderDishesPage.menu.readSelectedMenuCategoryName()).toBe(
             orderServiceReduceCategoryCase.expectedCategory,
           );
         });
 
         await test.step('将当前类别的菜品减到删除并校验仍停留原类别', async () => {
-          await orderDishesPage.reduceOrderedDishQuantity(orderServiceDishes.alternateCategory.name, 1);
-          const orderedDishNames = (await orderDishesPage.readOrderedItems()).map((item) => item.name);
+          await orderDishesPage.menu.reduceOrderedDishQuantity(orderServiceDishes.alternateCategory.name, 1);
+          const orderedDishNames = (await orderDishesPage.reads.readOrderedItems()).map((item) => item.name);
 
           expect(orderedDishNames).toContain(orderServiceDishes.regular.name);
           expect(orderedDishNames).not.toContain(orderServiceDishes.alternateCategory.name);
-          expect(await orderDishesPage.readSelectedMenuCategoryName()).toBe(
+          expect(await orderDishesPage.menu.readSelectedMenuCategoryName()).toBe(
             orderServiceReduceCategoryCase.expectedCategory,
           );
         });
@@ -477,40 +467,40 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
     {
       annotation: [jiraIssueAnnotation('POS-33186')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         orderServiceDecimalReduceCase.configuration,
         { verify: true },
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
+        const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
 
         await test.step('添加普通菜并将数量修改为一点二五', async () => {
-          await new OrderDishesFlow().addRegularDish(
+          await flows.orderDishesFlow.addRegularDish(
             orderDishesPage,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
           );
-          await orderDishesPage.changeOrderedDishQuantity(
+          await orderDishesPage.menu.changeOrderedDishQuantity(
             orderServiceDishes.regular.name,
             orderServiceDecimalReduceCase.initialQuantity,
           );
         });
 
         await test.step('第一次减菜后数量应变为零点二五', async () => {
-          await orderDishesPage.reduceOrderedDishQuantity(orderServiceDishes.regular.name, 1);
-          const rowStates = await orderDishesPage.readOrderedDishRowStates(orderServiceDishes.regular.name);
+          await orderDishesPage.menu.reduceOrderedDishQuantity(orderServiceDishes.regular.name, 1);
+          const rowStates = await orderDishesPage.reads.readOrderedDishRowStates(orderServiceDishes.regular.name);
           expect(rowStates[0]?.quantity).toBe(orderServiceDecimalReduceCase.expectedAfterFirstReduce);
         });
 
         await test.step('第二次减菜后应删除菜品', async () => {
-          await orderDishesPage.reduceOrderedDishQuantity(orderServiceDishes.regular.name, 1);
-          await orderDishesPage.expectOrderedDishAbsent(orderServiceDishes.regular.name);
+          await orderDishesPage.menu.reduceOrderedDishQuantity(orderServiceDishes.regular.name, 1);
+          await orderDishesPage.reads.expectOrderedDishAbsent(orderServiceDishes.regular.name);
         });
       } finally {
         await restoreConfiguration();
@@ -524,7 +514,7 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       tag: ['@分单'],
       annotation: [jiraIssueAnnotation('POS-33241')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       test.setTimeout(90_000);
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         orderServiceDecimalSplitCase.configuration,
@@ -532,12 +522,12 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-        const orderFlow = new OrderDishesFlow();
+        const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+        const orderFlow = flows.orderDishesFlow;
 
         await test.step('添加小数数量菜品和另一道普通菜', async () => {
           await orderFlow.addRegularDish(
@@ -545,7 +535,7 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
           );
-          await orderDishesPage.changeOrderedDishQuantity(
+          await orderDishesPage.menu.changeOrderedDishQuantity(
             orderServiceDishes.regular.name,
             orderServiceDecimalSplitCase.quantity,
           );
@@ -556,8 +546,8 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
           );
         });
 
-        const splitOrderPage = await orderDishesPage.openSplitOrder();
-        const splitFlow = new SplitOrderFlow();
+        const splitOrderPage = await orderDishesPage.navigation.openSplitOrder();
+        const splitFlow = flows.splitOrderFlow;
         await test.step('点击普通菜二并通过 Add Suborder 新增子单', async () => {
           await splitFlow.moveDishToNewSuborder(splitOrderPage, orderServiceDishes.test.name);
         });
@@ -579,12 +569,12 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
         });
 
         const returnedPage = await splitFlow.submitAndReturnPage(splitOrderPage);
-        const recallPage = await new RecallFlow().openRecallFromSplitReturnPage(returnedPage, homePage);
+        const recallPage = await flows.recallFlow.openRecallFromSplitReturnPage(returnedPage, homePage);
         const parentOrderNumber = decimalDishOrder!.orderNumber.replace(/-\d+$/, '');
 
         await test.step('从 Recall 回查小数数量子单', async () => {
-          await recallPage.openOrderDetails(parentOrderNumber, decimalDishOrder!.orderNumber);
-          const detailsText = await recallPage.readOrderDetailsText();
+          await recallPage.orderDetails.openOrderDetails(parentOrderNumber, decimalDishOrder!.orderNumber);
+          const detailsText = await recallPage.orderDetails.readOrderDetailsText();
           expect(detailsText).toContain(orderServiceDishes.regular.name);
           expect(detailsText).toContain(String(orderServiceDecimalSplitCase.quantity));
         });
@@ -600,7 +590,7 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       tag: ['@现金支付'],
       annotation: [jiraIssueAnnotation('POS-42011')],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateByName(
         'IS_PAYMENT_CONFIRM_REQUIRED',
         false,
@@ -608,26 +598,26 @@ test.describe('录制补充的点单页核心回归', { tag: ['@点单'] }, () =
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
         await readyHomePage.clickRefresh();
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
         const openFood = buildOpenFoodWithoutTaxCase();
 
         await test.step('添加 Open Food 并确认无税告警后读取税额', async () => {
-          await new OrderDishesFlow().addOpenFoodItemWithoutTax(
+          await flows.orderDishesFlow.addOpenFoodItemWithoutTax(
             orderDishesPage,
             openFood.name,
             openFood.price,
           );
-          expect(await orderDishesPage.readTaxAmount()).toBe(0);
+          expect(await orderDishesPage.reads.readTaxAmount()).toBe(0);
         });
 
         await test.step('完成无税 Open Food 订单现金支付', async () => {
-          const paymentPage = await orderDishesPage.openPayment();
-          await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
+          const paymentPage = await orderDishesPage.navigation.openPayment();
+          await flows.paymentFlow.payByCash(paymentPage, { printReceipt: false });
           expect(await paymentPage.isPaymentPanelVisible()).toBe(false);
         });
       } finally {

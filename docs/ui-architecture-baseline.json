@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "capturedAt": "2026-07-24",
+  "policy": "Values are decreasing debt ceilings. Never increase a value to make the gate pass.",
+  "maximums": {
+    "candidateLocatorResolvers": 0,
+    "locatorOrFallbacks": 0,
+    "xpathSelectors": 0,
+    "testIdAttributeAliases": 0,
+    "multilingualLocatorFallbacks": 0,
+    "rawLocatorCallsInFlows": 0,
+    "rawLocatorCallsInSpecs": 0,
+    "samePageReturns": 0,
+    "hardWaits": 0,
+    "inputWaitsWithoutLocator": 0,
+    "immediateFlowConstructorsInSpecs": 0,
+    "defaultConstructedFlowDependencies": 0,
+    "flowServiceLocatorParameters": 0,
+    "broadDomTraversal": 0,
+    "unclassifiedGlobalConfigMutations": 0
+  },
+  "hotspots": [
+    "pages/order-dishes/order-dishes-menu.section.ts",
+    "pages/order-dishes/order-dishes-locators.ts",
+    "pages/order-dishes/order-dishes-navigation.ts",
+    "pages/payment.page.ts",
+    "pages/recall/recall-order-details.dialog.ts",
+    "pages/split-order.page.ts"
+  ]
+}

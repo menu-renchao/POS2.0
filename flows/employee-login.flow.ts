@@ -24,7 +24,9 @@ export class EmployeeLoginFlow {
     }
     await employeeLoginPage.fillPassword(password);
     await employeeLoginPage.clickConfirm();
+    await employeeLoginPage.expectHidden();
     await homePage.expectLoaded();
+    await homePage.expectPrimaryFunctionCardsVisible();
 
     return homePage;
   }
@@ -35,16 +37,20 @@ export class EmployeeLoginFlow {
     employeeLoginPage: EmployeeLoginPage,
     password = '11',
   ): Promise<HomePage> {
+    let consecutiveHomeReadySamples = 0;
     const entryState = await waitUntil(
       async (): Promise<EmployeeEntryState> => {
         if (await employeeLoginPage.isVisible().catch(() => false)) {
+          consecutiveHomeReadySamples = 0;
           return 'employee-login';
         }
 
         if (await homePage.isPrimaryFunctionCardsVisible().catch(() => false)) {
-          return 'home-ready';
+          consecutiveHomeReadySamples += 1;
+          return consecutiveHomeReadySamples >= 3 ? 'home-ready' : 'pending';
         }
 
+        consecutiveHomeReadySamples = 0;
         return 'pending';
       },
       (state) => state !== 'pending',

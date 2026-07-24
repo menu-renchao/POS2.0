@@ -137,20 +137,14 @@ export class OrderDishesModifierSection {
     }
 
     private async resolveModifyButton(): Promise<Locator> {
-      const candidates = [this.locators.modifyButton];
-
-      const directModifyButton = await this.ctx.findVisibleLocator(candidates);
-      if (directModifyButton) {
-        return directModifyButton;
+      if (await this.locators.modifyButton.isVisible().catch(() => false)) {
+        return this.locators.modifyButton;
       }
 
       if (await this.locators.moreActionButton.isVisible().catch(() => false)) {
         await this.locators.moreActionButton.click();
-        const modifyButtonAfterMore = await this.ctx.findVisibleLocator(candidates);
-
-        if (modifyButtonAfterMore) {
-          return modifyButtonAfterMore;
-        }
+        await expect(this.locators.modifyButton).toBeVisible();
+        return this.locators.modifyButton;
       }
 
       throw new Error('Unable to find the Modify button for the selected ordered dish.');
@@ -172,77 +166,19 @@ export class OrderDishesModifierSection {
       buttonName: string,
     ): Promise<Locator> {
       const section = this.resolveModifySection(sectionName);
-      const escapedButtonName = this.ctx.escapeRegExp(buttonName);
-      const fallbackSectionLocators: Locator[] = [];
-
-      if (sectionName === 'Actions') {
-        fallbackSectionLocators.push(
-          this.locators.modifyPanel.locator('[class*="_actionsGrid_"], [class*="_actionGrid_"]'),
-        );
-      }
-
-      if (sectionName === 'Category') {
-        fallbackSectionLocators.push(
-          this.locators.modifyPanel.locator('[class*="_categoryGrid_"], [class*="_categoryOptions_"]'),
-        );
-      }
-
-      if (sectionName === 'Option') {
-        fallbackSectionLocators.push(
-          this.locators.modifyPanel.locator('[class*="_optionsGrid_"], [class*="_optionGrid_"]'),
-        );
-      }
-
-      if (sectionName === 'Price') {
-        fallbackSectionLocators.push(
-          this.locators.modifyPanel.locator('[class*="_priceGrid_"], [class*="_priceSection_"]'),
-        );
-      }
-
-      return await this.ctx.resolveVisibleLocator(
-        [
-          section.getByRole('button', { name: buttonName, exact: true }).first(),
-          section
-            .locator('button')
-            .filter({
-              hasText: new RegExp(`^\\s*${escapedButtonName}\\s*$`),
-            })
-            .first(),
-          ...fallbackSectionLocators.map((locator) =>
-            locator
-              .getByRole('button', { name: buttonName, exact: true })
-              .first(),
-          ),
-          ...fallbackSectionLocators.map((locator) =>
-            locator
-              .locator('button')
-              .filter({ hasText: new RegExp(`^\\s*${escapedButtonName}\\s*$`) })
-              .first(),
-          ),
-        ],
-        `Unable to find Modify ${sectionName} button: ${buttonName}.`,
-      );
+      const button = section.getByRole('button', {
+        name: buttonName,
+        exact: true,
+      });
+      await expect(button).toBeVisible();
+      return button;
     }
 
     private async resolveModifyCustomPriceInput(): Promise<Locator> {
       const priceSection = this.resolveModifySection('Price');
-
-      return await this.ctx.resolveVisibleLocator(
-        [
-          priceSection
-            .locator(
-              '[data-testid="modifier-custom-price-input"], [data-test-id="modifier-custom-price-input"]',
-            )
-            .first(),
-          priceSection.locator('input').first(),
-          this.locators.appFrame
-            .locator(
-              '[data-testid="modifier-custom-price-input"], [data-test-id="modifier-custom-price-input"]',
-            )
-            .first(),
-        ],
-        'Unable to find Modify custom price input after selecting Custom price.',
-      );
+      const input = priceSection.getByTestId('modifier-custom-price-input');
+      await expect(input).toBeVisible();
+      return input;
     }
 
     private formatModifierPriceInput(price: number | string): string {

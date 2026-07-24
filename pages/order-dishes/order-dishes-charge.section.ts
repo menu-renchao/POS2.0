@@ -296,10 +296,9 @@ export class OrderDishesChargeSection {
     }
 
     @step('页面操作：确认加收并关闭弹窗')
-    async confirmChargeDialog(): Promise<void> {
-      await this.expectChargeDialogVisible();
-      await waitForInputSettled(undefined, 250);
-      await expect(this.locators.confirmChargeButton).toBeEnabled();
+  async confirmChargeDialog(): Promise<void> {
+    await this.expectChargeDialogVisible();
+    await expect(this.locators.confirmChargeButton).toBeEnabled();
       await this.locators.confirmChargeButton.click();
       await expect(this.locators.chargeDialog).toBeHidden();
       this.persistedChargeState = this.cloneChargeState(this.ensureChargeDraft());
@@ -575,22 +574,12 @@ export class OrderDishesChargeSection {
         return itemScope;
       }
 
-      const buttonNames =
-        scope === 'whole' ? WHOLE_ORDER_BUTTON_NAMES : ITEM_CHARGE_BUTTON_NAMES;
       const scopeKey = scope === 'whole' ? 'whole' : 'item';
-
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.chargeDialog
-            .locator(
-              `[data-testid="charge-scope-${scopeKey}"], [data-test-id="charge-scope-${scopeKey}"]`,
-            )
-            .first(),
-          this.locators.chargeDialog.getByRole('radio', { name: buttonNames }).first(),
-          this.locators.chargeDialog.getByRole('button', { name: buttonNames }).first(),
-        ],
-        `Unable to find the ${scopeKey} charge scope control.`,
+      const scopeControl = this.locators.chargeDialog.getByTestId(
+        `charge-scope-${scopeKey}`,
       );
+      await expect(scopeControl).toBeVisible();
+      return scopeControl;
     }
 
     private async resolveChargeDishLocator(dishName: string): Promise<Locator> {
@@ -603,46 +592,10 @@ export class OrderDishesChargeSection {
     }
 
     private async resolveChargeButton(): Promise<Locator> {
-      const candidates = [
-        this.locators.appFrame
-          .locator(
-            '[data-testid="icon-button-charge"], [data-test-id="icon-button-charge"], [data-testid="charge-button"], [data-test-id="charge-button"]',
-          )
-          .first(),
-        this.locators.appFrame.getByTestId('bottom-more-action-addprc'),
-        this.locators.chargeButton,
-        this.ctx.page.getByRole('button', { name: /^(Charge|加收)$/ }).first(),
-        this.ctx.page.getByRole('menuitem', { name: /^(Charge|加收)$/ }).first(),
-        this.locators.appFrame.getByRole('menuitem', { name: /^(Charge|加收)$/ }).first(),
-      ];
-
-      const directChargeButton = await this.ctx.findVisibleLocator(candidates);
-      if (directChargeButton) {
-        return directChargeButton;
-      }
-
-      const moreActionButton = await this.ctx.findVisibleLocator([
-        this.locators.moreActionButton,
-        this.ctx.page.getByRole('button', { name: /^(More|更多)$/ }).first(),
-      ]);
-
-      if (moreActionButton) {
-        await moreActionButton.click();
-        const chargeButtonAfterMore = await waitUntil(
-          async () => await this.ctx.findVisibleLocator(candidates),
-          (chargeButton): chargeButton is Locator => chargeButton !== null,
-          {
-            timeout: 3_000,
-            message: 'Charge button did not appear after opening More menu.',
-          },
-        ).catch(() => null);
-
-        if (chargeButtonAfterMore) {
-          return chargeButtonAfterMore;
-        }
-      }
-
-      throw new Error('Unable to find the charge button on the order page.');
+      await expect(this.locators.moreActionButton).toBeVisible();
+      await this.locators.moreActionButton.click();
+      await expect(this.locators.chargeButton).toBeVisible();
+      return this.locators.chargeButton;
     }
 
     private resolveCustomDiscountDialog(): Locator {
@@ -655,60 +608,42 @@ export class OrderDishesChargeSection {
     }
 
     private async resolveChargeOptionLocator(optionName: string): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.chargeDialog.getByRole('button', { name: optionName, exact: true }).first(),
-          this.locators.chargeDialog.locator(`[data-option-name="${optionName}"]`).first(),
-        ],
-        `Unable to find charge option button: ${optionName}.`,
-      );
+      const option = this.locators.chargeDialog.getByRole('button', {
+        name: optionName,
+        exact: true,
+      });
+      await expect(option).toBeVisible();
+      return option;
     }
 
     private async resolveCustomChargeButton(): Promise<Locator> {
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.chargeDialog.getByRole('button', {
-            name: /^(Custom Charge|自定义加费|自定义加收)$/,
-          }).first(),
-          this.locators.chargeDialog.locator('[data-action="custom-charge"]').first(),
-        ],
-        'Unable to find the custom charge button.',
+      const customChargeButton = this.locators.chargeDialog.getByRole(
+        'button',
+        {
+          name: 'Custom Charge',
+          exact: true,
+        },
       );
+      await expect(customChargeButton).toBeVisible();
+      return customChargeButton;
     }
 
     private async resolveCustomTaxedLocator(): Promise<Locator | null> {
-      const candidates = [
-        this.locators.customChargeDialog.getByLabel(CUSTOM_TAXED_LABELS).first(),
-        this.locators.customChargeDialog.getByRole('button', { name: CUSTOM_TAXED_LABELS }).first(),
-        this.locators.customChargeDialog.locator('[data-action="taxed"]').first(),
-      ];
-
-      for (const candidate of candidates) {
-        if (await candidate.isVisible().catch(() => false)) {
-          return candidate;
-        }
-      }
-
-      return null;
+      const taxedControl = this.locators.customChargeDialog.getByRole('button', {
+        name: CUSTOM_TAXED_LABELS,
+      });
+      return (await taxedControl.isVisible().catch(() => false))
+        ? taxedControl
+        : null;
     }
 
     private async resolveCustomChargeTypeLocator(type: ChargeCustomType): Promise<Locator> {
-      const buttonNames =
-        type === 'percentage' ? CUSTOM_PERCENTAGE_BUTTON_NAMES : CUSTOM_FIXED_BUTTON_NAMES;
       const typeKey = type === 'percentage' ? 'percentage' : 'fixed';
-
-      return await this.ctx.resolveVisibleLocator(
-        [
-          this.locators.customChargeDialog
-            .locator(
-              `[data-testid="custom-charge-type-${typeKey}"], [data-test-id="custom-charge-type-${typeKey}"]`,
-            )
-            .first(),
-          this.locators.customChargeDialog.getByRole('radio', { name: buttonNames }).first(),
-          this.locators.customChargeDialog.getByRole('button', { name: buttonNames }).first(),
-        ],
-        `Unable to find the ${typeKey} custom charge type control.`,
+      const typeControl = this.locators.customChargeDialog.getByTestId(
+        `custom-charge-type-${typeKey}`,
       );
+      await expect(typeControl).toBeVisible();
+      return typeControl;
     }
 
     private async enterCustomChargeValueByKeypad(value: number): Promise<void> {

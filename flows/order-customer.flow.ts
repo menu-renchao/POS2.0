@@ -21,10 +21,10 @@ export class OrderCustomerFlow {
     orderDishesPage: OrderDishesPage,
     customer: AddOrderCustomerInformationParams,
   ): Promise<string> {
-    await orderDishesPage.openEmptyCustomerInformation();
-    await orderDishesPage.fillCustomerInformation(customer);
-    await orderDishesPage.saveCustomerInformationPage();
-    return await orderDishesPage.readCustomerButtonText(customer.customerButtonLabel);
+    await orderDishesPage.customer.openEmptyCustomerInformation();
+    await orderDishesPage.customer.fillCustomerInformation(customer);
+    await orderDishesPage.customer.saveCustomerInformationPage();
+    return await orderDishesPage.customer.readCustomerButtonText(customer.customerButtonLabel);
   }
 
   @step('业务步骤：校验支付前客户姓名和电话必填并提交完整信息')
@@ -32,11 +32,11 @@ export class OrderCustomerFlow {
     orderDishesPage: OrderDishesPage,
     customer: RequiredCustomerInformation,
   ): Promise<PaymentPage> {
-    await orderDishesPage.openCustomerDialogForPayment();
-    await orderDishesPage.confirmEmptyCustomerAndExpectNameRequired();
-    await orderDishesPage.fillCustomerName(customer.name);
-    await orderDishesPage.confirmCustomerNameAndExpectPhoneRequired();
-    await orderDishesPage.fillCustomerPhone(customer.phone);
-    return await orderDishesPage.confirmCustomerAndOpenPayment();
+    await orderDishesPage.customer.openCustomerDialogForPayment();
+    await orderDishesPage.customer.confirmEmptyCustomerAndExpectNameRequired();
+    await orderDishesPage.customer.fillCustomerName(customer.name);
+    await orderDishesPage.customer.confirmCustomerNameAndExpectPhoneRequired();
+    await orderDishesPage.customer.fillCustomerPhone(customer.phone);
+    return await orderDishesPage.customer.confirmCustomerAndOpenPayment();
   }
 }

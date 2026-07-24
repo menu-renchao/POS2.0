@@ -6,6 +6,11 @@ import {
   type ApiQueryParams,
   type ApiRequestData,
 } from './client-path';
+import { expectResponseEnvelope } from '../core/api-response';
+import {
+  extractOrderCharges,
+  type OrderChargeReadModel,
+} from '../read-models/order.read-model';
 
 export class OrderApiClient {
   constructor(private readonly request: APIRequestContext) {}
@@ -26,6 +31,25 @@ export class OrderApiClient {
    */
   clearTable(data: ApiRequestData): Promise<APIResponse> {
     return this.post('/api/order/clearTable', data);
+  }
+
+  async clearTableOrders(orderIds: number[]): Promise<void> {
+    if (
+      orderIds.length === 0 ||
+      orderIds.some((orderId) => !Number.isInteger(orderId) || orderId <= 0)
+    ) {
+      throw new Error('清理桌台时必须提供至少一个有效的订单 ID。');
+    }
+
+    const response = await this.clearTable({ orderIds });
+    const body: unknown = await response.json();
+    expectResponseEnvelope(body);
+
+    if (!response.ok() || body.code !== 0) {
+      throw new Error(
+        `清理桌台订单失败：HTTP ${response.status()}，code=${body.code}，msg=${body.msg}`,
+      );
+    }
   }
 
   /**
@@ -62,6 +86,28 @@ export class OrderApiClient {
    */
   fetchOrder(params?: ApiQueryParams): Promise<APIResponse> {
     return this.get('/api/order/fetch', params);
+  }
+
+  async readOrderCharges(orderId: number): Promise<OrderChargeReadModel[]> {
+    const response = await this.fetchOrder({ orderId, fetchPayments: true });
+    const body: unknown = await response.json();
+    expectResponseEnvelope(body);
+
+    if (!response.ok() || body.code !== 0) {
+      throw new Error(
+        `读取订单 ${orderId} 加收失败：HTTP ${response.status()}，code=${body.code}，msg=${body.msg}`,
+      );
+    }
+
+    return extractOrderCharges(body.data);
+  }
+
+  async readOrderChargeAmount(
+    orderId: number,
+    chargeName: string,
+  ): Promise<number | null> {
+    const charges = await this.readOrderCharges(orderId);
+    return charges.find((charge) => charge.name === chargeName)?.amount ?? null;
   }
 
   /**
@@ -143,6 +189,26 @@ export class OrderApiClient {
    */
   voidOrder(data: ApiRequestData): Promise<APIResponse> {
     return this.post('/api/order/void', data);
+  }
+
+  async voidOrderById(orderId: number): Promise<void> {
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      throw new Error('作废订单时必须提供有效的订单 ID。');
+    }
+
+    const response = await this.voidOrder({
+      id: orderId,
+      orderId,
+      reason: 'UI_AUTOMATION_CLEANUP',
+    });
+    const body: unknown = await response.json();
+    expectResponseEnvelope(body);
+
+    if (!response.ok() || body.code !== 0) {
+      throw new Error(
+        `作废 UI 测试订单失败：orderId=${orderId}，HTTP ${response.status()}，code=${body.code}，msg=${body.msg}`,
+      );
+    }
   }
 
   /**

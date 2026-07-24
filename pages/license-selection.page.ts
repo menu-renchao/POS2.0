@@ -7,10 +7,6 @@ export type LicenseRecord = {
   status: string;
 };
 
-type LicenseRow = LicenseRecord & {
-  row: Locator;
-};
-
 export class LicenseSelectionPage {
   readonly licenseInput: Locator;
   private readonly enterButton: Locator;
@@ -23,7 +19,6 @@ export class LicenseSelectionPage {
     });
     this.enterButton = this.page.getByText('Enter', { exact: true });
     this.titleHeaders = this.page.getByText(/^(POS LICENSE|TYPE|STATUS)$/);
-    this.licenseRows = this.page.locator('.selectbx .tablebx > .skOneRow');
     this.licenseRows = this.page.locator('.selectbx .tablebx > .skOneRow');
   }
 
@@ -44,19 +39,28 @@ export class LicenseSelectionPage {
     }
   }
 
-  @step((type = 'PC') => `页面操作：从 License 列表中选择一个类型为 ${type} 且未占用的 License`)
-  async selectAvailableLicenseByType(type = 'PC'): Promise<LicenseRecord> {
+  @step('页面读取：读取 License 列表中的名称、类型和状态')
+  async readLicenseRecords(): Promise<LicenseRecord[]> {
     await this.expectVisible();
-    const availableRow = await this.findAvailableLicenseRow(type);
+    const rowCount = await this.licenseRows.count();
+    const records: LicenseRecord[] = [];
 
-    await availableRow.row.click();
-    await expect(this.licenseInput).toHaveValue(availableRow.name);
+    for (let index = 0; index < rowCount; index += 1) {
+      records.push(await this.readLicenseRow(this.licenseRows.nth(index)));
+    }
 
-    return {
-      name: availableRow.name,
-      type: availableRow.type,
-      status: availableRow.status,
-    };
+    return records;
+  }
+
+  @step((licenseName: string) => `页面操作：选择 License ${licenseName}`)
+  async selectLicenseByName(licenseName: string): Promise<void> {
+    const row = this.licenseRows
+      .filter({ has: this.page.getByText(licenseName, { exact: true }) })
+      .first();
+
+    await expect(row).toBeVisible();
+    await row.click();
+    await expect(this.licenseInput).toHaveValue(licenseName);
   }
 
   @step('页面操作：点击 Enter 按钮提交当前选中的 License')
@@ -81,22 +85,6 @@ export class LicenseSelectionPage {
 
     await expect(row.locator(':scope > div').nth(1)).toHaveText(type);
     await expect(row.locator(':scope > div').nth(2)).toHaveText(status);
-  }
-
-  @step((type: string) => `页面操作：在 License 列表中查找类型为 ${type} 且状态为 Not in use 的记录`)
-  private async findAvailableLicenseRow(type: string): Promise<LicenseRow> {
-    const rowCount = await this.licenseRows.count();
-
-    for (let index = 0; index < rowCount; index += 1) {
-      const row = this.licenseRows.nth(index);
-      const record = await this.readLicenseRow(row);
-
-      if (record.type === type && record.status === 'Not in use') {
-        return { ...record, row };
-      }
-    }
-
-    throw new Error(`No available license found for type: ${type}`);
   }
 
   @step('页面操作：读取一条 License 列表行中的名称、类型和状态')

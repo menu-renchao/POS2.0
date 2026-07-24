@@ -1,14 +1,6 @@
 import { expect } from '@playwright/test';
-import { HomeFlow } from '../../flows/home.flow';
-import { OrderDishesFlow } from '../../flows/order-dishes.flow';
-import { OrderPermissionFlow } from '../../flows/order-permission.flow';
-import { PaymentFlow } from '../../flows/payment.flow';
-import { RecallDatabaseFlow } from '../../flows/recall-database.flow';
-import { RecallFlow } from '../../flows/recall.flow';
-import { SelectTableFlow } from '../../flows/select-table.flow';
-import { SplitOrderFlow } from '../../flows/split-order.flow';
-import { TakeoutFlow } from '../../flows/takeout.flow';
-import { test } from '../../fixtures/test.fixture';
+import { createShortTestName } from '../../api/core/test-data-id';
+import { test, type FlowFixtures } from '../../fixtures/test.fixture';
 import type { HomePage } from '../../pages/home.page';
 import { OrderDishesPage } from '../../pages/order-dishes.page';
 import type { RecallPage } from '../../pages/recall.page';
@@ -59,17 +51,13 @@ const recallPickUpCardCase = {
   phoneNumber: '9342219952',
 } as const;
 
-async function enterReadyHome(
-  homePage: Parameters<HomeFlow['openHomeWithEmployeeContext']>[0],
-  employeeLoginPage: Parameters<HomeFlow['openHomeWithEmployeeContext']>[1],
-): Promise<HomePage> {
-  return await new HomeFlow().openHomeWithEmployeeContext(homePage, employeeLoginPage);
-}
-
-async function openCleanRecall(homePage: HomePage): Promise<RecallPage> {
-  const recallFlow = new RecallFlow();
-  const recallPage = await recallFlow.openRecallFromHome(homePage);
-  return await recallFlow.clearSearchConditions(recallPage);
+async function openCleanRecall(
+  homePage: HomePage,
+  flows: Readonly<FlowFixtures>,
+): Promise<RecallPage> {
+  const recallPage = await flows.recallFlow.openRecallFromHome(homePage);
+  await flows.recallFlow.clearSearchConditions(recallPage);
+  return recallPage;
 }
 
 function parseSortValue(column: RecallSortableColumn, value: string): number | string {
@@ -111,23 +99,22 @@ function isSortedInDirection(
     : comparisons.every((comparison) => comparison >= 0);
 }
 
-test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
+test.describe('Recall 已录制回归', { tag: ['@订单查询', '@ui-exclusive-config'] }, () => {
   for (const dateCase of datePresetDatabaseCases) {
     test(
       `应能按${dateCase.name}筛选并使订单数量与数据库一致`,
       { tag: ['@时间筛选'] },
-      async ({ apiConfig, employeeLoginPage, homePage }) => {
-        const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-        const recallPage = await openCleanRecall(readyHomePage);
-        const selectedRange = await new RecallFlow().applyDatePreset(
+      async ({ employeeLoginPage, homePage, flows }) => {
+        const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+        const recallPage = await openCleanRecall(readyHomePage, flows);
+        const selectedRange = await flows.recallFlow.applyDatePreset(
           recallPage,
           dateCase.preset,
         );
-        const databaseOrderCount = await new RecallDatabaseFlow(
-          apiConfig.baseURL,
-        ).countParentOrdersInDateRange(selectedRange);
+        const databaseOrderCount =
+          await flows.recallDatabaseFlow.countParentOrdersInDateRange(selectedRange);
         const pageOrderCount = await waitUntil(
-          async () => await recallPage.readOrderCount(),
+          async () => await recallPage.summary.readOrderCount(),
           (count) => count === databaseOrderCount,
           {
             timeout: 15_000,
@@ -149,12 +136,12 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-16387')],
       tag: ['@时间筛选', '@状态筛选'],
     },
-    async ({ apiConfig, employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-      await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-      const savedOrder = await orderDishesPage.saveOrderWithReference();
-      const recallFlow = new RecallFlow();
+    async ({ employeeLoginPage, homePage, flows }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+      await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+      const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
+      const recallFlow = flows.recallFlow;
       const recallPage = await recallFlow.openRecallFromHome(savedOrder.homePage);
 
       await recallFlow.searchOrders(recallPage, {
@@ -163,29 +150,31 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
           keyword: savedOrder.orderNumber,
         },
       });
-      await recallPage.openOrderDetails(savedOrder.orderNumber);
-      await recallPage.voidCurrentOrder({ reason: 'POS-16387' });
+      await recallPage.orderDetails.openOrderDetails(savedOrder.orderNumber);
+      await recallPage.voidDialog.voidCurrentOrder({ reason: 'POS-16387' });
       await recallFlow.clearSearchConditions(recallPage);
 
       const selectedRange = await recallFlow.applyDatePreset(
         recallPage,
         RecallDatePresets.thisWeek,
       );
-      await recallPage.selectOrderStatus(RecallOrderStatuses.voided);
+      await recallPage.filterBar.selectOrderStatus(RecallOrderStatuses.voided);
       const pageOrderCount = await waitUntil(
-        async () => await recallPage.readOrderCount(),
+        async () => await recallPage.summary.readOrderCount(),
         (count) => count > 0,
         {
           timeout: 15_000,
           message: 'Recall 页面未加载出本周已删除订单数量。',
         },
       );
-      const databaseOrderCount = await new RecallDatabaseFlow(
-        apiConfig.baseURL,
-      ).countParentOrdersByStatusesInDateRange(selectedRange, [-1, -2]);
+      const databaseOrderCount =
+        await flows.recallDatabaseFlow.countParentOrdersByStatusesInDateRange(
+          selectedRange,
+          [-1, -2],
+        );
 
       expect(pageOrderCount).toBe(databaseOrderCount);
-      expect(await recallPage.readVisibleOrderNumbers()).toContain(`#${savedOrder.orderNumber}`);
+      expect(await recallPage.filterBar.readVisibleOrderNumbers()).toContain(`#${savedOrder.orderNumber}`);
     },
   );
 
@@ -195,13 +184,13 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-31674')],
       tag: ['@点单', '@分单'],
     },
-    async ({ apiConfig, employeeLoginPage, homePage }) => {
+    async ({ employeeLoginPage, homePage, flows }) => {
       test.setTimeout(120_000);
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(
         readyHomePage,
       );
-      const orderDishesFlow = new OrderDishesFlow();
+      const orderDishesFlow = flows.orderDishesFlow;
       await orderDishesFlow.addRegularDish(
         orderDishesPage,
         orderServiceDishes.regular.name,
@@ -213,8 +202,8 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
         orderServiceDishes.test.menu,
       );
 
-      const splitOrderPage = await orderDishesPage.openSplitOrder();
-      const splitOrderFlow = new SplitOrderFlow();
+      const splitOrderPage = await orderDishesPage.navigation.openSplitOrder();
+      const splitOrderFlow = flows.splitOrderFlow;
       await splitOrderFlow.moveDishToNewSuborder(
         splitOrderPage,
         orderServiceDishes.test.name,
@@ -227,12 +216,13 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       expect(childOrderNumber, '按菜分单后应读取到子单号').toBeTruthy();
 
       const returnedPage = await splitOrderFlow.submitAndReturnPage(splitOrderPage);
-      const alphabeticChild = await new RecallDatabaseFlow(
-        apiConfig.baseURL,
-      ).replaceLatestSplitChildOrderNumberWithAlphabetic(childOrderNumber!);
+      const alphabeticChild =
+        await flows.recallDatabaseFlow.replaceLatestSplitChildOrderNumberWithAlphabetic(
+          childOrderNumber!,
+        );
 
       try {
-        const recallFlow = new RecallFlow();
+        const recallFlow = flows.recallFlow;
         const recallPage = await recallFlow.openRecallFromSplitReturnPage(
           returnedPage,
           readyHomePage,
@@ -246,7 +236,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
           },
         });
 
-        expect(await recallPage.readVisibleOrderNumbers()).toContain(parentOrderNumber);
+        expect(await recallPage.filterBar.readVisibleOrderNumbers()).toContain(parentOrderNumber);
       } finally {
         await alphabeticChild.restore();
       }
@@ -259,41 +249,41 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-32935')],
       tag: ['@点单', '@现金支付'],
     },
-    async ({ employeeLoginPage, homePage }) => {
+    async ({ employeeLoginPage, homePage, flows }) => {
       test.setTimeout(120_000);
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(
         readyHomePage,
       );
-      await new OrderDishesFlow().addRegularDish(
+      await flows.orderDishesFlow.addRegularDish(
         orderDishesPage,
         orderServiceDishes.regular.name,
         orderServiceDishes.regular.menu,
       );
-      const savedOrder = await orderDishesPage.saveOrderWithReference();
-      const recallFlow = new RecallFlow();
+      const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
+      const recallFlow = flows.recallFlow;
       const recallPage = await recallFlow.openRecallFromHome(savedOrder.homePage);
       await recallFlow.clearSearchConditions(recallPage);
-      await recallPage.openOrderDetails(savedOrder.orderNumber);
-      const paymentPage = await recallPage.openPayment();
-      await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
-      await recallPage.closeOrderDetailsDialog();
+      await recallPage.orderDetails.openOrderDetails(savedOrder.orderNumber);
+      const paymentPage = await recallPage.orderDetails.openPayment();
+      await flows.paymentFlow.payByCash(paymentPage, { printReceipt: false });
+      await recallPage.orderDetails.closeOrderDetailsDialog();
 
-      await recallPage.switchToListView();
-      const firstSort = await recallPage.clickListSort(RecallSortableColumns.total);
+      await recallPage.list.switchToListView();
+      const firstSort = await recallPage.list.clickSort(RecallSortableColumns.total);
       await recallFlow.searchOrders(recallPage, {
         manualSearch: {
           tag: RecallManualSearchTags.orderNumber,
           keyword: savedOrder.orderNumber,
         },
       });
-      await recallPage.switchToCardView();
-      await recallPage.openOrderDetails(savedOrder.orderNumber);
-      await recallPage.voidPaymentRecord(0);
-      await recallPage.closeOrderDetailsDialog();
+      await recallPage.list.switchToCardView();
+      await recallPage.orderDetails.openOrderDetails(savedOrder.orderNumber);
+      await recallPage.orderDetails.voidPaymentRecord(0);
+      await recallPage.orderDetails.closeOrderDetailsDialog();
       await recallFlow.clearSearchConditions(recallPage);
-      await recallPage.switchToListView();
-      const pricesAfterVoid = await recallPage.readVisibleListColumnValues(
+      await recallPage.list.switchToListView();
+      const pricesAfterVoid = await recallPage.list.readVisibleColumnValues(
         RecallSortableColumns.total,
       );
 
@@ -317,7 +307,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       ],
       tag: ['@点单'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       test.setTimeout(120_000);
       const restoreConfiguration = await apiSetup.systemConfiguration.updateByName(
         'AUTO_SEND_TO_KITCHEN_AFTER_PRINTED',
@@ -326,18 +316,20 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-        await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-        const savedOrder = await orderDishesPage.saveOrderWithReference();
-        const recallPage = await new RecallFlow().openRecallFromHome(savedOrder.homePage);
-        await recallPage.openOrderDetails(savedOrder.orderNumber);
-        expect(await recallPage.clickPrintInOrderDetailsAndReadReceiptStatus()).toBe(200);
-        await recallPage.closeOrderDetailsDialog();
-        const recallFlow = new RecallFlow();
+        const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+        await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+        const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
+        const recallPage = await flows.recallFlow.openRecallFromHome(savedOrder.homePage);
+        await recallPage.orderDetails.openOrderDetails(savedOrder.orderNumber);
+        expect(
+          await recallPage.orderDetails.clickPrintInOrderDetailsAndReadReceiptStatus(),
+        ).toBe(200);
+        await recallPage.orderDetails.closeOrderDetailsDialog();
+        const recallFlow = flows.recallFlow;
         await recallFlow.clearSearchConditions(recallPage);
         await recallFlow.searchOrders(recallPage, {
           orderStatus: RecallOrderStatuses.printed,
@@ -347,7 +339,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
           },
         });
 
-        expect(await recallPage.readVisibleOrderNumbers()).toContain(`#${savedOrder.orderNumber}`);
+        expect(await recallPage.filterBar.readVisibleOrderNumbers()).toContain(`#${savedOrder.orderNumber}`);
       } finally {
         await restoreConfiguration();
       }
@@ -360,7 +352,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-34442')],
       tag: ['@点单'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       test.setTimeout(120_000);
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         orderServiceSameDishStatusCombineCase.configuration,
@@ -368,28 +360,28 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       );
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-        await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-        const savedOrder = await orderDishesPage.saveOrderWithReference();
-        const recallPage = await new RecallFlow().openRecallFromHome(savedOrder.homePage);
-        const editingPage = await new RecallFlow().editOrder(
+        const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+        await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+        const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
+        const recallPage = await flows.recallFlow.openRecallFromHome(savedOrder.homePage);
+        const editingPage = await flows.recallFlow.editOrder(
           recallPage,
           savedOrder.orderNumber,
         );
 
-        await editingPage.reduceOrderedDishQuantity(orderServiceDishes.regular.name, 1);
-        await editingPage.expectOrderedDishAbsent(orderServiceDishes.regular.name);
-        await editingPage.clickDish(orderServiceDishes.test.name);
-        await editingPage.clickDish(orderServiceDishes.regular.name);
-        const editedItems = await editingPage.readOrderedItems();
+        await editingPage.menu.reduceOrderedDishQuantity(orderServiceDishes.regular.name, 1);
+        await editingPage.reads.expectOrderedDishAbsent(orderServiceDishes.regular.name);
+        await editingPage.menu.clickDish(orderServiceDishes.test.name);
+        await editingPage.menu.clickDish(orderServiceDishes.regular.name);
+        const editedItems = await editingPage.reads.readOrderedItems();
 
         expect(editedItems.filter((item) => item.name === orderServiceDishes.regular.name)).toHaveLength(1);
         expect(editedItems.map((item) => item.name)).toContain(orderServiceDishes.test.name);
-        await editingPage.saveOrder();
+        await editingPage.navigation.saveOrder();
       } finally {
         await restoreConfiguration();
       }
@@ -402,15 +394,15 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-34673')],
       tag: ['@点单'],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const orderDishesPage = await new TakeoutFlow().startPickUpOrder(
+    async ({ employeeLoginPage, homePage, flows }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const orderDishesPage = await flows.takeoutFlow.startPickUpOrder(
         readyHomePage,
         recallPickUpCardCase,
       );
-      await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-      const savedOrder = await orderDishesPage.saveOrderWithReference();
-      const recallFlow = new RecallFlow();
+      await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+      const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
+      const recallFlow = flows.recallFlow;
       const recallPage = await recallFlow.openRecallFromHome(savedOrder.homePage);
       await recallFlow.searchOrders(recallPage, {
         orderType: 'Pickup',
@@ -419,10 +411,10 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
           keyword: savedOrder.orderNumber,
         },
       });
-      const cardText = await recallPage.readOrderCardText(savedOrder.orderNumber);
+      const cardText = await recallPage.filterBar.readOrderCardText(savedOrder.orderNumber);
 
-      await recallPage.openOrderDetails(savedOrder.orderNumber);
-      const context = await recallPage.readOrderContext();
+      await recallPage.orderDetails.openOrderDetails(savedOrder.orderNumber);
+      const context = await recallPage.orderDetails.readOrderContext();
       expect(cardText).toContain(recallPickUpCardCase.expectedFormattedPhone);
       expect(context.serverName).toBeTruthy();
       expect(cardText).toContain(context.serverName!);
@@ -435,7 +427,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-30058')],
       tag: ['@点单'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       test.setTimeout(120_000);
       const restoreOriginalConfiguration = await apiSetup.systemConfiguration.updateByName(
         orderSettleConfiguration.roundingName,
@@ -445,31 +437,31 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       let restoreRoundedConfiguration: (() => Promise<void>) | undefined;
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+        const readyHomePage = await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-        const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(
+        const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(
           readyHomePage,
         );
-        await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-        await orderDishesPage.changeOrderedDishPrice(orderServiceDishes.regular.name, 10.01);
-        await orderDishesPage.setOrderedDishTaxExempt(orderServiceDishes.regular.name, true);
-        const summaryBeforeSave = await orderDishesPage.readPriceSummary();
-        const savedOrder = await orderDishesPage.saveOrderWithReference();
+        await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+        await orderDishesPage.menu.changeOrderedDishPrice(orderServiceDishes.regular.name, 10.01);
+        await orderDishesPage.menu.setOrderedDishTaxExempt(orderServiceDishes.regular.name, true);
+        const summaryBeforeSave = await orderDishesPage.reads.readPriceSummary();
+        const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
 
         restoreRoundedConfiguration = await apiSetup.systemConfiguration.updateByName(
           orderSettleConfiguration.roundingName,
           orderSettleConfiguration.noRounding,
           { verify: true },
         );
-        const refreshedHomePage = await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+        const refreshedHomePage = await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
           savedOrder.homePage,
           employeeLoginPage,
         );
-        const recallPage = await new RecallFlow().openRecallFromHome(refreshedHomePage);
-        await recallPage.openOrderDetails(savedOrder.orderNumber);
-        const details = await recallPage.readOrderDetailsSnapshot();
+        const recallPage = await flows.recallFlow.openRecallFromHome(refreshedHomePage);
+        await recallPage.orderDetails.openOrderDetails(savedOrder.orderNumber);
+        const details = await recallPage.orderDetails.readOrderDetailsSnapshot();
         const expectedTotal = summaryBeforeSave['Total(Cash)'];
         const actualTotal = details.priceSummary.Total ?? details.priceSummary['Total(Cash)'];
         const expectedRounding =
@@ -494,20 +486,24 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-34021')],
       tag: ['@点单', '@加收'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       test.setTimeout(120_000);
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const toGoPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-      await toGoPage.clickDish(orderServiceDishes.regular.name);
-      const toGoOrder = await toGoPage.saveOrderWithReference();
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const toGoPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+      await toGoPage.menu.clickDish(orderServiceDishes.regular.name);
+      const toGoOrder = await toGoPage.navigation.saveOrderWithReference();
 
-      const dineInPage = await new SelectTableFlow().enterDineInNoTableOrder(toGoOrder.homePage);
-      await dineInPage.changeGuestCount(4);
-      await dineInPage.clickDish(orderServiceDishes.test.name);
-      const dineInOrder = await dineInPage.saveOrderWithReference();
+      const dineInPage = await flows.selectTableFlow.enterDineInNoTableOrder(toGoOrder.homePage);
+      await dineInPage.menu.changeGuestCount(4);
+      await dineInPage.menu.clickDish(orderServiceDishes.test.name);
+      const dineInOrder = await dineInPage.navigation.saveOrderWithReference();
 
       const chargeResource = await apiSetup.charge.create({
-        name: 'POS34021_GUEST4',
+        name: createShortTestName({
+          prefix: 'AT',
+          domain: 'POS34021_GUEST4',
+          maxLength: 24,
+        }),
         minGuest: 4,
         orderType: 'dine in',
         rate: 10,
@@ -523,18 +519,18 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
 
       try {
         const refreshedHomePage =
-          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+          await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
             dineInOrder.homePage,
             employeeLoginPage,
           );
-        const recallPage = await new RecallFlow().openRecallFromHome(refreshedHomePage);
-        await new RecallFlow().combineOrders(
+        const recallPage = await flows.recallFlow.openRecallFromHome(refreshedHomePage);
+        await flows.recallFlow.combineOrders(
           recallPage,
           toGoOrder.orderNumber,
           dineInOrder.orderNumber,
         );
-        const details = await recallPage.readOrderDetailsSnapshot();
-        const detailsText = await recallPage.readOrderDetailsText();
+        const details = await recallPage.orderDetails.readOrderDetailsSnapshot();
+        const detailsText = await recallPage.orderDetails.readOrderDetailsText();
 
         expect(details.orderContext.orderType).toMatch(/Dine\s*In/i);
         expect(details.orderContext.guestCount).toContain('4');
@@ -551,24 +547,19 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-34787')],
       tag: ['@点单'],
     },
-    async ({ apiConfig, employeeLoginPage, homePage, orderApi }) => {
+    async ({ employeeLoginPage, homePage, flows }) => {
       test.setTimeout(120_000);
-      const databaseFlow = new RecallDatabaseFlow(apiConfig.baseURL);
-      const occupiedOrderIds = await databaseFlow.readLeastOccupiedTableOrderIds(2);
-      const clearTableResponse = await orderApi.clearTable({ orderIds: occupiedOrderIds });
-      expect(clearTableResponse.ok()).toBe(true);
-      const clearTableBody = (await clearTableResponse.json()) as { code?: number };
-      expect(clearTableBody.code).toBe(0);
+      const databaseFlow = flows.recallDatabaseFlow;
 
-      const recallFlow = new RecallFlow();
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
+      const recallFlow = flows.recallFlow;
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
         const selectTablePage = await readyHomePage.enterDineIn();
-        const initialEntry = await new SelectTableFlow().selectAnyAvailableTableAndEnterOrderDishes(
+        const initialEntry = await flows.selectTableFlow.selectAnyAvailableTableAndEnterOrderDishes(
           selectTablePage,
           1,
         );
-        await initialEntry.orderDishesPage.clickDish(orderServiceDishes.regular.name);
-        const sentOrder = await initialEntry.orderDishesPage.sendOrderWithReference();
+        await initialEntry.orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+        const sentOrder = await initialEntry.orderDishesPage.navigation.sendOrderWithReference();
         const recallPage = await recallFlow.openRecallFromHome(sentOrder.homePage);
         await recallFlow.clearSearchConditions(recallPage);
         const printStatus = await recallFlow.printReceiptAndReadStatus(
@@ -581,7 +572,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
           sentOrder.orderNumber,
         );
         expect(receiptPrintCount).toBeGreaterThan(0);
-        await recallPage.closeOrderDetailsDialog();
+        await recallPage.orderDetails.closeOrderDetailsDialog();
         await recallFlow.clearSearchConditions(recallPage);
         await recallFlow.searchOrders(recallPage, {
           manualSearch: {
@@ -590,7 +581,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
           },
         });
         const editingPage = await recallFlow.editOrder(recallPage, sentOrder.orderNumber);
-        const changedEntry = await new SelectTableFlow().changeToAnyAvailableTable(
+        const changedEntry = await flows.selectTableFlow.changeToAnyAvailableTable(
           editingPage,
           initialEntry.selectedTable.tableNumber,
           1,
@@ -598,7 +589,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
         expect(changedEntry.selectedTable.tableNumber).not.toBe(
           initialEntry.selectedTable.tableNumber,
         );
-        const savedHomePage = await changedEntry.orderDishesPage.saveOrder();
+        const savedHomePage = await changedEntry.orderDishesPage.navigation.saveOrder();
 
         expect(await databaseFlow.readLatestOrderStatus(sentOrder.orderNumber)).toBe(
           printedDatabaseStatus,
@@ -615,8 +606,8 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
             keyword: sentOrder.orderNumber,
           },
         });
-        await cleanupRecallPage.openOrderDetails(sentOrder.orderNumber);
-        await cleanupRecallPage.clickClearTableInMoreMenu();
+        await cleanupRecallPage.orderDetails.openOrderDetails(sentOrder.orderNumber);
+        await cleanupRecallPage.orderDetails.clickClearTableInMoreMenu();
     },
   );
 
@@ -626,12 +617,12 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-34800')],
       tag: ['@点单'],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-      await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-      const sentOrder = await orderDishesPage.sendOrderWithReference();
-      const recallFlow = new RecallFlow();
+    async ({ employeeLoginPage, homePage, flows }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+      await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+      const sentOrder = await orderDishesPage.navigation.sendOrderWithReference();
+      const recallFlow = flows.recallFlow;
       const recallPage = await recallFlow.openRecallFromHome(sentOrder.homePage);
       await recallFlow.clearSearchConditions(recallPage);
       const printStatus = await recallFlow.printReceiptAndReadStatus(
@@ -639,7 +630,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
         sentOrder.orderNumber,
       );
       expect(printStatus).toBe(200);
-      await recallPage.closeOrderDetailsDialog();
+      await recallPage.orderDetails.closeOrderDetailsDialog();
       await recallFlow.clearSearchConditions(recallPage);
       await recallFlow.searchOrders(recallPage, {
         manualSearch: {
@@ -648,8 +639,8 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
         },
       });
       const editingPage = await recallFlow.editOrder(recallPage, sentOrder.orderNumber);
-      await editingPage.clickDish(orderServiceDishes.test.name);
-      const savedHomePage = await editingPage.saveOrder();
+      await editingPage.menu.clickDish(orderServiceDishes.test.name);
+      const savedHomePage = await editingPage.navigation.saveOrder();
       const updatedRecallPage = await recallFlow.openRecallFromHome(savedHomePage);
       await recallFlow.clearSearchConditions(updatedRecallPage);
       await recallFlow.searchOrders(updatedRecallPage, {
@@ -659,7 +650,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
           keyword: sentOrder.orderNumber,
         },
       });
-      expect(await updatedRecallPage.readVisibleOrderNumbers()).toContain(`#${sentOrder.orderNumber}`);
+      expect(await updatedRecallPage.filterBar.readVisibleOrderNumbers()).toContain(`#${sentOrder.orderNumber}`);
     },
   );
 
@@ -669,13 +660,13 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-34827')],
       tag: ['@点单'],
     },
-    async ({ apiConfig, employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-      await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-      const sentOrder = await orderDishesPage.sendOrderWithReference();
-      const databaseFlow = new RecallDatabaseFlow(apiConfig.baseURL);
-      const recallFlow = new RecallFlow();
+    async ({ employeeLoginPage, homePage, flows }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+      await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+      const sentOrder = await orderDishesPage.navigation.sendOrderWithReference();
+      const databaseFlow = flows.recallDatabaseFlow;
+      const recallFlow = flows.recallFlow;
       const recallPage = await recallFlow.openRecallFromHome(sentOrder.homePage);
       await recallFlow.clearSearchConditions(recallPage);
       const printStatus = await recallFlow.printReceiptAndReadStatus(
@@ -688,7 +679,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
         sentOrder.orderNumber,
       );
       expect(receiptPrintCount).toBeGreaterThan(0);
-      await recallPage.closeOrderDetailsDialog();
+      await recallPage.orderDetails.closeOrderDetailsDialog();
       await recallFlow.clearSearchConditions(recallPage);
       await recallFlow.searchOrders(recallPage, {
         manualSearch: {
@@ -697,9 +688,9 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
         },
       });
       const editingPage = await recallFlow.editOrder(recallPage, sentOrder.orderNumber);
-      await editingPage.setOrderedDishTaxExempt(orderServiceDishes.regular.name, true);
-      await editingPage.setOrderedDishTaxExempt(orderServiceDishes.regular.name, false);
-      await editingPage.saveOrder();
+      await editingPage.menu.setOrderedDishTaxExempt(orderServiceDishes.regular.name, true);
+      await editingPage.menu.setOrderedDishTaxExempt(orderServiceDishes.regular.name, false);
+      await editingPage.navigation.saveOrder();
 
       expect(await databaseFlow.readLatestOrderStatus(sentOrder.orderNumber)).toBe(
         printedDatabaseStatus,
@@ -716,34 +707,38 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-34829')],
       tag: ['@点单', '@加收'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage, page }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, page, flows }) => {
       test.setTimeout(120_000);
       const chargeResource = await apiSetup.charge.create({
-        name: 'POS34829_CHARGE',
+        name: createShortTestName({
+          prefix: 'AT',
+          domain: 'POS34829_CHARGE',
+          maxLength: 24,
+        }),
         rate: 5,
         rateType: 1,
         triggerMode: 2,
         type: 'DEFAULT',
       });
       const readyHomePage =
-        await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+        await flows.homeFlow.openHomeAfterConfigurationRefreshWithEmployeeContext(
           homePage,
           employeeLoginPage,
         );
-      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-      await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-      const sentOrder = await orderDishesPage.sendOrderWithReference();
+      const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+      await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+      const sentOrder = await orderDishesPage.navigation.sendOrderWithReference();
 
-      const recallPage = await new RecallFlow().openRecallFromHome(sentOrder.homePage);
-      await new RecallFlow().openChargeFromMore(recallPage, sentOrder.orderNumber);
+      const recallPage = await flows.recallFlow.openRecallFromHome(sentOrder.homePage);
+      await flows.recallFlow.openChargeFromMore(recallPage, sentOrder.orderNumber);
       const editingPage = new OrderDishesPage(page);
-      await editingPage.expectChargeDialogVisible();
-      await editingPage.toggleChargeOption(chargeResource.name);
-      const chargeSnapshot = await editingPage.readChargeSnapshot();
+      await editingPage.charge.expectChargeDialogVisible();
+      await editingPage.charge.toggleChargeOption(chargeResource.name);
+      const chargeSnapshot = await editingPage.charge.readChargeSnapshot();
       expect(chargeSnapshot.wholeOrderCharges.map((charge) => charge.name)).toContain(
         chargeResource.name,
       );
-      await editingPage.confirmChargeDialog();
+      await editingPage.charge.confirmChargeDialog();
     },
   );
 
@@ -753,27 +748,27 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-36180')],
       tag: ['@点单'],
     },
-    async ({ apiSetup, employeeLoginPage, homePage }) => {
+    async ({ apiSetup, employeeLoginPage, homePage, flows }) => {
       test.setTimeout(120_000);
       const restrictedEmployee = await apiSetup.staff.createWithoutKitchenVoidPermission();
-      const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
+      const readyHomePage = await flows.homeFlow.openHomeWithEmployeeContext(
         homePage,
         employeeLoginPage,
         restrictedEmployee.passcode,
       );
-      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-      await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-      await orderDishesPage.clickDish(orderServiceDishes.test.name);
-      const sentOrder = await orderDishesPage.sendOrderWithReference();
-      const recallFlow = new RecallFlow();
+      const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+      await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+      await orderDishesPage.menu.clickDish(orderServiceDishes.test.name);
+      const sentOrder = await orderDishesPage.navigation.sendOrderWithReference();
+      const recallFlow = flows.recallFlow;
       const recallPage = await recallFlow.openRecallFromHome(sentOrder.homePage);
       const editingPage = await recallFlow.editOrder(recallPage, sentOrder.orderNumber);
-      await new OrderPermissionFlow().removeSentDishWithAuthorization(
+      await flows.orderPermissionFlow.removeSentDishWithAuthorization(
         editingPage,
         orderServiceDishes.regular.name,
         orderServiceKitchenVoidPermissionCase.authorizationPasscode,
       );
-      const savedHomePage = await editingPage.saveOrder();
+      const savedHomePage = await editingPage.navigation.saveOrder();
       const resultPage = await recallFlow.openRecallFromHome(savedHomePage);
       await recallFlow.clearSearchConditions(resultPage);
       await recallFlow.searchOrders(resultPage, {
@@ -784,7 +779,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
         },
       });
 
-      expect(await resultPage.readVisibleOrderNumbers()).toContain(`#${sentOrder.orderNumber}`);
+      expect(await resultPage.filterBar.readVisibleOrderNumbers()).toContain(`#${sentOrder.orderNumber}`);
     },
   );
 
@@ -794,18 +789,18 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-39760')],
       tag: ['@点单', '@现金支付', '@小费'],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const orderDishesPage = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-      await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-      const expectedTotal = (await orderDishesPage.readPriceSummary())['Total(Cash)'];
-      const savedOrder = await orderDishesPage.saveOrderWithReference();
-      const recallPage = await new RecallFlow().openRecallFromHome(savedOrder.homePage);
-      await recallPage.openOrderDetails(savedOrder.orderNumber);
-      const paymentPage = await recallPage.openPayment();
-      await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
-      await recallPage.confirmEmptyPaymentCardTip('Cash');
-      const details = await recallPage.readOrderDetailsSnapshot();
+    async ({ employeeLoginPage, homePage, flows }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const orderDishesPage = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+      await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+      const expectedTotal = (await orderDishesPage.reads.readPriceSummary())['Total(Cash)'];
+      const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
+      const recallPage = await flows.recallFlow.openRecallFromHome(savedOrder.homePage);
+      await recallPage.orderDetails.openOrderDetails(savedOrder.orderNumber);
+      const paymentPage = await recallPage.orderDetails.openPayment();
+      await flows.paymentFlow.payByCash(paymentPage, { printReceipt: false });
+      await recallPage.orderDetails.confirmEmptyPaymentCardTip('Cash');
+      const details = await recallPage.orderDetails.readOrderDetailsSnapshot();
       const actualTotal = details.priceSummary.Total ?? details.priceSummary['Total(Cash)'];
 
       expect(details.paymentStatus).toBe('Success');
@@ -820,10 +815,10 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       annotation: [jiraIssueAnnotation('POS-16377')],
       tag: ['@时间筛选'],
     },
-    async ({ apiConfig, employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const recallPage = await openCleanRecall(readyHomePage);
-      const recallFlow = new RecallFlow();
+    async ({ employeeLoginPage, homePage, flows }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const recallPage = await openCleanRecall(readyHomePage, flows);
+      const recallFlow = flows.recallFlow;
 
       for (const dateCase of datePresetCases) {
         await test.step(`选择${dateCase.name}并校验日期范围`, async () => {
@@ -838,11 +833,10 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
           recallPage,
           RecallDatePresets.thisWeek,
         );
-        const databaseOrderCount = await new RecallDatabaseFlow(
-          apiConfig.baseURL,
-        ).countParentOrdersInDateRange(thisWeekRange);
+        const databaseOrderCount =
+          await flows.recallDatabaseFlow.countParentOrdersInDateRange(thisWeekRange);
         const pageOrderCount = await waitUntil(
-          async () => await recallPage.readOrderCount(),
+          async () => await recallPage.summary.readOrderCount(),
           (orderCount) => orderCount > 0,
           {
             timeout: 15_000,
@@ -866,10 +860,10 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
         annotation: [jiraIssueAnnotation(sortCase.issue)],
         tag: ['@排序'],
       },
-      async ({ employeeLoginPage, homePage }) => {
-        const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-        const recallPage = await openCleanRecall(readyHomePage);
-        const sortedValues = await new RecallFlow().readBothSortDirections(
+      async ({ employeeLoginPage, homePage, flows }) => {
+        const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+        const recallPage = await openCleanRecall(readyHomePage, flows);
+        const sortedValues = await flows.recallFlow.readBothSortDirections(
           recallPage,
           sortCase.column,
         );
@@ -899,13 +893,13 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
   test(
     '应能按菜品名称关键字搜索到包含该菜品的订单',
     { tag: ['@点单'] },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
-      await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-      const savedOrder = await orderDishesPage.saveOrderWithReference();
+    async ({ employeeLoginPage, homePage, flows }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const orderDishesPage = await flows.takeoutFlow.startToGoOrder(readyHomePage);
+      await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+      const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
 
-      const recallFlow = new RecallFlow();
+      const recallFlow = flows.recallFlow;
       const recallPage = await recallFlow.openRecallFromHome(savedOrder.homePage);
       await recallFlow.searchOrders(recallPage, {
         manualSearch: {
@@ -916,7 +910,7 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
 
       const expectedOrderNumber = `#${savedOrder.orderNumber}`;
       const visibleOrderNumbers = await waitUntil(
-        async () => await recallPage.readVisibleOrderNumbers(),
+        async () => await recallPage.filterBar.readVisibleOrderNumbers(),
         (orderNumbers) => orderNumbers.includes(expectedOrderNumber),
         {
           timeout: 10_000,
@@ -936,17 +930,17 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       ],
       tag: ['@点单'],
     },
-    async ({ employeeLoginPage, homePage }) => {
-      const readyHomePage = await enterReadyHome(homePage, employeeLoginPage);
-      const orderDishesPage = await new TakeoutFlow().startDeliveryOrder(
+    async ({ employeeLoginPage, homePage, flows }) => {
+      const readyHomePage = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
+      const orderDishesPage = await flows.takeoutFlow.startDeliveryOrder(
         readyHomePage,
         recallDeliveryDriverCase.customer,
       );
-      await orderDishesPage.clickDish(orderServiceDishes.regular.name);
-      await orderDishesPage.selectDriver(recallDeliveryDriverCase.initialDriver);
-      const savedOrder = await orderDishesPage.saveOrderWithReference();
+      await orderDishesPage.menu.clickDish(orderServiceDishes.regular.name);
+      await orderDishesPage.driver.selectDriver(recallDeliveryDriverCase.initialDriver);
+      const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
 
-      const recallFlow = new RecallFlow();
+      const recallFlow = flows.recallFlow;
       const recallPage = await recallFlow.openRecallFromHome(savedOrder.homePage);
       await recallFlow.searchOrders(recallPage, {
         manualSearch: {
@@ -956,26 +950,26 @@ test.describe('Recall 已录制回归', { tag: ['@订单查询'] }, () => {
       });
 
       await test.step('校验 Recall 订单卡片展示格式化后的完整手机号', async () => {
-        const orderCardText = await recallPage.readOrderCardText(savedOrder.orderNumber);
+        const orderCardText = await recallPage.filterBar.readOrderCardText(savedOrder.orderNumber);
         expect(orderCardText).toContain(recallDeliveryDriverCase.expectedFormattedPhone);
       });
 
-      await recallPage.openOrderDetails(savedOrder.orderNumber);
-      expect(await recallPage.readOrderDriverName()).toContain(
+      await recallPage.orderDetails.openOrderDetails(savedOrder.orderNumber);
+      expect(await recallPage.orderDetails.readOrderDriverName()).toContain(
         recallDeliveryDriverCase.initialDriver,
       );
-      expect((await recallPage.readOrderCustomerInfo())?.phone).toContain(
+      expect((await recallPage.orderDetails.readOrderCustomerInfo())?.phone).toContain(
         recallDeliveryDriverCase.expectedFormattedPhone,
       );
 
-      await recallPage.changeOrderDriver(recallDeliveryDriverCase.targetDriver);
-      await recallPage.closeOrderDetailsDialog();
-      await recallPage.openOrderDetails(savedOrder.orderNumber);
+      await recallPage.orderDetails.changeOrderDriver(recallDeliveryDriverCase.targetDriver);
+      await recallPage.orderDetails.closeOrderDetailsDialog();
+      await recallPage.orderDetails.openOrderDetails(savedOrder.orderNumber);
 
-      expect(await recallPage.readOrderDriverName()).toContain(
+      expect(await recallPage.orderDetails.readOrderDriverName()).toContain(
         recallDeliveryDriverCase.targetDriver,
       );
-      expect((await recallPage.readOrderCustomerInfo())?.phone).toContain(
+      expect((await recallPage.orderDetails.readOrderCustomerInfo())?.phone).toContain(
         recallDeliveryDriverCase.expectedFormattedPhone,
       );
     },

@@ -1,15 +1,12 @@
-import { expect, type Locator, type Page } from '@playwright/test';
-import { waitForInputSettled } from '../utils/input-stability';
+import { expect, type Page } from '@playwright/test';
 import { step } from '../utils/step';
 import { waitUntil } from '../utils/wait';
-
-export type PaymentCardForm = {
-  cardNumber: string;
-  cvv: string;
-  expMonth: string;
-  expYear: string;
-  holderName: string;
-};
+import { PaymentCardSection } from './payment/payment-card.section';
+import { PaymentCashSection } from './payment/payment-cash.section';
+import { PaymentPageContext } from './payment/payment-page-context';
+import { PaymentReceiptDialog } from './payment/payment-receipt.dialog';
+import { PaymentSummarySection } from './payment/payment-summary.section';
+import { PaymentTipDialog } from './payment/payment-tip.dialog';
 
 export type PaymentSummaryRow = {
   label: string;
@@ -21,72 +18,37 @@ export type PaymentSummarySnapshot = {
   text: string;
 };
 
+/**
+ * Payment 页面门面只负责页面加载、跨 section 状态与向后兼容的窄委托。
+ * 具体现金、卡、Tips、小票及汇总实现分别由对应能力组件持有。
+ */
 export class PaymentPage {
-  private readonly contractRoot: Locator;
-  private readonly paymentPanelFrame: Locator;
-  private readonly paymentFrame: ReturnType<Page['frameLocator']>;
-  private readonly printReceiptDialog: Locator;
-  private readonly printReceiptCancelButton: Locator;
-  private readonly printReceiptConfirmButton: Locator;
-  private readonly paymentSuccessConfirmButton: Locator;
-  private readonly paymentLoadingOverlay: Locator;
-  private readonly paymentFailureDialog: Locator;
-  private readonly paymentFlow: Locator;
-  private readonly tipsButton: Locator;
-  private readonly tipsConfirmButton: Locator;
-  private readonly tipSuggestionButtons: Locator;
+  readonly cash: PaymentCashSection;
+  readonly card: PaymentCardSection;
+  readonly tips: PaymentTipDialog;
+  readonly receipt: PaymentReceiptDialog;
+  readonly summary: PaymentSummarySection;
+  private readonly ctx: PaymentPageContext;
 
-  constructor(private readonly page: Page) {
-    this.contractRoot = this.page.getByTestId('payment-page');
-    this.paymentPanelFrame = this.page.locator('#paymentPanelContainer iframe');
-    this.paymentFrame = this.page.frameLocator('#paymentPanelContainer iframe');
-    this.printReceiptDialog = this.page.locator('#print-customer-dialog');
-    this.printReceiptCancelButton = this.printReceiptDialog.locator('#print-customer-cancel');
-    this.printReceiptConfirmButton = this.printReceiptDialog.locator('#print-customer-submit');
-    this.paymentSuccessConfirmButton = this.paymentFrame.getByTestId('pay-success-status-button-1');
-    this.paymentLoadingOverlay = this.paymentFrame.getByTestId('pos-ui-loading-overlay');
-    this.paymentFailureDialog = this.paymentFrame
-      .getByRole('dialog')
-      .filter({
-        has: this.paymentFrame.getByRole('heading', {
-          name: 'Payment Failed',
-          exact: true,
-        }),
-      });
-    this.paymentFlow = this.paymentFrame.getByTestId('payment-panel-payment-flow');
-    this.tipsButton = this.paymentFrame.getByTestId('payment-panel-action-tips');
-    this.tipsConfirmButton = this.paymentFrame.getByTestId(
-      'preset-numeric-input-modal-confirm-button',
-    );
-    this.tipSuggestionButtons = this.paymentFrame.getByRole('button', {
-      name: /^\d+(?:\.\d+)?%$/,
-    });
+  constructor(page: Page) {
+    this.ctx = new PaymentPageContext(page);
+    this.cash = new PaymentCashSection(this.ctx);
+    this.card = new PaymentCardSection(this.ctx);
+    this.tips = new PaymentTipDialog(this.ctx);
+    this.receipt = new PaymentReceiptDialog(this.ctx);
+    this.summary = new PaymentSummarySection(this.ctx);
   }
 
   @step('页面操作：确认支付页面已经加载完成')
   async expectLoaded(): Promise<void> {
-    const paymentSurface = await this.resolvePaymentSurface();
-    const balanceDueControl = await this.resolveBalanceDueControl();
-    const paymentTypeControl = await this.resolvePaymentTypeControl();
-
-    await expect(paymentSurface).toBeVisible({ timeout: 15_000 });
-    await expect(balanceDueControl).toBeVisible({ timeout: 15_000 });
-    await expect(paymentTypeControl).toBeVisible({ timeout: 15_000 });
-  }
-
-  @step('页面操作：在 Balance due 区域点击 Cash')
-  async clickBalanceDueCash(): Promise<void> {
-    await (await this.resolveBalanceDueCashButton()).click();
-  }
-
-  @step('页面操作：在 Balance due 区域点击 Cards')
-  async clickBalanceDueCards(): Promise<void> {
-    await (await this.resolveBalanceDueCardsButton()).click();
+    await expect(this.ctx.frameElement).toBeVisible({ timeout: 15_000 });
+    await expect(this.ctx.surface).toBeVisible({ timeout: 15_000 });
+    await expect(this.ctx.balanceDueControl).toBeVisible({ timeout: 15_000 });
+    await expect(this.ctx.paymentTypeControl).toBeVisible({ timeout: 15_000 });
   }
 
   @step('页面操作：在 Payment type 区域点击 Cash')
   async clickPaymentTypeCash(): Promise<void> {
-    await this.waitForPaymentOverlayToClear();
     if (
       (await this.isPaymentSuccessConfirmVisible()) ||
       (await this.isPrintReceiptDialogVisible()) ||
@@ -94,200 +56,67 @@ export class PaymentPage {
     ) {
       return;
     }
-
-    const paymentFailureText = await this.readPaymentFailureText();
-    if (paymentFailureText) {
-      throw new Error(`支付终端返回失败：${paymentFailureText}`);
-    }
-
-    const cashButton = await this.resolvePaymentTypeCashButton();
-    await expect(cashButton).toBeEnabled({ timeout: 5_000 });
-    await cashButton.click({ timeout: 10_000 });
+    this.throwIfPaymentFailed(await this.readPaymentFailureText());
+    await this.cash.clickPaymentTypeCash();
   }
 
   @step((amountInCents: number) => `页面操作：输入本次现金支付金额 ${amountInCents} 分`)
   async fillAmountTendered(amountInCents: number): Promise<void> {
-    if (!Number.isInteger(amountInCents) || amountInCents <= 0) {
-      throw new Error(`Invalid payment amount in cents: ${amountInCents}`);
-    }
-
-    const amountDisplay = await this.resolveAmountTenderedInput();
-    await amountDisplay.click();
-
-    const currentValue = await amountDisplay.inputValue().catch(() => '');
-    for (let index = 0; index < currentValue.replace(/\D/g, '').length + 4; index += 1) {
-      await this.resolveKeypadButton('backspace').click();
-    }
-
-    const amountDigits = String(amountInCents);
-    const wholeDigits = amountDigits.endsWith('00') ? amountDigits.slice(0, -2) : amountDigits;
-    for (const digit of wholeDigits) {
-      await this.resolveKeypadButton(digit).click();
-    }
-
-    if (amountDigits.endsWith('00')) {
-      await this.resolveKeypadButton('00').click();
-    }
-
-    await waitForInputSettled(amountDisplay);
+    await this.cash.fillAmountTendered(amountInCents);
   }
 
   @step((amountInCents: number) => `页面操作：在 Payment 页添加小费 ${amountInCents} 分`)
   async addTip(amountInCents: number): Promise<void> {
-    if (!Number.isInteger(amountInCents) || amountInCents <= 0) {
-      throw new Error(`Invalid tip amount in cents: ${amountInCents}`);
-    }
-
-    await this.tipsButton.click();
-    const amountDigits = String(amountInCents);
-    const wholeDigits = amountDigits.endsWith('00') ? amountDigits.slice(0, -2) : amountDigits;
-
-    for (const digit of wholeDigits) {
-      await this.paymentFrame
-        .getByTestId(`preset-currency-keypad-input-number-${digit}`)
-        .click();
-    }
-
-    if (amountDigits.endsWith('00')) {
-      await this.paymentFrame
-        .getByTestId('preset-currency-keypad-input-double-zero')
-        .click();
-    }
-
-    await waitForInputSettled(undefined, 250);
-    await this.tipsConfirmButton.click();
+    await this.tips.add(amountInCents);
   }
 
   @step('页面读取：打开 Tips 并读取建议小费百分比列表')
   async readSuggestedTipPercentages(): Promise<number[]> {
     await this.expectLoaded();
-    await this.tipsButton.click();
-    await expect(this.tipSuggestionButtons.first()).toBeVisible({ timeout: 5_000 });
-    const labels = await this.tipSuggestionButtons.allTextContents();
-
-    return labels.map((label) => {
-      const percentage = Number(label.replace('%', '').trim());
-      if (!Number.isFinite(percentage)) {
-        throw new Error(`无法解析建议小费百分比：${label}`);
-      }
-      return percentage;
-    });
+    return await this.tips.readSuggestedPercentages();
   }
 
   @step((text: string) => `页面断言：Payment 支付流程展示 ${text}`)
   async expectPaymentFlowText(text: string): Promise<void> {
-    await expect(this.paymentFlow).toContainText(text);
+    await expect(this.ctx.paymentFlow).toContainText(text);
   }
 
   @step('页面读取：读取 Payment 当前未付金额')
   async readBalanceDue(): Promise<number> {
-    const paymentFlowText = await this.paymentFlow.innerText();
-    const balanceMatch = paymentFlowText.match(/Balance due\s*\$([\d,]+(?:\.\d{2})?)/i);
+    const paymentFlowText = await this.ctx.paymentFlow.innerText();
+    const balanceMatch = paymentFlowText.match(
+      /Balance due\s*\$([\d,]+(?:\.\d{2})?)/i,
+    );
     const balanceDue = Number(balanceMatch?.[1].replace(/,/g, ''));
-
     if (!Number.isFinite(balanceDue)) {
       throw new Error(`无法从 Payment 支付流程读取未付金额：${paymentFlowText}`);
     }
-
     return balanceDue;
   }
 
   @step('页面操作：在 Payment type 区域点击 Credit Card')
   async clickPaymentTypeCreditCard(): Promise<void> {
-    await this.waitForPaymentOverlayToClear();
-    const paymentFailureText = await this.readPaymentFailureText();
-    if (paymentFailureText) {
-      throw new Error(`支付终端返回失败：${paymentFailureText}`);
-    }
-
-    const creditCardButton = await this.resolvePaymentTypeCreditCardButton();
-    await expect(creditCardButton).toBeVisible({ timeout: 5_000 });
-    await expect(creditCardButton).toBeEnabled({ timeout: 5_000 });
-    await creditCardButton.click({ timeout: 10_000 });
-  }
-
-  @step('页面操作：填写信用卡表单')
-  async fillCreditCardForm(card: PaymentCardForm): Promise<void> {
-    await (await this.resolveCardNumberInput()).fill(card.cardNumber);
-    await (await this.resolveCardMonthInput()).fill(card.expMonth);
-    await (await this.resolveCardYearInput()).fill(card.expYear);
-    await (await this.resolveCardHolderInput()).fill(card.holderName);
-    await (await this.resolveCardCvvInput()).fill(card.cvv);
-  }
-
-  @step('页面操作：点击支付确认按钮')
-  async clickPay(): Promise<void> {
-    await waitForInputSettled();
-    await (await this.resolvePayButton()).click();
+    this.throwIfPaymentFailed(await this.readPaymentFailureText());
+    await this.card.clickCreditCard();
   }
 
   @step('页面操作：按参数处理是否打印小票弹窗')
   async handlePrintReceiptChoice(printReceipt: boolean): Promise<void> {
-    const targetButton = printReceipt ? this.printReceiptConfirmButton : this.printReceiptCancelButton;
-
-    await expect(await this.resolvePrintReceiptDialog()).toBeVisible({ timeout: 15_000 });
-    await expect(targetButton).toBeVisible({ timeout: 15_000 });
-
-    if (printReceipt) {
-      await this.printReceiptConfirmButton.click();
-    } else {
-      await this.printReceiptCancelButton.click();
-    }
-
-    await waitUntil(
-      async () => ({
-        paymentPanelVisible: await this.isPaymentPanelVisible(),
-        printReceiptVisible: await this.isPrintReceiptDialogVisible(),
-      }),
-      (state) => !state.paymentPanelVisible || !state.printReceiptVisible,
-      {
-        timeout: 15_000,
-        message: 'Print receipt flow did not settle after choosing whether to print.',
-      },
-    );
+    await this.receipt.choose(printReceipt);
   }
 
   @step('页面操作：如有打印小票弹窗则关闭，避免污染后续状态')
   async dismissPrintReceiptDialogIfVisible(): Promise<void> {
-    if (!(await this.isPrintReceiptDialogVisible())) {
-      return;
-    }
-
-    if (await this.printReceiptCancelButton.isVisible().catch(() => false)) {
-      await this.printReceiptCancelButton.click();
-      await expect(this.printReceiptDialog).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
-      return;
-    }
-
-    await this.page.keyboard.press('Escape').catch(() => undefined);
+    await this.receipt.dismissIfVisible();
   }
 
   @step((expectedButtonText = 'NO RECEIPT') =>
     `页面操作：如支付成功页仍显示，则点击 ${expectedButtonText} 关闭`,
   )
-  async confirmPaymentSuccessIfVisible(expectedButtonText = 'NO RECEIPT'): Promise<void> {
-    if (!(await this.isPaymentSuccessConfirmVisible())) {
-      return;
-    }
-
-    const buttonText = (await this.paymentSuccessConfirmButton.innerText())
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (buttonText.toUpperCase() !== expectedButtonText.toUpperCase()) {
-      throw new Error(
-        `支付成功页关闭按钮文案应为 ${expectedButtonText}，实际为：${buttonText}`,
-      );
-    }
-
-    await this.paymentSuccessConfirmButton.click();
-    await waitUntil(
-      async () => await this.isPaymentSuccessConfirmVisible(),
-      (successButtonVisible) => !successButtonVisible,
-      {
-        timeout: 5_000,
-        message: `点击 ${expectedButtonText} 后支付成功页未在超时内关闭。`,
-      },
-    );
+  async confirmPaymentSuccessIfVisible(
+    expectedButtonText = 'NO RECEIPT',
+  ): Promise<void> {
+    await this.receipt.confirmSuccessIfVisible(expectedButtonText);
   }
 
   @step('页面操作：关闭支付面板并返回订单详情')
@@ -296,453 +125,65 @@ export class PaymentPage {
       return;
     }
 
-    await (await this.resolvePaymentPanelBackButton()).click();
-    await this.confirmPartialPaidLeaveIfVisible();
-    await waitUntil(
-      async () => await this.isPaymentPanelVisible(),
-      (paymentPanelVisible) => !paymentPanelVisible,
+    await this.ctx.backButton.click();
+    const returnState = await waitUntil(
+      async () => ({
+        confirmVisible: await this.ctx.partialPaidLeaveConfirmButton
+          .isVisible()
+          .catch(() => false),
+        panelVisible: await this.isPaymentPanelVisible(),
+      }),
+      (state) => state.confirmVisible || !state.panelVisible,
       {
         timeout: 10_000,
-        message: 'Payment panel did not close after clicking Back.',
+        message: 'Payment panel did not enter a closeable state after clicking Back.',
+      },
+    );
+
+    if (returnState.confirmVisible) {
+      await this.ctx.partialPaidLeaveConfirmButton.click();
+    }
+    await waitUntil(
+      async () => await this.isPaymentPanelVisible(),
+      (panelVisible) => !panelVisible,
+      {
+        timeout: 10_000,
+        message: 'Payment panel remained active after returning to order details.',
       },
     );
   }
 
-  private async confirmPartialPaidLeaveIfVisible(): Promise<void> {
-    const confirmButton = await waitUntil(
-      async () => {
-        const candidates = [
-          this.paymentFrame.getByRole('button', { name: /^Yes$/i }).first(),
-          this.contractRoot.getByRole('button', { name: /^Yes$/i }).first(),
-          this.page.getByRole('button', { name: /^Yes$/i }).first(),
-        ];
-
-        for (const candidate of candidates) {
-          if (await candidate.isVisible().catch(() => false)) {
-            return candidate;
-          }
-        }
-
-        return null;
-      },
-      (button): button is Locator => button !== null,
-      {
-        timeout: 2_000,
-        message: 'Partial paid leave confirmation did not appear.',
-      },
-    ).catch(() => null);
-
-    if (!confirmButton) {
-      return;
-    }
-
-    await confirmButton.click();
-  }
-
-  @step('页面读取：读取左侧支付详情_summaryContent')
+  @step('页面读取：读取左侧支付详情')
   async readSummaryContent(): Promise<PaymentSummarySnapshot> {
-    const summaryContent = await this.resolveSummaryContent();
-
-    return await summaryContent.evaluate((summaryElement) => {
-      const cleanText = (value: string | null | undefined): string =>
-        value?.replace(/\s+/g, ' ').trim() ?? '';
-      const normalizeOptionalText = (value: string | null | undefined): string | null => {
-        const normalized = cleanText(value);
-        return normalized.length > 0 ? normalized : null;
-      };
-
-      const rows = Array.from(summaryElement.querySelectorAll(':scope > *, :scope > * > *'))
-        .map((rowElement) => {
-          const label =
-            normalizeOptionalText(
-              rowElement.querySelector('.label, [class*="label"]')?.textContent,
-            ) ??
-            normalizeOptionalText(rowElement.querySelector('span:first-child')?.textContent) ??
-            normalizeOptionalText(rowElement.children[0]?.textContent);
-          const value =
-            normalizeOptionalText(
-              rowElement.querySelector('.value, [class*="value"]')?.textContent,
-            ) ??
-            normalizeOptionalText(rowElement.querySelector('span:last-child')?.textContent) ??
-            (rowElement.children.length > 1
-              ? normalizeOptionalText(rowElement.children[rowElement.children.length - 1]?.textContent)
-              : null);
-
-          if (!label) {
-            return null;
-          }
-
-          return {
-            label,
-            value: value && value !== label ? value : null,
-          };
-        })
-        .filter((row): row is PaymentSummaryRow => row !== null);
-
-      if (rows.length > 0) {
-        return {
-          rows,
-          text: cleanText(summaryElement.textContent),
-        };
-      }
-
-      const fallbackText = cleanText(summaryElement.textContent);
-      const fallbackRows = Array.from(
-        fallbackText.matchAll(
-          /\b(Subtotal|Tax|Charge|Tips|Total(?:\s*\([^)]*\))?)\b\s*([$]?[0-9,.-]+)/gi,
-        ),
-      ).map((matchedRow) => ({
-        label: matchedRow[1],
-        value: matchedRow[2] ?? null,
-      }));
-
-      return {
-        rows: fallbackRows,
-        text: fallbackText,
-      };
-    });
+    return await this.summary.read();
   }
 
   @step('页面读取：确认当前是否显示打印小票弹窗')
   async isPrintReceiptDialogVisible(): Promise<boolean> {
-    return await this.printReceiptDialog.isVisible().catch(() => false);
+    return await this.receipt.isVisible();
   }
 
   @step('页面读取：确认支付面板当前是否仍然可见')
   async isPaymentPanelVisible(): Promise<boolean> {
-    if (await this.contractRoot.isVisible().catch(() => false)) {
-      return true;
-    }
-
-    if (await this.paymentPanelFrame.isVisible().catch(() => false)) {
-      return true;
-    }
-
-    return await this.paymentFrame.locator('body').isVisible().catch(() => false);
+    return await this.ctx.isPanelVisible();
   }
 
   @step('页面读取：确认支付成功确认按钮当前是否可见')
   async isPaymentSuccessConfirmVisible(): Promise<boolean> {
-    return await this.paymentSuccessConfirmButton.isVisible().catch(() => false);
+    return await this.receipt.isSuccessConfirmVisible();
   }
 
   @step('页面读取：读取支付失败弹窗信息')
   async readPaymentFailureText(): Promise<string | null> {
-    if (!(await this.paymentFailureDialog.isVisible().catch(() => false))) {
+    if (!(await this.ctx.failureDialog.isVisible().catch(() => false))) {
       return null;
     }
-
-    return (await this.paymentFailureDialog.innerText()).replace(/\s+/g, ' ').trim();
+    return (await this.ctx.failureDialog.innerText()).replace(/\s+/g, ' ').trim();
   }
 
-  private async resolvePaymentSurface(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [this.contractRoot, this.paymentPanelFrame, this.paymentFrame.locator('body')],
-      'Unable to find payment panel surface.',
-      15_000,
-    );
-  }
-
-  private async resolveBalanceDueControl(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.getByText(/^Balance due$/),
-        this.contractRoot.getByTestId('balance-due-cash'),
-        this.contractRoot.getByTestId('balance-due-cards'),
-        this.paymentFrame.getByRole('radiogroup', { name: /Balance due/i }),
-        this.paymentFrame.getByText(/^Balance due$/),
-        this.paymentFrame.getByTestId('balance-due-cash'),
-        this.paymentFrame.getByTestId('balance-due-cards'),
-      ],
-      'Unable to find Balance due controls.',
-      15_000,
-    );
-  }
-
-  private async resolvePaymentPanelBackButton(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.getByTestId('payment-panel-header-back'),
-        this.paymentFrame.getByTestId('payment-panel-header-back'),
-      ],
-      'Unable to find payment panel Back button.',
-    );
-  }
-
-  private async resolvePaymentTypeControl(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.getByText(/^Payment type$/),
-        this.contractRoot.getByTestId('payment-type-cash'),
-        this.contractRoot.getByTestId('payment-type-credit-card'),
-        this.paymentFrame.getByText(/^Payment type$/),
-        this.paymentFrame.getByTestId('payment-type-cash'),
-        this.paymentFrame.getByTestId('payment-type-credit-card'),
-        this.paymentFrame.getByRole('button', { name: /Credit Card/i }),
-      ],
-      'Unable to find Payment type controls.',
-      15_000,
-    );
-  }
-
-  private async resolveSummaryContent(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.locator('#_summaryContent').first(),
-        this.contractRoot.locator('[class*="_summaryContent"]').first(),
-        this.contractRoot.locator('[class*="summaryContent"]').first(),
-        this.paymentFrame.locator('#_summaryContent').first(),
-        this.paymentFrame.locator('[class*="_summaryContent"]').first(),
-        this.paymentFrame.locator('[class*="summaryContent"]').first(),
-        this.paymentFrame
-          .locator('section, aside, div')
-          .filter({ hasText: /Subtotal/i })
-          .filter({ hasText: /Tax/i })
-          .filter({ hasText: /Total/i })
-          .first(),
-      ],
-      'Unable to find payment summary content.',
-      15_000,
-    );
-  }
-
-  private async resolveBalanceDueCashButton(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.getByTestId('balance-due-cash'),
-        this.contractRoot.getByRole('button', { name: /Cash/i }),
-        this.contractRoot.getByRole('radio', { name: /Cash/i }),
-        this.paymentFrame.getByTestId('balance-due-cash'),
-        this.paymentFrame.getByRole('radio', { name: /Cash/i }).first(),
-        this.paymentFrame.getByRole('button', { name: /Cash/i }).first(),
-      ],
-      'Unable to find Balance due Cash button.',
-    );
-  }
-
-  private async resolveBalanceDueCardsButton(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.getByTestId('balance-due-cards'),
-        this.contractRoot.getByRole('button', { name: /Cards?/i }),
-        this.contractRoot.getByRole('radio', { name: /Cards?/i }),
-        this.paymentFrame.getByTestId('balance-due-cards'),
-        this.paymentFrame.getByRole('radio', { name: /Cards?/i }).first(),
-        this.paymentFrame.getByRole('button', { name: /Cards?/i }).first(),
-      ],
-      'Unable to find Balance due Cards button.',
-    );
-  }
-
-  private async resolvePaymentTypeCashButton(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.getByTestId('payment-panel-btn-cash'),
-        this.contractRoot.getByTestId('payment-type-cash'),
-        this.contractRoot.getByRole('button', { name: /Cash/i }),
-        this.paymentFrame.getByTestId('payment-panel-btn-cash'),
-        this.paymentFrame.getByTestId('payment-type-cash'),
-        this.paymentFrame.getByRole('button', { name: /Cash/i }).first(),
-      ],
-      'Unable to find Payment type Cash button.',
-    );
-  }
-
-  private async resolvePaymentTypeCreditCardButton(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.getByTestId('payment-type-credit-card'),
-        this.contractRoot.getByRole('button', { name: /Credit Card/i }),
-        this.paymentFrame.getByTestId('payment-type-credit-card'),
-        this.paymentFrame.getByRole('button', { name: /Credit Card/i }).first(),
-      ],
-      'Unable to find Payment type Credit Card button.',
-    );
-  }
-
-  private async resolveAmountTenderedInput(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.getByTestId('payment-panel-amount-display'),
-        this.paymentFrame.getByTestId('payment-panel-amount-display'),
-      ],
-      'Unable to find payment amount tendered input.',
-    );
-  }
-
-  private resolveKeypadButton(digit: string): Locator {
-    const testId =
-      digit === 'backspace'
-        ? 'payment-panel-keypad-backspace'
-        : `payment-panel-keypad-digit-${digit}`;
-
-    return this.paymentFrame.getByTestId(testId).or(this.contractRoot.getByTestId(testId)).first();
-  }
-
-  private async resolveCardNumberInput(): Promise<Locator> {
-    const creditCardDialogCandidates = this.resolveTopLevelCreditCardDialogCandidates();
-
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.locator('#cardNof'),
-        this.paymentFrame.locator('#cardNof'),
-        ...creditCardDialogCandidates.map((creditCardDialog) =>
-          creditCardDialog.getByRole('textbox', { name: /____-____-____-____/ }).first(),
-        ),
-        ...creditCardDialogCandidates.map((creditCardDialog) =>
-          creditCardDialog.locator('input, textarea').nth(0),
-        ),
-      ],
-      'Unable to find credit-card number input.',
-    );
-  }
-
-  private async resolveCardMonthInput(): Promise<Locator> {
-    const creditCardDialogCandidates = this.resolveTopLevelCreditCardDialogCandidates();
-
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.locator('#carddate'),
-        this.paymentFrame.locator('#carddate'),
-        ...creditCardDialogCandidates.map((creditCardDialog) =>
-          creditCardDialog.locator('input, textarea').nth(2),
-        ),
-      ],
-      'Unable to find credit-card month input.',
-    );
-  }
-
-  private async resolveCardYearInput(): Promise<Locator> {
-    const creditCardDialogCandidates = this.resolveTopLevelCreditCardDialogCandidates();
-
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.locator('#carddateY'),
-        this.paymentFrame.locator('#carddateY'),
-        ...creditCardDialogCandidates.map((creditCardDialog) =>
-          creditCardDialog.locator('input, textarea').nth(3),
-        ),
-      ],
-      'Unable to find credit-card year input.',
-    );
-  }
-
-  private async resolveCardCvvInput(): Promise<Locator> {
-    const creditCardDialogCandidates = this.resolveTopLevelCreditCardDialogCandidates();
-
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.locator('#cvv2'),
-        this.paymentFrame.locator('#cvv2'),
-        ...creditCardDialogCandidates.map((creditCardDialog) =>
-          creditCardDialog.getByText(/^CVV2$/).locator('xpath=preceding-sibling::input[1]').first(),
-        ),
-        ...creditCardDialogCandidates.map((creditCardDialog) =>
-          creditCardDialog.getByText(/^CVV2$/).locator('xpath=../input[1]').first(),
-        ),
-        ...creditCardDialogCandidates.map((creditCardDialog) =>
-          creditCardDialog.locator('input, textarea').nth(4),
-        ),
-      ],
-      'Unable to find credit-card CVV input.',
-    );
-  }
-
-  private async resolveCardHolderInput(): Promise<Locator> {
-    const creditCardDialogCandidates = this.resolveTopLevelCreditCardDialogCandidates();
-
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.locator('#cardfHolderName'),
-        this.paymentFrame.locator('#cardfHolderName'),
-        ...creditCardDialogCandidates.map((creditCardDialog) =>
-          creditCardDialog.locator('input, textarea').nth(1),
-        ),
-      ],
-      'Unable to find card-holder input.',
-    );
-  }
-
-  private async resolvePayButton(): Promise<Locator> {
-    const creditCardDialogCandidates = this.resolveTopLevelCreditCardDialogCandidates();
-
-    return await this.resolveVisibleLocator(
-      [
-        this.contractRoot.getByTestId('payment-submit'),
-        this.contractRoot.getByRole('button', { name: /Pay/i }),
-        this.paymentFrame.getByTestId('payment-submit'),
-        this.paymentFrame.getByRole('button', { name: /Pay/i }).first(),
-        ...creditCardDialogCandidates.map((creditCardDialog) =>
-          creditCardDialog.getByRole('button', { name: /Pay/i }).first(),
-        ),
-        ...creditCardDialogCandidates.map((creditCardDialog) =>
-          creditCardDialog.getByText(/^Pay$/).first(),
-        ),
-      ],
-      'Unable to find payment submit button.',
-      15_000,
-    );
-  }
-
-  private async resolvePrintReceiptDialog(): Promise<Locator> {
-    return await this.resolveVisibleLocator(
-      [this.printReceiptDialog],
-      'Unable to find print receipt dialog.',
-      15_000,
-    );
-  }
-
-  private resolveTopLevelCreditCardDialogCandidates(): Locator[] {
-    return [
-      this.page
-        .locator('body > div:visible')
-        .filter({ has: this.page.getByText(/Card Holder/i) })
-        .filter({ has: this.page.getByText(/Exp\. Date/i) })
-        .first(),
-      this.page
-        .locator('body > div:visible')
-        .filter({ has: this.page.getByRole('textbox', { name: /____-____-____-____/ }) })
-        .first(),
-    ];
-  }
-
-  private async resolveVisibleLocator(
-    candidates: Locator[],
-    message: string,
-    timeout = 5_000,
-  ): Promise<Locator> {
-    const resolvedLocator = await waitUntil(
-      async () => {
-        for (const candidate of candidates) {
-          if (await candidate.isVisible().catch(() => false)) {
-            return candidate;
-          }
-        }
-
-        return null;
-      },
-      (locator): locator is Locator => locator !== null,
-      {
-        timeout,
-        message,
-      },
-    );
-
-    if (!resolvedLocator) {
-      throw new Error(message);
+  private throwIfPaymentFailed(paymentFailureText: string | null): void {
+    if (paymentFailureText) {
+      throw new Error(`支付终端返回失败：${paymentFailureText}`);
     }
-
-    return resolvedLocator;
-  }
-
-  private async waitForPaymentOverlayToClear(): Promise<void> {
-    await waitUntil(
-      async () => await this.paymentLoadingOverlay.isVisible().catch(() => false),
-      (visible) => !visible,
-      {
-        timeout: 15_000,
-        message: '支付加载遮罩未在超时内消失。',
-      },
-    );
   }
 }

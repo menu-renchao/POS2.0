@@ -30,6 +30,8 @@ export type DeliveryOrderWithCustomerInformationResult = {
 };
 
 export class TakeoutFlow {
+  constructor(private readonly employeeLoginFlow: EmployeeLoginFlow) {}
+
   @step('业务步骤：从主页点击 To Go 并进入点单页')
   async startToGoOrder(
     homePage: HomePage,
@@ -52,7 +54,7 @@ export class TakeoutFlow {
         .catch(() => false);
 
       if (passcodeRequested) {
-        await new EmployeeLoginFlow().enterWithEmployeePassword(
+        await this.employeeLoginFlow.enterWithEmployeePassword(
           employeeLoginPage,
           homePage,
           employeePasscode,

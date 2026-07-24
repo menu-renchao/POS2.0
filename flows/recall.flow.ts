@@ -53,7 +53,7 @@ export class RecallFlow {
   }
 
   @step('业务步骤：按综合条件搜索 Recall 订单')
-  async searchOrders(recallPage: RecallPage, params: RecallSearchParams): Promise<RecallPage> {
+  async searchOrders(recallPage: RecallPage, params: RecallSearchParams): Promise<void> {
     const {
       paymentStatus,
       orderStatus,
@@ -67,59 +67,49 @@ export class RecallFlow {
     await recallPage.expectLoaded();
 
     if (clearFirst) {
-      await recallPage.clearAllSearchConditions();
-      await waitUntil(
-        async () => (await recallPage.readActiveFilterTexts()).length,
-        (activeFilterCount) => activeFilterCount === 0,
-        {
-          timeout: 5_000,
-          message: 'Recall 筛选条件在清空后仍残留激活标签。',
-        },
-      ).catch(() => undefined);
+      await recallPage.filterBar.clearAllSearchConditions();
     }
 
     if (paymentStatus && paymentStatus !== 'Unpaid') {
-      await recallPage.selectPaymentStatus(paymentStatus);
+      await recallPage.filterBar.selectPaymentStatus(paymentStatus);
     }
 
     if (orderStatus) {
-      await recallPage.selectOrderStatus(orderStatus);
+      await recallPage.filterBar.selectOrderStatus(orderStatus);
     }
 
     if (orderType) {
-      await recallPage.selectOrderType(orderType);
+      await recallPage.filterBar.selectOrderType(orderType);
     }
 
     if (paymentType) {
-      await recallPage.selectPaymentType(paymentType);
+      await recallPage.filterBar.selectPaymentType(paymentType);
     }
 
     if (productLine) {
-      await recallPage.selectProductLine(productLine);
+      await recallPage.filterBar.selectProductLine(productLine);
     }
 
     if (manualSearch) {
-      await recallPage.openManualSearchDialog();
-      await recallPage.selectManualSearchTag(manualSearch.tag);
-      await recallPage.fillManualSearchKeyword(manualSearch.keyword);
-      await recallPage.submitManualSearch();
-      await recallPage.removeUnpaidPaymentStatusFilterIfPresent();
+      await recallPage.filterBar.openManualSearchDialog();
+      await recallPage.filterBar.selectManualSearchTag(manualSearch.tag);
+      await recallPage.filterBar.fillManualSearchKeyword(manualSearch.keyword);
+      await recallPage.filterBar.submitManualSearch();
+      await recallPage.filterBar.removeUnpaidPaymentStatusFilterIfPresent();
     }
 
-    return recallPage;
   }
 
   @step('业务步骤：清空 Recall 当前所有搜索条件')
-  async clearSearchConditions(recallPage: RecallPage): Promise<RecallPage> {
+  async clearSearchConditions(recallPage: RecallPage): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.clearAllSearchConditions();
-    return recallPage;
+    await recallPage.filterBar.clearAllSearchConditions();
   }
 
   @step('业务步骤：读取当前 Recall 列表中的最新订单号')
   async readLatestVisibleOrderNumber(recallPage: RecallPage): Promise<string> {
     const visibleOrderNumbers = await waitUntil(
-      async () => await recallPage.readVisibleOrderNumbers(),
+      async () => await recallPage.filterBar.readVisibleOrderNumbers(),
       (orderNumbers) => orderNumbers.length > 0,
       {
         timeout: 10_000,
@@ -150,21 +140,21 @@ export class RecallFlow {
     orderNumber: string,
     targetOrderNumber?: string,
   ): Promise<RecallOrderDetails> {
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
 
     try {
-      await recallPage.expandOrderDetailsPriceSummary();
-      return await recallPage.readOrderDetailsSnapshot();
+      await recallPage.orderDetails.expandOrderDetailsPriceSummary();
+      return await recallPage.orderDetails.readOrderDetailsSnapshot();
     } finally {
-      await recallPage.closeOrderDetailsDialog();
+      await recallPage.orderDetails.closeOrderDetailsDialog();
     }
   }
 
   @step('业务步骤：查看 Recall 第一张可见订单卡片详情')
   async viewFirstVisibleOrderDetails(recallPage: RecallPage): Promise<RecallOrderDetails> {
-    await recallPage.openFirstVisibleOrderDetails();
-    await recallPage.expandOrderDetailsPriceSummary();
-    return await recallPage.readOrderDetailsSnapshot();
+    await recallPage.orderDetails.openFirstVisibleOrderDetails();
+    await recallPage.orderDetails.expandOrderDetailsPriceSummary();
+    return await recallPage.orderDetails.readOrderDetailsSnapshot();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -178,13 +168,13 @@ export class RecallFlow {
     targetOrderNumber?: string,
   ): Promise<OrderDishesPage> {
     await recallPage.expectLoaded();
-    return await recallPage.openOrderForEditing(orderNumber, targetOrderNumber);
+    return await recallPage.orderDetails.openOrderForEditing(orderNumber, targetOrderNumber);
   }
 
   @step('业务步骤：从 Recall 第一张可见订单卡片进入编辑点单页')
   async editFirstVisibleOrder(recallPage: RecallPage): Promise<OrderDishesPage> {
     await recallPage.expectLoaded();
-    return await recallPage.openFirstVisibleOrderForEditing();
+    return await recallPage.orderDetails.openFirstVisibleOrderForEditing();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -196,11 +186,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickSendInOrderDetails();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickSendInOrderDetails();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -214,8 +203,8 @@ export class RecallFlow {
     targetOrderNumber?: string,
   ): Promise<PaymentPage> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    return await recallPage.openPayment();
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.orderDetails.openPayment();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -227,11 +216,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickPrintInOrderDetails();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickPrintInOrderDetails();
   }
 
   @step((_recallPage: RecallPage, preset: RecallDatePreset) =>
@@ -242,8 +230,8 @@ export class RecallFlow {
     preset: RecallDatePreset,
   ): Promise<RecallDateRange> {
     await recallPage.expectLoaded();
-    await recallPage.selectDatePreset(preset);
-    return await recallPage.readSelectedDateRange();
+    await recallPage.dateFilter.selectPreset(preset);
+    return await recallPage.dateFilter.readSelectedRange();
   }
 
   @step((_recallPage: RecallPage, column: RecallSortableColumn) =>
@@ -257,11 +245,11 @@ export class RecallFlow {
     second: { direction: 'ascending' | 'descending'; values: string[] };
   }> {
     await recallPage.expectLoaded();
-    await recallPage.switchToListView();
-    const firstDirection = await recallPage.clickListSort(column);
-    const firstValues = await recallPage.readVisibleListColumnValues(column);
-    const secondDirection = await recallPage.clickListSort(column);
-    const secondValues = await recallPage.readVisibleListColumnValues(column);
+    await recallPage.list.switchToListView();
+    const firstDirection = await recallPage.list.clickSort(column);
+    const firstValues = await recallPage.list.readVisibleColumnValues(column);
+    const secondDirection = await recallPage.list.clickSort(column);
+    const secondValues = await recallPage.list.readVisibleColumnValues(column);
     const first = { direction: firstDirection, values: firstValues };
     const second = { direction: secondDirection, values: secondValues };
     return { first, second };
@@ -278,8 +266,8 @@ export class RecallFlow {
     targetOrderNumber?: string,
   ): Promise<number> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    return await recallPage.clickPrintInOrderDetailsAndReadKitchenTicketStatus();
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.orderDetails.clickPrintInOrderDetailsAndReadKitchenTicketStatus();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -291,10 +279,12 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): ReturnType<RecallPage['clickPrintInOrderDetailsAndReadKitchenTicketResult']> {
+  ): ReturnType<
+    RecallPage['orderDetails']['clickPrintInOrderDetailsAndReadKitchenTicketResult']
+  > {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    return await recallPage.clickPrintInOrderDetailsAndReadKitchenTicketResult();
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.orderDetails.clickPrintInOrderDetailsAndReadKitchenTicketResult();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -308,8 +298,8 @@ export class RecallFlow {
     targetOrderNumber?: string,
   ): Promise<number> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    return await recallPage.clickPrintInOrderDetailsAndReadReceiptStatus();
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.orderDetails.clickPrintInOrderDetailsAndReadReceiptStatus();
   }
 
   @step((_: RecallPage, orderNumber: string) => `业务步骤：重打 Recall 订单 ${orderNumber} 的收据`)
@@ -317,8 +307,8 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
   ): Promise<number> {
-    await recallPage.openOrderDetails(orderNumber);
-    return await recallPage.clickReprintInOrderDetailsAndReadReceiptStatus();
+    await recallPage.orderDetails.openOrderDetails(orderNumber);
+    return await recallPage.orderDetails.clickReprintInOrderDetailsAndReadReceiptStatus();
   }
 
   @step((_: RecallPage, orderNumber: string, dishNames: readonly string[]) =>
@@ -328,9 +318,9 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     dishNames: readonly string[],
-  ): ReturnType<RecallPage['resendDishes']> {
-    await recallPage.openOrderDetails(orderNumber);
-    return await recallPage.resendDishes(dishNames);
+  ): ReturnType<RecallPage['orderDetails']['resendDishes']> {
+    await recallPage.orderDetails.openOrderDetails(orderNumber);
+    return await recallPage.orderDetails.resendDishes(dishNames);
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -342,11 +332,11 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-    options?: Parameters<RecallPage['openSplitInOrderDetails']>[0],
+    options?: Parameters<RecallPage['orderDetails']['openSplitInOrderDetails']>[0],
   ): Promise<SplitOrderPage> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    return await recallPage.openSplitInOrderDetails(options);
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.orderDetails.openSplitInOrderDetails(options);
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -358,11 +348,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickDiscountInOrderDetails();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickDiscountInOrderDetails();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -374,11 +363,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickOrderDetailsMoreButton();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickOrderDetailsMoreButton();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -390,11 +378,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickChargeInMoreMenu();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickChargeInMoreMenu();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -406,11 +393,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickMoveItemInMoreMenu();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickMoveItemInMoreMenu();
   }
 
   @step((_: RecallPage, sourceOrderNumber: string, targetOrderNumber: string) =>
@@ -420,18 +406,17 @@ export class RecallFlow {
     recallPage: RecallPage,
     sourceOrderNumber: string,
     targetOrderNumber: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(sourceOrderNumber);
-    await recallPage.expandOrderDetailsPriceSummary();
-    await recallPage.selectFirstOrderDishItem();
-    await recallPage.clickMoveItemInMoreMenu();
-    await recallPage.expectMoveDishesOutReady();
-    await recallPage.clickMoveDishesToExistingOrder();
-    await recallPage.expectMoveDishesTargetSelectionReady();
-    await recallPage.clickMoveDishesTargetOrder(targetOrderNumber);
-    await recallPage.expectMovedOrderDetailsReady(targetOrderNumber);
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(sourceOrderNumber);
+    await recallPage.orderDetails.expandOrderDetailsPriceSummary();
+    await recallPage.orderDetails.selectFirstOrderDishItem();
+    await recallPage.orderDetails.clickMoveItemInMoreMenu();
+    await recallPage.orderDetails.expectMoveDishesOutReady();
+    await recallPage.orderDetails.clickMoveDishesToExistingOrder();
+    await recallPage.orderDetails.expectMoveDishesTargetSelectionReady();
+    await recallPage.orderDetails.clickMoveDishesTargetOrder(targetOrderNumber);
+    await recallPage.orderDetails.expectMovedOrderDetailsReady(targetOrderNumber);
   }
 
   @step((_: RecallPage, sourceOrderNumber: string) =>
@@ -440,15 +425,14 @@ export class RecallFlow {
   async moveFirstDishToNewOrder(
     recallPage: RecallPage,
     sourceOrderNumber: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(sourceOrderNumber);
-    await recallPage.selectFirstOrderDishItem();
-    await recallPage.clickMoveItemInMoreMenu();
-    await recallPage.expectMoveDishesToNewOrderReady();
-    await recallPage.clickMoveDishesToNewOrder();
-    await recallPage.expectMovedToNewOrderDetailsReady(sourceOrderNumber);
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(sourceOrderNumber);
+    await recallPage.orderDetails.selectFirstOrderDishItem();
+    await recallPage.orderDetails.clickMoveItemInMoreMenu();
+    await recallPage.orderDetails.expectMoveDishesToNewOrderReady();
+    await recallPage.orderDetails.clickMoveDishesToNewOrder();
+    await recallPage.orderDetails.expectMovedToNewOrderDetailsReady(sourceOrderNumber);
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -460,11 +444,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickCombineInMoreMenu();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickCombineInMoreMenu();
   }
 
   @step((_: RecallPage, sourceOrderNumber: string, targetOrderNumber: string) =>
@@ -474,15 +457,14 @@ export class RecallFlow {
     recallPage: RecallPage,
     sourceOrderNumber: string,
     targetOrderNumber: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(sourceOrderNumber);
-    await recallPage.clickCombineInMoreMenu();
-    await recallPage.expectCombineTargetSelectionReady();
-    await recallPage.clickCombineTargetOrder(targetOrderNumber);
-    await recallPage.confirmCombineChargeWarningIfNeeded();
-    await recallPage.expectCombinedOrderDetailsReady(targetOrderNumber);
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(sourceOrderNumber);
+    await recallPage.orderDetails.clickCombineInMoreMenu();
+    await recallPage.orderDetails.expectCombineTargetSelectionReady();
+    await recallPage.orderDetails.clickCombineTargetOrder(targetOrderNumber);
+    await recallPage.orderDetails.confirmCombineChargeWarningIfNeeded();
+    await recallPage.orderDetails.expectCombinedOrderDetailsReady(targetOrderNumber);
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -494,11 +476,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickTipsInMoreMenu();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickTipsInMoreMenu();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber: string, amountInCents: number) =>
@@ -511,9 +492,9 @@ export class RecallFlow {
     amountInCents: number,
   ): Promise<string | null> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    const message = await recallPage.addOrderDetailsTip(amountInCents);
-    await recallPage.closeOrderDetailsDialog();
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    const message = await recallPage.orderDetails.addOrderDetailsTip(amountInCents);
+    await recallPage.orderDetails.closeOrderDetailsDialog();
     return message;
   }
 
@@ -526,11 +507,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickPagingInMoreMenu();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickPagingInMoreMenu();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -542,11 +522,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickCallOffInMoreMenu();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickCallOffInMoreMenu();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -560,9 +539,9 @@ export class RecallFlow {
     targetOrderNumber?: string,
   ): Promise<OrderDishesPage> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickCopyInMoreMenu();
-    return await recallPage.confirmCopyAndEnterOrderDishes();
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickCopyInMoreMenu();
+    return await recallPage.orderDetails.confirmCopyAndEnterOrderDishes();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -574,11 +553,10 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickVoidInMoreMenu();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickVoidInMoreMenu();
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -593,8 +571,8 @@ export class RecallFlow {
     options: RecallVoidOptions = {},
   ): Promise<string | null> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    return await recallPage.attemptVoidCurrentOrder(options);
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    return await recallPage.voidDialog.attemptVoidCurrentOrder(options);
   }
 
   @step(
@@ -613,8 +591,8 @@ export class RecallFlow {
     }
 
     for (const targetOrderNumber of targetOrderNumbers) {
-      await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-      await recallPage.voidCurrentOrder(options);
+      await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+      await recallPage.voidDialog.voidCurrentOrder(options);
     }
   }
 
@@ -625,8 +603,8 @@ export class RecallFlow {
     options: RecallVoidOptions = {},
   ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber);
-    await recallPage.voidCurrentOrder(options);
+    await recallPage.orderDetails.openOrderDetails(orderNumber);
+    await recallPage.voidDialog.voidCurrentOrder(options);
   }
 
   @step(
@@ -661,10 +639,10 @@ export class RecallFlow {
       ? await this.openRecallFromSplitReturnPage(cleanupReturnPage, homePage)
       : await this.openRecallFromSplitReturnPage(recallPage, homePage);
     await cleanupRecallPage.expectLoaded();
-    await cleanupRecallPage.openOrderDetails(orderNumber);
+    await cleanupRecallPage.orderDetails.openOrderDetails(orderNumber);
     const targetOrderNumbers = options.requireSplitChildren
       ? await waitUntil(
-          async () => await cleanupRecallPage.readTargetOrderNumbers(),
+          async () => await cleanupRecallPage.orderDetails.readTargetOrderNumbers(),
           (orderNumbers) => orderNumbers.length >= 2,
           {
             timeout: 10_000,
@@ -672,13 +650,13 @@ export class RecallFlow {
             message: `Recall 订单 ${orderNumber} 未展示至少两个持久化子单。`,
           },
         )
-      : await cleanupRecallPage.readTargetOrderNumbers();
+      : await cleanupRecallPage.orderDetails.readTargetOrderNumbers();
 
     if (targetOrderNumbers.length > 0) {
-      await cleanupRecallPage.openOrderDetails(orderNumber, targetOrderNumbers[0]);
+      await cleanupRecallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumbers[0]);
     }
 
-    await cleanupRecallPage.clickClearTableInMoreMenu();
+    await cleanupRecallPage.orderDetails.clickClearTableInMoreMenu();
 
     if (targetOrderNumbers.length > 0) {
       await this.voidSplitChildren(cleanupRecallPage, orderNumber, targetOrderNumbers, options);
@@ -691,37 +669,32 @@ export class RecallFlow {
   @step('业务步骤：从分单提交返回页进入 Recall')
   async openRecallFromSplitReturnPage(
     returnedPage: SplitOrderReturnPage,
-    homePage: HomePage,
+    _homePage: HomePage,
   ): Promise<RecallPage> {
-    try {
-      if (returnedPage instanceof RecallPage) {
-        await returnedPage.expectLoaded();
-        return returnedPage;
-      }
-
-      if (returnedPage instanceof OrderDishesPage) {
-        return await returnedPage.clickRecall();
-      }
-
-      return await returnedPage.enterRecall();
-    } catch {
-      await homePage.expectPrimaryFunctionCardsVisible();
-      return await homePage.enterRecall();
+    if (returnedPage instanceof RecallPage) {
+      await returnedPage.expectLoaded();
+      return returnedPage;
     }
+
+    if (returnedPage instanceof OrderDishesPage) {
+      return await returnedPage.navigation.clickRecall();
+    }
+
+    return await returnedPage.enterRecall();
   }
 
   @step('业务步骤：对当前 Recall 订单详情中的所有正向支付流水发起退款')
   async refundAllPaymentRecords(recallPage: RecallPage): Promise<void> {
     await recallPage.expectLoaded();
-    const paymentAmounts = (await recallPage.readOrderPaymentAmounts()).filter((amount) => amount > 0);
+    const paymentAmounts = (await recallPage.orderDetails.readOrderPaymentAmounts()).filter((amount) => amount > 0);
 
     for (let index = 0; index < paymentAmounts.length; index += 1) {
-      const refundedCountBefore = (await recallPage.readOrderPaymentAmounts()).filter((amount) => amount < 0).length;
+      const refundedCountBefore = (await recallPage.orderDetails.readOrderPaymentAmounts()).filter((amount) => amount < 0).length;
 
-      await recallPage.refundPaymentRecord(index);
+      await recallPage.orderDetails.refundPaymentRecord(index);
       await waitUntil(
         async () => {
-          const amounts = await recallPage.readOrderPaymentAmounts();
+          const amounts = await recallPage.orderDetails.readOrderPaymentAmounts();
           return amounts.filter((amount) => amount < 0).length;
         },
         (refundedCount) => refundedCount > refundedCountBefore,
@@ -742,8 +715,8 @@ export class RecallFlow {
     dishName: string,
   ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber);
-    await recallPage.refundOrderItem(0, dishName);
+    await recallPage.orderDetails.openOrderDetails(orderNumber);
+    await recallPage.orderDetails.refundOrderItem(0, dishName);
   }
 
   @step((_: RecallPage, orderNumber: string, targetOrderNumber?: string) =>
@@ -755,10 +728,9 @@ export class RecallFlow {
     recallPage: RecallPage,
     orderNumber: string,
     targetOrderNumber?: string,
-  ): Promise<RecallPage> {
+  ): Promise<void> {
     await recallPage.expectLoaded();
-    await recallPage.openOrderDetails(orderNumber, targetOrderNumber);
-    await recallPage.clickSortInMoreMenu();
-    return recallPage;
+    await recallPage.orderDetails.openOrderDetails(orderNumber, targetOrderNumber);
+    await recallPage.orderDetails.clickSortInMoreMenu();
   }
 }

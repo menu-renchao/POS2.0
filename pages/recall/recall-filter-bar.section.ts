@@ -8,6 +8,7 @@ import {
   type RecallProductLine,
 } from '../../test-data/recall-search-options';
 import { step } from '../../utils/step';
+import { escapeRegExp } from '../../utils/text';
 import { waitForInputSettled } from '../../utils/input-stability';
 import { waitUntil } from '../../utils/wait';
 import { resolveManualSearchTagTestId } from './recall-reads.section';
@@ -22,16 +23,13 @@ export class RecallFilterBarSection {
   private readonly searchTriggerButton: Locator;
   private readonly topSearchInput: Locator;
   private readonly searchDialog: Locator;
-  private readonly searchDialogDefaultInput: Locator;
-  private readonly searchDialogNumberInput: Locator;
-  private readonly searchDialogAmountInput: Locator;
-  private readonly searchDialogDefaultInputClearButton: Locator;
-  private readonly searchDialogNumberInputClearButton: Locator;
-  private readonly searchDialogAmountInputClearButton: Locator;
+  private readonly searchDialogInput: Locator;
   private readonly searchDialogSubmitButton: Locator;
   private readonly searchDialogKeyboardCloseButton: Locator;
   private readonly activeFilterTags: Locator;
   private readonly orderCardGrid: Locator;
+  readonly orderCards: Locator;
+  readonly orderCardByNumber: (orderNumber: string) => Locator;
   readonly orderListContainer: Locator;
 
   constructor(readonly page: Page) {
@@ -54,24 +52,24 @@ export class RecallFilterBarSection {
     this.searchTriggerButton = this.page.locator('[data-testid="recall2-search-trigger"]:visible');
     this.topSearchInput = this.page.getByTestId('recall2-search-input');
     this.searchDialog = this.page.getByTestId('recall2-search-modal');
-    this.searchDialogDefaultInput = this.searchDialog.getByTestId('recall2-search-modal-input-default');
-    this.searchDialogNumberInput = this.searchDialog.getByTestId('recall2-search-modal-input-number');
-    this.searchDialogAmountInput = this.searchDialog.getByTestId('recall2-search-modal-input-amount');
-    this.searchDialogDefaultInputClearButton = this.searchDialog.getByTestId(
-      'recall2-search-modal-input-default-clear',
-    );
-    this.searchDialogNumberInputClearButton = this.searchDialog.getByTestId(
-      'recall2-search-modal-input-number-clear',
-    );
-    this.searchDialogAmountInputClearButton = this.searchDialog.getByTestId(
-      'recall2-search-modal-input-amount-clear',
-    );
+    this.searchDialogInput = this.searchDialog.getByRole('textbox', {
+      name: 'Search',
+    });
     this.searchDialogSubmitButton = this.searchDialog.getByTestId('recall2-search-modal-search-button');
     this.searchDialogKeyboardCloseButton = this.page.getByTestId('pos-keyboard-button-{close}');
     this.activeFilterTags = this.page.locator(
       '[data-testid^="recall2-filter-tag-"]:not([data-testid^="recall2-filter-tag-label"]):not([data-testid^="recall2-filter-tag-value"]):visible',
     );
     this.orderCardGrid = this.page.getByTestId('recall2-order-card-grid');
+    this.orderCards = this.orderCardGrid.locator(
+      '[data-testid^="recall2-order-card-"]',
+    );
+    this.orderCardByNumber = (orderNumber: string) => {
+      const normalizedOrderNumber = orderNumber.trim().replace(/^#/, '');
+      return this.orderCards.filter({
+        has: this.page.getByText(`#${normalizedOrderNumber}`, { exact: true }),
+      });
+    };
     this.orderListContainer = this.page.getByTestId('recall2-order-list-container');
   }
 
@@ -110,9 +108,7 @@ export class RecallFilterBarSection {
   @step('页面操作：打开手动输入搜索弹窗')
   async openManualSearchDialog(): Promise<void> {
     await expect(this.searchTriggerButton).toBeVisible();
-    await this.searchTriggerButton.evaluate((searchTrigger) => {
-      (searchTrigger as HTMLElement).click();
-    });
+    await this.searchTriggerButton.click();
     await expect(this.searchDialog).toBeVisible();
   }
 
@@ -125,13 +121,13 @@ export class RecallFilterBarSection {
   @step((keyword: string) => `页面操作：输入手动搜索关键字 ${keyword}`)
   async fillManualSearchKeyword(keyword: string): Promise<void> {
     await expect(this.searchDialog).toBeVisible();
-    await (await this.resolveVisibleSearchDialogInput()).fill(keyword);
+    await this.searchDialogInput.fill(keyword);
   }
 
   @step('页面操作：提交手动搜索条件')
   async submitManualSearch(): Promise<void> {
     await expect(this.searchDialog).toBeVisible();
-    await waitForInputSettled(await this.resolveVisibleSearchDialogInput());
+    await waitForInputSettled(this.searchDialogInput);
     await this.searchDialogSubmitButton.click();
     await expect(this.searchDialog).toBeHidden();
   }
@@ -140,9 +136,7 @@ export class RecallFilterBarSection {
   async closeManualSearchDialog(): Promise<void> {
     if (await this.searchDialog.isVisible().catch(() => false)) {
       if (await this.searchDialogKeyboardCloseButton.isVisible().catch(() => false)) {
-        await this.searchDialogKeyboardCloseButton.evaluate((closeButton) => {
-          (closeButton as HTMLElement).click();
-        });
+        await this.searchDialogKeyboardCloseButton.click();
       }
 
       if (await this.searchDialog.isVisible().catch(() => false)) {
@@ -164,9 +158,7 @@ export class RecallFilterBarSection {
 
       const clearAllButton = this.page.getByRole('button', { name: /^Clear All$/i });
       if (await clearAllButton.isVisible().catch(() => false)) {
-        await clearAllButton.evaluate((button) => {
-          (button as HTMLElement).click();
-        });
+        await clearAllButton.click();
         await waitUntil(
           async () => await this.readActiveFilterCount(),
           (filterCount) => filterCount === 0,
@@ -174,27 +166,30 @@ export class RecallFilterBarSection {
             timeout: 3_000,
             message: 'Recall 筛选条件在点击 Clear All 后仍未清空。',
           },
-        ).catch(() => undefined);
-
-        if ((await this.readActiveFilterCount()) === 0) {
-          return;
-        }
+        );
+        return;
       }
 
       if ((await this.activeFilterTags.count().catch(() => 0)) > 0) {
-        await this.activeFilterTags.first().click({ timeout: 1_000 }).catch(() => undefined);
+        await this.activeFilterTags.first().click({ timeout: 1_000 });
         continue;
       }
 
       const removeFilterButton = this.page.getByRole('button', { name: /^Remove filter:/i }).first();
       if (!(await removeFilterButton.isVisible().catch(() => false))) {
-        return;
+        const activeFilters = await this.readActiveFilterTexts();
+        throw new Error(
+          `Recall 仍有 ${activeFilters.length} 个筛选条件，但未找到可清除控件：${activeFilters.join(' | ')}`,
+        );
       }
 
-      await removeFilterButton.evaluate((button) => {
-        (button as HTMLElement).click();
-      });
+      await removeFilterButton.click();
     }
+
+    const remainingFilters = await this.readActiveFilterTexts();
+    throw new Error(
+      `Recall 筛选条件在 10 次清理后仍未清空：${remainingFilters.join(' | ')}`,
+    );
   }
 
   @step('页面操作：移除 Recall 支付状态 Unpaid 筛选标签')
@@ -204,9 +199,7 @@ export class RecallFilterBarSection {
     });
 
     if (await unpaidFilterButton.isVisible().catch(() => false)) {
-      await unpaidFilterButton.evaluate((button) => {
-        (button as HTMLElement).click();
-      });
+      await unpaidFilterButton.click();
     }
   }
 
@@ -235,10 +228,7 @@ export class RecallFilterBarSection {
       }
     }
 
-    return await this.page.evaluate(() => {
-      const matchedOrderNumbers = document.body.innerText.match(/#\d+/g) ?? [];
-      return [...new Set<string>(matchedOrderNumbers)];
-    });
+    return [];
   }
 
   @step('页面读取：读取当前可见订单中的最新订单号')
@@ -267,10 +257,7 @@ export class RecallFilterBarSection {
 
   @step((orderNumber: string) => `页面读取：读取 Recall 订单 ${orderNumber} 的卡片文本`)
   async readOrderCardText(orderNumber: string): Promise<string> {
-    const normalizedOrderNumber = orderNumber.trim().replace(/^#/, '');
-    const orderCard = this.orderCardGrid
-      .locator('[data-testid^="recall2-order-card-"]')
-      .filter({ has: this.page.getByText(`#${normalizedOrderNumber}`, { exact: true }) });
+    const orderCard = this.orderCardByNumber(orderNumber);
 
     await expect(orderCard).toHaveCount(1);
     return (await orderCard.innerText()).replace(/\s+/g, ' ').trim();
@@ -306,7 +293,7 @@ export class RecallFilterBarSection {
     await filterButton.click();
     await this.page
       .getByTestId(/^recall2-filter-option-.+$/)
-      .filter({ hasText: new RegExp(`^\\s*${escapeRegularExpression(optionName)}\\s*$`, 'i') })
+      .filter({ hasText: new RegExp(`^\\s*${escapeRegExp(optionName)}\\s*$`, 'i') })
       .first()
       .click();
   }
@@ -321,24 +308,10 @@ export class RecallFilterBarSection {
 
     await this.openManualSearchDialog();
 
-    const visibleClearButton = await this.resolveVisibleSearchDialogClearButton();
-
-    if (visibleClearButton) {
-      await visibleClearButton.evaluate((clearButton) => {
-        (clearButton as HTMLElement).click();
-      });
-    } else {
-      await (await this.resolveVisibleSearchDialogInput()).fill('');
-    }
-
-    await expect(await this.resolveVisibleSearchDialogInput()).toHaveValue('');
+    await this.searchDialogInput.fill('');
+    await expect(this.searchDialogInput).toHaveValue('');
     await this.closeManualSearchDialog();
-    await this.topSearchInput.evaluate((inputElement) => {
-      const input = inputElement as HTMLInputElement;
-      input.value = '';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    await this.topSearchInput.fill('');
     await expect(this.topSearchInput).toHaveValue('');
   }
 
@@ -372,24 +345,8 @@ export class RecallFilterBarSection {
         interval: 200,
         message: 'Recall 顶层遮罩在按 Escape 后仍未消失。',
       },
-    ).catch(() => undefined);
+    );
   }
-  private async resolveVisibleSearchDialogInput(): Promise<Locator> {
-    const inputCandidates = [
-      this.searchDialogDefaultInput,
-      this.searchDialogNumberInput,
-      this.searchDialogAmountInput,
-    ];
-
-    for (const inputCandidate of inputCandidates) {
-      if (await inputCandidate.isVisible().catch(() => false)) {
-        return inputCandidate;
-      }
-    }
-
-    throw new Error('Unable to find a visible manual search input in the Recall search dialog.');
-  }
-
   private async readActiveFilterCount(): Promise<number> {
     const tagCount = await this.activeFilterTags.count().catch(() => 0);
     const removeFilterCount = await this.page
@@ -400,23 +357,4 @@ export class RecallFilterBarSection {
     return tagCount + removeFilterCount;
   }
 
-  private async resolveVisibleSearchDialogClearButton(): Promise<Locator | null> {
-    const clearButtonCandidates = [
-      this.searchDialogDefaultInputClearButton,
-      this.searchDialogNumberInputClearButton,
-      this.searchDialogAmountInputClearButton,
-    ];
-
-    for (const clearButtonCandidate of clearButtonCandidates) {
-      if (await clearButtonCandidate.isVisible().catch(() => false)) {
-        return clearButtonCandidate;
-      }
-    }
-
-    return null;
-  }
-}
-
-function escapeRegularExpression(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

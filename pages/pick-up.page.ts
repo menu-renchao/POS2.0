@@ -50,9 +50,7 @@ export class PickUpPage {
   async clickStartOrder(): Promise<OrderDishesPage> {
     await this.closeKeyboardIfVisible();
     await waitForInputSettled(this.noteInput);
-    await this.startOrderButton.evaluate((buttonElement) => {
-      (buttonElement as HTMLElement).click();
-    });
+    await this.startOrderButton.click();
     return new OrderDishesPage(this.page);
   }
 
@@ -62,8 +60,7 @@ export class PickUpPage {
       return;
     }
 
-    await this.keyboardCloseButton.evaluate((buttonElement) => {
-      (buttonElement as HTMLElement).click();
-    });
+    await this.keyboardCloseButton.click();
+    await expect(this.keyboardCloseButton).toBeHidden();
   }
 }

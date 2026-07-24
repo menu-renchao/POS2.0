@@ -2,7 +2,6 @@ import type { FullConfig } from '@playwright/test';
 import { existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { appConfig } from '../../test-data/env';
-import { clearOccupiedTablesBeforeRun } from './table-cleanup';
 
 const PROJECT_ROOT = resolve(__dirname, '..', '..');
 const STALE_OUTPUT_DIRS = ['test-results', 'allure-results', 'allure-report'];
@@ -15,10 +14,6 @@ function validateUrl(url: string): void {
   }
 }
 
-function shouldClearOccupiedTables(): boolean {
-  return process.env.UI_CLEAR_TABLES_BEFORE_RUN?.trim().toLowerCase() === 'true';
-}
-
 async function globalSetup(_config: FullConfig): Promise<void> {
   for (const dir of STALE_OUTPUT_DIRS) {
     const dirPath = resolve(PROJECT_ROOT, dir);
@@ -29,11 +24,6 @@ async function globalSetup(_config: FullConfig): Promise<void> {
   }
 
   validateUrl(appConfig.baseURL);
-
-  if (shouldClearOccupiedTables()) {
-    const clearedOrderCount = await clearOccupiedTablesBeforeRun();
-    console.log(`[global setup] Cleared ${clearedOrderCount} occupied table order(s).`);
-  }
 }
 
 export default globalSetup;

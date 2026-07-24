@@ -1,13 +1,5 @@
 import { expect } from '@playwright/test';
-import { EmployeeLoginFlow } from '../../flows/employee-login.flow';
-import { HomeFlow } from '../../flows/home.flow';
-import { OrderDishesFlow } from '../../flows/order-dishes.flow';
-import { PaymentFlow } from '../../flows/payment.flow';
-import { RecallFlow } from '../../flows/recall.flow';
-import { SelectTableFlow } from '../../flows/select-table.flow';
-import { SplitOrderFlow } from '../../flows/split-order.flow';
-import { TakeoutFlow } from '../../flows/takeout.flow';
-import { test } from '../../fixtures/test.fixture';
+import { test, type FlowFixtures } from '../../fixtures/test.fixture';
 import type { EmployeeLoginPage } from '../../pages/employee-login.page';
 import type { HomePage } from '../../pages/home.page';
 import { RecallPage } from '../../pages/recall.page';
@@ -21,23 +13,10 @@ import {
 import { jiraIssueAnnotation } from '../../utils/jira';
 import { waitUntil } from '../../utils/wait';
 
-type ReadyPages = {
-  employeeLoginPage: EmployeeLoginPage;
-  homePage: HomePage;
-};
-
-async function enterReadyHome({ employeeLoginPage, homePage }: ReadyPages): Promise<HomePage> {
-  const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
-    homePage,
-    employeeLoginPage,
-  );
-  await readyHomePage.expectPrimaryFunctionCardsVisible();
-  return readyHomePage;
-}
-
 async function createCashPaidToGoOrder(
   readyHomePage: HomePage,
   employeeLoginPage: EmployeeLoginPage,
+  flows: Readonly<FlowFixtures>,
   options: {
     firstItem?: 'combo' | 'regular';
     itemFixedCharge?: number;
@@ -61,9 +40,9 @@ async function createCashPaidToGoOrder(
   total: number;
 }> {
   const orderDishesPage = options.orderType === 'dine-in'
-    ? await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage)
-    : await new TakeoutFlow().startToGoOrder(readyHomePage, employeeLoginPage);
-  const orderDishesFlow = new OrderDishesFlow();
+    ? await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage)
+    : await flows.takeoutFlow.startToGoOrder(readyHomePage, employeeLoginPage);
+  const orderDishesFlow = flows.orderDishesFlow;
   if (options.firstItem === 'combo') {
     await orderDishesFlow.addComboDishWithItemOptions(orderDishesPage, {
       comboName: orderServiceComboOptionRemovalCase.comboName,
@@ -81,7 +60,7 @@ async function createCashPaidToGoOrder(
   }
 
   if (options.taxExemptFirstDish) {
-    await orderDishesPage.setOrderedDishTaxExempt(orderServiceDishes.regular.name, true);
+    await orderDishesPage.menu.setOrderedDishTaxExempt(orderServiceDishes.regular.name, true);
   }
 
   if (options.itemFixedCharge !== undefined) {
@@ -94,7 +73,7 @@ async function createCashPaidToGoOrder(
     });
   }
 
-  const firstDishSummary = await orderDishesPage.readPriceSummary();
+  const firstDishSummary = await orderDishesPage.reads.readPriceSummary();
   const firstDishTotal =
     firstDishSummary.Subtotal +
     firstDishSummary.Tax +
@@ -118,16 +97,16 @@ async function createCashPaidToGoOrder(
     }
   }
 
-  const total = (await orderDishesPage.readPriceSummary())['Total(Cash)'];
-  const savedOrder = await orderDishesPage.saveOrderWithReference();
-  const employeeHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+  const total = (await orderDishesPage.reads.readPriceSummary())['Total(Cash)'];
+  const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
+  const employeeHomePage = await flows.employeeLoginFlow.enterEmployeeContext(
     savedOrder.homePage,
     employeeLoginPage,
   );
-  const recallPage = await new RecallFlow().openRecallFromHome(employeeHomePage);
+  const recallPage = await flows.recallFlow.openRecallFromHome(employeeHomePage);
   const orderNumber = savedOrder.orderNumber;
-  const paymentPage = await new RecallFlow().openPayment(recallPage, orderNumber);
-  const paymentFlow = new PaymentFlow();
+  const paymentPage = await flows.recallFlow.openPayment(recallPage, orderNumber);
+  const paymentFlow = flows.paymentFlow;
 
   if (options.partialCreditAmountInCents !== undefined) {
     await paymentFlow.payPartialByCreditCard(paymentPage, {
@@ -150,11 +129,11 @@ async function createCashPaidToGoOrder(
     await paymentFlow.payByCash(paymentPage, { printReceipt: false });
   }
 
-  const paidAmounts = (await recallPage.readOrderPaymentAmounts()).filter(
+  const paidAmounts = (await recallPage.orderDetails.readOrderPaymentAmounts()).filter(
     (amount) => amount > 0,
   );
-  await recallPage.closeOrderDetailsDialog();
-  await new RecallFlow().clearSearchConditions(recallPage);
+  await recallPage.orderDetails.closeOrderDetailsDialog();
+  await flows.recallFlow.clearSearchConditions(recallPage);
 
   return { firstDishTotal, orderNumber, paidAmounts, recallPage, total };
 }
@@ -162,15 +141,16 @@ async function createCashPaidToGoOrder(
 async function refundDishAndReadLatestRefund(
   paidOrder: Awaited<ReturnType<typeof createCashPaidToGoOrder>>,
   dishName: string,
+  flows: Readonly<FlowFixtures>,
 ): Promise<number> {
-  await new RecallFlow().refundOrderItem(
+  await flows.recallFlow.refundOrderItem(
     paidOrder.recallPage,
     paidOrder.orderNumber,
     dishName,
   );
   const refundAmounts = await waitUntil(
     async () =>
-      (await paidOrder.recallPage.readOrderPaymentAmounts()).filter((amount) => amount < 0),
+      (await paidOrder.recallPage.orderDetails.readOrderPaymentAmounts()).filter((amount) => amount < 0),
     (amounts) => amounts.length > 0,
     {
       timeout: 10_000,
@@ -187,7 +167,7 @@ async function refundDishAndReadLatestRefund(
   return latestRefund;
 }
 
-test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
+test.describe('订单操作剩余回归', { tag: ['@点单', '@ui-exclusive-config'] }, () => {
   test.describe.configure({ timeout: 180_000 });
 
   test(
@@ -196,23 +176,23 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@现金支付'],
       annotation: [jiraIssueAnnotation('POS-35134')],
     },
-    async ({ homePage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage, flows }) => {
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
 
       const paidOrder = await test.step('创建包含两道菜的现金已支付 To Go 订单', async () => {
-        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, {
+        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, flows, {
           secondDish: true,
         });
       });
 
       await test.step('从 Recall 对第一道计税菜品发起按菜退款', async () => {
-        await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name);
+        await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name, flows);
       });
 
       await test.step('校验退款流水等于第一道菜含税金额', async () => {
-        const refundAmounts = (await paidOrder.recallPage.readOrderPaymentAmounts())
+        const refundAmounts = (await paidOrder.recallPage.orderDetails.readOrderPaymentAmounts())
           .filter((amount) => amount < 0);
         expect(refundAmounts.at(-1)).toBeCloseTo(-paidOrder.firstDishTotal, 2);
       });
@@ -225,19 +205,19 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@现金支付'],
       annotation: [jiraIssueAnnotation('POS-35135')],
     },
-    async ({ homePage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage, flows }) => {
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
       const paidOrder = await test.step('创建第一道菜免税的现金已支付 To Go 订单', async () => {
-        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, {
+        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, flows, {
           secondDish: true,
           taxExemptFirstDish: true,
         });
       });
 
       const refundAmount = await test.step('对免税菜品退款并读取退款流水', async () => {
-        return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name);
+        return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name, flows);
       });
 
       expect(refundAmount).toBeCloseTo(-paidOrder.firstDishTotal, 2);
@@ -250,15 +230,15 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@现金支付', '@加收'],
       annotation: [jiraIssueAnnotation('POS-35142')],
     },
-    async ({ apiSetup, homePage, employeeLoginPage }) => {
+    async ({ apiSetup, homePage, employeeLoginPage, flows }) => {
       const discount = await test.step('通过 API 创建本次使用的 10% 单菜折扣', async () => {
         return await apiSetup.discount.create({ rate: 10, rateType: 2 });
       });
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
       const paidOrder = await test.step('创建含百分比折扣的现金已支付 To Go 订单', async () => {
-        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, {
+        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, flows, {
           presetItemDiscount: {
             authorizationPasscode: '11',
             name: discount.name,
@@ -268,7 +248,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       });
 
       const refundAmount = await test.step('对参与折扣的第一道菜退款并读取流水', async () => {
-        return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name);
+        return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name, flows);
       });
 
       expect(refundAmount).toBeCloseTo(-paidOrder.firstDishTotal, 2);
@@ -281,18 +261,18 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@现金支付'],
       annotation: [jiraIssueAnnotation('POS-35150')],
     },
-    async ({ homePage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage, flows }) => {
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
       const paidOrder = await test.step('创建首笔支付五美元并完成尾款的 To Go 订单', async () => {
-        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, {
+        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, flows, {
           splitPaymentAmountInCents: 500,
         });
       });
 
       const refundAmount = await test.step('对金额高于支付流水的菜品发起退款', async () => {
-        return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name);
+        return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name, flows);
       });
 
       expect(paidOrder.paidAmounts).toContain(5);
@@ -306,7 +286,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@现金支付'],
       annotation: [jiraIssueAnnotation('POS-35155')],
     },
-    async ({ apiSetup, homePage, employeeLoginPage }) => {
+    async ({ apiSetup, homePage, employeeLoginPage, flows }) => {
       test.info().annotations.push({
         type: '已知产品问题',
         description:
@@ -324,33 +304,33 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
 
       try {
         const readyHomePage = await test.step('进入 POS 主页并刷新支付后送厨配置', async () => {
-          const page = await enterReadyHome({ employeeLoginPage, homePage });
+          const page = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
           await page.clickRefresh();
           await page.confirmDelayedConfigurationRefresh();
           return page;
         });
         const paidOrder = await test.step('创建两道菜且支付后尚未送厨的堂食无桌订单', async () => {
-          return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, {
+          return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, flows, {
             orderType: 'dine-in',
             secondDish: true,
           });
         });
 
         const refundAmount = await test.step('按菜退款普通菜1并记录退款金额', async () => {
-          return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name);
+          return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name, flows);
         });
 
         await test.step('关闭退款后的详情并从 Recall 再次送厨该订单', async () => {
-          await paidOrder.recallPage.closeOrderDetailsDialog();
-          await new RecallFlow().sendOrderToKitchen(
+          await paidOrder.recallPage.orderDetails.closeOrderDetailsDialog();
+          await flows.recallFlow.sendOrderToKitchen(
             paidOrder.recallPage,
             paidOrder.orderNumber,
           );
         });
 
         await test.step('确认未退款菜品已送厨且退款金额正确', async () => {
-          await paidOrder.recallPage.openOrderDetails(paidOrder.orderNumber);
-          const details = await paidOrder.recallPage.readOrderDetailsSnapshot();
+          await paidOrder.recallPage.orderDetails.openOrderDetails(paidOrder.orderNumber);
+          const details = await paidOrder.recallPage.orderDetails.readOrderDetailsSnapshot();
           const refundedItem = details.items.find(
             (item) => item.name === orderServiceDishes.regular.name,
           );
@@ -378,23 +358,23 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@现金支付'],
       annotation: [jiraIssueAnnotation('POS-35163')],
     },
-    async ({ homePage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage, flows }) => {
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
       const paidOrder = await test.step('创建包含两道菜的现金已支付 To Go 订单', async () => {
-        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, {
+        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, flows, {
           secondDish: true,
         });
       });
       const secondDishTotal = paidOrder.total - paidOrder.firstDishTotal;
 
       const firstRefund = await test.step('第一次按菜退款普通菜1', async () => {
-        return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name);
+        return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name, flows);
       });
-      await paidOrder.recallPage.closeOrderDetailsDialog();
+      await paidOrder.recallPage.orderDetails.closeOrderDetailsDialog();
       const secondRefund = await test.step('第二次按菜退款普通菜2', async () => {
-        return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.test.name);
+        return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.test.name, flows);
       });
 
       expect(firstRefund).toBeCloseTo(-paidOrder.firstDishTotal, 2);
@@ -408,21 +388,21 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@现金支付'],
       annotation: [jiraIssueAnnotation('POS-35166')],
     },
-    async ({ homePage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage, flows }) => {
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
       const paidOrder = await test.step('创建现金支付并产生找零的 To Go 订单', async () => {
-        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, {
+        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, flows, {
           withChange: true,
         });
       });
 
       await test.step('对实际支付流水执行整笔退款', async () => {
-        await paidOrder.recallPage.openOrderDetails(paidOrder.orderNumber);
-        await paidOrder.recallPage.refundPaymentRecord(0);
+        await paidOrder.recallPage.orderDetails.openOrderDetails(paidOrder.orderNumber);
+        await paidOrder.recallPage.orderDetails.refundPaymentRecord(0);
       });
-      const refundAmounts = (await paidOrder.recallPage.readOrderPaymentAmounts()).filter(
+      const refundAmounts = (await paidOrder.recallPage.orderDetails.readOrderPaymentAmounts()).filter(
         (amount) => amount < 0,
       );
 
@@ -436,19 +416,19 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@信用卡支付'],
       annotation: [jiraIssueAnnotation('POS-35173')],
     },
-    async ({ homePage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage, flows }) => {
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
       const paidOrder = await test.step('创建信用卡部分支付一美元的 To Go 订单', async () => {
-        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, {
+        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, flows, {
           partialCreditAmountInCents: 100,
         });
       });
 
       await test.step('打开信用卡支付流水并校验不提供按菜退款', async () => {
-        await paidOrder.recallPage.openOrderDetails(paidOrder.orderNumber);
-        await paidOrder.recallPage.expectOrderItemRefundUnavailable(0);
+        await paidOrder.recallPage.orderDetails.openOrderDetails(paidOrder.orderNumber);
+        await paidOrder.recallPage.orderDetails.expectOrderItemRefundUnavailable(0);
       });
     },
   );
@@ -459,7 +439,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@现金支付', '@加收'],
       annotation: [jiraIssueAnnotation('POS-35498')],
     },
-    async ({ apiSetup, homePage, employeeLoginPage }) => {
+    async ({ apiSetup, homePage, employeeLoginPage, flows }) => {
       const discount = await apiSetup.discount.create({ rate: 10, rateType: 2 });
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         {
@@ -471,13 +451,13 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
 
       try {
         const readyHomePage = await test.step('进入 POS 主页并刷新退款及折扣计税配置', async () => {
-          const page = await enterReadyHome({ employeeLoginPage, homePage });
+          const page = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
           await page.clickRefresh();
           await page.confirmDelayedConfigurationRefresh();
           return page;
         });
         const paidOrder = await test.step('创建含三美元单菜加收和整单九折的两菜订单并现金结账', async () => {
-          return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, {
+          return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, flows, {
             itemFixedCharge: 3,
             presetItemDiscount: {
               authorizationPasscode: '11',
@@ -489,11 +469,11 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
         });
 
         const firstRefund = await test.step('按菜退款普通菜1', async () => {
-          return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name);
+          return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.regular.name, flows);
         });
-        await paidOrder.recallPage.closeOrderDetailsDialog();
+        await paidOrder.recallPage.orderDetails.closeOrderDetailsDialog();
         const secondRefund = await test.step('按菜退款普通菜2', async () => {
-          return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.test.name);
+          return await refundDishAndReadLatestRefund(paidOrder, orderServiceDishes.test.name, flows);
         });
 
         await test.step('确认全部按菜退款金额合计等于原订单实付金额', async () => {
@@ -513,7 +493,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@加收'],
       annotation: [jiraIssueAnnotation('POS-36140')],
     },
-    async ({ apiSetup, homePage, employeeLoginPage }) => {
+    async ({ apiSetup, homePage, employeeLoginPage, flows }) => {
       const discount = await apiSetup.discount.create({ rate: 10, rateType: 2 });
       const restoreConfiguration = await apiSetup.systemConfiguration.updateByName(
         'DISCOUNT_REASON_REQUIRED',
@@ -523,17 +503,17 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
 
       try {
         const readyHomePage = await test.step('进入 POS 主页并刷新折扣原因可选配置', async () => {
-          const page = await enterReadyHome({ employeeLoginPage, homePage });
+          const page = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
           await page.clickRefresh();
           await page.confirmDelayedConfigurationRefresh();
           return page;
         });
         const orderDishesPage = await test.step('进入 To Go 并添加普通菜1', async () => {
-          const page = await new TakeoutFlow().startToGoOrder(
+          const page = await flows.takeoutFlow.startToGoOrder(
             readyHomePage,
             employeeLoginPage,
           );
-          await new OrderDishesFlow().addRegularDish(
+          await flows.orderDishesFlow.addRegularDish(
             page,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
@@ -542,23 +522,23 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
         });
 
         await test.step('添加百分之十折扣且不填写折扣原因', async () => {
-          await new OrderDishesFlow().applyPresetItemDiscount(orderDishesPage, {
+          await flows.orderDishesFlow.applyPresetItemDiscount(orderDishesPage, {
             authorizationPasscode: '11',
             discountName: discount.name,
             dishName: orderServiceDishes.regular.name,
           });
         });
         const savedOrder = await test.step('保存订单并读取精确订单号', async () => {
-          return await orderDishesPage.saveOrderWithReference();
+          return await orderDishesPage.navigation.saveOrderWithReference();
         });
-        const employeeHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+        const employeeHomePage = await flows.employeeLoginFlow.enterEmployeeContext(
           savedOrder.homePage,
           employeeLoginPage,
         );
-        const recallPage = await new RecallFlow().openRecallFromHome(employeeHomePage);
+        const recallPage = await flows.recallFlow.openRecallFromHome(employeeHomePage);
 
         await test.step('在 Recall 确认订单已保存负向折扣金额', async () => {
-          const details = await new RecallFlow().viewOrderDetails(
+          const details = await flows.recallFlow.viewOrderDetails(
             recallPage,
             savedOrder.orderNumber,
           );
@@ -576,7 +556,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@加收'],
       annotation: [jiraIssueAnnotation('POS-36148')],
     },
-    async ({ apiSetup, homePage, employeeLoginPage }) => {
+    async ({ apiSetup, homePage, employeeLoginPage, flows }) => {
       const discount = await apiSetup.discount.create({ rate: 10, rateType: 2 });
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         {
@@ -588,17 +568,17 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
 
       try {
         const readyHomePage = await test.step('进入 POS 主页并刷新折扣原因必填配置', async () => {
-          const page = await enterReadyHome({ employeeLoginPage, homePage });
+          const page = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
           await page.clickRefresh();
           await page.confirmDelayedConfigurationRefresh();
           return page;
         });
         const orderDishesPage = await test.step('进入 To Go 并添加普通菜1', async () => {
-          const page = await new TakeoutFlow().startToGoOrder(
+          const page = await flows.takeoutFlow.startToGoOrder(
             readyHomePage,
             employeeLoginPage,
           );
-          await new OrderDishesFlow().addRegularDish(
+          await flows.orderDishesFlow.addRegularDish(
             page,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
@@ -607,7 +587,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
         });
 
         await test.step('添加百分之十折扣并选择 Waited Too Long 原因', async () => {
-          await new OrderDishesFlow().applyPresetItemDiscount(orderDishesPage, {
+          await flows.orderDishesFlow.applyPresetItemDiscount(orderDishesPage, {
             authorizationPasscode: '11',
             discountName: discount.name,
             dishName: orderServiceDishes.regular.name,
@@ -615,16 +595,16 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
         });
 
         const savedOrder = await test.step('保存订单并读取精确订单号', async () => {
-          return await orderDishesPage.saveOrderWithReference();
+          return await orderDishesPage.navigation.saveOrderWithReference();
         });
-        const employeeHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+        const employeeHomePage = await flows.employeeLoginFlow.enterEmployeeContext(
           savedOrder.homePage,
           employeeLoginPage,
         );
-        const recallPage = await new RecallFlow().openRecallFromHome(employeeHomePage);
+        const recallPage = await flows.recallFlow.openRecallFromHome(employeeHomePage);
 
         await test.step('在 Recall 校验普通菜1保留 Waited Too Long 折扣原因', async () => {
-          const details = await new RecallFlow().viewOrderDetails(
+          const details = await flows.recallFlow.viewOrderDetails(
             recallPage,
             savedOrder.orderNumber,
           );
@@ -648,13 +628,13 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@分单'],
       annotation: [jiraIssueAnnotation('POS-37798')],
     },
-    async ({ homePage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage, flows }) => {
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
       const orderDishesPage = await test.step('创建包含两道普通菜的堂食无桌订单', async () => {
-        const page = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        const orderFlow = new OrderDishesFlow();
+        const page = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        const orderFlow = flows.orderDishesFlow;
         await orderFlow.addRegularDish(
           page,
           orderServiceDishes.regular.name,
@@ -667,8 +647,8 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
         );
         return page;
       });
-      const splitOrderPage = await orderDishesPage.openSplitOrder();
-      const splitFlow = new SplitOrderFlow();
+      const splitOrderPage = await orderDishesPage.navigation.openSplitOrder();
+      const splitFlow = flows.splitOrderFlow;
 
       await test.step('将一道菜移入第二子单并新增第三个零元空子单', async () => {
         await splitFlow.moveDishToNewSuborder(splitOrderPage, orderServiceDishes.test.name);
@@ -685,13 +665,15 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
           return returnedPage;
         }
 
-        return await returnedPage.clickRecall();
+        return await flows.orderRegressionFlow.enterRecallFromReturnedPage(
+          returnedPage,
+        );
       });
 
       await test.step('确认保存后只保留两个非空子单', async () => {
-        const orderNumber = await new RecallFlow().readLatestVisibleOrderNumber(recallPage);
-        await recallPage.openOrderDetails(orderNumber);
-        const targetOrderNumbers = await recallPage.readTargetOrderNumbers();
+        const orderNumber = await flows.recallFlow.readLatestVisibleOrderNumber(recallPage);
+        await recallPage.orderDetails.openOrderDetails(orderNumber);
+        const targetOrderNumbers = await recallPage.orderDetails.readTargetOrderNumbers();
         expect(targetOrderNumbers).toHaveLength(2);
       });
     },
@@ -703,7 +685,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@加收'],
       annotation: [jiraIssueAnnotation('POS-36156')],
     },
-    async ({ apiSetup, homePage, employeeLoginPage }) => {
+    async ({ apiSetup, homePage, employeeLoginPage, flows }) => {
       test.setTimeout(90_000);
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         {
@@ -716,17 +698,17 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
 
       try {
         const readyHomePage = await test.step('进入 POS 主页并刷新折扣原因必填配置', async () => {
-          const page = await enterReadyHome({ employeeLoginPage, homePage });
+          const page = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
           await page.clickRefresh();
           await page.confirmDelayedConfigurationRefresh();
           return page;
         });
         const orderDishesPage = await test.step('创建 To Go 订单并添加普通菜1', async () => {
-          const page = await new TakeoutFlow().startToGoOrder(
+          const page = await flows.takeoutFlow.startToGoOrder(
             readyHomePage,
             employeeLoginPage,
           );
-          await new OrderDishesFlow().addRegularDish(
+          await flows.orderDishesFlow.addRegularDish(
             page,
             orderServiceDishes.regular.name,
             orderServiceDishes.regular.menu,
@@ -735,7 +717,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
         });
 
         await test.step('为普通菜1应用百分之十折扣并完成授权', async () => {
-          await new OrderDishesFlow().applyPresetItemDiscount(orderDishesPage, {
+          await flows.orderDishesFlow.applyPresetItemDiscount(orderDishesPage, {
             authorizationPasscode: '11',
             discountName: discount.name,
             dishName: orderServiceDishes.regular.name,
@@ -743,16 +725,16 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
         });
 
         const savedOrder = await test.step('保存订单并读取精确订单号', async () => {
-          return await orderDishesPage.saveOrderWithReference();
+          return await orderDishesPage.navigation.saveOrderWithReference();
         });
-        const employeeHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+        const employeeHomePage = await flows.employeeLoginFlow.enterEmployeeContext(
           savedOrder.homePage,
           employeeLoginPage,
         );
-        const recallPage = await new RecallFlow().openRecallFromHome(employeeHomePage);
+        const recallPage = await flows.recallFlow.openRecallFromHome(employeeHomePage);
 
         await test.step('在 Recall 校验普通菜1保留 Waited Too Long 折扣原因', async () => {
-          const details = await new RecallFlow().viewOrderDetails(
+          const details = await flows.recallFlow.viewOrderDetails(
             recallPage,
             savedOrder.orderNumber,
           );
@@ -773,7 +755,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
     {
       annotation: [jiraIssueAnnotation('POS-42631')],
     },
-    async ({ apiSetup, homePage, employeeLoginPage }) => {
+    async ({ apiSetup, homePage, employeeLoginPage, flows }) => {
       test.setTimeout(120_000);
       test.info().annotations.push({
         type: '已知产品问题',
@@ -792,14 +774,14 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
 
       try {
         const readyHomePage = await test.step('进入 POS 主页并刷新打单后自动送厨配置', async () => {
-          const page = await enterReadyHome({ employeeLoginPage, homePage });
+          const page = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
           await page.clickRefresh();
           await page.confirmDelayedConfigurationRefresh();
           return page;
         });
         const orderDishesPage = await test.step('创建堂食无桌订单并添加目标套餐', async () => {
-          const page = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-          await new OrderDishesFlow().addComboDishWithItemOptions(page, {
+          const page = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+          await flows.orderDishesFlow.addComboDishWithItemOptions(page, {
             comboName: comboCase.comboName,
             itemIndex: orderServiceComboOptionRemovalCase.itemIndex,
             menuSelection: orderServiceDishes.regular.menu,
@@ -810,24 +792,24 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
           return page;
         });
         const sentOrder = await test.step('整单送厨并读取精确订单号', async () => {
-          return await orderDishesPage.sendOrderWithReference();
+          return await orderDishesPage.navigation.sendOrderWithReference();
         });
 
-        const recallFlow = new RecallFlow();
+        const recallFlow = flows.recallFlow;
         const recallPage = await recallFlow.openRecallFromHome(sentOrder.homePage);
         const updatedOrder = await test.step('从 Recall 编辑套餐子菜并追加调味后保存', async () => {
           await recallFlow.clearSearchConditions(recallPage);
           const editingPage = await recallFlow.editOrder(recallPage, sentOrder.orderNumber);
-          await editingPage.openComboEditorForOrderedCombo(comboCase.comboName);
-          await editingPage.selectComboItem(
+          await editingPage.menu.openComboEditorForOrderedCombo(comboCase.comboName);
+          await editingPage.menu.selectComboItem(
             comboCase.sectionId,
             comboCase.targetSaleItemId,
             comboCase.targetItemIndex,
           );
-          await editingPage.expectItemOptionVisible(comboCase.parentOption);
-          await editingPage.selectCategoryOption(comboCase.parentOption);
-          await editingPage.confirmComboDialog();
-          const result = await editingPage.saveOrderWithReference();
+          await editingPage.menu.expectItemOptionVisible(comboCase.parentOption);
+          await editingPage.menu.selectCategoryOption(comboCase.parentOption);
+          await editingPage.menu.confirmComboDialog();
+          const result = await editingPage.navigation.saveOrderWithReference();
           const updatedComboSubItem = result.orderItems
             .flatMap((item) => item.comboSubItems)
             .find(
@@ -864,7 +846,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@小费', '@加收'],
       annotation: [jiraIssueAnnotation('POS-42086')],
     },
-    async ({ apiSetup, homePage, employeeLoginPage }) => {
+    async ({ apiSetup, homePage, employeeLoginPage, flows }) => {
       const restoreConfiguration = await apiSetup.systemConfiguration.updateManyByName(
         {
           TIPS_SUGGESTIONS_CALCULATION: '1',
@@ -876,14 +858,14 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
 
       try {
         const readyHomePage = await test.step('进入 POS 主页并刷新建议小费配置', async () => {
-          const page = await enterReadyHome({ employeeLoginPage, homePage });
+          const page = await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
           await page.clickRefresh();
           await page.confirmDelayedConfigurationRefresh();
           return page;
         });
         const orderDishesPage = await test.step('创建多份普通菜1和一份普通菜2的堂食无桌订单', async () => {
-          const page = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-          const orderFlow = new OrderDishesFlow();
+          const page = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+          const orderFlow = flows.orderDishesFlow;
           await orderFlow.addRegularDish(
             page,
             orderServiceDishes.regular.name,
@@ -899,7 +881,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
         });
 
         await test.step('为普通菜2应用百分之十单菜折扣', async () => {
-          await new OrderDishesFlow().applyPresetItemDiscount(orderDishesPage, {
+          await flows.orderDishesFlow.applyPresetItemDiscount(orderDishesPage, {
             authorizationPasscode: '11',
             discountName: discount.name,
             dishName: orderServiceDishes.test.name,
@@ -907,7 +889,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
         });
 
         await test.step('进入支付页并确认建议小费百分比列表', async () => {
-          const paymentPage = await orderDishesPage.openPayment();
+          const paymentPage = await orderDishesPage.navigation.openPayment();
           expect(await paymentPage.readSuggestedTipPercentages()).toEqual([15, 18, 20]);
         });
       } finally {
@@ -921,13 +903,13 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
     {
       annotation: [jiraIssueAnnotation('POS-43825')],
     },
-    async ({ homePage, employeeLoginPage }) => {
+    async ({ homePage, employeeLoginPage, flows }) => {
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
       const orderDishesPage = await test.step('创建堂食无桌订单并添加普通菜1', async () => {
-        const page = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        await new OrderDishesFlow().addRegularDish(
+        const page = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        await flows.orderDishesFlow.addRegularDish(
           page,
           orderServiceDishes.regular.name,
           orderServiceDishes.regular.menu,
@@ -936,7 +918,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       });
 
       await test.step('进入 Modify、添加全局调味并点击返回按钮', async () => {
-        await new OrderDishesFlow().addGlobalOptionAndCloseModify(
+        await flows.orderDishesFlow.addGlobalOptionAndCloseModify(
           orderDishesPage,
           orderServiceDishes.regular.name,
           orderServiceModifyGlobalOptionCase.optionName,
@@ -944,7 +926,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       });
 
       await test.step('确认 Modify 面板已退出', async () => {
-        expect(await orderDishesPage.isModifyPanelVisible()).toBe(false);
+        expect(await orderDishesPage.modifier.isModifyPanelVisible()).toBe(false);
       });
     },
   );
@@ -955,26 +937,26 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@现金支付', '@加收'],
       annotation: [jiraIssueAnnotation('POS-42085')],
     },
-    async ({ apiSetup, homePage, employeeLoginPage }) => {
+    async ({ apiSetup, homePage, employeeLoginPage, flows }) => {
       const discount = await test.step('通过 API 创建本次测试使用的百分之十单菜折扣', async () => {
         return await apiSetup.discount.create({ rate: 10, rateType: 2 });
       });
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
       const orderDishesPage = await test.step('创建堂食无桌订单并添加两份普通菜1', async () => {
-        const page = await new SelectTableFlow().enterDineInNoTableOrder(readyHomePage);
-        await new OrderDishesFlow().addRegularDish(
+        const page = await flows.selectTableFlow.enterDineInNoTableOrder(readyHomePage);
+        await flows.orderDishesFlow.addRegularDish(
           page,
           orderServiceDishes.regular.name,
           orderServiceDishes.regular.menu,
         );
-        await page.changeDishCount(2);
+        await page.menu.changeDishCount(2);
         return page;
       });
 
       await test.step('应用单菜折扣后清空全部菜品折扣', async () => {
-        const orderFlow = new OrderDishesFlow();
+        const orderFlow = flows.orderDishesFlow;
         await orderFlow.applyPresetItemDiscount(orderDishesPage, {
           authorizationPasscode: '11',
           discountName: discount.name,
@@ -987,27 +969,27 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       });
 
       await test.step('继续添加普通菜2', async () => {
-        await new OrderDishesFlow().addRegularDish(
+        await flows.orderDishesFlow.addRegularDish(
           orderDishesPage,
           orderServiceDishes.test.name,
           orderServiceDishes.test.menu,
         );
       });
-      const savedOrder = await orderDishesPage.saveOrderWithReference();
-      const employeeHomePage = await new EmployeeLoginFlow().enterEmployeeContext(
+      const savedOrder = await orderDishesPage.navigation.saveOrderWithReference();
+      const employeeHomePage = await flows.employeeLoginFlow.enterEmployeeContext(
         savedOrder.homePage,
         employeeLoginPage,
       );
-      const recallPage = await new RecallFlow().openRecallFromHome(employeeHomePage);
-      const paymentPage = await new RecallFlow().openPayment(
+      const recallPage = await flows.recallFlow.openRecallFromHome(employeeHomePage);
+      const paymentPage = await flows.recallFlow.openPayment(
         recallPage,
         savedOrder.orderNumber,
       );
 
       await test.step('现金全额支付并在 Recall 确认状态为 Paid', async () => {
-        await new PaymentFlow().payByCash(paymentPage, { printReceipt: false });
-        await recallPage.openOrderDetails(savedOrder.orderNumber);
-        const details = await recallPage.readOrderDetailsSnapshot();
+        await flows.paymentFlow.payByCash(paymentPage, { printReceipt: false });
+        await recallPage.orderDetails.openOrderDetails(savedOrder.orderNumber);
+        const details = await recallPage.orderDetails.readOrderDetailsSnapshot();
         expect(details.paymentStatus).toBe('Paid');
       });
     },
@@ -1019,16 +1001,16 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
       tag: ['@现金支付'],
       annotation: [jiraIssueAnnotation('POS-35307')],
     },
-    async ({ apiSetup, homePage, employeeLoginPage }) => {
+    async ({ apiSetup, homePage, employeeLoginPage, flows }) => {
       test.setTimeout(90_000);
       await test.step('停用订单类型为空且会中断套餐同步的脏自动加收配置', async () => {
         await apiSetup.charge.deactivateInvalidAutomaticCharges();
       });
       const readyHomePage = await test.step('进入 POS 主页并建立员工上下文', async () => {
-        return await enterReadyHome({ employeeLoginPage, homePage });
+        return await flows.orderRegressionFlow.enterReadyHome(homePage, employeeLoginPage);
       });
       const paidOrder = await test.step('创建只包含套餐菜的现金已支付 To Go 订单', async () => {
-        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, {
+        return await createCashPaidToGoOrder(readyHomePage, employeeLoginPage, flows, {
           firstItem: 'combo',
         });
       });
@@ -1037,6 +1019,7 @@ test.describe('订单操作剩余回归', { tag: ['@点单'] }, () => {
         return await refundDishAndReadLatestRefund(
           paidOrder,
           orderServiceComboOptionRemovalCase.comboName,
+          flows,
         );
       });
 

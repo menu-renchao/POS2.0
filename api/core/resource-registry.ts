@@ -91,6 +91,25 @@ export class ResourceRegistry {
   }
 }
 
+export function assertCleanupSucceeded(
+  cleanupResult: CleanupResult,
+  scope: string,
+): void {
+  if (cleanupResult.errors.length === 0) {
+    return;
+  }
+
+  const errorSummary = cleanupResult.errors
+    .map(
+      ({ resource, error }) =>
+        `${resource.type}:${String(resource.id)} ${error.message}`,
+    )
+    .join('; ');
+  throw new Error(
+    `${scope} cleanup failed for ${cleanupResult.errors.length} resource(s): ${errorSummary}`,
+  );
+}
+
 function isSameResource(resource: RegisteredResource, type: string, id: ResourceId): boolean {
   return resource.type === type && resource.id === id;
 }

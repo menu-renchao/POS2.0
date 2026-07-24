@@ -16,6 +16,8 @@ export type TableOrderEntryResult = {
 };
 
 export class SelectTableFlow {
+  constructor(private readonly employeeLoginFlow: EmployeeLoginFlow) {}
+
   @step('业务步骤：返回主页后重新进入指定桌台区域以刷新桌台信息')
   async refreshTableInformationByReentering(
     selectTablePage: SelectTablePage,
@@ -56,7 +58,7 @@ export class SelectTableFlow {
     );
 
     if (entryState === 'employee-login') {
-      await new EmployeeLoginFlow().enterWithEmployeePassword(
+      await this.employeeLoginFlow.enterWithEmployeePassword(
         employeeLoginPage,
         homePage,
         employeePasscode,
@@ -228,8 +230,8 @@ export class SelectTableFlow {
     currentTableNumber: string,
     guestCount: number,
   ): Promise<TableOrderEntryResult> {
-    await orderDishesPage.openChangeTable(currentTableNumber);
-    const targetTableNumbers = await orderDishesPage.readAvailableChangeTableNumbers();
+    await orderDishesPage.menu.openChangeTable(currentTableNumber);
+    const targetTableNumbers = await orderDishesPage.menu.readAvailableChangeTableNumbers();
     const targetTableNumber = targetTableNumbers.find(
       (tableNumber) => tableNumber !== currentTableNumber,
     );
@@ -238,9 +240,9 @@ export class SelectTableFlow {
       throw new Error(`当前桌台 ${currentTableNumber} 没有其他可用的换桌目标。`);
     }
 
-    await orderDishesPage.selectChangeTableTarget(targetTableNumber);
-    await orderDishesPage.confirmChangeTable(targetTableNumber);
-    await orderDishesPage.expectGuestCount(guestCount);
+    await orderDishesPage.menu.selectChangeTableTarget(targetTableNumber);
+    await orderDishesPage.menu.confirmChangeTable(targetTableNumber);
+    await orderDishesPage.menu.expectGuestCount(guestCount);
     const selectedTable = {
       areaName: '换桌',
       tableNumber: targetTableNumber,

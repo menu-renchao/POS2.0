@@ -15,7 +15,7 @@ export class InventoryFlow {
     quantity: number,
     menu: InventoryMenuConfig = inventoryMenu,
   ): Promise<OrderDishesPage> {
-    const inventoryPage = await orderDishesPage.openInventoryPage();
+    const inventoryPage = await orderDishesPage.navigation.openInventoryPage();
     await inventoryPage.focusItem({
       itemName,
       menu: {
@@ -35,7 +35,7 @@ export class InventoryFlow {
     itemName: string,
     menu: InventoryMenuConfig = inventoryMenu,
   ): Promise<string> {
-    const inventoryPage = await orderDishesPage.openInventoryPage();
+    const inventoryPage = await orderDishesPage.navigation.openInventoryPage();
     await inventoryPage.focusItem({
       itemName,
       menu: {
@@ -57,7 +57,7 @@ export class InventoryFlow {
     expectedState: string,
     menu: InventoryMenuConfig = inventoryMenu,
   ): Promise<OrderDishesPage> {
-    const inventoryPage = await orderDishesPage.openInventoryPage();
+    const inventoryPage = await orderDishesPage.navigation.openInventoryPage();
     await inventoryPage.focusItem({
       itemName,
       menu: {

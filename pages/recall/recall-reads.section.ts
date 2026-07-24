@@ -1,21 +1,9 @@
 import type { Locator, Page } from '@playwright/test';
 import type { RecallManualSearchTag } from '../../test-data/recall-search-options';
 
-/** 页面同时暴露 data-testid 与 data-test-id 时的单一 locator 契约。 */
+/** Recall 共享组件统一使用 data-testid 作为稳定 DOM 契约。 */
 export function recallScopedTestId(scope: Locator | Page, testId: string): Locator {
-  return scope.locator(`[data-testid="${testId}"], [data-test-id="${testId}"]`).first();
-}
-
-export function normalizeOrderNumber(orderNumber: string): string {
-  const normalizedOrderNumber = orderNumber
-    .trim()
-    .replace(/^#/, '')
-    .replace(/\(\d+\)$/, '');
-  return `#${normalizedOrderNumber}`;
-}
-
-export function escapeRegExp(input: string): string {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return scope.getByTestId(testId);
 }
 
 export function resolveManualSearchTagTestId(tag: RecallManualSearchTag): string {
