@@ -15,6 +15,8 @@ export const orderServiceDishes = {
     menu: orderServiceMenu,
   },
   test: {
+    expectedBasePrice: 9.9,
+    saleItemId: 699,
     name: '普通菜2',
     menu: orderServiceMenu,
   },

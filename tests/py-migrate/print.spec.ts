@@ -106,10 +106,23 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
   test(
     '[POS-32337] To Go带加收子单收据应打印提示语且只包含目标子单菜品',
     {
-      annotation: [jiraIssueAnnotation('POS-32337')],
+      annotation: [
+        jiraIssueAnnotation('POS-32337'),
+        jiraIssueAnnotation('POS-50320'),
+        {
+          type: 'known-issue',
+          description:
+            'POS NG / 环境 0.247：普通订单收据可正常打印加收提示语；分单后打印指定子单时缺少提示语，详见 POS-50320。',
+        },
+      ],
       tag: ['@点单', '@分单', '@加收', '@小费'],
     },
     async ({ apiSetup, employeeLoginPage, homePage }) => {
+      test.fixme(
+        true,
+        'POS-50320：POS NG / 环境 0.247 分单子单收据缺少加收提醒语，等待产品修复。',
+      );
+
       const restoreTemplate = await apiSetup.printConfiguration.selectTemplate(
         'RECEIPT',
         '2_5',
@@ -124,10 +137,11 @@ test.describe('POS 本地票据打印核心回归', { tag: ['@打印'] }, () => 
       const charge = await createManualSharedTipCharge(apiSetup, 'DEFAULT');
 
       try {
-        const readyHomePage = await new HomeFlow().openHomeWithEmployeeContext(
-          homePage,
-          employeeLoginPage,
-        );
+        const readyHomePage =
+          await new HomeFlow().openHomeAfterConfigurationRefreshWithEmployeeContext(
+            homePage,
+            employeeLoginPage,
+          );
         const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
         const orderFlow = new OrderDishesFlow();
 

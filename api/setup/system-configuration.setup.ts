@@ -60,14 +60,24 @@ export function createSystemConfigurationSetupService(
     }
 
     const api = requireApi();
-    const body = await expectOkEnvelope(
-      await api.listSystemConfigurations({
+    const [frontendResponse, adminResponse] = await Promise.all([
+      api.listSystemConfigurations({
+        fetchDetails: true,
+        adminRequest: false,
+      }),
+      api.listSystemConfigurations({
         fetchDetails: true,
         adminRequest: true,
       }),
-    );
+    ]);
+    const [frontendBody, adminBody] = await Promise.all([
+      expectOkEnvelope(frontendResponse),
+      expectOkEnvelope(adminResponse),
+    ]);
+    const frontendIndex = toConfigurationIndex(frontendBody.data);
+    const adminIndex = toConfigurationIndex(adminBody.data);
 
-    cachedIndex = toConfigurationIndex(body.data);
+    cachedIndex = new Map([...frontendIndex, ...adminIndex]);
     return cachedIndex;
   };
 

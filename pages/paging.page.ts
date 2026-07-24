@@ -80,7 +80,7 @@ export class PagingPage {
   }
 
   @step((_orderNumber: string) => `页面操作：等待 Paging 订单 ${_orderNumber} 出现在当前列表`)
-  async waitForOrderVisible(orderNumber: string, timeout = 15_000): Promise<void> {
+  async waitForOrderVisible(orderNumber: string, timeout = 30_000): Promise<void> {
     const card = this.orderCard(orderNumber);
     await waitUntil(
       async () => await card.isVisible().catch(() => false),

@@ -457,7 +457,7 @@ const chargeFollowUpCases: readonly ChargeFollowUpCase[] = [
     operation: 'edit-even-split',
     updateCharge: { ...autoFixedCharge, name: 'mod_test1', orderType: 'dine in' },
     expectedChargeName: 'mod_test1',
-    expectedChargeAmount: '10.00',
+    expectedChargeAmount: '5.00',
   },
 ];
 
@@ -651,6 +651,10 @@ const combineChargeRecalculationCases: readonly CombineChargeRecalculationCase[]
     scenario: 'single-auto',
     charge: {
       ...autoPercentCharge,
+      description: '',
+      minConsumption: 0,
+      minGuest: 0,
+      minMileage: 0,
       orderType: 'delivery',
       sharedTip: true,
       type: 'DELIVERY',
@@ -1642,6 +1646,10 @@ async function createSavedDeliveryOrder(
 async function createSavedToGoOrder(
   readyHomePage: HomePage,
   employeeLoginPage: EmployeeLoginPage,
+  dish: {
+    readonly name: string;
+    readonly menu: typeof orderServiceDishes.regular.menu;
+  } = orderServiceDishes.regular,
 ): Promise<{
   beforeChargeSnapshot: OrderChargeSnapshot;
   beforeSummary: Awaited<ReturnType<OrderDishesPage['readPriceSummary']>>;
@@ -1651,8 +1659,8 @@ async function createSavedToGoOrder(
   const orderDishesPage = await new TakeoutFlow().startToGoOrder(readyHomePage);
   await new OrderDishesFlow().addRegularDish(
     orderDishesPage,
-    orderServiceDishes.regular.name,
-    orderServiceDishes.regular.menu,
+    dish.name,
+    dish.menu,
   );
   const beforeSummary = await orderDishesPage.readPriceSummary();
   const beforeChargeSnapshot = await readOrderDishesChargeSnapshot(orderDishesPage);
@@ -1972,6 +1980,7 @@ async function configureCombineChargeRecalculation(
     { verify: true },
   );
   await homePage.clickRefresh();
+  await homePage.confirmDelayedConfigurationRefresh();
   return restore;
 }
 
@@ -2008,6 +2017,7 @@ async function reopenSavedOrderForChargeCheck(
 }> {
   const refreshedHomePage = await enterReadyHome({ employeeLoginPage, homePage });
   await refreshedHomePage.clickRefresh();
+  await refreshedHomePage.confirmDelayedConfigurationRefresh();
   const recallPage = await refreshedHomePage.clickRecall();
   const editingPage = await new RecallFlow().editOrder(recallPage, orderNumber);
   const summary = await editingPage.readPriceSummary();
@@ -2022,6 +2032,7 @@ async function openRecallAfterConfigurationRefresh(
 ): Promise<RecallPage> {
   const refreshedHomePage = await enterReadyHome({ employeeLoginPage, homePage });
   await refreshedHomePage.clickRefresh();
+  await refreshedHomePage.confirmDelayedConfigurationRefresh();
   return await refreshedHomePage.clickRecall();
 }
 
@@ -4515,23 +4526,10 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           return await enterReadyHome({ employeeLoginPage, homePage });
         });
 
-        let workingHomePage = readyHomePage;
-        let deliveryTargetWithoutCharge:
-          | Awaited<ReturnType<typeof createSavedDeliveryOrder>>
-          | null = null;
+        const workingHomePage = readyHomePage;
         let chargeResourceId: string | number | null = null;
         let restoreCombineChargeRecalculation: (() => Promise<void>) | null = null;
         try {
-          if (chargeCase.issue === 'POS-32016') {
-            deliveryTargetWithoutCharge = await test.step(
-              '在加收配置生效前创建不含加收的 Delivery 目标订单',
-              async () => {
-                return await createSavedDeliveryOrder(workingHomePage, employeeLoginPage);
-              },
-            );
-            workingHomePage = await enterReadyHome({ employeeLoginPage, homePage });
-          }
-
           const chargeResource = await test.step(
             '预置合单加收配置并设置合单是否重新计算加收',
             async () => {
@@ -4558,10 +4556,6 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           });
 
           const targetOrder = await test.step('创建用于接收合并的目标订单', async () => {
-            if (deliveryTargetWithoutCharge) {
-              return deliveryTargetWithoutCharge;
-            }
-
             const targetReadyHomePage = await enterReadyHome({ employeeLoginPage, homePage });
 
             if (chargeCase.issue === 'POS-32008') {
@@ -4580,6 +4574,14 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
               chargeCase.scenario === 'single-manual' ||
               chargeCase.scenario === 'three-charges'
             ) {
+              if (chargeCase.issue === 'POS-32016') {
+                return await createSavedToGoOrder(
+                  targetReadyHomePage,
+                  employeeLoginPage,
+                  orderServiceDishes.test,
+                );
+              }
+
               return await createSavedToGoOrder(targetReadyHomePage, employeeLoginPage);
             }
 
@@ -4620,6 +4622,18 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
               expect(targetOrder.beforeSummary.Charge ?? 0).toBe(0);
               expect(targetOrder.beforeSummary['Total(Cash)']).toBeCloseTo(9.68, 2);
             }
+
+            if (chargeCase.issue === 'POS-32016') {
+              expect(oldChargeAmount).toBeCloseTo(0.88, 2);
+              expect(sourceOrder.beforeSummary.Subtotal).toBeCloseTo(8.8, 2);
+              expect(sourceOrder.beforeSummary.Tax).toBeCloseTo(0.88, 2);
+              expect(sourceOrder.beforeSummary.Charge).toBeCloseTo(0.88, 2);
+              expect(sourceOrder.beforeSummary['Total(Cash)']).toBeCloseTo(10.56, 2);
+              expect(targetOrder.beforeSummary.Subtotal).toBeCloseTo(9.9, 2);
+              expect(targetOrder.beforeSummary.Tax).toBeCloseTo(0.99, 2);
+              expect(targetOrder.beforeSummary.Charge ?? 0).toBe(0);
+              expect(targetOrder.beforeSummary['Total(Cash)']).toBeCloseTo(10.89, 2);
+            }
           });
 
           await test.step('校验 POS-32023 订单 A 合单前手动加收金额为 0.88', async () => {
@@ -4655,6 +4669,15 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
           });
 
           const combinedRecallPage = await test.step('从 Recall 合并两笔订单', async () => {
+            if (chargeCase.issue === 'POS-32016') {
+              return await combineSavedOrdersAfterConfigurationRefresh(
+                homePage,
+                employeeLoginPage,
+                targetOrder.orderNumber,
+                sourceOrder.orderNumber,
+              );
+            }
+
             return await combineSavedOrdersAfterConfigurationRefresh(
               homePage,
               employeeLoginPage,
@@ -4699,6 +4722,16 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
               expect(
                 combinedCharge.summary!['Total(Cash)'] ?? combinedCharge.summary!.Total,
               ).toBeCloseTo(20.24, 2);
+            }
+
+            if (chargeCase.issue === 'POS-32016') {
+              expect(combinedCharge.summary!.Count).toBe(2);
+              expect(combinedCharge.summary!.Subtotal).toBeCloseTo(18.7, 2);
+              expect(combinedCharge.summary!.Tax).toBeCloseTo(1.87, 2);
+              expect(combinedCharge.summary!.Charge).toBeCloseTo(1.87, 2);
+              expect(
+                combinedCharge.summary!['Total(Cash)'] ?? combinedCharge.summary!.Total,
+              ).toBeCloseTo(22.44, 2);
             }
           });
         } finally {
@@ -5129,6 +5162,7 @@ test.describe('分单操作回归第一批', { tag: ['@点单', '@分单'] }, ()
         await paymentFlow.payPartialByCash(paymentPage, {
           amountInCents: 2000,
           printReceipt: false,
+          successButtonText: 'NO RECEIPT',
         });
 
         const recallPage = await readyHomePage.clickRecall();

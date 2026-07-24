@@ -256,9 +256,9 @@ export class OrderDishesLocators {
         .first(),
     );
     this.changePriceClearButton = this.page.getByTestId('preset-currency-keypad-input-clear');
-    this.changePriceConfirmButton = this.page.getByTestId(
-      'preset-numeric-input-modal-confirm-button',
-    );
+    this.changePriceConfirmButton = this.page
+      .getByRole('dialog', { name: 'Price', exact: true })
+      .getByRole('button', { name: 'Confirm', exact: true });
     this.itemPriceChangeButton = this.page.getByTestId('action-rail-button-chgPrc');
     this.itemPriceDiscountDialog = this.page.getByRole('dialog', { name: 'Price', exact: true });
     this.itemPriceDiscountConfirmButton = this.itemPriceDiscountDialog.getByTestId(

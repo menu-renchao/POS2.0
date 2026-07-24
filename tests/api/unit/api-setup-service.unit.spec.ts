@@ -91,6 +91,10 @@ test.describe('API 数据预置服务', () => {
 
     expect(systemConfigurationApi.payloads.listSystemConfigurations[0]).toEqual({
       fetchDetails: true,
+      adminRequest: false,
+    });
+    expect(systemConfigurationApi.payloads.listSystemConfigurations[1]).toEqual({
+      fetchDetails: true,
       adminRequest: true,
     });
     expect(systemConfigurationApi.payloads.updateSystemConfigurations[0]).toEqual({
@@ -255,6 +259,35 @@ test.describe('API 数据预置服务', () => {
     });
     expect(adminConfig.payloads.deleteCharge[0]).toEqual({ chargeId: 1201 });
     expect(resourceRegistry.has('charge', 1201)).toBe(false);
+  });
+
+  test('系统配置应合并前台可读与后台可读配置后按名称更新', async () => {
+    const systemConfigurationApi = createSystemConfigurationApi();
+    const apiSetup = createApiSetup({
+      adminConfigApi: createAdminConfigApi().api as AdminConfigApiClient,
+      systemConfigurationApi:
+        systemConfigurationApi.api as unknown as SystemConfigurationApiClient,
+      resourceRegistry: new ResourceRegistry(),
+    });
+
+    await apiSetup.systemConfiguration.updateByName(
+      'SHOW_UNSPLIT_ITEMS_WHEN_SPLIT_ORDER',
+      true,
+    );
+
+    expect(systemConfigurationApi.payloads.updateSystemConfigurations[0]).toEqual({
+      systemConfiguration: [
+        {
+          id: 642,
+          name: 'SHOW_UNSPLIT_ITEMS_WHEN_SPLIT_ORDER',
+          value: 'true',
+          dataType: 'Boolean',
+        },
+      ],
+      userAuth: {
+        userId: 1,
+      },
+    });
   });
 
   test('清空加收配置时应查询并逐条调用删除接口', async () => {
@@ -486,6 +519,11 @@ function createSystemConfigurationApi(
       listSystemConfigurations: async (payload: unknown) => {
         calls.listSystemConfigurations += 1;
         payloads.listSystemConfigurations.push(payload);
+        const adminRequest =
+          typeof payload === 'object' &&
+          payload !== null &&
+          'adminRequest' in payload &&
+          payload.adminRequest === true;
         return createApiResponse({
           code: 0,
           msg: 'ok',
@@ -503,6 +541,16 @@ function createSystemConfigurationApi(
                 value: '90',
                 dataType: 'Integer',
               },
+              ...(!adminRequest
+                ? [
+                    {
+                      id: 642,
+                      name: 'SHOW_UNSPLIT_ITEMS_WHEN_SPLIT_ORDER',
+                      value: 'false',
+                      dataType: 'Boolean',
+                    },
+                  ]
+                : []),
             ],
           },
         });
