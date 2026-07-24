@@ -9,11 +9,17 @@ const posClientHeaders = {
 const desktopChromeChannel = process.env.CI ? {} : { channel: 'chrome' as const };
 const videoMode = process.env.PLAYWRIGHT_VIDEO === 'true' ? 'retain-on-failure' : 'off';
 const runApiCleanupAfterTests = process.env.API_RUN_CLEANUP_AFTER_TESTS === 'true';
-const legacyUiProjectRequested = process.argv.some(
+const legacyUiProjectRequestedByCli = process.argv.some(
   (argument, index, argumentsList) =>
     argument === '--project=py-migrate' ||
     (argument === '--project' && argumentsList[index + 1] === 'py-migrate'),
 );
+if (legacyUiProjectRequestedByCli) {
+  process.env.PLAYWRIGHT_LEGACY_UI_PROJECT = 'true';
+}
+const legacyUiProjectRequested =
+  legacyUiProjectRequestedByCli ||
+  process.env.PLAYWRIGHT_LEGACY_UI_PROJECT === 'true';
 
 export default defineConfig({
   testDir: './tests',
