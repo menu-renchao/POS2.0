@@ -9,6 +9,11 @@ const posClientHeaders = {
 const desktopChromeChannel = process.env.CI ? {} : { channel: 'chrome' as const };
 const videoMode = process.env.PLAYWRIGHT_VIDEO === 'true' ? 'retain-on-failure' : 'off';
 const runApiCleanupAfterTests = process.env.API_RUN_CLEANUP_AFTER_TESTS === 'true';
+const legacyUiProjectRequested = process.argv.some(
+  (argument, index, argumentsList) =>
+    argument === '--project=py-migrate' ||
+    (argument === '--project' && argumentsList[index + 1] === 'py-migrate'),
+);
 
 export default defineConfig({
   testDir: './tests',
@@ -124,5 +129,21 @@ export default defineConfig({
         headless: !!process.env.CI,
       },
     },
+    ...(legacyUiProjectRequested
+      ? [
+          {
+            name: 'py-migrate',
+            testMatch: /(?:^|[\\/])py-migrate[\\/].*\.spec\.ts$/,
+            workers: 1,
+            use: {
+              ...devices['Desktop Chrome'],
+              ...desktopChromeChannel,
+              extraHTTPHeaders: posClientHeaders,
+              viewport: { width: 1920, height: 1080 },
+              headless: !!process.env.CI,
+            },
+          },
+        ]
+      : []),
   ],
 });

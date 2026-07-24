@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const generator = resolve(repoRoot, 'scripts/generate-jenkins-test-tree.mjs');
 
-test('应只生成 py-migrate UI 项目的 Jenkins 用例树', () => {
+test('应兼容旧 py-migrate 项目名并只生成 UI 用例树', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'pos-ui-test-tree-'));
   const outputPath = join(tempDir, 'test-tree.json');
 

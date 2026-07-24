@@ -1,211 +1,61 @@
 {
   "suites": [
     "all",
-    "e2e",
-    "py-migrate",
-    "smoke"
+    "py-migrate"
   ],
   "files": {
     "all": [
-      "tests/e2e/home-page-refresh.spec.ts",
-      "tests/e2e/inventory-stock-setting.spec.ts",
-      "tests/e2e/order-dishes-charge-live.spec.ts",
-      "tests/e2e/order-dishes-charge.spec.ts",
-      "tests/e2e/order-dishes-combo-quantity.spec.ts",
-      "tests/e2e/order-dishes-edit-quantity.spec.ts",
-      "tests/e2e/order-dishes-load.spec.ts",
-      "tests/e2e/order-dishes-modifier.spec.ts",
-      "tests/e2e/order-dishes-ordered-items.spec.ts",
-      "tests/e2e/order-dishes-price-summary.spec.ts",
-      "tests/e2e/order-dishes-quantity.spec.ts",
-      "tests/e2e/order-dishes-weight-exception.spec.ts",
-      "tests/e2e/order-tips.spec.ts",
-      "tests/e2e/payment-live.spec.ts",
-      "tests/e2e/payment-page.spec.ts",
-      "tests/e2e/recall-order-details.spec.ts",
-      "tests/e2e/recall-order-edit.spec.ts",
-      "tests/e2e/recall-order-void.spec.ts",
-      "tests/e2e/recall-page-selectors.spec.ts",
-      "tests/e2e/recall-payment.spec.ts",
-      "tests/e2e/recall-recent-order.spec.ts",
-      "tests/e2e/report-noise-guard.spec.ts",
-      "tests/e2e/select-table-page.spec.ts",
-      "tests/e2e/split-order.spec.ts",
-      "tests/e2e/wait-utils.spec.ts",
+      "tests/py-migrate/gift-card.spec.ts",
       "tests/py-migrate/inventory.spec.ts",
-      "tests/py-migrate/order.service.spec.ts",
-      "tests/seed.spec.ts",
-      "tests/smoke/dine-in-order-dishes.smoke.spec.ts",
-      "tests/smoke/dine-in-recall-consistency.smoke.spec.ts",
-      "tests/smoke/home.smoke.spec.ts",
-      "tests/smoke/license-and-login.smoke.spec.ts",
-      "tests/smoke/license-selection.smoke.spec.ts",
-      "tests/smoke/order-dishes.smoke.spec.ts",
-      "tests/smoke/recall-order-details.smoke.spec.ts",
-      "tests/smoke/recall-search.smoke.spec.ts",
-      "tests/smoke/step-decorator.smoke.spec.ts",
-      "tests/smoke/takeout-entry.smoke.spec.ts"
-    ],
-    "e2e": [
-      "tests/e2e/home-page-refresh.spec.ts",
-      "tests/e2e/inventory-stock-setting.spec.ts",
-      "tests/e2e/order-dishes-charge-live.spec.ts",
-      "tests/e2e/order-dishes-charge.spec.ts",
-      "tests/e2e/order-dishes-combo-quantity.spec.ts",
-      "tests/e2e/order-dishes-edit-quantity.spec.ts",
-      "tests/e2e/order-dishes-load.spec.ts",
-      "tests/e2e/order-dishes-modifier.spec.ts",
-      "tests/e2e/order-dishes-ordered-items.spec.ts",
-      "tests/e2e/order-dishes-price-summary.spec.ts",
-      "tests/e2e/order-dishes-quantity.spec.ts",
-      "tests/e2e/order-dishes-weight-exception.spec.ts",
-      "tests/e2e/order-tips.spec.ts",
-      "tests/e2e/payment-live.spec.ts",
-      "tests/e2e/payment-page.spec.ts",
-      "tests/e2e/recall-order-details.spec.ts",
-      "tests/e2e/recall-order-edit.spec.ts",
-      "tests/e2e/recall-order-void.spec.ts",
-      "tests/e2e/recall-page-selectors.spec.ts",
-      "tests/e2e/recall-payment.spec.ts",
-      "tests/e2e/recall-recent-order.spec.ts",
-      "tests/e2e/report-noise-guard.spec.ts",
-      "tests/e2e/select-table-page.spec.ts",
-      "tests/e2e/split-order.spec.ts",
-      "tests/e2e/wait-utils.spec.ts"
+      "tests/py-migrate/order-combo-regression.spec.ts",
+      "tests/py-migrate/order-customer-and-delivery.spec.ts",
+      "tests/py-migrate/order-discount-and-note.spec.ts",
+      "tests/py-migrate/order-menu-configuration.spec.ts",
+      "tests/py-migrate/order-operation-remaining.spec.ts",
+      "tests/py-migrate/order-option-regression.spec.ts",
+      "tests/py-migrate/order-page-recorded-regression.spec.ts",
+      "tests/py-migrate/order-page-regression.spec.ts",
+      "tests/py-migrate/order-payment-and-tip.spec.ts",
+      "tests/py-migrate/order-recall-and-split.spec.ts",
+      "tests/py-migrate/order-settle.spec.ts",
+      "tests/py-migrate/order-split-persistence.spec.ts",
+      "tests/py-migrate/paging.spec.ts",
+      "tests/py-migrate/print.spec.ts",
+      "tests/py-migrate/recall-page-recorded.spec.ts",
+      "tests/py-migrate/split-order-charge-combine.spec.ts",
+      "tests/py-migrate/split-order-charge-copy-transfer.spec.ts",
+      "tests/py-migrate/split-order-charge-edit.spec.ts",
+      "tests/py-migrate/split-order-operation.spec.ts",
+      "tests/py-migrate/table-order.spec.ts"
     ],
     "py-migrate": [
+      "tests/py-migrate/gift-card.spec.ts",
       "tests/py-migrate/inventory.spec.ts",
-      "tests/py-migrate/order.service.spec.ts"
-    ],
-    "smoke": [
-      "tests/smoke/dine-in-order-dishes.smoke.spec.ts",
-      "tests/smoke/dine-in-recall-consistency.smoke.spec.ts",
-      "tests/smoke/home.smoke.spec.ts",
-      "tests/smoke/license-and-login.smoke.spec.ts",
-      "tests/smoke/license-selection.smoke.spec.ts",
-      "tests/smoke/order-dishes.smoke.spec.ts",
-      "tests/smoke/recall-order-details.smoke.spec.ts",
-      "tests/smoke/recall-search.smoke.spec.ts",
-      "tests/smoke/step-decorator.smoke.spec.ts",
-      "tests/smoke/takeout-entry.smoke.spec.ts"
+      "tests/py-migrate/order-combo-regression.spec.ts",
+      "tests/py-migrate/order-customer-and-delivery.spec.ts",
+      "tests/py-migrate/order-discount-and-note.spec.ts",
+      "tests/py-migrate/order-menu-configuration.spec.ts",
+      "tests/py-migrate/order-operation-remaining.spec.ts",
+      "tests/py-migrate/order-option-regression.spec.ts",
+      "tests/py-migrate/order-page-recorded-regression.spec.ts",
+      "tests/py-migrate/order-page-regression.spec.ts",
+      "tests/py-migrate/order-payment-and-tip.spec.ts",
+      "tests/py-migrate/order-recall-and-split.spec.ts",
+      "tests/py-migrate/order-settle.spec.ts",
+      "tests/py-migrate/order-split-persistence.spec.ts",
+      "tests/py-migrate/paging.spec.ts",
+      "tests/py-migrate/print.spec.ts",
+      "tests/py-migrate/recall-page-recorded.spec.ts",
+      "tests/py-migrate/split-order-charge-combine.spec.ts",
+      "tests/py-migrate/split-order-charge-copy-transfer.spec.ts",
+      "tests/py-migrate/split-order-charge-edit.spec.ts",
+      "tests/py-migrate/split-order-operation.spec.ts",
+      "tests/py-migrate/table-order.spec.ts"
     ]
   },
   "cases": {
-    "tests/e2e/home-page-refresh.spec.ts": [
-      "主页核心可用信号应基于固定头部按钮而非可配置菜单项",
-      "应能通过按钮名称识别没有 data-testid 的 Pick Up 入口",
-      "应能点击主页刷新按钮并等待刷新完成",
-      "刷新后应等待 To Go 入口恢复跳转能力再进入点单页"
-    ],
-    "tests/e2e/inventory-stock-setting.spec.ts": [
-      "库存页定位商品时不应依赖 inventoryCategoryPanelId 这类写死 id",
-      "库存分类和商品延迟渲染时仍应等待后定位目标商品",
-      "同名商品存在隐藏副本时仍应定位并打开可见商品的库存设置",
-      "设置有限库存后提交前应等待输入稳定 200ms"
-    ],
-    "tests/e2e/order-dishes-charge-live.spec.ts": [
-      "应能在真实环境中执行整单自定义固定金额加收"
-    ],
-    "tests/e2e/order-dishes-charge.spec.ts": [
-      "应能快捷执行整单预置加收并在重新打开后读取结果",
-      "应能按菜品多选执行百分比自定义加收并返回详细菜品",
-      "应能清除已选加收和全部加收"
-    ],
-    "tests/e2e/order-dishes-combo-quantity.spec.ts": [
-      "应能在同一套餐分组下按数量重复选择子菜",
-      "应能在新版分组按钮套餐面板下选择带数量的子菜"
-    ],
-    "tests/e2e/order-dishes-edit-quantity.spec.ts": [
-      "应能选中已下单菜品并点击加 1"
-    ],
-    "tests/e2e/order-dishes-load.spec.ts": [
-      "应能通过 Back 的 data-testid 识别点餐页已加载"
-    ],
-    "tests/e2e/order-dishes-modifier.spec.ts": [
-      "应能先聚焦已点菜品再打开 Modify 并连续选择多条系统预置调味",
-      "应能通过顶部独立输入区添加自定义调味并返回关闭",
-      "应能选择分类 option 且不强制选择二级 option",
-      "应能选择分类 option 后再选择二级 option"
-    ],
-    "tests/e2e/order-dishes-ordered-items.spec.ts": [
-      "应能读取多节点渲染且不含调味的购物车菜品行",
-      "应能读取已点菜品下的调味名称和价格并兼容 Less 前缀",
-      "应能读取已点菜品下的二级调味名称"
-    ],
-    "tests/e2e/order-dishes-price-summary.spec.ts": [
-      "应在读取点单页价格汇总前自动展开折叠态汇总",
-      "应兼容后台仅展示 Total 的价格汇总配置"
-    ],
-    "tests/e2e/order-dishes-quantity.spec.ts": [
-      "当 quantity 不等于 1 时应先点菜再通过 Count 修改已点菜数量",
-      "添加菜品前必须先按 group 和 category 切换菜单"
-    ],
-    "tests/e2e/order-dishes-weight-exception.spec.ts": [
-      "当称重弹窗持续处于 Loading 时应抛出磅秤模式异常"
-    ],
-    "tests/e2e/order-tips.spec.ts": [
-      "应能在点单页通过 More 打开 Tips 并在大额小费确认后更新价格汇总",
-      "应能在 Recall 订单详情和 PAYMENT 卡片分别添加 Tips"
-    ],
-    "tests/e2e/payment-live.spec.ts": [
-      "应能从 To Go 进入点单页后完成现金支付",
-      "应能从 To Go 进入点单页后完成信用卡支付"
-    ],
-    "tests/e2e/payment-page.spec.ts": [
-      "应能完成现金支付并读取左侧支付详情",
-      "应能完成信用卡支付并自动填写测试卡",
-      "应能在支付面板关闭后结束打印小票分支而不强等弹窗隐藏"
-    ],
-    "tests/e2e/recall-order-details.spec.ts": [
-      "应能读取指定订单的详情并在完成后主动关闭详情弹窗",
-      "应能在客户会员支付菜品为空时返回空结果并关闭详情弹窗",
-      "应能在订单详情选择器换 hash 或改用 data-test-id 后继续读出菜名与价格汇总",
-      "应能读取 Recall 菜品下的调味名称和价格",
-      "应能读取仅稳定展示 Total 的部分支付订单详情",
-      "应能读取仅展示 Total 的 Delivery 未支付订单详情客户信息",
-      "应能从未支付订单详情触发右侧操作入口",
-      "应能从订单详情 More 菜单触发二级操作入口",
-      "应能读取 Recall 菜品下的二级调味"
-    ],
-    "tests/e2e/recall-order-edit.spec.ts": [
-      "应能从 Recall 订单详情点击编辑并进入点单页",
-      "按订单号进入编辑时应优先点击订单卡触发器而不是内部文本节点"
-    ],
-    "tests/e2e/recall-order-void.spec.ts": [
-      "应能从订单详情页的 More 进入 Void All 并完成作废",
-      "应能识别带图标文本名称的 More 按钮并进入 Void All",
-      "应能在恢复库存默认未勾选时主动勾选后再提交 Void",
-      "应能在恢复库存原生 checkbox 脱离视口时仍切换为不勾选后提交 Void",
-      "应能在退出 Recall 后等待页面真正离开 Recall",
-      "应能通过左上角 Back 按钮退出 Recall",
-      "应能在订单详情仍遮挡退出按钮时先关闭详情再退出 Recall"
-    ],
-    "tests/e2e/recall-page-selectors.spec.ts": [
-      "应能通过筛选与搜索相关的 data-testid 完成 Recall 页面操作",
-      "手动搜索提交前应等待输入稳定 200ms"
-    ],
-    "tests/e2e/recall-payment.spec.ts": [
-      "应能从 Recall 订单详情点击 Pay 后进入支付页面并完成现金支付"
-    ],
-    "tests/e2e/recall-recent-order.spec.ts": [
-      "应按最新订单号而不是第一张卡片打开最近一笔订单详情"
-    ],
-    "tests/e2e/report-noise-guard.spec.ts": [
-      "业务代码中不应重新引入会制造假红灯的重试断言写法",
-      "页面对象不应回潮为超长 locator 猜测链或膨胀的单体 facade"
-    ],
-    "tests/e2e/select-table-page.spec.ts": [
-      "应能在返回控件变为 ChevronLeftIcon 时仍识别选桌页已加载"
-    ],
-    "tests/e2e/split-order.spec.ts": [
-      "应能完成分单页面读取、按菜品平分、移动菜品、合并与取消分单",
-      "应能按子单序号对指定菜品执行平分并在子单间移动菜品",
-      "应能通过 flow 完成平分订单、金额分单与按座位分单",
-      "应能在提交后根据当前地址返回对应页面对象"
-    ],
-    "tests/e2e/wait-utils.spec.ts": [
-      "应能在条件满足前持续重试并返回最终值",
-      "应能在超时时抛出包含最后值的错误"
+    "tests/py-migrate/gift-card.spec.ts": [
+      "[POS-34106] 应能输入正确手机号并新建实体礼品卡"
     ],
     "tests/py-migrate/inventory.spec.ts": [
       "[POS-43898 POS-43890 POS-43889] 未送厨点菜、加菜、减菜应正确更新库存",
@@ -213,61 +63,267 @@
       "[POS-43891] 库存点餐数量为小数时应正确扣减并在恢复库存后回退",
       "[POS-43892] 超出库存点单保存时应提示库存不足"
     ],
-    "tests/py-migrate/order.service.spec.ts": [
-      "[POS-30543] 应能堂食保存后在 Recall 编辑菜品数量并校验税额实时更新",
-      "[POS-15602] 应能 To Go 点普通菜后在 Recall 校验菜品名称和价格",
-      "[POS-15641] 应能 To Go 点另一个分类菜品后在 Recall 校验菜品名称和价格",
-      "[POS-32905] 应能点单时累计整数菜品数量并在 Recall 保持数量",
-      "[POS-30575] 应能创建 Delivery 订单并在 Recall 详情展示客户信息",
-      "[POS-31409] 应能创建带姓名的 Pick Up 订单并在 Recall 详情展示客户姓名",
-      "[POS-16303] 应能在点单页将订单平分为两份并校验子单金额",
+    "tests/py-migrate/order-combo-regression.spec.ts": [
+      "[POS-42061] 套餐子菜应支持独立改价并更新套餐总价",
+      "[POS-37804] 无 Note 权限员工为套餐子菜添加备注时应要求授权",
+      "[POS-43823] 选择无 option 套餐子菜后应返回主菜并可选择 option",
+      "[POS-43956] 已保存套餐应能编辑子菜并保留 display-all 与 max 选择结果"
+    ],
+    "tests/py-migrate/order-customer-and-delivery.spec.ts": [
+      "[POS-30575] 应能在 Delivery 点单页 Info 和 Recall 中展示一致的客户信息",
+      "[POS-36286] Delivery 填写客户信息进入点单页后应能无提示直接退出",
+      "[POS-22640] 自定义 Delivery 应能保存订单并打单成功",
+      "[POS-42943] 修改一笔匿名 Pick Up 订单的客户姓名不应影响另一笔订单",
+      "[POS-31409] 应能在无姓名堂食订单补充客户信息并在 Recall 详情及编辑页展示"
+    ],
+    "tests/py-migrate/order-discount-and-note.spec.ts": [
+      "[POS-42886] 应能在菜品改价弹窗选择预置单菜折扣并保存",
+      "[POS-28674] 特殊价格菜品应用 50% 单菜折扣后应按产品规则舍入并保存",
+      "[POS-42888] 应能通过 Modify 添加备注并在 Recall 保留"
+    ],
+    "tests/py-migrate/order-menu-configuration.spec.ts": [
+      "[POS-15605 POS-15737] 切换中文后应展示中文菜单组和类别",
+      "[POS-43827] 中文界面按菜品拼音首字母搜索应返回对应菜品",
+      "[POS-42097] 点单页面类别应展示配置的 POS NAME",
+      "[POS-42060] 未满足必选类别时应阻止保存并自动跳转到该类别",
+      "[POS-42958] 未启用整单折扣适用性的类别菜品不应参与整单比例加收",
+      "[POS-30762] 切换 POS 与 EMENU 菜单模式后应能搜索对应菜单菜品",
+      "[ORDER-PAGE-015] Open Food 屏幕键盘应能切换中文并输入候选字",
+      "[POS-36255] 菜品名称与编号相同时搜索结果应只展示一次",
+      "[POS-33447 POS-33456] 应能按配置控制新订单与 Recall 编辑页的菜单搜索入口"
+    ],
+    "tests/py-migrate/order-operation-remaining.spec.ts": [
+      "[POS-35134] 应能按菜退款计税菜品并退回菜价与税额",
+      "[POS-35135] 应能按菜退款免税菜品并仅退回菜价",
+      "[POS-35142] 应能按菜退款参与整单百分比折扣的计税菜品",
+      "[POS-35150] 按菜退款金额应不超过对应支付流水金额",
+      "[POS-35155] 已支付未送厨订单按菜退款后再次送厨不应发送已退款菜品",
+      "[POS-35163] 多次按菜退款时应分别生成正确退款流水",
+      "[POS-35166] 现金找零订单按金额退款应默认实际支付金额",
+      "[POS-35173] 信用卡部分支付后应不提供按菜退款",
+      "[POS-35498] 菜品不计税加收并应用整单百分比折扣后全菜退款应等于实付金额",
+      "[POS-36140] 折扣原因可选时不填写原因也应成功保存整单折扣",
+      "[POS-36148] 折扣原因必填时整单自定义百分比折扣应保存所选原因",
+      "[POS-37798] 分单中新增零元空子单后保存应自动删除该子单",
+      "[POS-36156] 折扣原因必填时单菜百分比折扣应展示并保存所选原因",
+      "[POS-42631] 打单后自动送厨时套餐新增子菜调味应展示为已送厨",
+      "[POS-42086] 多数量菜品和折扣菜共存时建议小费百分比应保持配置值",
+      "[POS-43825] 添加全局调味后点击返回按钮应退出 Modify 面板",
+      "[POS-42085] 多份菜品应用并清除单菜折扣后继续加菜应能正常支付",
+      "[POS-35307] 应能按菜退款套餐主菜、子菜与税额合计"
+    ],
+    "tests/py-migrate/order-option-regression.spec.ts": [
+      "[POS-31662] 应能通过 Add 增加全局选项数量并保持 Modify 面板可见",
+      "[POS-31663] 应能通过 Count 设置全局选项数量并在归零后移除选项",
+      "[POS-31664] 应能通过 Reduce 将全局选项从 2 逐次减至移除",
+      "[POS-15760] 应能只选择菜品一级选项并跳过二级选项后在 Recall 正确回显",
+      "[POS-15762] 应能不选择菜品选项直接保存并在 Recall 保持无选项",
+      "[POS-15761 POS-15763] 应能选择菜品一级和二级选项并在 Recall 正确回显",
+      "[POS-31045] 应能连续删除套餐子菜选项并在 Recall 保留剩余选项",
+      "[POS-24394] 应能在分类菜品上选择有价格 option 并正确计算总额",
+      "[POS-15759] 应能选择分类一级 option 并跳过二级 option 后在 Recall 正确回显",
+      "[POS-15643 POS-15758] 应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显"
+    ],
+    "tests/py-migrate/order-page-recorded-regression.spec.ts": [
+      "[POS-42889] 应能在支付前校验客户姓名和电话必填并完成现金支付",
+      "[POS-39750] 应能拦截无送厨删菜权限的员工并通过主管口令完成删菜",
+      "[POS-34873] 应能拦截无权限员工删除 Hold 菜品并通过主管口令完成删除",
+      "[POS-35325] 应能拦截无权限员工通过 Count 删除 Delay 菜品并通过主管口令完成删除",
+      "[POS-34895] 应能按配置将连续添加的相同菜分为独立订单行",
+      "[POS-34903] 应能仅合并状态一致的相同菜并与已送厨菜分行展示",
+      "[POS-34910] 应能将新加同菜合并到已送厨行并显示厨房数量和红色菜名",
+      "[POS-34842] 关闭减菜自动跳转后应在删除跨类别菜品时停留当前类别",
+      "[POS-33186] 小数数量菜品应先按一份递减再在不足一份时删除",
+      "[POS-33241] 应能通过点击菜品新增子单并保持小数数量和价格正确",
+      "[POS-42011] 应能添加不选择税的 Open Food 菜品并完成现金支付"
+    ],
+    "tests/py-migrate/order-page-regression.spec.ts": [
+      "[POS-15602] 应能切换菜单组并保存目标组菜品",
+      "[POS-32905] 应能以整数原文展示累计菜品数量并保存",
+      "[POS-33244] 应能合并含小数数量的两笔 To Go 订单并保持数量和小计守恒",
+      "[POS-33600] 应能保存改价为 6.50 且数量为 1.5 的菜品并保持小计一致",
+      "[POS-33600] 应能保存改价为 6.50 且数量为 2.55 的菜品和两份追加菜",
+      "[POS-35129] 应能保存数量为 2.55 的菜品并在 Recall 保持数量和价格",
+      "[POS-35660] 开启相同菜合并后应能为小数数量菜品添加两份全局调味"
+    ],
+    "tests/py-migrate/order-payment-and-tip.spec.ts": [
       "应能在 Recall 为最新 To Go 订单完成现金支付后看到 Success 状态",
       "应能在 Recall 为最新 To Go 订单完成信用卡支付后看到 Success 状态",
       "[POS-33110] 应能在点单页添加超过餐费 50% 的小费并完成确认",
       "[POS-33122] 应能在信用卡支付后追加超过餐费 50% 的小费并完成确认",
-      "[POS-24394] 应能在分类菜品上选择有价格 option 并正确计算总额",
-      "[POS-15643 POS-15758 POS-15759] 应能在分类菜品上选择 option 和二级 option 并在 Recall 正确回显",
-      "[POS-16325] 应能在子单 1 上对指定菜品执行 Even Item 平分并校验比例",
-      "[POS-16314] 应能在平分三份后将子单 1 的菜品移动到子单 3",
-      "[POS-16316] 应能按自定义金额拆成两个子单且金额与输入一致",
-      "[POS-16318] 应能在平分两个子单后撤销分单并恢复订单总额"
+      "[POS-19362] 应能在支付一个子单并删除另一个子单后保持已支付子单 tips 不变"
     ],
-    "tests/seed.spec.ts": [
-      "应能进入 POS 首页并建立员工上下文"
+    "tests/py-migrate/order-recall-and-split.spec.ts": [
+      "[POS-30543] 应能堂食保存后在 Recall 编辑菜品数量并校验税额实时更新",
+      "[POS-15641] 应能 To Go 点另一个分类菜品后在 Recall 校验菜品名称和价格",
+      "[POS-36254] 按菜分单后子单折扣界面应显示当前子单整单金额"
     ],
-    "tests/smoke/dine-in-order-dishes.smoke.spec.ts": [
-      "应能通过 New order 跳过选桌直接进入点餐页面"
+    "tests/py-migrate/order-settle.spec.ts": [
+      "[POS-16479] 应能在 No Rounding 配置下保持现金支付金额不变",
+      "[POS-19046] 应能在同一笔现金支付流水中以第二次小费覆盖第一次小费",
+      "[POS-19049] 应能分别为两笔现金支付流水添加小费并按合计展示"
     ],
-    "tests/smoke/dine-in-recall-consistency.smoke.spec.ts": [
-      "应能在任意空桌以 3 人堂食点单保存后通过 Recall 校验订单信息一致",
-      "应能在堂食点单后将订单平分三份并移动 x-1 的 test 到 x-3 后保存分单并在 Recall 查看订单"
+    "tests/py-migrate/order-split-persistence.spec.ts": [
+      "[POS-16303] 应能保存 To Go 订单后从 Recall 平分两份并保持金额守恒",
+      "[POS-16324] 应能在分单页现金支付一个子单并查看两个子单状态",
+      "[POS-16314] 应能保存两道不同菜品后从 Recall 将普通菜2移入新子单",
+      "[POS-16316] 应能保存改价为 10.60 的订单后从 Recall 按 2 和 8.6 分单",
+      "[POS-16318] 应能保存订单并提交平分后从 Recall 撤销分单恢复总额",
+      "[POS-16315] 应能保存共享座位与座位一菜品后从 Recall 按座位分单",
+      "[POS-39762] 应能平分含 2.00 小费的 To Go 订单后再合并并恢复母单小费",
+      "[POS-16325] 应能保存两人堂食两菜订单后从 Recall 对普通菜1执行 Even Item"
     ],
-    "tests/smoke/home.smoke.spec.ts": [
-      "应能成功打开首页壳"
+    "tests/py-migrate/paging.spec.ts": [
+      "[POS-42087] 应能在 Paging 页面按订单类型和订单号组合搜索订单",
+      "[POS-42090] 应能在 Paging 页面叫号并销号后显示为已完成",
+      "[POS-42091] 应能按配置时长自动完成 Paging 订单",
+      "[POS-42092] 应能一键完成 Paging 页面全部待取餐订单",
+      "[POS-43829] 应能刷新叫号屏并展示指定 Paging 订单"
     ],
-    "tests/smoke/license-and-login.smoke.spec.ts": [
-      "应能通过 License 选择和员工口令登录进入 POS 主页"
+    "tests/py-migrate/print.spec.ts": [
+      "[POS-34187] 仅打印新菜应在重打时恢复整单菜品",
+      "[POS-32337] To Go带加收子单收据应打印提示语且只包含目标子单菜品",
+      "[POS-34222] To Go收据应以黑底白字加重显示订单类型",
+      "[POS-33876] Delivery送厨单应打印客户电话",
+      "[POS-33599] 厨房单应在菜品数量后打印X",
+      "[POS-26979] 未支付堂食收据应打印服务费提示语",
+      "[POS-32335] 未支付Delivery收据应打印送餐费提示语",
+      "[POS-31979] 3_5模板收据应友好展示最大长度加收提示语",
+      "[POS-31934] 加收记作小费并现金支付时订单收据不应打印小费建议",
+      "[POS-32336] 现金支付后的堂食收据应打印加收提示语",
+      "[POS-33004] 四段收据脚注使用同一模板时应正常打印",
+      "[POS-33010] 有小费的订单收据默认不应展示Total Before Tips",
+      "[POS-33036] 现金支付收据重打时间应晚于首次打印时间",
+      "[POS-34259] To Go厨房单应加重订单类型、订单Note和菜品Note",
+      "[POS-34258][POS-34225] 堂食部分外带菜应在厨房单和收据中加重显示",
+      "[POS-33892] To Go送厨单应打印客户地址",
+      "[POS-35260] 删除已送厨菜品后厨房单应保留被删菜品的调味",
+      "[POS-35227] 删除已送厨菜品后打包单不应打印被删菜品",
+      "[POS-42890] 支付后应能只选择部分菜品重新送厨"
     ],
-    "tests/smoke/license-selection.smoke.spec.ts": [
-      "default selection should pick a PC license that is not in use",
-      "submitting an available Android license should show the known mismatch error"
+    "tests/py-migrate/recall-page-recorded.spec.ts": [
+      "应能按今天筛选并使订单数量与数据库一致",
+      "应能按昨天筛选并使订单数量与数据库一致",
+      "应能按上周筛选并使订单数量与数据库一致",
+      "应能按本月筛选并使订单数量与数据库一致",
+      "应能按上月筛选并使订单数量与数据库一致",
+      "[POS-16387] 应能按本周和已删除状态筛选并与数据库一致",
+      "[POS-31674] 应能通过带字母的子单号搜索到对应母单",
+      "[POS-32935] 已支付订单作废后价格排序仍应保持正确",
+      "[POS-34463] 关闭结账后自动送厨时订单打单后应变为Printed",
+      "[POS-34442] 开启相同菜合并后编辑订单应能删除并重新添加同一道菜",
+      "[POS-34673] Pick Up订单卡片应显示服务员和完整格式化手机号",
+      "[POS-30058] 订单保存后切换为No Rounding仍应保留原舍入明细和总额",
+      "[POS-34021] To Go合入四人堂食订单后应保留人数且不新增自动加收",
+      "[POS-34787] Printed订单换桌保存后应保持Printed状态",
+      "[POS-34800] Printed订单编辑新增菜品保存后应变为Semi-Sent",
+      "[POS-34827] Printed订单免税后恢复税并保存应保持原状态",
+      "[POS-34829] In Kitchen订单应能从Recall进入Charge并添加加收",
+      "[POS-36180] 删除部分已送厨菜品后应能按Partially Void筛选到订单",
+      "[POS-39760] 现金支付后小费留空确认应保持无小费和已付款总额",
+      "[POS-16377] 应能应用日期预设并使本周订单数量与数据库一致",
+      "[POS-16432] 应能按照时间在升序和降序间切换",
+      "[POS-16433] 应能按照价格在升序和降序间切换",
+      "[POS-16436] 应能按照类型在升序和降序间切换",
+      "[POS-16437] 应能按照订单号在升序和降序间切换",
+      "应能按菜品名称关键字搜索到包含该菜品的订单",
+      "[POS-32940][POS-33781] Delivery 订单应格式化手机号并持久化司机切换"
     ],
-    "tests/smoke/order-dishes.smoke.spec.ts": [
-      "应能进入点餐页面并添加普通菜与带数量的套餐子菜到购物车"
+    "tests/py-migrate/split-order-charge-combine.spec.ts": [
+      "[POS-32002] 应能在合单不重新计算加收时保留计税固定金额自动加收",
+      "[POS-32004] 应能在合单不重新计算加收时保留计小费百分比手动加收",
+      "[POS-32006] 应能在合单不重新计算加收时不自动新增满足人数条件的服务加收",
+      "[POS-32008] 应能在合单不重新计算加收时累加两笔订单的同名自动加收",
+      "[POS-32016] 应能在合单重新计算加收时按合单后金额计算满足条件的 Delivery 加收",
+      "[POS-32017] 应能在合单重新计算加收时移除不满足条件的 Delivery 加收",
+      "[POS-32006] 应能在合单重新计算加收时自动新增满足人数条件的服务加收",
+      "[POS-32023] 应能在合单不重新计算加收时保留计小费百分比手动加收",
+      "[POS-32031] 应能在合单重新计算加收时正确计算三类加收金额",
+      "[POS-32955] 应能在加收页展示 OpenFood 自定义中英文名称",
+      "[POS-32934] 应能在分单页展示 Add Suborder 并新增子单",
+      "[POS-32963] 应能在加收金额出现三位小数时按规则进位到分",
+      "[POS-33063] 应能在税额计算包含加收时正确计算服务加收、税和订单金额",
+      "[POS-32903] 应能创建地址包含 & 符号的 Delivery 订单并送厨成功",
+      "[POS-34555] 应能分两次现金付款且第二次产生找零后支付成功"
     ],
-    "tests/smoke/recall-order-details.smoke.spec.ts": [
-      "应能读取 #1 订单详情并在完成后恢复 Recall 页面状态"
+    "tests/py-migrate/split-order-charge-copy-transfer.spec.ts": [
+      "[POS-27257] 应能在复制订单时使用自动加收修改名称和金额后的新配置",
+      "[POS-27258] 应能在复制订单时保留满足人数条件的自动加收",
+      "[POS-27259] 应能在复制订单时移除不满足人数条件的自动加收",
+      "[POS-27271] 应能在复制 Delivery 订单时移除不满足里程条件的自动加收",
+      "[POS-27286] 应能在复制订单时移除已改为手动触发的自动加收",
+      "[POS-27287] 应能在复制订单时保留已改为自动触发的手动加收",
+      "[POS-27288] 应能在复制订单时移除改为自动触发但不满足订单类型的手动加收",
+      "[POS-27303] 应能在修改和删除加收配置后合单并累加原订单加收金额",
+      "[POS-27314] 应能在修改自动加收后移菜并保留源订单原加收",
+      "[POS-27317] 应能将菜品移动到已有手动加收订单并保持加收明细",
+      "[POS-27324] 应能在修改自动加收后移单并保留原加收金额",
+      "[POS-27325] 应能在删除自动加收后移单并保留原加收金额"
     ],
-    "tests/smoke/recall-search.smoke.spec.ts": [
-      "应能按订单号搜索 Recall 订单并清空当前搜索条件"
+    "tests/py-migrate/split-order-charge-edit.spec.ts": [
+      "[POS-27156] 应能在编辑已保存订单时识别手动加收改名后的配置",
+      "[POS-27157] 应能在编辑已保存订单时识别手动加收由固定金额改为百分比",
+      "[POS-27158] 应能在编辑已保存订单时识别手动加收由百分比改为固定金额",
+      "[POS-27159] 应能在编辑已保存订单时识别手动固定金额加收改值",
+      "[POS-27160] 应能在编辑已保存订单时识别手动百分比加收改值",
+      "[POS-27163] 应能在编辑已保存订单时识别手动加收改为计税",
+      "[POS-27164] 应能在编辑已保存订单时保留满足订单类型条件的手动加收",
+      "[POS-27165] 应能在编辑已保存订单时移除已改为 Delivery 的自动服务加收",
+      "[POS-27169] 应能在编辑已保存订单时保留已删除手动加收的历史金额",
+      "[POS-27170] 应能在编辑已保存订单时识别自动加收改名后的配置",
+      "[POS-27171] 应能在编辑已保存订单时识别自动加收由固定金额改为百分比",
+      "[POS-27172] 应能在编辑已保存订单时识别自动加收由百分比改为固定金额",
+      "[POS-27173] 应能在编辑已保存订单时识别自动固定金额加收改值",
+      "[POS-27174] 应能在编辑已保存订单时识别自动百分比加收改值",
+      "[POS-27176] 应能在编辑已保存订单时隐藏类型不满足条件的自动加收",
+      "[POS-27177] 应能在编辑已保存订单时识别自动加收改为计税",
+      "[POS-27182] 应能在编辑已保存订单时移除已删除的自动加收",
+      "[POS-27190] 应能在自动加收配置修改后从详情页送厨并保留原加收金额",
+      "[POS-27191] 应能在手动加收配置修改后从编辑页送厨并保留原加收金额",
+      "[POS-27192] 应能在自动加收配置修改后从编辑页保存并使用新加收金额",
+      "[POS-27229] 应能在自动加收配置修改后从详情页分单并按子单分摊加收",
+      "[POS-27242] 应能在手动加收配置修改后按菜品分单并按子单分摊加收",
+      "[POS-27248] 应能在自动加收配置修改后从编辑页平分订单并使用新加收名称"
     ],
-    "tests/smoke/step-decorator.smoke.spec.ts": [
-      "步骤装饰器不应改变原始返回值"
+    "tests/py-migrate/split-order-operation.spec.ts": [
+      "[POS-19365] 应能在共享菜已支付后阻止作废另一子单",
+      "[POS-19368] 应能修改一个子单 tips 且另一个子单 tips 保持不变",
+      "[POS-19371] 应能在半支付状态阻止撤销分单",
+      "[POS-19374] 应能在按金额分单半支付后保持分单状态",
+      "[POS-19377] 应能撤销未支付的按金额分单",
+      "[POS-19380] 应能在按金额分单半支付后阻止撤销分单",
+      "[POS-19383] 应能平分后修改子单 tips 再撤销分单并校验 tips",
+      "[POS-19386] 应能在座位分单子单减菜后按 subtotal 重算 tips",
+      "[POS-19389] 应能在座位分单子单折扣后按 subtotal 重算 tips",
+      "[POS-19517] 应能对多笔支付流水分别退款并生成对应负向流水",
+      "[POS-21845] 应能按多个金额拆分订单并在 Recall 保持子单总额",
+      "[POS-21855] 应能在订单作废时展示 7 个作废原因",
+      "[POS-22813] 应能在加收订单按菜分单并逐个清除子单加收后现金结清",
+      "[POS-23204] 应能清空整单折扣并恢复订单总额",
+      "[POS-23204] 应能清空菜品折扣并恢复订单总额",
+      "[POS-23322] 应能在 Payment 页设置小费后部分现金支付并保持未付金额正确",
+      "[POS-24394] 应能复制带自定义调味的订单并保持总额不变",
+      "[POS-23671] 应能合并不含税订单加收订单并保持合并总额等于原订单之和",
+      "[POS-23672] 应能合并计税订单加收订单并保持合并总额等于原订单之和",
+      "[POS-25235] 应能在 To Go 平分子单现金支付后追加 1 元小费",
+      "[POS-30756] 应能在现金支付后追加小费并成功转服务员",
+      "[POS-31301] 应能清空单菜折扣并保存",
+      "[POS-31081] 应能在自动加收计入小费后按金额分单并保持报表费用金额一致",
+      "[POS-30566] 应能在现金支付订单退款后保持报表首页 unpaid 数值不变"
     ],
-    "tests/smoke/takeout-entry.smoke.spec.ts": [
-      "应能从主页点击 To Go 直接进入点单页",
-      "应能从主页填写 Pick Up 信息后进入点单页",
-      "应能从主页填写 Delivery 信息后进入点单页"
+    "tests/py-migrate/table-order.spec.ts": [
+      "应能从空桌创建堂食订单并在 Recall 回查桌号",
+      "应能在同一桌台创建第二笔订单并显示两笔订单",
+      "应能切换区域选择空桌并在 Recall 回查桌号",
+      "应能在桌台卡片显示订单时长达到一分钟",
+      "应能在桌台卡片显示与数据库一致的订单号",
+      "应能在桌台卡片显示与 Recall 一致的下单时间",
+      "应能在桌台卡片显示与 Recall 一致的客人数",
+      "应能在桌台卡片显示与 Recall 一致的企台",
+      "应能在桌台卡片显示与 Recall 一致的订单价格",
+      "应能在桌台卡片显示下单时填写的客人姓名",
+      "应能修改已保存 Pick Up 订单的客人数",
+      "应能从桌台多订单弹窗打印订单并保持订单详情不变"
     ]
   }
 }
